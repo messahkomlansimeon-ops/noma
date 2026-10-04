@@ -1,0 +1,42 @@
+{
+  "rows": [
+    {
+      "task": "google-online",
+      "model": "openai/gpt-4o-mini:online",
+      "cost": 0.00737305,
+      "promptTokens": 1439,
+      "completionTokens": 262,
+      "ts": "2026-10-02T16:28:39.591Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0008505,
+      "promptTokens": 1006,
+      "completionTokens": 1166,
+      "ts": "2026-10-02T16:29:05.209Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0003513,
+      "promptTokens": 454,
+      "completionTokens": 472,
+      "ts": "2026-10-02T16:29:13.402Z"
+    }
+  ],
+  "parModele": {
+    "openai/gpt-4o-mini:online": {
+      "calls": 1,
+      "cost": 0.00737305
+    },
+    "openai/gpt-4o-mini": {
+      "calls": 2,
+      "cost": 0.0012018
+    }
+  },
+  "total": {
+    "total": 0.00857485,
+    "known": true
+  }
+}

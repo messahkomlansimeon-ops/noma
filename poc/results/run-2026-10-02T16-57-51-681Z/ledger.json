@@ -1,0 +1,106 @@
+{
+  "rows": [
+    {
+      "task": "google-online",
+      "model": "openai/gpt-4o-mini:online",
+      "cost": 0.00739885,
+      "promptTokens": 1555,
+      "completionTokens": 276,
+      "ts": "2026-10-02T16:55:09.779Z"
+    },
+    {
+      "task": "page-extraction",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.00023625,
+      "promptTokens": 951,
+      "completionTokens": 156,
+      "ts": "2026-10-02T16:55:15.271Z"
+    },
+    {
+      "task": "page-extraction",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.000462,
+      "promptTokens": 2316,
+      "completionTokens": 191,
+      "ts": "2026-10-02T16:55:20.350Z"
+    },
+    {
+      "task": "page-extraction",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0004869,
+      "promptTokens": 1894,
+      "completionTokens": 338,
+      "ts": "2026-10-02T16:55:28.560Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0008523,
+      "promptTokens": 1006,
+      "completionTokens": 1169,
+      "ts": "2026-10-02T16:55:50.066Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.00077175,
+      "promptTokens": 1017,
+      "completionTokens": 1032,
+      "ts": "2026-10-02T16:56:03.926Z"
+    },
+    {
+      "task": "scoring",
+      "model": "deepseek/deepseek-chat",
+      "cost": 0.00204557,
+      "promptTokens": 1083,
+      "completionTokens": 1909,
+      "ts": "2026-10-02T16:57:05.309Z"
+    },
+    {
+      "task": "scoring",
+      "model": "google/gemini-2.5-flash",
+      "cost": 0.0058558,
+      "promptTokens": 1211,
+      "completionTokens": 2197,
+      "ts": "2026-10-02T16:57:15.110Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.00113655,
+      "promptTokens": 1025,
+      "completionTokens": 1638,
+      "ts": "2026-10-02T16:57:38.099Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.00045165,
+      "promptTokens": 455,
+      "completionTokens": 639,
+      "ts": "2026-10-02T16:57:51.671Z"
+    }
+  ],
+  "parModele": {
+    "openai/gpt-4o-mini:online": {
+      "calls": 1,
+      "cost": 0.00739885
+    },
+    "openai/gpt-4o-mini": {
+      "calls": 7,
+      "cost": 0.004397399999999999
+    },
+    "deepseek/deepseek-chat": {
+      "calls": 1,
+      "cost": 0.00204557
+    },
+    "google/gemini-2.5-flash": {
+      "calls": 1,
+      "cost": 0.0058558
+    }
+  },
+  "total": {
+    "total": 0.019697620000000002,
+    "known": true
+  }
+}

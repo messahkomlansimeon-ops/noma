@@ -1,0 +1,196 @@
+{
+  "description": "Jeu de référence annoté — comportements attendus du PoC v3. Utilisable comme base de tests de non-régression hors ligne.",
+  "cas": [
+    {
+      "nom": "telephone-iphone12",
+      "besoin": "iPhone 12 · 128 Go, bon état, à Abidjan, max 150 000 FCFA",
+      "parseAttendu": {
+        "kind": "produit",
+        "model": "iphone 12",
+        "capacity": {
+          "value": 128,
+          "unit": "Go"
+        },
+        "budget": {
+          "amount": 150000,
+          "currency": "XOF",
+          "explicitCurrency": true
+        },
+        "zone": "abidjan",
+        "criteria": [
+          "bon etat"
+        ]
+      },
+      "comportement": [
+        "requêtes CoinAfrique/Facebook/Locanto/Google distinctes, sans budget ni critères dans la requête site",
+        "256 Go → rejeté (incompatibilité avérée) ; iPhone 13 → rejeté ; iPhone 12 sans capacité → candidate (inconnu)",
+        "annonce en USD → prix non comparable, jamais comparée au budget XOF"
+      ]
+    },
+    {
+      "nom": "canape-cocody",
+      "besoin": "canapé à Cocody",
+      "parseAttendu": {
+        "kind": "produit",
+        "product": "canape",
+        "budget": null,
+        "zone": "cocody",
+        "capacity": null
+      },
+      "comportement": [
+        "budget non défini : aucun plafond implicite, prix affiché comme critère inconnu",
+        "aucune offre hors budget (pas de budget)",
+        "requête « canape » distincte de la démonstration"
+      ]
+    },
+    {
+      "nom": "service-plombier-bouake",
+      "besoin": "plombier à Bouaké",
+      "parseAttendu": {
+        "kind": "service",
+        "product": "plombier",
+        "zone": "bouake"
+      },
+      "comportement": [
+        "produits sans rapport rejetés (mot-clé absent)",
+        "annonces sans prix conservées « prix sur demande »",
+        "zone non filtrée par CoinAfrique → signalé dans les capacités, filtrage local"
+      ]
+    },
+    {
+      "nom": "modele-18",
+      "besoin": "iPhone 18 à Abidjan",
+      "parseAttendu": {
+        "model": "iphone 18",
+        "capacity": null,
+        "budget": null
+      },
+      "comportement": [
+        "le numéro de modèle n'est jamais converti en capacité"
+      ]
+    },
+    {
+      "nom": "budget-absent",
+      "besoin": "iPhone 12 128 Go à Abidjan",
+      "parseAttendu": {
+        "budget": null
+      },
+      "comportement": [
+        "budgetMax = null — plus aucun plafond implicite 150 000 FCFA",
+        "les annonces gardent leur prix observé, critère budget = inconnu"
+      ]
+    },
+    {
+      "nom": "prix-inconnu",
+      "annonce": {
+        "title": "Plombier disponible",
+        "price": null
+      },
+      "comportement": [
+        "candidate conservée, « prix sur demande », jamais notée 0 FCFA"
+      ]
+    },
+    {
+      "nom": "devise-etrangere",
+      "annonce": {
+        "title": "Apple iPhone 12 128Gb",
+        "price": 250,
+        "currency": "USD"
+      },
+      "comportement": [
+        "prix non comparable avec un budget XOF — jamais « dans le budget »",
+        "raison : « Prix non comparable — prix non comparable (devise) »"
+      ]
+    },
+    {
+      "nom": "doublons-identite",
+      "annonces": [
+        {
+          "id": "a1",
+          "url": "https://s.com/l?ad?id=1"
+        },
+        {
+          "id": "a2",
+          "url": "https://s.com/l?ad?id=2"
+        },
+        {
+          "id": "a3",
+          "url": "https://s.com/l?ad?id=1&utm_source=wa"
+        }
+      ],
+      "comportement": [
+        "a1+a3 fusionnées (URL canonique égale, tracking retiré)",
+        "a2 distincte (ad?id=2)",
+        "deux vendeurs au même prix → deux offres distinctes + groupe de doublon possible"
+      ]
+    },
+    {
+      "nom": "chaussures-pointure",
+      "besoin": "chaussures de sport pointure 42 à Abidjan",
+      "parseAttendu": {
+        "attributes": [
+          {
+            "label": "pointure",
+            "value": 42
+          }
+        ]
+      },
+      "comportement": [
+        "pointure 42/43 → candidate ; pointure 45 → rejetée ; pointure absente → candidate (information manquante)",
+        "la pointure part dans la requête site"
+      ]
+    },
+    {
+      "nom": "televiseur-pouces",
+      "besoin": "téléviseur 55 pouces à Abidjan",
+      "parseAttendu": {
+        "attributes": [
+          {
+            "label": "pouces",
+            "value": 55
+          }
+        ]
+      },
+      "comportement": [
+        "55 pouces/55\" confirmé ; 65 pouces → rejeté ; absente → candidate"
+      ]
+    },
+    {
+      "nom": "climatiseur-btu",
+      "besoin": "climatiseur 12000 BTU à Abidjan",
+      "parseAttendu": {
+        "attributes": [
+          {
+            "label": "BTU",
+            "value": 12000
+          }
+        ]
+      },
+      "comportement": [
+        "12000/AS-12 confirmé ; 9000 BTU → rejeté ; « 1,5 CV » → information manquante"
+      ]
+    },
+    {
+      "nom": "table-places",
+      "besoin": "table à manger 6 places à Cocody",
+      "parseAttendu": {
+        "attributes": [
+          {
+            "label": "places",
+            "value": 6
+          }
+        ]
+      },
+      "comportement": [
+        "6 places confirmé ; 4 places → rejeté"
+      ]
+    },
+    {
+      "nom": "empty-vs-indisponible",
+      "comportement": [
+        "sources ok/vides mais 0 annonce → « aucune offre trouvée (sources opérationnelles) »",
+        "sources bloquées/plantées seules → « sources indisponibles » (summarizeSources)"
+      ]
+    }
+  ]
+}

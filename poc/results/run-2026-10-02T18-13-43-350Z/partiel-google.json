@@ -1,0 +1,71 @@
+{
+  "source": "google",
+  "status": "ok",
+  "annonces": [
+    {
+      "id": "gpage-1",
+      "source": "ci.coinafrique.com",
+      "title": "Vélo électrique disponible - CoinAfrique Côte d'Ivoire",
+      "price": 70000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-6041788",
+      "photo": null,
+      "date": null,
+      "description": "Vélo électrique disponible. Interesser, contactez nous."
+    },
+    {
+      "id": "gpage-2",
+      "source": "ci.coinafrique.com",
+      "title": "Vélo électrique neuf - CoinAfrique Côte d'Ivoire",
+      "price": 85000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-6041773",
+      "photo": null,
+      "date": null,
+      "description": "Nouveau dans carton jamais utilisé toujours disponible en côte d'ivoire"
+    },
+    {
+      "id": "gpage-3",
+      "source": "ci.coinafrique.com",
+      "title": "Vélo électrique tout terrain - CoinAfrique Côte d'Ivoire",
+      "price": 45000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-5940091",
+      "photo": null,
+      "date": null,
+      "description": "velo electrique tout terrain batterie 100%"
+    },
+    {
+      "id": "gpage-4",
+      "source": "ci.coinafrique.com",
+      "title": "Vélo électrique propre et neuf - CoinAfrique Côte d'Ivoire",
+      "price": 45000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-5982926",
+      "photo": null,
+      "date": null,
+      "description": "Propre et neuf tout terrain"
+    },
+    {
+      "id": "gpage-5",
+      "source": "ci.coinafrique.com",
+      "title": "Vélo électrique avec livraison - CoinAfrique Côte d'Ivoire",
+      "price": 89000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-5916619",
+      "photo": null,
+      "date": null,
+      "description": null
+    }
+  ]
+}

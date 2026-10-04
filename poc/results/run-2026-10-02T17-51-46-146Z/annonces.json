@@ -1,0 +1,1903 @@
+[
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6033355",
+        "source": "coinafrique",
+        "title": "Climatiseur Samsung 1,5 Chevaux (12000 BTU) Très Bon État\n\n",
+        "price": 80000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-samsung-1-5-chevaux-12000-btu-tres-bon-etat-6033355",
+        "photo": "https://images.coinafrique.com/thumb_6033355_uploaded_image1_1787834466.jpg",
+        "date": "il y a 1 mois",
+        "description": "Climatiseurs & ventilateurs — Climatiseur Samsung 1,5 Chevaux (12000 BTU) Très Bon État — Climatiseur Samsung de 1,5 chevaux (12000 BTU) en très bon état de fonctionnement. Déjà installé et démonté avec soin (film plastique de protection remis en place). Froid puissant et de très bonne qualité. Idéal pour rafraîchir efficacement votre salon ou votre chambre."
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "80000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "compatible",
+          "observed": "12000 BTU"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.91,
+    "score": 0.96,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "BTU",
+        "valeur": "12000 BTU",
+        "extrait": "Climatiseur Samsung 1,5 Chevaux (12000 BTU) Très Bon État"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · BTU : 12000 confirmé · BTU : 12000 BTU (« Climatiseur Samsung 1,5 Chevaux (12000 BTU) Très Bon État ») — informations confirmées : 3/3",
+    "confirmedRatio": {
+      "known": 3,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-4677467282487681",
+        "source": "facebook",
+        "title": "Climatiseur NASCO 1.5 CV split 12000 btu",
+        "price": 100000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/4677467282487681/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/814740731_2792333671167449_393187514208892954_n.jpg?stp=c0.0.261.261a_dst-jpg_p261x260_tt6&_nc_cat=106&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=t9cqaeeKOsUQ7kNvwGoT64d&_nc_oc=AdrCluGs9Qg6G8T-87kJpeLzzewzgM3dcINyHVtc9JYc8jv4-hD1r29LiYpqezw1LDbtde46KgXTuhsZUuAGiV0i&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=CejrEnx3DbrxrExwQkE86Q&_nc_ss=7b289&oh=00_AQOEdSUsQhxEMnWecBDjwsLXbtptgBRSb2h3NUFHPUE00w&oe=6AC5AD9A",
+        "date": null,
+        "description": "100 000 CFA Climatiseur NASCO 1.5 CV split 12000 btu Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "100000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "compatible",
+          "observed": "12000 BTU"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.9,
+    "score": 0.95,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de climatiseur",
+        "valeur": "Climatiseur NASCO 1.5 CV split",
+        "extrait": "Climatiseur NASCO 1.5 CV split 12000 btu"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU : 12000 confirmé · Type de climatiseur : Climatiseur NASCO 1.5 CV split (« Climatiseur NASCO 1.5 CV split 12000 btu ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 3/3",
+    "confirmedRatio": {
+      "known": 3,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-4793898",
+        "source": "coinafrique",
+        "title": "Climatiseur Split Hisense AS-12CR4SVDTG01 - 12000 BTU - 1.5 CV - R410  ",
+        "price": 145000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-split-hisense-as-12cr4svdtg01-12000-btu-15-cv-r410-4793898",
+        "photo": "https://images.coinafrique.com/thumb_4793898_uploaded_image1_1718281892.jpg",
+        "date": "il y a 2 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur Split Hisense AS-12CR4SVDTG01 - 12000 BTU - 1.5..."
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "145000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "compatible",
+          "observed": "12000 BTU"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.9,
+    "score": 0.95,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "BTU",
+        "valeur": "12000 BTU",
+        "extrait": "Climatiseur Split Hisense AS-12CR4SVDTG01 - 12000 BTU - 1.5 CV - R410"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · BTU : 12000 confirmé · BTU : 12000 BTU (« Climatiseur Split Hisense AS-12CR4SVDTG01 - 12000 BTU - 1.5 CV - R410 ») — informations confirmées : 3/3",
+    "confirmedRatio": {
+      "known": 3,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-3726254",
+        "source": "coinafrique",
+        "title": "Climatiseur split Skyline-eco 1.5CV R410",
+        "price": 140000,
+        "currency": "FCFA",
+        "zone": "Treichville, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-split-skyline-eco-15cv-r410-3726254",
+        "photo": "https://images.coinafrique.com/thumb_3726254_uploaded_image1_1654334947.jpg",
+        "date": "il y a 4 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur split Skyline-eco 1.5CV R410"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "140000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Treichville, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.88,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type",
+        "valeur": "Climatiseur split",
+        "extrait": "Climatiseur split Skyline-eco 1.5CV R410"
+      },
+      {
+        "nom": "Capacité",
+        "valeur": "1.5CV",
+        "extrait": "Climatiseur split Skyline-eco 1.5CV R410"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Treichville, Abidjan) · BTU 12000 non confirmé · Type : Climatiseur split (« Climatiseur split Skyline-eco 1.5CV R410 ») · Capacité : 1.5CV (« Climatiseur split Skyline-eco 1.5CV R410 ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-3364436",
+        "source": "coinafrique",
+        "title": "Climatiseur Nasco  1,5 Cv",
+        "price": 145000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-nasco-1-5-cv-3364436",
+        "photo": "https://images.coinafrique.com/thumb_3364436_uploaded_image1_1633190801.jpg",
+        "date": "il y a 5 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur Nasco  1,5 Cv"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "145000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.88,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type",
+        "valeur": "Climatiseur",
+        "extrait": "Climatiseur Nasco  1,5 Cv"
+      },
+      {
+        "nom": "Capacité",
+        "valeur": "1.5 Cv",
+        "extrait": "Climatiseur Nasco  1,5 Cv"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · BTU 12000 non confirmé · Type : Climatiseur (« Climatiseur Nasco  1,5 Cv ») · Capacité : 1.5 Cv (« Climatiseur Nasco  1,5 Cv ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-3359034",
+        "source": "coinafrique",
+        "title": "Climatiseur Nasco ",
+        "price": 145000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-nasco-3359034",
+        "photo": "https://images.coinafrique.com/thumb_3359034_uploaded_image1_1632985644.jpg",
+        "date": "il y a 5 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur Nasco"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "145000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.88,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type",
+        "valeur": "Climatiseur",
+        "extrait": "Climatiseur Nasco"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · BTU 12000 non confirmé · Type : Climatiseur (« Climatiseur Nasco ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-3120037",
+        "source": "coinafrique",
+        "title": "Climatiseur split Ilux 1.5cv ",
+        "price": 155000,
+        "currency": "FCFA",
+        "zone": "Vridi, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-split-ilux-15cv-3120037",
+        "photo": "https://images.coinafrique.com/thumb_3120037_uploaded_image1_1621286527.jpg",
+        "date": "il y a 5 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur split Ilux 1.5cv"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "155000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Vridi, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.88,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type",
+        "valeur": "Climatiseur split",
+        "extrait": "Climatiseur split Ilux 1.5cv"
+      },
+      {
+        "nom": "Capacité",
+        "valeur": "1.5cv",
+        "extrait": "Climatiseur split Ilux 1.5cv"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Vridi, Abidjan) · BTU 12000 non confirmé · Type : Climatiseur split (« Climatiseur split Ilux 1.5cv ») · Capacité : 1.5cv (« Climatiseur split Ilux 1.5cv ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-3115860",
+        "source": "coinafrique",
+        "title": "Climatiseur split TCL 1.5cv gaz r410",
+        "price": 160000,
+        "currency": "FCFA",
+        "zone": "Vridi, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-split-tcl-15cv-gaz-r410-3115860",
+        "photo": "https://images.coinafrique.com/thumb_3115860_uploaded_image1_1621040748.jpg",
+        "date": "il y a 5 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur split TCL 1.5cv gaz r410"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "160000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Vridi, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.88,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type",
+        "valeur": "Climatiseur split",
+        "extrait": "Climatiseur split TCL 1.5cv gaz r410"
+      },
+      {
+        "nom": "Capacité",
+        "valeur": "1.5cv",
+        "extrait": "Climatiseur split TCL 1.5cv gaz r410"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Vridi, Abidjan) · BTU 12000 non confirmé · Type : Climatiseur split (« Climatiseur split TCL 1.5cv gaz r410 ») · Capacité : 1.5cv (« Climatiseur split TCL 1.5cv gaz r410 ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-3014773",
+        "source": "coinafrique",
+        "title": "Climatiseur Ilux 1.5CV",
+        "price": 155000,
+        "currency": "FCFA",
+        "zone": "Treichville, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-ilux-15cv-3014773",
+        "photo": "https://images.coinafrique.com/thumb_3014773_uploaded_image1_1616413423.jpg",
+        "date": "il y a 5 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur Ilux 1.5CV"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "155000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Treichville, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.88,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type",
+        "valeur": "Climatiseur",
+        "extrait": "Climatiseur Ilux 1.5CV"
+      },
+      {
+        "nom": "Capacité",
+        "valeur": "1.5CV",
+        "extrait": "Climatiseur Ilux 1.5CV"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Treichville, Abidjan) · BTU 12000 non confirmé · Type : Climatiseur (« Climatiseur Ilux 1.5CV ») · Capacité : 1.5CV (« Climatiseur Ilux 1.5CV ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1081518788108566",
+        "source": "facebook",
+        "title": "Split 1.5 climatiseur NASCO",
+        "price": 100000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1081518788108566/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/814535323_1600077051794952_5059372154575864411_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=109&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=qCMTTz1nmeQQ7kNvwFFsI7j&_nc_oc=Adrqr9UX-fGYWtA-ORzrnc0CFyV3xF7D29q7aw86qchC_SN5z-dY8QdqKwtJ-_Cwc10Q-1gtPzv54D9zNdciIM1K&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=CejrEnx3DbrxrExwQkE86Q&_nc_ss=7b289&oh=00_AQMDvgrdjAjTNprc1Qf_pV0PE-h7FIlRQRygCV4lAtWk6A&oe=6AC5BBB7",
+        "date": null,
+        "description": "100 000 CFA Split 1.5 climatiseur NASCO Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "100000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.63,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de climatiseur",
+        "valeur": "Split 1.5",
+        "extrait": "Split 1.5 climatiseur NASCO"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé · Type de climatiseur : Split 1.5 (« Split 1.5 climatiseur NASCO ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1075890748261410",
+        "source": "facebook",
+        "title": "Climatiseur 1,5 disponible [hidden information]",
+        "price": 90000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1075890748261410/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/797625281_1698049791272650_8808645633327570211_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=109&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=ZOAwfu7hIOEQ7kNvwE3lnz1&_nc_oc=AdqnsoinHQ5UIaaPP5dOd9fmSL2LcK-q40jHh5hNUdTgI9T2datShI_qjtOA56WuNouILxhSCKt-9Wg2SewU3FgC&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=CejrEnx3DbrxrExwQkE86Q&_nc_ss=7b289&oh=00_AQO1Yof_c6foLyNNfWro-vVRQlfaGwT0BCYvCKO5FcsTjQ&oe=6AC5B02D",
+        "date": null,
+        "description": "90 000 CFA Climatiseur 1,5 disponible [hidden information] Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "90000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.63,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de climatiseur",
+        "valeur": "Climatiseur 1,5",
+        "extrait": "Climatiseur 1,5 disponible"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé · Type de climatiseur : Climatiseur 1,5 (« Climatiseur 1,5 disponible ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-7694063977",
+        "source": "locanto",
+        "title": "Climatiseur nasco 1c",
+        "price": 80000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.locanto.ci/abidjan/ID_7694063977/Climatiseur-nasco-1c.html",
+        "photo": "https://images.locanto.info/6616032645/Climatiseur-nasco-1c_1.jpg",
+        "date": "il y a 14 mois",
+        "description": "Climatiseur nasco 1c neuf Un Mois d'utilisation Encore installer (( venir avec quelqu'un pour désinstaller a vos frais !))"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "80000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.74,
+    "score": 0.62,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de climatiseur",
+        "valeur": "Nasco 1c",
+        "extrait": "Climatiseur nasco 1c neuf"
+      },
+      {
+        "nom": "État",
+        "valeur": "Neuf",
+        "extrait": "Climatiseur nasco 1c neuf"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé · Type de climatiseur : Nasco 1c (« Climatiseur nasco 1c neuf ») · État : Neuf (« Climatiseur nasco 1c neuf ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-8682669074",
+        "source": "locanto",
+        "title": "Vente de climatiseur de type split 1cv, Bassam",
+        "price": 65000,
+        "currency": "FCFA",
+        "zone": "Bassam",
+        "vendor": null,
+        "url": "https://www.locanto.ci/touba/ID_8682669074/Vente-de-climatiseur-de-type-split-1cv.html",
+        "photo": "https://images.locanto.info/6994503284/Vente-de-climatiseur-de-type-split-1cv_1.jpg",
+        "date": "il y a 2 mois",
+        "description": "Vente de climatiseur de type split de capacité 1cheval de marque Hisense.ideal pour une chambre moyenne"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "65000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Bassam",
+        "note": "zone annexe d'Abidjan : bassam"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.68,
+    "score": 0.49,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance possible — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Bassam — zone annexe d'Abidjan : bassam · BTU 12000 non confirmé — informations confirmées : 1/3",
+    "confirmedRatio": {
+      "known": 1,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-7361563701",
+        "source": "locanto",
+        "title": "Les splits climatiseur",
+        "price": 90000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.locanto.ci/abidjan/ID_7361563701/Les-splits-climatiseur.html",
+        "photo": "https://images.locanto.info/6283248102/Les-splits-climatiseur_1.jpg",
+        "date": "il y a 18 mois",
+        "description": "Climatiseur de tout sortes nouveaux deuxième met disponible chez nous"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "90000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.74,
+    "score": 0.47,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1375727010885410",
+        "source": "facebook",
+        "title": "Climatiseur binataune",
+        "price": 35000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1375727010885410/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/797842690_1650138939874973_164622952290908462_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=108&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=IeufiTm5I7oQ7kNvwELtJAG&_nc_oc=AdqTtrX19bIX7K84b_aA-owIvdJ8ZVsEDdUUlWWaevqiK9LPAUITxYp1N3FvTmOuHcQ6wAfkfOHzbOjWPH_7G6o1&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=CejrEnx3DbrxrExwQkE86Q&_nc_ss=7b289&oh=00_AQNAZjNZwmE_T64IpAQsV8GyiB6jhSL1GIxynXCwcM5wkw&oe=6AC5CFE6",
+        "date": null,
+        "description": "35 000 CFA Climatiseur binataune Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "35000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de climatiseur",
+        "valeur": "Climatiseur binataune",
+        "extrait": "Climatiseur binataune"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé · Type de climatiseur : Climatiseur binataune (« Climatiseur binataune ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1749757353041538",
+        "source": "facebook",
+        "title": "Climatiseur nasco 1.5 inverter",
+        "price": 110000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1749757353041538/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/750615717_995810249729078_1237589705564230965_n.jpg?stp=c101.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=110&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=6WBnVrctH78Q7kNvwHW1S4s&_nc_oc=AdrTHxTh3IH5brpcp3wkTrJtsYM3Z-Xgg5XgrmFC1KxxWWr-uJ-0xWYFPlee9_DVI-2FrJ5vKga_8Kcg47WADJL0&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=CejrEnx3DbrxrExwQkE86Q&_nc_ss=7b289&oh=00_AQPcrP0c33wYv8JDvCct0P_kPV4AV6WkEZaGLYuuFUF2Fg&oe=6AC5C98B",
+        "date": null,
+        "description": "110 000 CFA 140 000 CFA Climatiseur nasco 1.5 inverter Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "110000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de climatiseur",
+        "valeur": "Climatiseur nasco 1.5 inverter",
+        "extrait": "Climatiseur nasco 1.5 inverter"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé · Type de climatiseur : Climatiseur nasco 1.5 inverter (« Climatiseur nasco 1.5 inverter ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-2301424803974845",
+        "source": "facebook",
+        "title": "Climatiseur",
+        "price": 55000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/2301424803974845/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/819175840_1760286805279083_4585459718908352537_n.jpg?stp=c0.89.261.261a_dst-jpg_p261x260_tt6&_nc_cat=110&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=8VkDrSlxPlYQ7kNvwHMuzTP&_nc_oc=AdrDk89m58Yzaki7FKeuVFyuXXfiddywQk6egZfptbYyurHIlroXf7VOjf2zVsvLAZzjbgBDLpyf0WjDWWyee0Za&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=CejrEnx3DbrxrExwQkE86Q&_nc_ss=7b289&oh=00_AQPjzw2qWMds223mhPXLri_T-60o6Sk4CEMuquxNCrWe_w&oe=6AC5CE10",
+        "date": null,
+        "description": "55 000 CFA Climatiseur Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "55000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de climatiseur",
+        "valeur": "Climatiseur",
+        "extrait": "Climatiseur"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé · Type de climatiseur : Climatiseur (« Climatiseur ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1374969944700900",
+        "source": "facebook",
+        "title": "Climatiseur MIDEA 1,5 Cv inverter",
+        "price": 78000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1374969944700900/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/778972434_2043717483174640_2708463253948541576_n.jpg?stp=c0.35.261.261a_dst-jpg_p261x260_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=fpFDOuajfD0Q7kNvwHfn5FY&_nc_oc=AdoxWaye89P69WNIX8xZVgGroZV-R1Bhi-2TQFQ4U_dzjXxdnOKv4RaV22F_pSOU5g6iX92LGzvKKACYDJwNjygZ&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=CejrEnx3DbrxrExwQkE86Q&_nc_ss=7b289&oh=00_AQMCHtc6r7RAkLZu00TLr6ahcZN0U9WVxBr6IilxiG-ZMQ&oe=6AC5B703",
+        "date": null,
+        "description": "78 000 CFA Climatiseur MIDEA 1,5 Cv inverter Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "78000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de climatiseur",
+        "valeur": "Climatiseur MIDEA 1,5 Cv inverter",
+        "extrait": "Climatiseur MIDEA 1,5 Cv inverter"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé · Type de climatiseur : Climatiseur MIDEA 1,5 Cv inverter (« Climatiseur MIDEA 1,5 Cv inverter ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-2590125231457714",
+        "source": "facebook",
+        "title": "CLIMATISEUR SPLIT SKYLINE-ECO 1.5CV R410",
+        "price": 190000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/2590125231457714/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/782086760_1732227954651121_4075870949282961242_n.jpg?stp=c0.0.261.261a_dst-jpg_p261x260_tt6&_nc_cat=104&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=PX3X_9Hpu_YQ7kNvwGRpljn&_nc_oc=AdrjQiiVmlNaoKOg4THiDA-5Z_H0YfE8fS1oqIme8-ZkauKwK0YJrwuiPT2opKejXz_nFBJScIQINZh-Kb6adbKq&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=CejrEnx3DbrxrExwQkE86Q&_nc_ss=7b289&oh=00_AQMTcC62F7-m3bDHbrmb7fvONjHvNihSo67-urJeREx3IQ&oe=6AC5C754",
+        "date": null,
+        "description": "190 000 CFA CLIMATISEUR SPLIT SKYLINE-ECO 1.5CV R410 Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "190000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de climatiseur",
+        "valeur": "CLIMATISEUR SPLIT SKYLINE-ECO 1.5CV R410",
+        "extrait": "CLIMATISEUR SPLIT SKYLINE-ECO 1.5CV R410"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé · Type de climatiseur : CLIMATISEUR SPLIT SKYLINE-ECO 1.5CV R410 (« CLIMATISEUR SPLIT SKYLINE-ECO 1.5CV R410 ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-2895027927521165",
+        "source": "facebook",
+        "title": "Climatiseur",
+        "price": 70000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/2895027927521165/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/774904686_1371302991827183_3051471104927480186_n.jpg?stp=c5.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=79tYp2cO5w4Q7kNvwF67a9x&_nc_oc=AdopprNjGROrZO-QevZkmdn8vTzFqkcCvZopqA7Bi8OfC3b8S0tbzWc2TwhcTbk3hoXIuu-IIUwu1NkKysp4ibaR&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=CejrEnx3DbrxrExwQkE86Q&_nc_ss=7b289&oh=00_AQM05aU9WfY3320JK2H0iIwcyymAkfMIJbjGJg6yJ8cqhg&oe=6AC5C385",
+        "date": null,
+        "description": "70 000 CFA 80 000 CFA Climatiseur Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "70000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de climatiseur",
+        "valeur": "Climatiseur",
+        "extrait": "Climatiseur"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé · Type de climatiseur : Climatiseur (« Climatiseur ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1979500419410055",
+        "source": "facebook",
+        "title": "Climatiseur",
+        "price": 55000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1979500419410055/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/819103748_1086737240766350_4437213860817839023_n.jpg?stp=c0.91.261.261a_dst-jpg_p261x260_tt6&_nc_cat=103&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=pvWzu28DiU8Q7kNvwG7R_Ix&_nc_oc=AdqUOV6Yh3zoUZM3UMkcoQ1d3pmSF38j5Z9PW0Fo4FtxYd5Ob24ZH56hYgeLDQjJvx8l3o-TK6IggwvIh967yaLM&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=CejrEnx3DbrxrExwQkE86Q&_nc_ss=7b289&oh=00_AQNVaOxdkBErpZWz0aYYa895DEri4xKWXTrIGs27ILsYoA&oe=6AC5CF35",
+        "date": null,
+        "description": "55 000 CFA Climatiseur Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "55000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé · zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5522418",
+        "source": "coinafrique",
+        "title": "Climatiseur Split Skyline Eco 1.5cv  R410",
+        "price": 115000,
+        "currency": "FCFA",
+        "zone": "Treichville, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-split-skyline-eco-15cv-r410-5522418",
+        "photo": "https://images.coinafrique.com/thumb_5522418_uploaded_image1_1757696567.jpg",
+        "date": "il y a 1 année",
+        "description": "Climatiseurs & ventilateurs — Climatiseur Split Skyline Eco 1.5cv  R410"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "115000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Treichville, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Treichville, Abidjan) · BTU 12000 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5155522",
+        "source": "coinafrique",
+        "title": "Climatiseur Cassette midea - 1,5cv & 2cv",
+        "price": 360500,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-cassette-midea-1-5cv-et-2cv-5155522",
+        "photo": "https://images.coinafrique.com/thumb_5155522_uploaded_image1_1737990822.jpg",
+        "date": "il y a 1 année",
+        "description": "Climatiseurs & ventilateurs — Climatiseur Cassette midea - 1,5cv & 2cv"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "360500 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · BTU 12000 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-4798624",
+        "source": "coinafrique",
+        "title": "Climatiseur Smart 1.5ch",
+        "price": 150000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-smart-15ch-4798624",
+        "photo": "https://images.coinafrique.com/thumb_4798624_uploaded_image1_1718631369.jpg",
+        "date": "il y a 2 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur Smart 1.5ch"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "150000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · BTU 12000 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-4792969",
+        "source": "coinafrique",
+        "title": "Climatiseur Nasco 1,5CV",
+        "price": 135500,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-nasco-1-5cv-4792969",
+        "photo": "https://images.coinafrique.com/thumb_4792969_uploaded_image1_1718225503.jpg",
+        "date": "il y a 2 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur Nasco 1,5CV"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "135500 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-4610023",
+        "source": "coinafrique",
+        "title": "Climatiseur ",
+        "price": 170000,
+        "currency": "FCFA",
+        "zone": "Le plateau, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-4610023",
+        "photo": "https://images.coinafrique.com/thumb_4610023_uploaded_image1_1708783509.jpg",
+        "date": "il y a 2 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "170000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Le plateau, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Le plateau, Abidjan) · BTU 12000 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-4328608",
+        "source": "coinafrique",
+        "title": "Climatiseur split Skyline-eco 1.5cv  r410",
+        "price": 140000,
+        "currency": "FCFA",
+        "zone": "Treichville, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-split-skyline-eco-15cv-r410-4328608",
+        "photo": "https://images.coinafrique.com/thumb_4328608_uploaded_image1_1691593110.jpg",
+        "date": "il y a 3 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur split Skyline-eco 1.5cv  r410"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "140000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Treichville, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Treichville, Abidjan) · BTU 12000 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-4119551",
+        "source": "coinafrique",
+        "title": "Climatiseur split Smart ",
+        "price": 140000,
+        "currency": "FCFA",
+        "zone": "Treichville, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-split-smart-4119551",
+        "photo": "https://images.coinafrique.com/thumb_4119551_uploaded_image1_1677924995.jpg",
+        "date": "il y a 3 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur split Smart"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "140000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Treichville, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Treichville, Abidjan) · BTU 12000 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-2983904",
+        "source": "coinafrique",
+        "title": "Climatiseur Smart Technology ",
+        "price": 160000,
+        "currency": "FCFA",
+        "zone": "Port-Bouet, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-smart-technology-2983904",
+        "photo": "https://images.coinafrique.com/thumb_2983904_uploaded_image1_1614850023.jpg",
+        "date": "il y a 5 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur Smart Technology"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "160000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Port-Bouet, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type",
+        "valeur": "Climatiseur",
+        "extrait": "Climatiseur Smart Technology"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Port-Bouet, Abidjan) · BTU 12000 non confirmé · Type : Climatiseur (« Climatiseur Smart Technology ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-1997657",
+        "source": "coinafrique",
+        "title": "Climatiseur",
+        "price": 150000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-1997657",
+        "photo": "https://images.coinafrique.com/thumb_1997657_uploaded_image1_1587672723.jpg",
+        "date": "il y a 6 années",
+        "description": "Climatiseurs & ventilateurs — Climatiseur"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "150000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type",
+        "valeur": "Climatiseur",
+        "extrait": "Climatiseur"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · BTU 12000 non confirmé · Type : Climatiseur (« Climatiseur ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-7756179557",
+        "source": "locanto",
+        "title": "Climatiseur mural électrique 2 en 1 – Chauffage & Air frais",
+        "price": 25000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.locanto.ci/abidjan/ID_7756179557/Climatiseur-mural-electrique-2-en-1-Chauffage-Air-frais.html",
+        "photo": "https://images.locanto.info/6632639046/Climatiseur-mural-electrique-2-en-1-Chauffage-Air-frais_1.jpg",
+        "date": "il y a 13 mois",
+        "description": "Chauffage & Climatisation Murale 2 en 1 Caractéristiques techniques : Chauffage rapide : chauffe en 3 secondes, idéal pour période de froid. Fonction rafraîchissante : souffle d’air frais pour l’été. Température constante : maintien homogène de la chaleur dans toute la pièce. Sil"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "25000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.74,
+    "score": 0.37,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type",
+        "valeur": "Climatiseur mural électrique",
+        "extrait": "Climatiseur mural électrique 2 en 1 – Chauffage & Air frais"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé · Type : Climatiseur mural électrique (« Climatiseur mural électrique 2 en 1 – Chauffage & Air frais ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-7783638734",
+        "source": "locanto",
+        "title": "CLIMATISEUR A VENDRE",
+        "price": 54,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.locanto.ci/abidjan/ID_7783638734/CLIMATISEUR-A-VENDRE.html",
+        "photo": "https://images.locanto.info/6642070021/CLIMATISEUR-A-VENDRE_1.jpg",
+        "date": "il y a 13 mois",
+        "description": "CLIMATISEUR A VENDRE Best continental met en promotion DES CLIMATISEURS de très bonne qualité, pour vous rafraichir l’air et combattre la chaleur avec une consommation d’électricité moyenne"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "54 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.74,
+    "score": 0.37,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type",
+        "valeur": "Climatiseur",
+        "extrait": "CLIMATISEUR A VENDRE"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · BTU 12000 non confirmé · Type : Climatiseur (« CLIMATISEUR A VENDRE ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1597152864702468",
+        "source": "facebook",
+        "title": "Mini climatiseur mural mobile intelligent",
+        "price": 22500,
+        "currency": "FCFA",
+        "zone": "Bingerville",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1597152864702468/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/690644412_1258695616417573_4736902757983396415_n.jpg?stp=c0.0.261.261a_dst-jpg_p261x260_tt6&_nc_cat=103&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=X8ZIo89NWdYQ7kNvwHRlqGy&_nc_oc=Ado7b666Io8r_6WNIlyvGBVmwDXBe4pwZjhVHESKZTPVGLNK1VDfvC2VTsm_x2eM-SAv1Dk6o0HNF2XkWf4l7KHX&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=CejrEnx3DbrxrExwQkE86Q&_nc_ss=7b289&oh=00_AQODeFY5BhTw9nfpCDLN3o8xnGpTbcx4xe96ZYzSOgth8w&oe=6AC5DA3E",
+        "date": null,
+        "description": "22 500 CFA Mini climatiseur mural mobile intelligent Bingerville"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "22500 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Bingerville",
+        "note": "zone annexe d'Abidjan : bingerville"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "BTU 12000 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.69,
+    "score": 0.35,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de climatiseur",
+        "valeur": "Mini climatiseur mural mobile",
+        "extrait": "Mini climatiseur mural mobile intelligent"
+      }
+    ],
+    "raison": "Correspondance possible — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Bingerville — zone annexe d'Abidjan : bingerville · BTU 12000 non confirmé · Type de climatiseur : Mini climatiseur mural mobile (« Mini climatiseur mural mobile intelligent ») — informations confirmées : 1/3",
+    "confirmedRatio": {
+      "known": 1,
+      "total": 3
+    }
+  }
+]

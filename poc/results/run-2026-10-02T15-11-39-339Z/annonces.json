@@ -1,0 +1,1034 @@
+[
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1126338466409082",
+        "source": "facebook",
+        "title": "iPhone 12 Simple 128gb Sans Face ID Bon état",
+        "price": 75000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1126338466409082/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/830979286_3245092815691080_470718088666810487_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=7Cevq8Cz5tUQ7kNvwFW7kt0&_nc_oc=AdptrwpVrXIpK3vz26m95TwjZi11hE1rflnubIOp-1E1EKTbnXyWUzO-MEhZzdh-66xFS7TKq2icP8CUrTKJ8GHF&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQN1YfWfXFS2rSSwHh7G4D6z8X-a5RzdpF_-tg8qmA7pKA&oe=6AC5B3CD",
+        "date": "récente",
+        "description": "Annonce récente 75 000 CFA iPhone 12 Simple 128gb Sans Face ID Bon état Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "compatible",
+        "observed": "128 Go"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "75000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 1,
+    "score": 0.95,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 Simple",
+        "extrait": "iPhone 12 Simple 128gb Sans Face ID Bon état"
+      },
+      {
+        "nom": "Prix",
+        "valeur": "75000 FCFA",
+        "extrait": "75 000 CFA"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (iphone 12) · capacité 128 Go · dans le budget (75000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 Simple (« iPhone 12 Simple 128gb Sans Face ID Bon état ») · Prix : 75000 FCFA (« 75 000 CFA ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1083311634315342",
+        "source": "facebook",
+        "title": "iPhone 12 Pro 128go en bon état",
+        "price": 150000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1083311634315342/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/831522193_1674189554217190_1347407220397619313_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=104&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=7Ktyrglw4cEQ7kNvwGv4x0a&_nc_oc=Adq_jKKlL1A5X-EXpJxxxbANuj9O5k4XhxDLkgr73YvRU-RBZWsY7OZGQ7hF32UMyr9saJKeFWwNzLRvQtuHxRcR&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQPhS4g6MpFo-FDU3urrwH-lXZG1Kdkuo8-_fAYqYnNu7A&oe=6AC58BA4",
+        "date": "récente",
+        "description": "Annonce récente 150 000 CFA iPhone 12 Pro 128go en bon état Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "compatible",
+        "observed": "128 Go"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "150000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 1,
+    "score": 0.9,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 Pro",
+        "extrait": "iPhone 12 Pro 128go en bon état"
+      },
+      {
+        "nom": "Prix",
+        "valeur": "150000 FCFA",
+        "extrait": "150 000 CFA"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (iphone 12) · capacité 128 Go · dans le budget (150000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 Pro (« iPhone 12 Pro 128go en bon état ») · Prix : 150000 FCFA (« 150 000 CFA ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1087604060346688",
+        "source": "facebook",
+        "title": "iPhone 12 Pro 128go en bon état",
+        "price": 125000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1087604060346688/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/807859064_1741634450390263_7569097207020817400_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=id-zxGmBo6IQ7kNvwEsGhPV&_nc_oc=Adr85fhEW0kA3CHbj-BOhsX-x5wE_35yX51-kDjFch0KOwZtCIBxXqbZJnphAhfq0d0udf2iSgBZpaNgfi_eZJFq&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQP1L-qsc7bGzP4FCJ0lQFaigQPuSxvhSXHPGNGFw783tw&oe=6AC587A5",
+        "date": null,
+        "description": "125 000 CFA iPhone 12 Pro 128go en bon état Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "compatible",
+        "observed": "128 Go"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "125000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.92,
+    "score": 0.88,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 Pro",
+        "extrait": "iPhone 12 Pro"
+      },
+      {
+        "nom": "Capacité",
+        "valeur": "128 Go",
+        "extrait": "128go"
+      },
+      {
+        "nom": "État",
+        "valeur": "bon état",
+        "extrait": "en bon état"
+      },
+      {
+        "nom": "Prix",
+        "valeur": "125000 FCFA",
+        "extrait": "125 000 CFA"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (iphone 12) · capacité 128 Go · dans le budget (125000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 Pro (« iPhone 12 Pro ») · Capacité : 128 Go (« 128go ») · État : bon état (« en bon état ») · Prix : 125000 FCFA (« 125 000 CFA »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1082757164344034",
+        "source": "facebook",
+        "title": "iPhone 12 Pro 128Go en bon état",
+        "price": 150000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1082757164344034/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/829544393_1575362087103712_7287217264604902073_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=102&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=YIHRhK9ZM9gQ7kNvwFZT4Uj&_nc_oc=AdoIQ-L_1-i_JN6oo52RG2WA0eaIJh5YpE0AIx-g_XMXUN87m1aV8xt7yL3M6qc15lbj1OaGr8LMkQ1lyQzTSPW-&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQOAD46FUTb0mwsp7yR9R7jy7gZ8zkUhCsH4m4Q8C1FC_g&oe=6AC584D0",
+        "date": null,
+        "description": "150 000 CFA iPhone 12 Pro 128Go en bon état Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "compatible",
+        "observed": "128 Go"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "150000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.92,
+    "score": 0.86,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 Pro",
+        "extrait": "iPhone 12 Pro 128Go en bon état"
+      },
+      {
+        "nom": "Prix",
+        "valeur": "150000 FCFA",
+        "extrait": "150 000 CFA"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (iphone 12) · capacité 128 Go · dans le budget (150000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 Pro (« iPhone 12 Pro 128Go en bon état ») · Prix : 150000 FCFA (« 150 000 CFA ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-28958998180454352",
+        "source": "facebook",
+        "title": "iPhone 12 Pro Max 128g en bon état",
+        "price": 135000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/28958998180454352/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/830669903_1464944958881431_182610824326670127_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=3MUQ-OjVGXwQ7kNvwEekHcw&_nc_oc=AdrgEzHGknwbAxv3i9XbK_cw6cUxgcvuEcNTT5p03shFiCOOsqE0nKHK-ykbmjG8b-CkdtWjh7CkaXmu92u84Sks&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQPDzOP2mi8qLrcc5RYEVcZsixv9Lbwc_CI_4HJG8ubQgA&oe=6AC5AD2B",
+        "date": null,
+        "description": "135 000 CFA iPhone 12 Pro Max 128g en bon état Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "capacité non indiquée — non confirmée"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "135000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.92,
+    "score": 0.76,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 Pro Max",
+        "extrait": "iPhone 12 Pro Max 128g en bon état"
+      },
+      {
+        "nom": "Prix",
+        "valeur": "135000 FCFA",
+        "extrait": "135 000 CFA"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (iphone 12) · capacité inconnue (non confirmée) · dans le budget (135000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 Pro Max (« iPhone 12 Pro Max 128g en bon état ») · Prix : 135000 FCFA (« 135 000 CFA ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-8471565474",
+        "source": "locanto",
+        "title": "Smartphone iphone 12 Pro Bleu, Abidjan marcory",
+        "price": 90000,
+        "currency": "FCFA",
+        "zone": "Abidjan marcory",
+        "vendor": null,
+        "url": "https://www.locanto.ci/abidjan/ID_8471565474/Smartphone-iphone-12-Pro-Bleu.html",
+        "photo": "https://images.locanto.info/6884269647/Smartphone-iphone-12-Pro-Bleu_1.jpg",
+        "date": "il y a 6 mois",
+        "description": "IPhone 12 Pro Bleu 128 Go deuxième main Face ID ne passe pas . Bon état , écran True Tone , Réseau compatible 5 G . Mémoire Ram 6 giga. Appareil Photo et Vidéo Système caméra Pro : Triple capteur 12 Mpx (Ultra …"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "compatible",
+        "observed": "128 Go"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "90000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan marcory"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 1,
+    "score": 0.75,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 Pro",
+        "extrait": "IPhone 12 Pro Bleu"
+      },
+      {
+        "nom": "Prix",
+        "valeur": "90000 FCFA",
+        "extrait": "90 000 CFA"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan marcory",
+        "extrait": "Abidjan marcory"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (iphone 12) · capacité 128 Go · dans le budget (90000 XOF ≤ 150000) · zone ok (Abidjan marcory) · Modèle : iPhone 12 Pro (« IPhone 12 Pro Bleu ») · Prix : 90000 FCFA (« 90 000 CFA ») · Zone : Abidjan marcory (« Abidjan marcory »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-2014565706014811",
+        "source": "facebook",
+        "title": "iPhone 12 Pro Max",
+        "price": 105000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/2014565706014811/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/829555469_1650120823420205_3662187937926061231_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=107&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=tBdQwTgNeJEQ7kNvwEqUn9t&_nc_oc=AdpNxA5ip--YkFIVWeT8vNzq5CuYX1CrGem_4SYUTOPtqzW4YJtnGdAfHsWSGL9eQJeot6b_GLhDfQU2FDULZAJd&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQOuLZhkARjWMfFoQAcHq4bd3JKQfgiskO2z17lgLJpuNQ&oe=6AC5A92B",
+        "date": null,
+        "description": "105 000 CFA iPhone 12 Pro Max Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "capacité non indiquée — non confirmée"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "105000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.92,
+    "score": 0.71,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 Pro Max",
+        "extrait": "iPhone 12 Pro Max"
+      },
+      {
+        "nom": "Prix",
+        "valeur": "105000 FCFA",
+        "extrait": "105 000 CFA"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (iphone 12) · capacité inconnue (non confirmée) · dans le budget (105000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 Pro Max (« iPhone 12 Pro Max ») · Prix : 105000 FCFA (« 105 000 CFA ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "gpage-1",
+        "source": "ci.coinafrique.com",
+        "title": "iPhone 12",
+        "price": 85000,
+        "currency": "CFA",
+        "zone": null,
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/telephones-et-tablettes/iphone-12-5830022",
+        "photo": null,
+        "date": null,
+        "description": "Iphone 12 simple (sans face id) original couleur : bleu élégant état : très propre, comme neuf stockage : 128go fonctionnel à 100% face id indisponible (n’affecte pas l’utilisation classique) caméra, wi-fi, bluetooth, réseau : ok batterie tient bien la charge prix : 85 000 fcfa (légèrement négociable) disponible à abidjan expédition"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "compatible",
+        "observed": "128 Go"
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "85000 CFA",
+        "note": "prix non comparable avec le budget"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "zone non indiquée"
+      },
+      "priceNonComparable": true
+    },
+    "baseScore": 0.67,
+    "score": 0.69,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12",
+        "extrait": "Iphone 12 simple (sans face id)"
+      },
+      {
+        "nom": "Prix",
+        "valeur": "85000 FCFA",
+        "extrait": "85 000 CFA"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "inconnue",
+        "extrait": "inconnue"
+      }
+    ],
+    "raison": "Prix non comparable — modèle confirmé (iphone 12) · capacité 128 Go · prix non comparable (devise) · Modèle : iPhone 12 (« Iphone 12 simple (sans face id) ») · Prix : 85000 FCFA (« 85 000 CFA ») · Zone : inconnue (« inconnue »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-2931213897215074",
+        "source": "facebook",
+        "title": "IPhone 12 CE",
+        "price": 100000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/2931213897215074/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/829058928_29048502041429632_1032947628356245138_n.jpg?stp=c0.40.261.261a_dst-jpg_p261x260_tt6&_nc_cat=106&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=wvFVgJPuO80Q7kNvwEvZxFd&_nc_oc=Adq88UP6McN4LPFlkhYb4K7UCOF2wFyqm-pUG89b0eWgCRF3Y6m6vzbiiJE6YskvbJr82KeMMpvLzFT8G35Mx4ig&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQM6CZIArWAzvoJuZNB_7N-P9saH83qlHA822ZCGt2IWZA&oe=6AC58651",
+        "date": null,
+        "description": "100 000 CFA IPhone 12 CE Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "capacité non indiquée — non confirmée"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "100000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.92,
+    "score": 0.66,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "IPhone 12 CE",
+        "extrait": "IPhone 12 CE"
+      },
+      {
+        "nom": "Prix",
+        "valeur": "100000 FCFA",
+        "extrait": "100 000 CFA"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (iphone 12) · capacité inconnue (non confirmée) · dans le budget (100000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : IPhone 12 CE (« IPhone 12 CE ») · Prix : 100000 FCFA (« 100 000 CFA ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "gpage-2",
+        "source": "ci.coinafrique.com",
+        "title": "iPhone 12",
+        "price": 145000,
+        "currency": "CFA",
+        "zone": null,
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/telephones-et-tablettes/iphone-12-5965820",
+        "photo": null,
+        "date": null,
+        "description": "Nous vendons des appareils super propres, qualité supérieure. Nos téléphones sont super clean avec une possibilité de troc. Nous livrons aussi."
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "capacité non indiquée — non confirmée"
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "145000 CFA",
+        "note": "prix non comparable avec le budget"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "zone non indiquée"
+      },
+      "priceNonComparable": true
+    },
+    "baseScore": 0.67,
+    "score": 0.54,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12",
+        "extrait": "iPhone 12"
+      },
+      {
+        "nom": "Prix",
+        "valeur": "145000 FCFA",
+        "extrait": "145 000 CFA"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "inconnue",
+        "extrait": "inconnue"
+      }
+    ],
+    "raison": "Prix non comparable — modèle confirmé (iphone 12) · capacité inconnue (non confirmée) · prix non comparable (devise) · Modèle : iPhone 12 (« iPhone 12 ») · Prix : 145000 FCFA (« 145 000 CFA ») · Zone : inconnue (« inconnue »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1061890963386841",
+        "source": "facebook",
+        "title": "iPhone 12 Pro avec carton en bon état 135k chap chap",
+        "price": 135000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1061890963386841/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/829868295_1113761598210391_3895150172145193448_n.jpg?stp=c0.0.261.261a_dst-jpg_p261x260_tt6&_nc_cat=104&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=_kZZ0uVTS_8Q7kNvwEQxASO&_nc_oc=Adrh4jLO26-dq6wxoF4JTU8bWfdToy044EgQUWhiJwaISD7VWalDEVkzghtsJcVS9ivItQ4fyXgxwVOZfoTaVpPV&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQNhQKE6_MPGGyDZNbohU_ndHEapYn9M7ya5F3lgM6gpSA&oe=6AC589F0",
+        "date": "récente",
+        "description": "Annonce récente 135 000 CFA iPhone 12 Pro avec carton en bon état 135k chap chap Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "capacité non indiquée — non confirmée"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "135000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 1,
+    "score": 0.5,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 Pro",
+        "extrait": "iPhone 12 Pro"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (iphone 12) · capacité inconnue (non confirmée) · dans le budget (135000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 Pro (« iPhone 12 Pro »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-955758570302364",
+        "source": "facebook",
+        "title": "iPhone 12 Pro Max 128Go en bon état",
+        "price": 145000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/955758570302364/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/831331475_1118489340525853_3087981775242168882_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=102&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=JKHm4iyDRZIQ7kNvwFSLgSw&_nc_oc=Ado9kdloXHBFn5HehdhFMEkfS5k0Oz9BcnuiTQk8Ev1ctBzMzv4ApTbO4NkYHLvZlaNT87pZXlRIEcYkt8GKZ1Hg&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQMDu_gLdnlpBZ3iZWJdPFDsi5LYIku1RlwWVy8jyZFGBw&oe=6AC5ACAE",
+        "date": "récente",
+        "description": "Annonce récente 145 000 CFA iPhone 12 Pro Max 128Go en bon état Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "compatible",
+        "observed": "128 Go"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "145000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 1,
+    "score": 0.5,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 Pro Max",
+        "extrait": "iPhone 12 Pro Max"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (iphone 12) · capacité 128 Go · dans le budget (145000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 Pro Max (« iPhone 12 Pro Max »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-2576546069452299",
+        "source": "facebook",
+        "title": "iPhone 12 Pro",
+        "price": 95000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/2576546069452299/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/787818504_1754379539212867_5220227686160419950_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=loJbQMa1TvYQ7kNvwEdNEZO&_nc_oc=AdqOMMIsEiCBqA6LfuXF2rjZ2Sab9zcuFqt1FkKdkqU0u15JRsSkh25Pcz6XSijQHTmZU3MNn88HauhSTT06yXgh&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQMEVxAnAifUAxoKPiBNuXfj4CLJ8ZYAKl6W_uQ26GQ4lQ&oe=6AC5862E",
+        "date": null,
+        "description": "95 000 CFA iPhone 12 Pro Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "capacité non indiquée — non confirmée"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "95000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.92,
+    "score": 0.46,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 Pro",
+        "extrait": "iPhone 12 Pro"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (iphone 12) · capacité inconnue (non confirmée) · dans le budget (95000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 Pro (« iPhone 12 Pro »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1828897378292327",
+        "source": "facebook",
+        "title": "Iphone 12 pro max",
+        "price": 120000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1828897378292327/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/796438833_1413068847677636_2023310974620020623_n.jpg?stp=c0.145.261.261a_dst-jpg_p261x260_tt6&_nc_cat=103&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=Hu2L54twq4gQ7kNvwHGUO3v&_nc_oc=AdofQhKQogZpuBK5boz24nQ8yBYtT8zysuhIhTuwtTNSFBHmXEbqo_89a5VeZLT-ez6PpjH0EQVzjUt0kS6ImJ0J&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQPEAJZXY6mCaSv5M810EfBTBiwJjyjsD5rF5V8frtGwvg&oe=6AC58FF9",
+        "date": null,
+        "description": "120 000 CFA Iphone 12 pro max Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "capacité non indiquée — non confirmée"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "120000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.92,
+    "score": 0.46,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 Pro Max",
+        "extrait": "Iphone 12 pro max"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (iphone 12) · capacité inconnue (non confirmée) · dans le budget (120000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 Pro Max (« Iphone 12 pro max »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1341197734556090",
+        "source": "facebook",
+        "title": "iPhone 12 simple 128 GB - bleu nuit bon état",
+        "price": 130000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1341197734556090/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/825278793_1127290936318434_3383717622238535837_n.jpg?stp=c0.152.261.261a_dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=gzj3FK_DnFIQ7kNvwGJJXCQ&_nc_oc=AdqV7UjW3yBCjA9igiTeNG1VGPbhBGbrhhQ6DVTv3I_AFsSJYZqnB7vGRbiXp9tFcrQ9KeA9uPdKDflE-AXWk6H2&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQPn4VFPmsnosFeU--POV7pCzRn8tO08Eivh9p89-SAR0A&oe=6AC58B0A",
+        "date": null,
+        "description": "130 000 CFA iPhone 12 simple 128 GB - bleu nuit bon état Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "compatible",
+        "observed": "128 Go"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "130000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.92,
+    "score": 0.46,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12",
+        "extrait": "iPhone 12 simple"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (iphone 12) · capacité 128 Go · dans le budget (130000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 (« iPhone 12 simple »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1604359374429220",
+        "source": "facebook",
+        "title": "iPhone 12 Mini 128Go - Très bon état - Batterie propre - Face ID OK",
+        "price": 86000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1604359374429220/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/796466879_939238875906108_3957203629157037819_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=jT0YOCfl2WEQ7kNvwGiPFHh&_nc_oc=AdrXmHV1_O7qpfj0BsrDD3bBL2mbLrr2Nh0EYIAsc42kgZqTaCt4Jqqk801DN_TI7ieKnB9QLZXGL1igBzEKPbkC&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQMQE3NcJINTxcvONJVbTcRhSunbylmw28GLfLtwXd2CNg&oe=6AC581AF",
+        "date": null,
+        "description": "86 000 CFA iPhone 12 Mini 128Go - Très bon état - Batterie propre - Face ID OK Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "compatible",
+        "observed": "128 Go"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "86000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.92,
+    "score": 0.46,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 Mini",
+        "extrait": "iPhone 12 Mini"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (iphone 12) · capacité 128 Go · dans le budget (86000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 Mini (« iPhone 12 Mini »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1771547500633122",
+        "source": "facebook",
+        "title": "iPhone 12 simple",
+        "price": 85000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1771547500633122/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/829055082_1424627512424935_3824352424917248006_n.jpg?stp=c0.101.261.261a_dst-jpg_p261x260_tt6&_nc_cat=103&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=rkhx9VUMqAIQ7kNvwHDP_of&_nc_oc=Ado3we7stJNZYSP07KGR4kKIayC87HPwgFuMzporyZCdvEOOI8JsfDxz-isHW7H8sYabdjFTQIkNDemIWZqPW8OK&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQNNEjV9Kh6fnqhiKoPdS8vZjPhik4hG0DaJuPDTIVXQoQ&oe=6AC5A197",
+        "date": null,
+        "description": "85 000 CFA iPhone 12 simple Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "capacité non indiquée — non confirmée"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "85000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.92,
+    "score": 0.46,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12",
+        "extrait": "iPhone 12 simple"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (iphone 12) · capacité inconnue (non confirmée) · dans le budget (85000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 (« iPhone 12 simple »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1089817670568763",
+        "source": "facebook",
+        "title": "Iphone 12 simple",
+        "price": 58500,
+        "currency": "USD",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1089817670568763/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/829299579_1625949032273899_8169331568703469426_n.jpg?stp=c0.101.261.261a_dst-jpg_p261x260_tt6&_nc_cat=107&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=m-mR3uaeT4IQ7kNvwG-RthX&_nc_oc=AdopzlCgOTAZc_TK4a6jlhQJHSEk1cpq1nVmCx5NE9OI1u_UF69a0H1M6Eu-jZg0OxP9AhlupB5ItuSZaHj8fG1g&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQNyHlEcjVp6tvPygUKXK3P76sHw2GA2Z7iAxQxAPet-BQ&oe=6AC5B658",
+        "date": null,
+        "description": "58 500 $US 65 000 $US Iphone 12 simple Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "iphone 12"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "capacité non indiquée — non confirmée"
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "58500 USD",
+        "note": "prix non comparable avec le budget"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": true
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 simple",
+        "extrait": "Iphone 12 simple"
+      },
+      {
+        "nom": "Prix",
+        "valeur": "58500 USD",
+        "extrait": "58 500 $US"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Prix non comparable — modèle confirmé (iphone 12) · capacité inconnue (non confirmée) · prix non comparable (devise) · zone ok (Abidjan) · Modèle : iPhone 12 simple (« Iphone 12 simple ») · Prix : 58500 USD (« 58 500 $US ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1498248632324507",
+        "source": "facebook",
+        "title": "iPhone",
+        "price": 110000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1498248632324507/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/801807587_1073728138582837_7524534388125701080_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=107&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=oiNSzb3lWRQQ7kNvwFNG5ht&_nc_oc=Adp2tRjhV9GYCADNWWD9WlIBC7kW7pOFf2DJFqaxsnR1CKScI2VTt_kldMEWfzumNpjsIuuF0PjoT-mpJsXlqMni&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQP4n3RNJgfn-XHcQ24YP8DZ00YnBXD07PtW993S4cfe_A&oe=6AC5AEFA",
+        "date": null,
+        "description": "110 000 CFA iPhone Abidjan"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "numéro de modèle non indiqué"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "capacité non indiquée — non confirmée"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "110000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.7,
+    "score": 0.35,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "Inconnu",
+        "extrait": "iPhone"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · dans le budget (110000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : Inconnu (« iPhone »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1432399702100897",
+        "source": "facebook",
+        "title": "IPhone 12pro très bon état 128giga",
+        "price": 120000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1432399702100897/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/813584512_27402861192724129_861263027831853891_n.jpg?stp=c0.38.261.261a_dst-jpg_p261x260_tt6&_nc_cat=109&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=2bjMTd5VotcQ7kNvwEWHHCr&_nc_oc=AdoSY7Wi7MXhR6hzEZVN9Y4MyGuEk1cPWf_k7uQYY5BvEGZwwWdzovueL9M3vRWdvjXWgq7zKNePw-en4cohuqPB&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=EYUpY57ztDKTx0fF_P-09w&_nc_ss=7b289&oh=00_AQM0vlBDmuNBB-5Vc-1M3kJmA8dRXbPq6tAASNZE2bIUVA&oe=6AC5AEF9",
+        "date": null,
+        "description": "120 000 CFA IPhone 12pro très bon état 128giga Abidjan"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "numéro de modèle non indiqué"
+      },
+      "capacity": {
+        "state": "compatible",
+        "observed": "128 Go"
+      },
+      "budget": {
+        "state": "compatible",
+        "observed": "120000 XOF ≤ 150000"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.7,
+    "score": 0.35,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Modèle",
+        "valeur": "iPhone 12 Pro",
+        "extrait": "IPhone 12pro"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité 128 Go · dans le budget (120000 XOF ≤ 150000) · zone ok (Abidjan) · Modèle : iPhone 12 Pro (« IPhone 12pro »)"
+  }
+]

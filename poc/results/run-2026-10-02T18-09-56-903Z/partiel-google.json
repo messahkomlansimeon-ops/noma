@@ -1,0 +1,45 @@
+{
+  "source": "google",
+  "status": "ok",
+  "annonces": [
+    {
+      "id": "gpage-1",
+      "source": "www.abidjandeals.com",
+      "title": "Table À Manger 6 Places Bouaké",
+      "price": 200000,
+      "currency": "F CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://www.abidjandeals.com/annonce/table-a-manger-6-places-bouake",
+      "photo": null,
+      "date": null,
+      "description": "Très belle table à manger 6 places neuve disponible. Très esthétique et solide. Livraison partout en Côte d'Ivoire. Payement par échelonnement possible. Garantie 24 mois."
+    },
+    {
+      "id": "gpage-2",
+      "source": "www.abidjandeals.com",
+      "title": "Table a mangé 4 places et 6 places à Assinie",
+      "price": 65000,
+      "currency": "F CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://www.abidjandeals.com/annonce/table-a-mange-4-places-et-6-places-assinie",
+      "photo": null,
+      "date": null,
+      "description": "4 places 1,30 cm sur 70cm et 6 places 1,70m / 80cm"
+    },
+    {
+      "id": "gpage-3",
+      "source": "chicpanier.ci",
+      "title": "Table à Manger 6 Place Dépliant En Bois – CHIC PANIER Côte d'Ivoire",
+      "price": null,
+      "currency": "FCFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://chicpanier.ci/produit/table-a-manger-6-place-depliant-en-bois/",
+      "photo": null,
+      "date": null,
+      "description": null
+    }
+  ]
+}

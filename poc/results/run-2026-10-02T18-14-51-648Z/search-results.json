@@ -1,0 +1,1014 @@
+{
+  "besoin": "vélo électrique à Bouaké",
+  "besoinParse": {
+    "text": "vélo électrique à Bouaké",
+    "kind": "produit",
+    "product": "velo electrique",
+    "model": null,
+    "variant": null,
+    "capacity": null,
+    "budget": null,
+    "zone": "bouake",
+    "criteria": [],
+    "attributes": [],
+    "keywords": [
+      "velo",
+      "electrique"
+    ]
+  },
+  "offresBrutes": 23,
+  "apresDedup": 20,
+  "fusionsCertaines": 3,
+  "groupesDoublonsPossibles": 0,
+  "candidates": 17,
+  "alternativesHorsBudget": 0,
+  "alternativesScorees": 0,
+  "rejetsIncompatibilite": 3,
+  "appelsIA": 8,
+  "lotsScoring": 2,
+  "tokens": {
+    "prompt": 15243,
+    "completion": 2518
+  },
+  "cout": {
+    "total": 0.010797250000000001,
+    "known": true
+  },
+  "couvertureScoring": "17/17",
+  "cacheHits": 0,
+  "cache": "froid",
+  "premierResultatMs": 1354,
+  "dureeSourcesMs": 41261,
+  "syntheseSources": {
+    "ok": 4,
+    "empty": 0,
+    "indisponibles": 0,
+    "verdict": "résultats disponibles"
+  },
+  "dureeTotaleMs": 68299,
+  "parSource": [
+    {
+      "source": "facebook",
+      "status": "ok",
+      "annonces": 2,
+      "dureeMs": 8232,
+      "erreurs": []
+    },
+    {
+      "source": "coinafrique",
+      "status": "ok",
+      "annonces": 13,
+      "dureeMs": 1337,
+      "erreurs": []
+    },
+    {
+      "source": "locanto",
+      "status": "ok",
+      "annonces": 3,
+      "dureeMs": 6416,
+      "erreurs": []
+    },
+    {
+      "source": "google",
+      "status": "ok",
+      "annonces": 5,
+      "dureeMs": 41236,
+      "erreurs": []
+    }
+  ],
+  "sources": [
+    {
+      "source": "facebook",
+      "query": "https://www.facebook.com/marketplace/bouake/search?query=velo+electrique",
+      "capabilities": {
+        "search": true,
+        "location": true,
+        "pagination": false,
+        "itemCheck": true,
+        "services": false,
+        "unsupported": []
+      },
+      "warnings": [],
+      "listings": [
+        {
+          "id": "fb-3512876475555454",
+          "source": "facebook",
+          "title": "26\" Electric Bike for Adults Removable Battery, Mountain Ebike Daly City, CA",
+          "price": 95,
+          "currency": "USD",
+          "zone": null,
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/3512876475555454/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/685560181_4316031888670517_7918089047420842313_n.jpg?stp=c0.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=106&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=delY5fHxGsAQ7kNvwGIHALF&_nc_oc=Adosh8d4FtsDflM_koD-iKOWIrvlRTebszdZasdmnPYGmB4Cu8DZTzSUpcPsT9kVcTg3k0b8NWfbyAJW34mytIJG&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=lRv6YdTbNsV9_ezR5xE07Q&_nc_ss=7b289&oh=00_AQMuchzt4Q2mCZpF_7C3zm07BFbL-1o5kHOwFFcDOXnmEQ&oe=6AC5AF44",
+          "date": null,
+          "description": "95 $US 26\" Electric Bike for Adults Removable Battery, Mountain Ebike Daly City, CA"
+        },
+        {
+          "id": "fb-1738817144159600",
+          "source": "facebook",
+          "title": "26\" Electric Bike for Adults Removable Battery, Mountain Ebike Concord, CA",
+          "price": 96,
+          "currency": "USD",
+          "zone": null,
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1738817144159600/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/680415570_4363535400580859_7826546864712886968_n.jpg?stp=c0.0.261.261a_dst-jpg_p261x260_tt6&_nc_cat=102&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=WS3Sppr8NswQ7kNvwF-SVpH&_nc_oc=AdrNSDu5tiJlCDEJNaXbCZD_K-nf4PiEdU3dCzXrYCcL7G0aIFnRkSJhLxICxTqyMzQqExSSMw_EsykWjCHRtUkT&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=lRv6YdTbNsV9_ezR5xE07Q&_nc_ss=7b289&oh=00_AQMoPvuiXS_T0wMFkzrqkmKtKCL6q4G6FwALP_zvlvQ1_w&oe=6AC5E063",
+          "date": null,
+          "description": "96 $US 26\" Electric Bike for Adults Removable Battery, Mountain Ebike Concord, CA"
+        }
+      ],
+      "status": "ok",
+      "durationMs": 8232,
+      "errors": [],
+      "evidence": [
+        "evidence/fb-attempt-1.png"
+      ]
+    },
+    {
+      "source": "coinafrique",
+      "query": "https://ci.coinafrique.com/search?keyword=velo+electrique",
+      "capabilities": {
+        "search": true,
+        "location": false,
+        "pagination": true,
+        "itemCheck": false,
+        "services": false,
+        "unsupported": [
+          "zone « bouake » non filtrée côté site (filtrage local ensuite)"
+        ]
+      },
+      "warnings": [
+        "zone « bouake » non filtrée côté site (filtrage local ensuite)"
+      ],
+      "listings": [
+        {
+          "id": "coin-6070034",
+          "source": "coinafrique",
+          "title": "Velo électrique ",
+          "price": 138000,
+          "currency": "FCFA",
+          "zone": "Bouaké",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-6070034",
+          "photo": "https://images.coinafrique.com/thumb_6070034_uploaded_image1_1790932856.jpg",
+          "date": "il y a 8 heures",
+          "description": "Vélos & trottinettes — Velo électrique"
+        },
+        {
+          "id": "coin-6041788",
+          "source": "coinafrique",
+          "title": "Velo électrique ",
+          "price": 70000,
+          "currency": "FCFA",
+          "zone": "Koumassi, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-6041788",
+          "photo": "https://images.coinafrique.com/thumb_6041788_uploaded_image1_1788519116.jpg",
+          "date": "il y a 28 jours",
+          "description": "Vélos & trottinettes — Velo électrique"
+        },
+        {
+          "id": "coin-6034019",
+          "source": "coinafrique",
+          "title": "Vélo électrique 45kh pour handicapé",
+          "price": 125000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/autre-materiel-professionnel/velo-electrique-45kh-pour-handicape-6034019",
+          "photo": "https://images.coinafrique.com/thumb_6034019_uploaded_image1_1787880903.jpg",
+          "date": "il y a 1 mois",
+          "description": "Autre matériel professionnel — Vélo électrique 45kh pour handicapé"
+        },
+        {
+          "id": "coin-5974768",
+          "source": "coinafrique",
+          "title": "Velo sport tout terrain 2026",
+          "price": 240000,
+          "currency": "FCFA",
+          "zone": "Marcory, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/motos-et-scooters/velo-sport-tout-terrain-2026-5974768",
+          "photo": "https://images.coinafrique.com/thumb_5974768_uploaded_image1_1783358415.jpg",
+          "date": "il y a 1 mois",
+          "description": "Motos & Scooters — Velo sport tout terrain 2026"
+        },
+        {
+          "id": "coin-5998072",
+          "source": "coinafrique",
+          "title": "Velo électrique ",
+          "price": 79900,
+          "currency": "FCFA",
+          "zone": "Bouaké",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-5998072",
+          "photo": "https://images.coinafrique.com/thumb_5998072_uploaded_image1_1785155786.jpg",
+          "date": "il y a 2 mois",
+          "description": "Vélos & trottinettes — Velo électrique"
+        },
+        {
+          "id": "coin-5973551",
+          "source": "coinafrique",
+          "title": " PCX 125 velo  2019",
+          "price": 145000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/motos-et-scooters/pcx-125-velo-2019-5973551",
+          "photo": "https://images.coinafrique.com/thumb_5973551_uploaded_image1_1783279618.jpg",
+          "date": "il y a 2 mois",
+          "description": "Motos & Scooters — PCX 125 velo  2019"
+        },
+        {
+          "id": "coin-5940091",
+          "source": "coinafrique",
+          "title": "Vélo électrique",
+          "price": 45000,
+          "currency": "FCFA",
+          "zone": "Abobo, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-5940091",
+          "photo": "https://images.coinafrique.com/thumb_5940091_uploaded_image1_1780904597.jpg",
+          "date": "il y a 3 mois",
+          "description": "Vélos & trottinettes — Vélo électrique"
+        },
+        {
+          "id": "coin-5929151",
+          "source": "coinafrique",
+          "title": "Vélo electrique 70kh",
+          "price": 125000,
+          "currency": "FCFA",
+          "zone": "Le plateau, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-70kh-5929151",
+          "photo": "https://images.coinafrique.com/thumb_5929151_uploaded_image1_1780095413.jpg",
+          "date": "il y a 4 mois",
+          "description": "Vélos & trottinettes — Vélo electrique 70kh"
+        },
+        {
+          "id": "coin-5916619",
+          "source": "coinafrique",
+          "title": "Velo électrique ",
+          "price": 89000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-5916619",
+          "photo": "https://images.coinafrique.com/thumb_5916619_uploaded_image1_1779196117.jpg",
+          "date": "il y a 4 mois",
+          "description": "Vélos & trottinettes — Velo électrique"
+        },
+        {
+          "id": "coin-5761746",
+          "source": "coinafrique",
+          "title": "BMW  2020 ",
+          "price": 100000,
+          "currency": "FCFA",
+          "zone": "Adjamé, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/motos-et-scooters/bmw-2020-5761746",
+          "photo": "https://images.coinafrique.com/thumb_5761746_uploaded_image1_1770381440.jpg",
+          "date": "il y a 7 mois",
+          "description": "Motos & Scooters — BMW  2020"
+        },
+        {
+          "id": "coin-4991993",
+          "source": "coinafrique",
+          "title": "Vélo électrique",
+          "price": 65000,
+          "currency": "FCFA",
+          "zone": "Vridi, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-4991993",
+          "photo": "https://images.coinafrique.com/thumb_4991993_uploaded_image1_1728856213.jpg",
+          "date": "il y a 1 année",
+          "description": "Vélos & trottinettes — Vélo électrique"
+        },
+        {
+          "id": "coin-4863800",
+          "source": "coinafrique",
+          "title": "Velo électrique ",
+          "price": 250000,
+          "currency": "FCFA",
+          "zone": "Marcory, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-4863800",
+          "photo": "https://images.coinafrique.com/thumb_4863800_uploaded_image1_1722094943.jpg",
+          "date": "il y a 2 années",
+          "description": "Vélos & trottinettes — Velo électrique"
+        },
+        {
+          "id": "coin-3088910",
+          "source": "coinafrique",
+          "title": "Vélo électrique Askmy X3",
+          "price": 800000,
+          "currency": "FCFA",
+          "zone": "Bingerville",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-askmy-x3-3088910",
+          "photo": "https://images.coinafrique.com/thumb_3088910_uploaded_image1_1619822320.jpg",
+          "date": "il y a 5 années",
+          "description": "Vélos & trottinettes — Vélo électrique Askmy X3"
+        }
+      ],
+      "status": "ok",
+      "durationMs": 1337,
+      "errors": []
+    },
+    {
+      "source": "locanto",
+      "query": "https://www.locanto.ci/g/q/?query=velo+electrique",
+      "capabilities": {
+        "search": true,
+        "location": true,
+        "pagination": true,
+        "itemCheck": false,
+        "services": true,
+        "unsupported": []
+      },
+      "warnings": [
+        "1 annonces « call view » conservées (prix sur demande)"
+      ],
+      "listings": [
+        {
+          "id": "loc-8224229878",
+          "source": "locanto",
+          "title": "Vélo électrique OneSport OT10 Folding E-Bike",
+          "price": null,
+          "currency": "unknown",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.locanto.ci/abidjan/ID_8224229878/Velo-electrique-OneSport-OT10-Folding-E-Bike.html",
+          "photo": "https://images.locanto.info/6813067421/Velo-electrique-OneSport-OT10-Folding-E-Bike_1.jpg",
+          "date": "il y a 8 mois",
+          "description": "Prix sur demande — Matériau Alliage d'aluminium Couleur Noir Charge maximale 120 kg Vitesse maximale 25 KM/H Gamme 30 KM en mode purement électrique Tablette arrière Avec tablette arrière non réglable Angle de montée maximal 30-40 degrés Affichage des instruments Écran LCD multifonctionnel Éclairag"
+        },
+        {
+          "id": "loc-8224237945",
+          "source": "locanto",
+          "title": "Moto électrique YVY C20(Q20) 20 Fat Tires Vélo électrique 1000W",
+          "price": 500000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.locanto.ci/abidjan/ID_8224237945/Moto-electrique-YVY-C20-Q20-20-Fat-Tires-Velo-electrique-1000W.html",
+          "photo": "https://images.locanto.info/6813074326/Moto-electrique-YVY-C20-Q20-20-Fat-Tires-Velo-electrique-1000W_1.jpg",
+          "date": "il y a 8 mois",
+          "description": "Terrain tout-terrain Notre vélo électrique tout-terrain antidérapant 20 \"x4.0 est adapté à une grande variété de terrains, y compris la neige, les plages, les montagnes et les routes urbaines. Vous pouvez vous attendre à une expérience de conduite exceptionnelle quelle que soit l"
+        },
+        {
+          "id": "loc-8224251570",
+          "source": "locanto",
+          "title": "Vélo électrique de ville OT05",
+          "price": 490000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.locanto.ci/abidjan/ID_8224251570/Velo-electrique-de-ville-OT05.html",
+          "photo": "https://images.locanto.info/6813089061/Velo-electrique-de-ville-OT05_1.jpg",
+          "date": "il y a 8 mois",
+          "description": "enu 0 Portefeuille HomePortefeuilleVélo de cyclisme récréatif OT05 OT05 OT05-16 OT05-19 OT05-20 OT05-21 BK6-17 Vélo électrique de ville OT05 NOUS SERVONS VOS DÉPLACEMENTS OT05 a adopté un nouveau capteur de couple qui ajuste la puissance du moteur en temps réel en fonction de vot"
+        }
+      ],
+      "status": "ok",
+      "durationMs": 6416,
+      "errors": []
+    },
+    {
+      "source": "google",
+      "query": "velo electrique côte d'ivoire annonce",
+      "capabilities": {
+        "search": true,
+        "location": true,
+        "pagination": false,
+        "itemCheck": true,
+        "services": true,
+        "unsupported": []
+      },
+      "warnings": [
+        "recherche online (via openai/gpt-4o-mini:online)"
+      ],
+      "listings": [
+        {
+          "id": "gpage-1",
+          "source": "ci.coinafrique.com",
+          "title": "Vélo électrique disponible - CoinAfrique Côte d'Ivoire",
+          "price": 70000,
+          "currency": "CFA",
+          "zone": null,
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-6041788",
+          "photo": null,
+          "date": null,
+          "description": "Vélo électrique disponible. Interesser, contactez nous."
+        },
+        {
+          "id": "gpage-2",
+          "source": "ci.coinafrique.com",
+          "title": "Vélo électrique neuf - CoinAfrique Côte d'Ivoire",
+          "price": 85000,
+          "currency": "CFA",
+          "zone": null,
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-6041773",
+          "photo": null,
+          "date": null,
+          "description": "Nouveau dans carton jamais utilisé toujours disponible en côte d'ivoire"
+        },
+        {
+          "id": "gpage-3",
+          "source": "ci.coinafrique.com",
+          "title": "Vélo électrique tout terrain - CoinAfrique Côte d'Ivoire",
+          "price": 45000,
+          "currency": "CFA",
+          "zone": null,
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-5940091",
+          "photo": null,
+          "date": null,
+          "description": "velo electrique tout terrain batterie 100%"
+        },
+        {
+          "id": "gpage-4",
+          "source": "ci.coinafrique.com",
+          "title": "Vélo électrique propre et neuf - CoinAfrique Côte d'Ivoire",
+          "price": 45000,
+          "currency": "CFA",
+          "zone": null,
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-5982926",
+          "photo": null,
+          "date": null,
+          "description": "Propre et neuf tout terrain"
+        },
+        {
+          "id": "gpage-5",
+          "source": "ci.coinafrique.com",
+          "title": "Vélo électrique avec livraison - CoinAfrique Côte d'Ivoire",
+          "price": 89000,
+          "currency": "CFA",
+          "zone": null,
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-5916619",
+          "photo": null,
+          "date": null,
+          "description": null
+        }
+      ],
+      "status": "ok",
+      "durationMs": 41236,
+      "errors": []
+    }
+  ],
+  "top": [
+    {
+      "evaluated": {
+        "listing": {
+          "id": "coin-6070034",
+          "source": "coinafrique",
+          "title": "Velo électrique ",
+          "price": 138000,
+          "currency": "FCFA",
+          "zone": "Bouaké",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-6070034",
+          "photo": "https://images.coinafrique.com/thumb_6070034_uploaded_image1_1790932856.jpg",
+          "date": "il y a 8 heures",
+          "description": "Vélos & trottinettes — Velo électrique"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "138000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "compatible",
+          "observed": "Bouaké"
+        },
+        "attributes": [],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.98,
+      "score": 0.99,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "type",
+          "valeur": "vélo électrique",
+          "extrait": "Velo électrique"
+        }
+      ],
+      "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Bouaké) · type : vélo électrique (« Velo électrique ») — informations confirmées : 2/2",
+      "confirmedRatio": {
+        "known": 2,
+        "total": 2
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "coin-5998072",
+          "source": "coinafrique",
+          "title": "Velo électrique ",
+          "price": 79900,
+          "currency": "FCFA",
+          "zone": "Bouaké",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-5998072",
+          "photo": "https://images.coinafrique.com/thumb_5998072_uploaded_image1_1785155786.jpg",
+          "date": "il y a 2 mois",
+          "description": "Vélos & trottinettes — Velo électrique"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "79900 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "compatible",
+          "observed": "Bouaké"
+        },
+        "attributes": [],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.89,
+      "score": 0.95,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "type",
+          "valeur": "vélo électrique",
+          "extrait": "Velo électrique"
+        }
+      ],
+      "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Bouaké) · type : vélo électrique (« Velo électrique ») — informations confirmées : 2/2",
+      "confirmedRatio": {
+        "known": 2,
+        "total": 2
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "loc-8224237945",
+          "source": "locanto",
+          "title": "Moto électrique YVY C20(Q20) 20 Fat Tires Vélo électrique 1000W",
+          "price": 500000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.locanto.ci/abidjan/ID_8224237945/Moto-electrique-YVY-C20-Q20-20-Fat-Tires-Velo-electrique-1000W.html",
+          "photo": "https://images.locanto.info/6813074326/Moto-electrique-YVY-C20-Q20-20-Fat-Tires-Velo-electrique-1000W_1.jpg",
+          "date": "il y a 8 mois",
+          "description": "Terrain tout-terrain Notre vélo électrique tout-terrain antidérapant 20 \"x4.0 est adapté à une grande variété de terrains, y compris la neige, les plages, les montagnes et les routes urbaines. Vous pouvez vous attendre à une expérience de conduite exceptionnelle quelle que soit l"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "500000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": "Abidjan",
+          "note": "autre zone : abidjan"
+        },
+        "attributes": [],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.83,
+      "score": 0.62,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de produit",
+          "valeur": "Vélo électrique",
+          "extrait": "Vélo électrique tout-terrain"
+        }
+      ],
+      "raison": "Correspondance possible — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Abidjan — autre zone : abidjan · Type de produit : Vélo électrique (« Vélo électrique tout-terrain ») — informations confirmées : 1/2",
+      "confirmedRatio": {
+        "known": 1,
+        "total": 2
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "loc-8224251570",
+          "source": "locanto",
+          "title": "Vélo électrique de ville OT05",
+          "price": 490000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.locanto.ci/abidjan/ID_8224251570/Velo-electrique-de-ville-OT05.html",
+          "photo": "https://images.locanto.info/6813089061/Velo-electrique-de-ville-OT05_1.jpg",
+          "date": "il y a 8 mois",
+          "description": "enu 0 Portefeuille HomePortefeuilleVélo de cyclisme récréatif OT05 OT05 OT05-16 OT05-19 OT05-20 OT05-21 BK6-17 Vélo électrique de ville OT05 NOUS SERVONS VOS DÉPLACEMENTS OT05 a adopté un nouveau capteur de couple qui ajuste la puissance du moteur en temps réel en fonction de vot"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "490000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": "Abidjan",
+          "note": "autre zone : abidjan"
+        },
+        "attributes": [],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.83,
+      "score": 0.62,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de produit",
+          "valeur": "Vélo électrique",
+          "extrait": "Vélo électrique de ville OT05"
+        }
+      ],
+      "raison": "Correspondance possible — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Abidjan — autre zone : abidjan · Type de produit : Vélo électrique (« Vélo électrique de ville OT05 ») — informations confirmées : 1/2",
+      "confirmedRatio": {
+        "known": 1,
+        "total": 2
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "gpage-2",
+          "source": "ci.coinafrique.com",
+          "title": "Vélo électrique neuf - CoinAfrique Côte d'Ivoire",
+          "price": 85000,
+          "currency": "CFA",
+          "zone": null,
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-6041773",
+          "photo": null,
+          "date": null,
+          "description": "Nouveau dans carton jamais utilisé toujours disponible en côte d'ivoire"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "85000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": null,
+          "note": "zone non indiquée"
+        },
+        "attributes": [],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.84,
+      "score": 0.57,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de produit",
+          "valeur": "Vélo électrique",
+          "extrait": "Vélo électrique neuf"
+        }
+      ],
+      "raison": "Correspondance possible — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone non indiquée · Type de produit : Vélo électrique (« Vélo électrique neuf ») — informations confirmées : 1/2",
+      "confirmedRatio": {
+        "known": 1,
+        "total": 2
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "gpage-4",
+          "source": "ci.coinafrique.com",
+          "title": "Vélo électrique propre et neuf - CoinAfrique Côte d'Ivoire",
+          "price": 45000,
+          "currency": "CFA",
+          "zone": null,
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-5982926",
+          "photo": null,
+          "date": null,
+          "description": "Propre et neuf tout terrain"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "45000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": null,
+          "note": "zone non indiquée"
+        },
+        "attributes": [],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.84,
+      "score": 0.57,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de produit",
+          "valeur": "Vélo électrique",
+          "extrait": "Vélo électrique propre et neuf"
+        }
+      ],
+      "raison": "Correspondance possible — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone non indiquée · Type de produit : Vélo électrique (« Vélo électrique propre et neuf ») — informations confirmées : 1/2",
+      "confirmedRatio": {
+        "known": 1,
+        "total": 2
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "loc-8224229878",
+          "source": "locanto",
+          "title": "Vélo électrique OneSport OT10 Folding E-Bike",
+          "price": null,
+          "currency": "unknown",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.locanto.ci/abidjan/ID_8224229878/Velo-electrique-OneSport-OT10-Folding-E-Bike.html",
+          "photo": "https://images.locanto.info/6813067421/Velo-electrique-OneSport-OT10-Folding-E-Bike_1.jpg",
+          "date": "il y a 8 mois",
+          "description": "Prix sur demande — Matériau Alliage d'aluminium Couleur Noir Charge maximale 120 kg Vitesse maximale 25 KM/H Gamme 30 KM en mode purement électrique Tablette arrière Avec tablette arrière non réglable Angle de montée maximal 30-40 degrés Affichage des instruments Écran LCD multifonctionnel Éclairag"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": null,
+          "note": "prix non affiché — à confirmer auprès du vendeur"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": "Abidjan",
+          "note": "autre zone : abidjan"
+        },
+        "attributes": [],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.72,
+      "score": 0.56,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de produit",
+          "valeur": "Vélo électrique",
+          "extrait": "Vélo électrique OneSport OT10 Folding E-Bike"
+        },
+        {
+          "nom": "Prix",
+          "valeur": "Sur demande",
+          "extrait": "Prix sur demande"
+        }
+      ],
+      "raison": "Correspondance possible — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · prix sur demande · zone : Abidjan — autre zone : abidjan · Type de produit : Vélo électrique (« Vélo électrique OneSport OT10 Folding E-Bike ») · Prix : Sur demande (« Prix sur demande ») — informations confirmées : 1/2",
+      "confirmedRatio": {
+        "known": 1,
+        "total": 2
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "coin-4863800",
+          "source": "coinafrique",
+          "title": "Velo électrique ",
+          "price": 250000,
+          "currency": "FCFA",
+          "zone": "Marcory, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-4863800",
+          "photo": "https://images.coinafrique.com/thumb_4863800_uploaded_image1_1722094943.jpg",
+          "date": "il y a 2 années",
+          "description": "Vélos & trottinettes — Velo électrique"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "250000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": "Marcory, Abidjan",
+          "note": "autre zone : abidjan"
+        },
+        "attributes": [],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.84,
+      "score": 0.52,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de produit",
+          "valeur": "Vélo électrique",
+          "extrait": "Velo électrique"
+        }
+      ],
+      "raison": "Correspondance possible — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Marcory, Abidjan — autre zone : abidjan · Type de produit : Vélo électrique (« Velo électrique ») — informations confirmées : 1/2",
+      "confirmedRatio": {
+        "known": 1,
+        "total": 2
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "coin-3088910",
+          "source": "coinafrique",
+          "title": "Vélo électrique Askmy X3",
+          "price": 800000,
+          "currency": "FCFA",
+          "zone": "Bingerville",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-askmy-x3-3088910",
+          "photo": "https://images.coinafrique.com/thumb_3088910_uploaded_image1_1619822320.jpg",
+          "date": "il y a 5 années",
+          "description": "Vélos & trottinettes — Vélo électrique Askmy X3"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "800000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": "Bingerville",
+          "note": "zone annexe d'Abidjan : bingerville"
+        },
+        "attributes": [],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.84,
+      "score": 0.52,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de produit",
+          "valeur": "Vélo électrique",
+          "extrait": "Vélo électrique Askmy X3"
+        }
+      ],
+      "raison": "Correspondance possible — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Bingerville — zone annexe d'Abidjan : bingerville · Type de produit : Vélo électrique (« Vélo électrique Askmy X3 ») — informations confirmées : 1/2",
+      "confirmedRatio": {
+        "known": 1,
+        "total": 2
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "coin-6041788",
+          "source": "coinafrique",
+          "title": "Velo électrique ",
+          "price": 70000,
+          "currency": "FCFA",
+          "zone": "Koumassi, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/velos-et-trottinettes/velo-electrique-6041788",
+          "photo": "https://images.coinafrique.com/thumb_6041788_uploaded_image1_1788519116.jpg",
+          "date": "il y a 28 jours",
+          "description": "Vélos & trottinettes — Velo électrique — Vélo électrique disponible. Interesser, contactez nous."
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "70000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": "Koumassi, Abidjan",
+          "note": "autre zone : abidjan"
+        },
+        "attributes": [],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.86,
+      "score": 0.43,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "type",
+          "valeur": "vélo électrique",
+          "extrait": "Velo électrique disponible."
+        }
+      ],
+      "raison": "Correspondance possible — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Koumassi, Abidjan — autre zone : abidjan · type : vélo électrique (« Velo électrique disponible. ») — informations confirmées : 1/2",
+      "confirmedRatio": {
+        "known": 1,
+        "total": 2
+      }
+    }
+  ],
+  "doublonsPossibles": [],
+  "fusions": {
+    "coin-6041788": [
+      "gpage-1"
+    ],
+    "coin-5940091": [
+      "gpage-3"
+    ],
+    "coin-5916619": [
+      "gpage-5"
+    ]
+  },
+  "rejets": [
+    {
+      "title": "26\" Electric Bike for Adults Removable Battery, Mountain Ebike Daly City, CA",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "26\" Electric Bike for Adults Removable Battery, Mountain Ebike Concord, CA",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "BMW  2020 ",
+      "reason": "autre modèle (produit sans rapport)"
+    }
+  ]
+}

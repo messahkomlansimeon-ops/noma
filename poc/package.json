@@ -1,0 +1,33 @@
+{
+  "name": "noma-poc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "poc": "tsx search.ts",
+    "ui-parcours": "tsx ui-parcours.ts",
+    "ui-turnstile": "tsx ui-turnstile.ts",
+    "test-coin": "tsx test-coin.ts",
+    "probe-fb": "tsx probe-fb.ts",
+    "probe-fb-city": "tsx probe-fb-city.ts",
+    "probe-locanto": "tsx probe-locanto2.ts",
+    "prices": "tsx prices.ts",
+    "test": "node --import tsx --test --test-isolation=none tests/need.test.ts tests/queries.test.ts tests/filter.test.ts tests/dedup.test.ts tests/scoring.test.ts tests/fetch.test.ts tests/transport.test.ts tests/orchestration.test.ts tests/regressions.test.ts tests/review2.test.ts tests/review3.test.ts tests/review4.test.ts tests/relevance.test.ts tests/mesures.test.ts tests/engine.test.ts tests/annonces.test.ts tests/understanding.test.ts tests/coinafrique-extraction.test.ts tests/scrapling-bridge.test.ts tests/trial-coinafrique.test.ts",
+    "test:scrapling": "NOMA_REQUIRE_SCRAPLING=1 node --import tsx --test --test-isolation=none tests/coinafrique-extraction.test.ts tests/scrapling-bridge.test.ts tests/trial-coinafrique.test.ts",
+    "pilot:scrapling": "tsx pilot/compare-coinafrique.ts",
+    "trial:scrapling": "tsx pilot/trial-coinafrique.ts",
+    "test:network": "POC_NETWORK=1 node --import tsx --test tests/network.test.ts"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "ipaddr.js": "^2.5.0",
+    "playwright": "^1.48.0",
+    "tsx": "^4.19.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5"
+  }
+}

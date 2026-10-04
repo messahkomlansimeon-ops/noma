@@ -1,0 +1,45 @@
+{
+  "source": "locanto",
+  "status": "ok",
+  "annonces": [
+    {
+      "id": "loc-8471565474",
+      "source": "locanto",
+      "title": "Smartphone iphone 12 Pro Bleu, Abidjan marcory",
+      "price": 90000,
+      "currency": "FCFA",
+      "zone": "Abidjan marcory",
+      "vendor": null,
+      "url": "https://www.locanto.ci/abidjan/ID_8471565474/Smartphone-iphone-12-Pro-Bleu.html",
+      "photo": "https://images.locanto.info/6884269647/Smartphone-iphone-12-Pro-Bleu_1.jpg",
+      "date": "il y a 6 mois",
+      "description": "IPhone 12 Pro Bleu 128 Go deuxième main Face ID ne passe pas . Bon état , écran True Tone , Réseau compatible 5 G . Mémoire Ram 6 giga. Appareil Photo et Vidéo Système caméra Pro : Triple capteur 12 Mpx (Ultra …"
+    },
+    {
+      "id": "loc-7478653649",
+      "source": "locanto",
+      "title": "IPHONE 12 PRO RAPIDE 128GB",
+      "price": 160000,
+      "currency": "FCFA",
+      "zone": "Abidjan",
+      "vendor": null,
+      "url": "https://www.locanto.ci/abidjan/ID_7478653649/IPHONE-12-PRO-RAPIDE-128GB.html",
+      "photo": "https://images.locanto.info/6339931223/IPHONE-12-PRO-RAPIDE-128GB_1.jpg",
+      "date": "il y a 17 mois",
+      "description": "IPHONE 12 PRO RAPIDE 128GB FACE ID PETIT POINT SUR L’ÉCRAN Batterie durable troc possible Prix Ko"
+    },
+    {
+      "id": "loc-7478656205",
+      "source": "locanto",
+      "title": "IPHONE 12 PRO 128GB",
+      "price": 190000,
+      "currency": "FCFA",
+      "zone": "Abidjan",
+      "vendor": null,
+      "url": "https://www.locanto.ci/abidjan/ID_7478656205/IPHONE-12-PRO-128GB.html",
+      "photo": "https://images.locanto.info/6339935462/IPHONE-12-PRO-128GB_1.jpg",
+      "date": "il y a 17 mois",
+      "description": "IPHONE 12 PRO 128GB FACE ID Batterie durable troc possible Prix Ko"
+    }
+  ]
+}

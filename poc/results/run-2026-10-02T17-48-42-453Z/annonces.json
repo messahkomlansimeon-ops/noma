@@ -1,0 +1,1394 @@
+[
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-4513789685545421",
+        "source": "facebook",
+        "title": "Chaussures Nike pointure 42/43",
+        "price": 17,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/4513789685545421/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/791245953_831833543284371_6561803714880039500_n.jpg?stp=c0.101.261.261a_dst-jpg_p261x260_tt6&_nc_cat=102&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=O1WfGIeXWbkQ7kNvwFxpd1t&_nc_oc=AdqCEpDHZbMgd3q84Lpk-n8NhmJ6O4ctd2yKtBfLim4pvIGeazWQpUS35wdhsFEcWUjQs5Xsea0vV584oMOcveWg&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=SMVJJDHp8C8ckWl2XhwPfg&_nc_ss=7b289&oh=00_AQNhTkBPLWw8UL7-wlmLjAq6xwVfnDwX-K4jxSj9pmphNQ&oe=6AC5D40A",
+        "date": null,
+        "description": "17 CFA Chaussures Nike pointure 42/43 Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "17 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "compatible",
+          "observed": "42 pointure"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.9,
+    "score": 0.95,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "pointure",
+        "valeur": "42/43",
+        "extrait": "Chaussures Nike pointure 42/43"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · pointure : 42 confirmé · pointure : 42/43 (« Chaussures Nike pointure 42/43 ») — informations confirmées : 3/3",
+    "confirmedRatio": {
+      "known": 3,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "gpage-1",
+        "source": "ci.coinafrique.com",
+        "title": "Chaussures Homme Baskets Jordan 40 neufs et occasions en Côte d'Ivoire - CoinAfrique Côte d'Ivoire",
+        "price": 39000,
+        "currency": "CFA",
+        "zone": null,
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/chaussures-homme/baskets-jordan-40-6040985",
+        "photo": null,
+        "date": null,
+        "description": "Baskets Jordan 40, pointure : 42, 43, 44 avec carton."
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "39000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "zone non indiquée"
+      },
+      "attributes": [
+        {
+          "state": "compatible",
+          "observed": "42 pointure"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "pointure",
+        "valeur": "42",
+        "extrait": "pointure : 42, 43, 44 avec carton."
+      }
+    ],
+    "raison": "Correspondance forte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone non indiquée · pointure : 42 confirmé · pointure : 42 (« pointure : 42, 43, 44 avec carton. ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "gpage-2",
+        "source": "ci.coinafrique.com",
+        "title": "Chaussures Homme Nike jordan 1 low neufs et occasions en Côte d'Ivoire - CoinAfrique Côte d'Ivoire",
+        "price": 23000,
+        "currency": "CFA",
+        "zone": null,
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/chaussures-homme/nike-jordan-1-low-5892219",
+        "photo": null,
+        "date": null,
+        "description": "Nike jordan 1 low pointures disponibles : 39, 40, 41, 42, 43, 44, 45"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "23000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "zone non indiquée"
+      },
+      "attributes": [
+        {
+          "state": "compatible",
+          "observed": "42 pointure"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "pointure",
+        "valeur": "42",
+        "extrait": "pointures disponibles : 39, 40, 41, 42, 43, 44, 45"
+      }
+    ],
+    "raison": "Correspondance forte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone non indiquée · pointure : 42 confirmé · pointure : 42 (« pointures disponibles : 39, 40, 41, 42, 43, 44, 45 ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "gpage-3",
+        "source": "ci.coinafrique.com",
+        "title": "Chaussures Homme Nike jordan cactus jack neufs et occasions en Côte d'Ivoire - CoinAfrique Côte d'Ivoire",
+        "price": 23000,
+        "currency": "CFA",
+        "zone": null,
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/chaussures-homme/nike-jordan-cactus-jack-5892193",
+        "photo": null,
+        "date": null,
+        "description": "Nike jordan cactus jack pointures disponibles : 39, 40, 41, 42, 43, 44, 45"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "23000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "zone non indiquée"
+      },
+      "attributes": [
+        {
+          "state": "compatible",
+          "observed": "42 pointure"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "pointure",
+        "valeur": "42",
+        "extrait": "pointures disponibles : 39, 40, 41, 42, 43, 44, 45"
+      }
+    ],
+    "raison": "Correspondance forte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone non indiquée · pointure : 42 confirmé · pointure : 42 (« pointures disponibles : 39, 40, 41, 42, 43, 44, 45 ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-2363709840820741",
+        "source": "facebook",
+        "title": "Gratuit Vente de chaussures Pointure 42_45 Cel 0709448854",
+        "price": null,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/2363709840820741/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/725743140_1856164428674094_4886875274254202424_n.jpg?stp=c0.101.261.261a_dst-jpg_p261x260_tt6&_nc_cat=103&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=9AdqsDEv9XAQ7kNvwHKFo3p&_nc_oc=Ado7xlBB-RVutj7uK1lP--_NTApxDYsZx1HqLJNbVn42Ftf5BzrD_kC-AI0Y1xze4JtN3lw9x8fPpR-1JuQtDIBM&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=SMVJJDHp8C8ckWl2XhwPfg&_nc_ss=7b289&oh=00_AQMG0EHEYj7ga6NY-m1a6bLgHwd66KWFG3VO7noZIY1tTQ&oe=6AC5B3B3",
+        "date": null,
+        "description": "Gratuit Vente de chaussures Pointure 42_45 Cel 0709448854 Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "prix non affiché — à confirmer auprès du vendeur"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "compatible",
+          "observed": "42 pointure"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.79,
+    "score": 0.65,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "pointure",
+        "valeur": "42_45",
+        "extrait": "Vente de chaussures Pointure 42_45"
+      }
+    ],
+    "raison": "Correspondance possible — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · prix sur demande · zone ok (Abidjan) · pointure : 42 confirmé · pointure : 42_45 (« Vente de chaussures Pointure 42_45 ») — informations confirmées : 3/3",
+    "confirmedRatio": {
+      "known": 3,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1138739038823457",
+        "source": "facebook",
+        "title": "Paire de baskets disponibles pratique pour le sport promo 5mil",
+        "price": 5000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1138739038823457/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/765796407_1056560923495797_3006289985774185127_n.jpg?stp=c0.0.261.261a_dst-jpg_p261x260_tt6&_nc_cat=110&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=eBTV-oWv1GUQ7kNvwG5NiDE&_nc_oc=AdoJlMdsv3WrkWskJYxKjv9JjxPcjW14m8h0gOe2Dmt9g8rZYE1QD_r-25BB4HFuzCRch4uW_NDRgo3WQBQ6YKkU&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=SMVJJDHp8C8ckWl2XhwPfg&_nc_ss=7b289&oh=00_AQP-mPVol7n3dNvgO8AEdqTxxtcCIEuKFGFG4vW0Bwod7g&oe=6AC5C3D4",
+        "date": null,
+        "description": "5 000 CFA Paire de baskets disponibles pratique pour le sport promo 5mil Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "5000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.63,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "type",
+        "valeur": "baskets",
+        "extrait": "Paire de baskets disponibles pratique pour le sport"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · pointure 42 non confirmé · type : baskets (« Paire de baskets disponibles pratique pour le sport ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-4854423",
+        "source": "coinafrique",
+        "title": "Chaussures  sport",
+        "price": 25000,
+        "currency": "FCFA",
+        "zone": "Angré, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/autres-sports-et-loisirs/chaussures-sport-4854423",
+        "photo": "https://images.coinafrique.com/thumb_4854423_uploaded_image1_1721613634.jpg",
+        "date": "il y a 2 années",
+        "description": "Autres Sports & Loisirs — Chaussures  sport"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "25000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Angré, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.63,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de chaussures",
+        "valeur": "sport",
+        "extrait": "Chaussures  sport"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Angré, Abidjan) · pointure 42 non confirmé · Type de chaussures : sport (« Chaussures  sport ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-4036471",
+        "source": "coinafrique",
+        "title": "Baskets Wetike homme",
+        "price": 12000,
+        "currency": "FCFA",
+        "zone": "Abobo, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/chaussures-homme/baskets-wetike-homme-4036471",
+        "photo": "https://images.coinafrique.com/thumb_4036471_uploaded_image1_1672946792.jpg",
+        "date": "il y a 3 années",
+        "description": "Chaussures Homme — Baskets Wetike homme"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "12000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abobo, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.63,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de chaussures",
+        "valeur": "baskets",
+        "extrait": "Baskets Wetike homme"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abobo, Abidjan) · pointure 42 non confirmé · Type de chaussures : baskets (« Baskets Wetike homme ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-2151930",
+        "source": "coinafrique",
+        "title": "Chaussures de sport",
+        "price": 0,
+        "currency": "FCFA",
+        "zone": "Treichville, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/chaussures-homme/chaussures-de-sport-2151930",
+        "photo": "https://images.coinafrique.com/thumb_2151930_uploaded_image1_1590073982.jpg",
+        "date": "il y a 6 années",
+        "description": "Chaussures Homme — Chaussures de sport"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "0 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Treichville, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.63,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de chaussures",
+        "valeur": "sport",
+        "extrait": "Chaussures de sport"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Treichville, Abidjan) · pointure 42 non confirmé · Type de chaussures : sport (« Chaussures de sport ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-1389786",
+        "source": "coinafrique",
+        "title": "Chaussures de sport pour homme",
+        "price": 8000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/chaussures-homme/chaussures-de-sport-pour-homme-1389786",
+        "photo": "https://images.coinafrique.com/thumb_1389786_uploaded_image1_1577307596.02.png",
+        "date": "il y a 6 années",
+        "description": "Chaussures Homme — Chaussures de sport pour homme"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "8000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.63,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de chaussures",
+        "valeur": "sport",
+        "extrait": "Chaussures de sport pour homme"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · pointure 42 non confirmé · Type de chaussures : sport (« Chaussures de sport pour homme ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-1389756",
+        "source": "coinafrique",
+        "title": "Chaussures sport pour homme",
+        "price": 8000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/chaussures-homme/chaussures-sport-pour-homme-1389756",
+        "photo": "https://images.coinafrique.com/thumb_1389756_uploaded_image1_1577307193.67.png",
+        "date": "il y a 6 années",
+        "description": "Chaussures Homme — Chaussures sport pour homme"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "8000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.63,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de chaussures",
+        "valeur": "sport",
+        "extrait": "Chaussures sport pour homme"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · pointure 42 non confirmé · Type de chaussures : sport (« Chaussures sport pour homme ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1378806087546204",
+        "source": "facebook",
+        "title": "chaussures Asis, TN, NB",
+        "price": 15000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1378806087546204/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/758217205_1696448324961361_6172972998561821141_n.jpg?stp=c0.14.261.261a_dst-jpg_p261x260_tt6&_nc_cat=111&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=J1YOHNIwRgQQ7kNvwHDAngq&_nc_oc=AdqAbUZYT-PraTPJm2JdjXfelGHuCuTCEhbS8h0VHjhaiEE1lYljqRJ1x0RoL6vxDCdBjRpiyMAVddcdTMkmfzSK&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=SMVJJDHp8C8ckWl2XhwPfg&_nc_ss=7b289&oh=00_AQO8VRFVdBzh2PqfP9OHTmMgVLlIv479ioT4ee-NNdbKHg&oe=6AC5BD8E",
+        "date": null,
+        "description": "15 000 CFA chaussures Asis, TN, NB Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "15000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.48,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "marque",
+        "valeur": "Asis, TN, NB",
+        "extrait": "chaussures Asis, TN, NB"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · pointure 42 non confirmé · marque : Asis, TN, NB (« chaussures Asis, TN, NB ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1031079839802334",
+        "source": "facebook",
+        "title": "Chaussures+de+sécurité+pointure+42+kao+10mil+je+suis+a+Gonzague+",
+        "price": 10000,
+        "currency": "USD",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1031079839802334/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/760511439_1866249268088359_6808161946816172754_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=107&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=VJokJQ5gMdoQ7kNvwEeoAnq&_nc_oc=AdousO1tdMNXx-O6SUx0UBEDSLzfJc3xoioEV4YMJWeMj88Uc5BSF6nzLcn5GrLiVQPBpgwTcMe48H4XGAvFv7y4&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=SMVJJDHp8C8ckWl2XhwPfg&_nc_ss=7b289&oh=00_AQPyH9vcYOaOymwSkSFAxXzDFQBrBxOlH0BFJppu28w4Hw&oe=6AC5B660",
+        "date": null,
+        "description": "10 000 $US Chaussures+de+sécurité+pointure+42+kao+10mil+je+suis+a+Gonzague+ Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "10000 USD",
+        "note": "prix non comparable avec le budget"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "compatible",
+          "observed": "42 pointure"
+        }
+      ],
+      "priceNonComparable": true
+    },
+    "baseScore": 0.9,
+    "score": 0.45,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "type",
+        "valeur": "sécurité",
+        "extrait": "Chaussures+de+sécurité+pointure+42"
+      }
+    ],
+    "raison": "Prix non comparable — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · prix non comparable (devise) · zone ok (Abidjan) · pointure : 42 confirmé · type : sécurité (« Chaussures+de+sécurité+pointure+42 ») — informations confirmées : 3/3",
+    "confirmedRatio": {
+      "known": 3,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1128928853040519",
+        "source": "facebook",
+        "title": "Chaussures filles",
+        "price": 3500,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1128928853040519/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/813399065_1551751326967667_61571715309295320_n.jpg?stp=c0.1.261.261a_dst-jpg_p261x260_tt6&_nc_cat=103&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=frAaFqQhC4YQ7kNvwFNf7d8&_nc_oc=AdpOnS6_N-q4G1h76Zd2VZnHRb74b0mGQeK7HdXejOKH7JaISZuh3rXXgK2K7fM5Zg5btYgF3xQiutjDChL9DyCq&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=SMVJJDHp8C8ckWl2XhwPfg&_nc_ss=7b289&oh=00_AQO3fD_Gn-mLDzTSTxvbeLpwEvF4bswLNWiTmc3veXqXXw&oe=6AC5CD0D",
+        "date": null,
+        "description": "3 500 CFA Chaussures filles Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "3500 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "type",
+        "valeur": "filles",
+        "extrait": "Chaussures filles"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · pointure 42 non confirmé · type : filles (« Chaussures filles ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1519483473205411",
+        "source": "facebook",
+        "title": "Chaussures+",
+        "price": 4000,
+        "currency": "USD",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1519483473205411/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/717400612_4480858135566073_6661124124859625650_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=104&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=T386Bt2hgKUQ7kNvwHIPyfN&_nc_oc=AdrTH-zwjQ2xNWCMT084v46k3I4ZIYIcDbZVZ_myvE8nM-2rtBp_EBziuScEX_i1Uf35dGKTdBvkAjulPRtX-vJT&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=SMVJJDHp8C8ckWl2XhwPfg&_nc_ss=7b289&oh=00_AQMX9mDJZEP7nEs55Y2MeIWK5TBHDOxW881aowVEMdX1TA&oe=6AC5BD87",
+        "date": null,
+        "description": "4 000 $US Chaussures+ Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "4000 USD",
+        "note": "prix non comparable avec le budget"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": true
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Prix non comparable — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · prix non comparable (devise) · zone ok (Abidjan) · pointure 42 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-2545888075925726",
+        "source": "facebook",
+        "title": "Chaussures",
+        "price": 7000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/2545888075925726/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/814670501_4100930240042268_6866980868456536584_n.jpg?stp=c0.0.261.261a_dst-jpg_p261x260_tt6&_nc_cat=110&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=ZKWcDVhCrP4Q7kNvwGTezWB&_nc_oc=AdrCkwPRK-pMYPdxX9umj9Uu61EcZlW9RgGhBFLFDsQPH9pwHRF2-6eBVhsE3NoeC2dJG6alHIMewiMPH3HeS9xW&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=SMVJJDHp8C8ckWl2XhwPfg&_nc_ss=7b289&oh=00_AQML-JWrdG8yWZJqBKkCH-HLc2J23_4UcPKcdpEpLyY8tA&oe=6AC5B116",
+        "date": null,
+        "description": "7 000 CFA Chaussures Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "7000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · pointure 42 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1045556821203067",
+        "source": "facebook",
+        "title": "Chaussures noir montante pour hommes",
+        "price": 15000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1045556821203067/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/760503395_27988050797491791_7963507819964503374_n.jpg?stp=c16.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=iOquBTOZ9pAQ7kNvwFVradI&_nc_oc=Adq9LKb5QYA0RTXjr77b1FdBz3CKM3Ja1MkIgV0OKAsSMVDaFCs3ccrD5ZCUOFoVpb4MsATNlw9XZRJ-JjbSQPs8&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=SMVJJDHp8C8ckWl2XhwPfg&_nc_ss=7b289&oh=00_AQMzn2fuIHuROV4xhgcdP0uw_ifLkn3PqLnfGw_fzxhCVQ&oe=6AC5D895",
+        "date": null,
+        "description": "15 000 CFA Chaussures noir montante pour hommes Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "15000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "type",
+        "valeur": "noir montante pour hommes",
+        "extrait": "Chaussures noir montante pour hommes"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · pointure 42 non confirmé · type : noir montante pour hommes (« Chaussures noir montante pour hommes ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1529564162152641",
+        "source": "facebook",
+        "title": "Chaussures",
+        "price": 25000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1529564162152641/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/726061412_973897025473861_3696233814155677391_n.jpg?stp=c0.70.261.261a_dst-jpg_p261x260_tt6&_nc_cat=110&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=IxTlVbt740AQ7kNvwHCuVS6&_nc_oc=Adrq7EOO-FPGPqKTke6ppdGxt0GJdYWYAeo9DSXDebWUBf6_PfOyrly-8ZpQOCZuagaJlv0I1H3wUho0DXiWVm34&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=SMVJJDHp8C8ckWl2XhwPfg&_nc_ss=7b289&oh=00_AQMPuo3zv3uM64iagvl_glHdUVyN6xK59wBnBQ62om-L-Q&oe=6AC5C041",
+        "date": null,
+        "description": "25 000 CFA Chaussures Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "25000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · pointure 42 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-2995168",
+        "source": "coinafrique",
+        "title": "Chaussures de boxe",
+        "price": 25000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/autres-sports-et-loisirs/chaussures-de-boxe-2995168",
+        "photo": "https://images.coinafrique.com/thumb_2995168_uploaded_image1_1615403294.jpg",
+        "date": "il y a 5 années",
+        "description": "Autres Sports & Loisirs — Chaussures de boxe"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "25000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de chaussures",
+        "valeur": "boxe",
+        "extrait": "Chaussures de boxe"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · pointure 42 non confirmé · Type de chaussures : boxe (« Chaussures de boxe ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-2618416",
+        "source": "coinafrique",
+        "title": "Baskets Fashion Sport Femme ",
+        "price": 17000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/chaussures-femme/baskets-fashion-sport-femme-2618416",
+        "photo": "https://images.coinafrique.com/thumb_2618416_uploaded_image1_1599824869.jpg",
+        "date": "il y a 6 années",
+        "description": "Chaussures Femme — Baskets Fashion Sport Femme"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "17000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de chaussures",
+        "valeur": "femme",
+        "extrait": "Baskets Fashion Sport Femme"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · pointure 42 non confirmé · Type de chaussures : femme (« Baskets Fashion Sport Femme ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-1642217",
+        "source": "coinafrique",
+        "title": "Chaussures  TN",
+        "price": 10000,
+        "currency": "FCFA",
+        "zone": "Le plateau, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/chaussures-homme/chaussures-tn-1642217",
+        "photo": "https://images.coinafrique.com/thumb_1642217_uploaded_image1_1581577827.89.png",
+        "date": "il y a 6 années",
+        "description": "Chaussures Homme — Chaussures  TN"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "10000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Le plateau, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de chaussures",
+        "valeur": "TN",
+        "extrait": "Chaussures  TN"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Le plateau, Abidjan) · pointure 42 non confirmé · Type de chaussures : TN (« Chaussures  TN ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-1389730",
+        "source": "coinafrique",
+        "title": "Chaussures Homme",
+        "price": 8000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/chaussures-homme/chaussures-homme-1389730",
+        "photo": "https://images.coinafrique.com/thumb_1389730_uploaded_image1_1577306803.69.png",
+        "date": "il y a 6 années",
+        "description": "Chaussures Homme — Chaussures Homme"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "8000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de chaussures",
+        "valeur": "homme",
+        "extrait": "Chaussures Homme"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · pointure 42 non confirmé · Type de chaussures : homme (« Chaussures Homme ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-1389695",
+        "source": "coinafrique",
+        "title": "Chaussures Homme",
+        "price": 8000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/chaussures-homme/chaussures-homme-1389695",
+        "photo": "https://images.coinafrique.com/thumb_1389695_uploaded_image1_1577306073.23.png",
+        "date": "il y a 6 années",
+        "description": "Chaussures Homme — Chaussures Homme"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "8000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de chaussures",
+        "valeur": "homme",
+        "extrait": "Chaussures Homme"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · pointure 42 non confirmé · Type de chaussures : homme (« Chaussures Homme ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-943800",
+        "source": "coinafrique",
+        "title": "Chaussures Puma",
+        "price": 15000,
+        "currency": "FCFA",
+        "zone": "Le Plateau, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/chaussures-homme/chaussures-puma-943800",
+        "photo": "https://images.coinafrique.com/thumb_943800_uploaded_image2_1568459656.16.png",
+        "date": "il y a 7 années",
+        "description": "Chaussures Homme — Chaussures Puma"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "15000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Le Plateau, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Le Plateau, Abidjan) · pointure 42 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-921674",
+        "source": "coinafrique",
+        "title": "Puma",
+        "price": 13000,
+        "currency": "FCFA",
+        "zone": "Treichville, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/chaussures-homme/puma-921674",
+        "photo": "https://images.coinafrique.com/thumb_921674_uploaded_image1_1567936557.57.png",
+        "date": "il y a 7 années",
+        "description": "Chaussures Homme — Puma"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "13000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Treichville, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pointure 42 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Treichville, Abidjan) · pointure 42 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  }
+]

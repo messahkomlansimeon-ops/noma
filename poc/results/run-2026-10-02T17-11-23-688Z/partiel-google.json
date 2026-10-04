@@ -1,0 +1,58 @@
+{
+  "source": "google",
+  "status": "ok",
+  "annonces": [
+    {
+      "id": "gpage-1",
+      "source": "annonces.abidjan.net",
+      "title": "Détails Iphone 12 pro 256 giga - Annonces Abidjan",
+      "price": null,
+      "currency": "FCFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://annonces.abidjan.net/achat-vente/8024/details/iphone-12-pro-256-giga",
+      "photo": null,
+      "date": null,
+      "description": null
+    },
+    {
+      "id": "gpage-2",
+      "source": "www.meiteshop.fr",
+      "title": "iPhone 12 pro Occasion Pas chère - Meite Shop",
+      "price": null,
+      "currency": "FCFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://www.meiteshop.fr/produit/iphone-12-pro-occasion/",
+      "photo": null,
+      "date": null,
+      "description": null
+    },
+    {
+      "id": "gpage-3",
+      "source": "ci.diaytar.com",
+      "title": "Smartphone Apple iPhone 12 Pro 4 GB RAM 256 GB - Diaytar Côte d'Ivoire",
+      "price": 779300,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.diaytar.com/products/smartphone-apple-iphone-12-pro-4-gb-ram-256-gb-256-gb-61-reconditionne-a/",
+      "photo": null,
+      "date": null,
+      "description": "Smartphone Apple iPhone 12 Pro 4 GB RAM 256 GB 256 GB 6,1″ (Reconditionné A) - Diaytar Côte d'Ivoire. Produit reconditionné en état impeccable."
+    },
+    {
+      "id": "gpage-4",
+      "source": "rhegzor.com",
+      "title": "Apple iPhone 12 Pro 256GB - Rhegzor",
+      "price": 650000,
+      "currency": "FCFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://rhegzor.com/product/Apple-iPhone-12-Pro-256GB-UP6b2",
+      "photo": null,
+      "date": null,
+      "description": "Apple iPhone 12 Pro 256GB - Pacific Blue - iPhone 12 Pro. Superfast 5G. A14 Bionic, the fastest chip in a smartphone. Pro camera system for next-level low-light photography. It’s a beautiful leap forward."
+    }
+  ]
+}

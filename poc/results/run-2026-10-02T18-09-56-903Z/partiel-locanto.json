@@ -1,0 +1,58 @@
+{
+  "source": "locanto",
+  "status": "ok",
+  "annonces": [
+    {
+      "id": "loc-8242276633",
+      "source": "locanto",
+      "title": "Table à manger 4 places",
+      "price": 35000,
+      "currency": "FCFA",
+      "zone": "Abidjan",
+      "vendor": null,
+      "url": "https://www.locanto.ci/abidjan/ID_8242276633/Table-a-manger-4-places.html",
+      "photo": "https://images.locanto.info/6819247632/Table-a-manger-4-places_1.jpg",
+      "date": "il y a 8 mois",
+      "description": "Table à manger noir avec 4 chaises deuxième mains en bon état juste une chaise qui bouge un peu a récupérer a la riviera triangle. Possibilité de vous livrer a vos frais. Les sièges sont en rose Possibilité de changer ou de …"
+    },
+    {
+      "id": "loc-8016348179",
+      "source": "locanto",
+      "title": "Table à manger de 4 chaises",
+      "price": 185000,
+      "currency": "FCFA",
+      "zone": "Abidjan",
+      "vendor": null,
+      "url": "https://www.locanto.ci/abidjan/ID_8016348179/Table-a-manger-de-4-chaises.html",
+      "photo": "https://images.locanto.info/6730218662/Table-a-manger-de-4-chaises_1.jpg",
+      "date": "il y a 7 mois",
+      "description": "Table à manger de 4 chaises Dimensions Longueur 1m40 Largeur 80 cm Excellente qualité, nous livrons partout."
+    },
+    {
+      "id": "loc-8016352354",
+      "source": "locanto",
+      "title": "Table à manger de 6 chaises",
+      "price": 255000,
+      "currency": "FCFA",
+      "zone": "Abidjan",
+      "vendor": null,
+      "url": "https://www.locanto.ci/abidjan/ID_8016352354/Table-a-manger-de-6-chaises.html",
+      "photo": "https://images.locanto.info/6730222889/Table-a-manger-de-6-chaises_1.jpg",
+      "date": "il y a 7 mois",
+      "description": "Table à manger de 6 chaises Dimensions Longueur 1m40 Largeur 80 cm Hauteur 75 cm Meuble importé, nous livrons partout. Prix légèrement négociable."
+    },
+    {
+      "id": "loc-7706261703",
+      "source": "locanto",
+      "title": "Table à manger Ultra Propre, Bouaké",
+      "price": 40000,
+      "currency": "FCFA",
+      "zone": "Bouaké",
+      "vendor": null,
+      "url": "https://www.locanto.ci/bouake/ID_7706261703/Table-a-manger-Ultra-Propre.html",
+      "photo": "https://images.locanto.info/6619074755/Table-a-manger-Ultra-Propre_1.jpg",
+      "date": "il y a 14 mois",
+      "description": "Je vend ma table à manger ultra propre pour des raisons de départ de Bouake. J’ai acheté le complet avec 4 chaises à 100.000f mais je vends uniquement la table à 40.000. J’offre également 2 chaises gratuitement à …"
+    }
+  ]
+}

@@ -1,0 +1,5348 @@
+[
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6047132",
+        "source": "coinafrique",
+        "title": "Canapé ",
+        "price": 85000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-6047132",
+        "photo": "https://images.coinafrique.com/thumb_6047132_uploaded_image1_1788957903.jpg",
+        "date": "il y a 23 jours",
+        "description": "Meubles — Canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "85000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé",
+        "extrait": "Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de meuble : Canapé (« Canapé ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5925887",
+        "source": "coinafrique",
+        "title": "Canapé ",
+        "price": 60000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/immeubles/canape-5925887",
+        "photo": "https://images.coinafrique.com/thumb_5925887_uploaded_image1_1779811829.jpg",
+        "date": "il y a 4 mois",
+        "description": "Immeubles — Canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "60000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "canapé",
+        "extrait": "Immeubles — Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de meuble : canapé (« Immeubles — Canapé ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5855205",
+        "source": "coinafrique",
+        "title": "Canapé de deux places et deux pouf ",
+        "price": 45000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-de-deux-places-et-deux-pouf-5855205",
+        "photo": "https://images.coinafrique.com/thumb_5855205_uploaded_image1_1775670836.jpg",
+        "date": "il y a 5 mois",
+        "description": "Meubles — Canapé de deux places et deux pouf"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "45000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "canapé",
+        "extrait": "Meubles — Canapé de deux places et deux pouf"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de meuble : canapé (« Meubles — Canapé de deux places et deux pouf ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5816572",
+        "source": "coinafrique",
+        "title": "Ensemble salon canapé Maresias Beige ",
+        "price": 280000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/ensemble-salon-canape-maresias-beige-5816572",
+        "photo": "https://images.coinafrique.com/thumb_5816572_uploaded_image1_1773325821.jpg",
+        "date": "il y a 6 mois",
+        "description": "Meubles — Ensemble salon canapé Maresias Beige"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "280000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé",
+        "extrait": "Ensemble salon canapé Maresias Beige"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de meuble : Canapé (« Ensemble salon canapé Maresias Beige ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5599932",
+        "source": "coinafrique",
+        "title": "Canapé 5 places",
+        "price": 85000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-5-places-5599932",
+        "photo": "https://images.coinafrique.com/thumb_5599932_uploaded_image1_1761994097.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Canapé 5 places"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "85000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé 5 places"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Meubles — Canapé 5 places"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Meubles — Canapé 5 places ») · Zone : Cocody (« Meubles — Canapé 5 places »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5599927",
+        "source": "coinafrique",
+        "title": "Canapé 6 places",
+        "price": 145000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-6-places-5599927",
+        "photo": "https://images.coinafrique.com/thumb_5599927_uploaded_image1_1761993859.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Canapé 6 places"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "145000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé 6 places"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Meubles — Canapé 6 places"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Meubles — Canapé 6 places ») · Zone : Cocody (« Meubles — Canapé 6 places »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5599925",
+        "source": "coinafrique",
+        "title": "Canapé 2 places",
+        "price": 65000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-2-places-5599925",
+        "photo": "https://images.coinafrique.com/thumb_5599925_uploaded_image1_1761993518.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Canapé 2 places"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "65000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé 2 places"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Meubles — Canapé 2 places"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Meubles — Canapé 2 places ») · Zone : Cocody (« Meubles — Canapé 2 places »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5565810",
+        "source": "coinafrique",
+        "title": "Canapé L",
+        "price": 85000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-l-5565810",
+        "photo": "https://images.coinafrique.com/thumb_5565810_uploaded_image1_1760002825.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Canapé L"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "85000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé L"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Meubles — Canapé L ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5565805",
+        "source": "coinafrique",
+        "title": "Canapé L",
+        "price": 85000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-l-5565805",
+        "photo": "https://images.coinafrique.com/thumb_5565805_uploaded_image1_1760002711.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Canapé L"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "85000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé L"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Meubles — Canapé L ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5502295",
+        "source": "coinafrique",
+        "title": "Canapé L",
+        "price": 145000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-l-5502295",
+        "photo": "https://images.coinafrique.com/thumb_5502295_uploaded_image1_1756722472.jpg",
+        "date": "il y a 1 année",
+        "description": "Meubles — Canapé L"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "145000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé L"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Meubles — Canapé L ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5502291",
+        "source": "coinafrique",
+        "title": "Canapé ",
+        "price": 85000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-5502291",
+        "photo": "https://images.coinafrique.com/thumb_5502291_uploaded_image1_1756722369.jpg",
+        "date": "il y a 1 année",
+        "description": "Meubles — Canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "85000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Meubles — Canapé ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-7981094243",
+        "source": "locanto",
+        "title": "Canapé à vendre",
+        "price": 180000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.locanto.ci/abidjan/ID_7981094243/Canape-a-vendre.html",
+        "photo": "https://images.locanto.info/6717711226/Canape-a-vendre_1.jpg",
+        "date": "il y a 11 mois",
+        "description": "Salon en cuir marron – Canapé + Pouf – Très bon état – 180.000 F seulement ! Je vends un ensemble salon en cuir composé de : .1 canapé 2–3 places .1 pouf / repose-pied assorti Cuir marron, solide et facile à nettoyer Pieds en bois, structure très stable Très confortable et bien e"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "180000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Canapé à vendre"
+      },
+      {
+        "nom": "État",
+        "valeur": "Très bon état",
+        "extrait": "Très bon état"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "zone : Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de produit : Canapé (« Canapé à vendre ») · État : Très bon état (« Très bon état ») · Zone : Abidjan (« zone : Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-28827764356821499",
+        "source": "facebook",
+        "title": "Gratuit Canapé 02 bourré disponible",
+        "price": null,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/28827764356821499/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/803102979_1756558105394624_5620093688071748926_n.jpg?stp=c11.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=108&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=n1XaFxCYqK8Q7kNvwFzsp2T&_nc_oc=AdrYKh85VSNN4HK87OWo2vIIu7reest0JUnCtBpn-yv7JOGwQNIyaGZdsc5r4xDzOFPu3NKHiO3Jww3Wqv-Py-i1&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQNC3xWb3fTD1yxJPe904jKEMjNOLwW4I2pBVREbX96fBw&oe=6AC5B567",
+        "date": null,
+        "description": "Gratuit Canapé 02 bourré disponible Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "prix non affiché — à confirmer auprès du vendeur"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.88,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "prix",
+        "valeur": "gratuit",
+        "extrait": "Gratuit Canapé 02 bourré disponible"
+      },
+      {
+        "nom": "zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · prix sur demande · zone ok (Abidjan) · prix : gratuit (« Gratuit Canapé 02 bourré disponible ») · zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1433079758924107",
+        "source": "facebook",
+        "title": "Gratuit Canapé terracota",
+        "price": null,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1433079758924107/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/819015904_28764470209908778_1984159150281324416_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=110&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=RhMh5T-tfEEQ7kNvwGd7y6C&_nc_oc=AdpPEw_026DtlqgoTPL6ahK4-ASKEyofYFuJE_DI9GyRVLVyIcQRf46g4V3oJwsRAtghdQ7NnWCueYu6eoH6QoRi&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQNegrskX3kqfOZ-fYkOfA_Yv0O293aFRrcnN6f2jdJhDQ&oe=6AC5AAEF",
+        "date": null,
+        "description": "Gratuit Canapé terracota Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "prix non affiché — à confirmer auprès du vendeur"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.88,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "prix",
+        "valeur": "gratuit",
+        "extrait": "Gratuit Canapé terracota"
+      },
+      {
+        "nom": "zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · prix sur demande · zone ok (Abidjan) · prix : gratuit (« Gratuit Canapé terracota ») · zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1523337642503661",
+        "source": "facebook",
+        "title": "Gratuit Canapé 03 places",
+        "price": null,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1523337642503661/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/671674991_802909012878956_1625367473616913860_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=110&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=PWacNPs4T60Q7kNvwGHeZQ5&_nc_oc=Adq3gXp6ywLJb6rQWixqiAnnm6aNcq1XiqmTdUMDp6y4ZfhguVo6TXiw5J1RbjAMqPEu12bu6F4bFU6IWP2ZpwXD&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQO-VCj9ohjKJjwlK2Bz5WS3SOi76Ac0FpEs0Iq9THyERg&oe=6AC5A097",
+        "date": null,
+        "description": "Gratuit Canapé 03 places Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "prix non affiché — à confirmer auprès du vendeur"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.88,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Disponibilité",
+        "valeur": "Gratuit",
+        "extrait": "Gratuit Canapé 03 places"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · prix sur demande · zone ok (Abidjan) · Disponibilité : Gratuit (« Gratuit Canapé 03 places ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1816650446127123",
+        "source": "facebook",
+        "title": "Canapé, disponible",
+        "price": 15000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1816650446127123/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/831026139_1304683981677558_128704686741546213_n.jpg?stp=c0.16.261.261a_dst-jpg_p261x260_tt6&_nc_cat=107&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=xERKLo6hiMsQ7kNvwEFQAfb&_nc_oc=AdqnG2Xj1WFWZbebQZwhy7qf-SbRaihhLxGMzt5-cKojyTxO50Pw6_j31JkRLovqUkcUGwCsZDfQkmDjXRMo-Q4H&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQOggE0hoH6i_uWLcPpM0uBLCaMVR-U2lKisWWfg5GDa-w&oe=6AC5B847",
+        "date": "récente",
+        "description": "Annonce récente 15 000 CFA Canapé, disponible Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "15000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.82,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "prix",
+        "valeur": "15000",
+        "extrait": "15 000 CFA Canapé, disponible"
+      },
+      {
+        "nom": "zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · prix : 15000 (« 15 000 CFA Canapé, disponible ») · zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5565802",
+        "source": "coinafrique",
+        "title": "Canapé ",
+        "price": 145000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-5565802",
+        "photo": "https://images.coinafrique.com/thumb_5565802_uploaded_image1_1760002625.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "145000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.82,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Meubles — Canapé ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5565794",
+        "source": "coinafrique",
+        "title": "Canapé salon",
+        "price": 165000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-salon-5565794",
+        "photo": "https://images.coinafrique.com/thumb_5565794_uploaded_image1_1760002376.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Canapé salon"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "165000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.82,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé salon"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Meubles — Canapé salon ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-7902974154",
+        "source": "locanto",
+        "title": "SALON 5 PLACES CANAPÉ complet",
+        "price": 80000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.locanto.ci/abidjan/ID_7902974154/SALON-5-PLACES-CANAPE-complet.html",
+        "photo": "https://images.locanto.info/6690491511/SALON-5-PLACES-CANAPE-complet_1.jpg",
+        "date": "il y a 11 mois",
+        "description": "Canapé a vendre salon complet 5 places + tapis importé mousse"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "80000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.82,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Canapé a vendre salon complet 5 places"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "zone : Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de produit : Canapé (« Canapé a vendre salon complet 5 places ») · Zone : Abidjan (« zone : Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1828309855152361",
+        "source": "facebook",
+        "title": "Canapé 02 places",
+        "price": 35000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1828309855152361/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/819146599_4731101597119318_6810549805369430865_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=TxRbFWAJPNMQ7kNvwHfwplY&_nc_oc=Adql8DtB-lGH_ne9RniOM6y1IknZpY5bmoUeHJoPocBKS53oUMJs9w-YBXwtZUSb9-ZYjUwx3y9rKZwmfHGj16bJ&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQMHNI2Rof7-nxsJmCYZvndKe9PE7GjwWve_R0G9Pss4vw&oe=6AC58CB6",
+        "date": null,
+        "description": "35 000 CFA Canapé 02 places Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "35000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.78,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "prix",
+        "valeur": "35000",
+        "extrait": "35 000 CFA Canapé 02 places"
+      },
+      {
+        "nom": "zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · prix : 35000 (« 35 000 CFA Canapé 02 places ») · zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1650431406678242",
+        "source": "facebook",
+        "title": "Canapé fauteuil",
+        "price": 20000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1650431406678242/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/805923602_1661135925375724_3329770879553453846_n.jpg?stp=c0.0.261.261a_dst-jpg_p261x260_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=BXFEW04TE40Q7kNvwHBXIgc&_nc_oc=Adr7cJz_Yql-6FdzZ0Ho8WEY9u0N25Csz8LVFH4jurdieYbLFUU9-vei1Ao981tYq2K64fzqALleHSWhJ9O9Nmi4&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQMrbrM5FHkhVeN9WucFXdgtxVk3nbuCr8SznXIdgBfyng&oe=6AC5A3A3",
+        "date": null,
+        "description": "20 000 CFA Canapé fauteuil Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "20000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.78,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "prix",
+        "valeur": "20000",
+        "extrait": "20 000 CFA Canapé fauteuil"
+      },
+      {
+        "nom": "zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · prix : 20000 (« 20 000 CFA Canapé fauteuil ») · zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1069945889221309",
+        "source": "facebook",
+        "title": "Canapé fauteuil",
+        "price": 25000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1069945889221309/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/829196753_1005187862591000_4986995475190944264_n.jpg?stp=c58.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=102&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=v6gzrHRTNOIQ7kNvwFCLppw&_nc_oc=Adrj0k2dNBVRRiqB-ssJkE171D-pa8icGbsBNVRGuQIidofeQWKJuKVhGsccqHHtRnb8V2r7KOvlOxwub1dKjm3D&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQOjvkBLf5tleEsfm5NqBoU5trr8xyk1MYdxEx2651W28A&oe=6AC5AEF3",
+        "date": null,
+        "description": "25 000 CFA Canapé fauteuil Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "25000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.78,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "prix",
+        "valeur": "25000",
+        "extrait": "25 000 CFA Canapé fauteuil"
+      },
+      {
+        "nom": "zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · prix : 25000 (« 25 000 CFA Canapé fauteuil ») · zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-2577595012754888",
+        "source": "facebook",
+        "title": "Canapé fauteuil",
+        "price": 25000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/2577595012754888/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/825352888_1752181926070049_793991325828509723_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=102&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=J2g20Y6us8gQ7kNvwEGGsRS&_nc_oc=AdozV-TnYJdEBpN8OzgoFEh7Ap2k8ztDxsW94YuNmWNiV78Tv6eAxjoeFokZK__Fyr3yD_huNkJv4Z7SXMK8WX_V&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQMVtk5p0jRM21vLi1f1ruvb9IUP5Eh5LOYqm1WjIjIaog&oe=6AC5A0C9",
+        "date": null,
+        "description": "25 000 CFA Canapé fauteuil Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "25000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.78,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "prix",
+        "valeur": "25000",
+        "extrait": "25 000 CFA Canapé fauteuil"
+      },
+      {
+        "nom": "zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · prix : 25000 (« 25 000 CFA Canapé fauteuil ») · zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1130223789564185",
+        "source": "facebook",
+        "title": "Canapé fauteuil",
+        "price": 20000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1130223789564185/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/825292536_1951451872477797_7470421644301402443_n.jpg?stp=c0.159.261.261a_dst-jpg_p261x260_tt6&_nc_cat=104&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=2kJbVbgCzIIQ7kNvwGQjb58&_nc_oc=Adq_x6kUsJgSGwzNN_-HFpKKl8Ed84C6IqHxiAMPUNftb17gkiiM-I0Muhct0DJ51Vi_0fXt9e50hBjClhOFIFYc&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQM5DDlakvg8cjF72HUO5z8rG77NLOEXk4ge_MmUIjHgVQ&oe=6AC5ACF0",
+        "date": null,
+        "description": "20 000 CFA Canapé fauteuil Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "20000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.78,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "prix",
+        "valeur": "20000",
+        "extrait": "20 000 CFA Canapé fauteuil"
+      },
+      {
+        "nom": "zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · prix : 20000 (« 20 000 CFA Canapé fauteuil ») · zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-799725393232886",
+        "source": "facebook",
+        "title": "Canapé avec pouf",
+        "price": 25000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/799725393232886/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/762324931_1408597081116077_3108323359508626019_n.jpg?stp=c57.0.256.256a_dst-jpg_p370x247_tt6&_nc_cat=107&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=qv5uhWIPYWMQ7kNvwEIf2dN&_nc_oc=AdrIUg1Japm1-t-ACdrjmLnltdQTxWRJESHNDyxmvNbQa7sx7bspbXMTbFvl3ORXME9tPykNvnbg13vLp8VdYeer&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQOZhv7d5cTKHF8RcddjTP_gyYxZttt43MhISPpfjYwMVg&oe=6AC59C36",
+        "date": null,
+        "description": "25 000 CFA Canapé avec pouf Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "25000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.78,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Prix",
+        "valeur": "25000 FCFA",
+        "extrait": "25 000 CFA Canapé avec pouf"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Prix : 25000 FCFA (« 25 000 CFA Canapé avec pouf ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1054547286984970",
+        "source": "facebook",
+        "title": "Canapé disponible à Bon prix",
+        "price": 18000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1054547286984970/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/786069946_1748914206247567_9077880503431487586_n.jpg?stp=c55.0.259.259a_dst-jpg_p370x247_tt6&_nc_cat=110&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=t4KT2TW7HsMQ7kNvwGGJFv2&_nc_oc=Adqkkh_AKcjqd9ISar513E43wKxGkTHLw5wLLxRTBVLUO_0FOptlBP_uf7f7s5szb8g-RkhDIyT55qQhLmzkKjAj&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQP05CYP4U2pgr_objwos8i-NidyFMf9bJwgyhOcs5beWA&oe=6AC5A475",
+        "date": null,
+        "description": "18 000 CFA Canapé disponible à Bon prix Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "18000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.78,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Prix",
+        "valeur": "18000 FCFA",
+        "extrait": "18 000 CFA Canapé disponible à Bon prix"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Prix : 18000 FCFA (« 18 000 CFA Canapé disponible à Bon prix ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1521579779710336",
+        "source": "facebook",
+        "title": "Canapé avec deux poufs",
+        "price": 25000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1521579779710336/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/762404617_1081392541068973_6103647434559022075_n.jpg?stp=c8.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=pQPKwF7fsEoQ7kNvwGdjGiN&_nc_oc=AdrBujzR1x-U_Y790Yh0FvDjrytzjVtIjP96TlgTkO09TwdPWqmdwH66_SknlOUC6JZD5CaQu2vINeMPlKXgGPKN&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQOaHOVHCxf4L2naq1v6yWecG9GQtqqikh8sb7JvYLIcxA&oe=6AC5ADEA",
+        "date": null,
+        "description": "25 000 CFA Canapé avec deux poufs Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "25000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.78,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Prix",
+        "valeur": "25000 FCFA",
+        "extrait": "25 000 CFA Canapé avec deux poufs"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Prix : 25000 FCFA (« 25 000 CFA Canapé avec deux poufs ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1755188895692015",
+        "source": "facebook",
+        "title": "Canapé une place disponible à bon prix.",
+        "price": 12000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1755188895692015/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/821175195_1617767509883303_4841209194335170216_n.jpg?stp=c59.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=103&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=z0Mwk3Sr7zUQ7kNvwE7KZic&_nc_oc=Ado4JQovrpINY4kA47TB6IN3zqGJl9RkUmyOt-XValJdL5KOwL0_A04Ffpp-Cbd2cixTQDAkLZPUJgakB_uxNzHe&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQPmIEaMD1ZMTtUel2ZNr5bO7ywMI8jGup0NtnGZDEMpGQ&oe=6AC5B19D",
+        "date": null,
+        "description": "12 000 CFA Canapé une place disponible à bon prix. Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "12000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.73,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "prix",
+        "valeur": "12000",
+        "extrait": "12 000 CFA Canapé une place disponible à bon prix."
+      },
+      {
+        "nom": "zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · prix : 12000 (« 12 000 CFA Canapé une place disponible à bon prix. ») · zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-1075310881802048",
+        "source": "facebook",
+        "title": "Canapé 2 places",
+        "price": 75000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/1075310881802048/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/830187442_1315872077212025_3447439634862228135_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=103&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=LcffXq4sRPQQ7kNvwGIqx3P&_nc_oc=AdoI-IsJVH9sBLA83CkJgQmWiNJQF1ptkRkkXotpWHMdL8hgPP9hiAo5EuhpcmOy5HDAyEEem16BBCXcyfKfqfWO&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQM-7jFG53tqmI7ikyWpEFsx9YOUbl7105mq1_68Pa_Mzg&oe=6AC58D72",
+        "date": "récente",
+        "description": "Annonce récente 75 000 CFA Canapé 2 places Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "75000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.72,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "prix",
+        "valeur": "75000",
+        "extrait": "75 000 CFA Canapé 2 places"
+      },
+      {
+        "nom": "zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · prix : 75000 (« 75 000 CFA Canapé 2 places ») · zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5509487",
+        "source": "coinafrique",
+        "title": "Canapé gonflable",
+        "price": 16000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-gonflable-5509487",
+        "photo": "https://images.coinafrique.com/thumb_5509487_uploaded_image1_1757043541.jpg",
+        "date": "il y a 1 année",
+        "description": "Meubles — Canapé gonflable"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "16000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.72,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé gonflable"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Meubles — Canapé gonflable ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-28177492731950099",
+        "source": "facebook",
+        "title": "Canapé",
+        "price": 40000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/28177492731950099/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/825281639_1529105305690532_5532472521371087908_n.jpg?stp=c0.101.261.261a_dst-jpg_p261x260_tt6&_nc_cat=108&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=6Rkhmd4AZ1sQ7kNvwEUWYto&_nc_oc=Adq9MmhkyrDSTwSBaWVZCwcxjcT9-DWMl9z0divcdI1CbCOW7ZmH4zevqcTN5nTk4UcSMaGAcj4I7CdBqxdMn83W&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQOGFVGwH_zryydlC_qJFmH_2rfnkd0R9pxAhzZKGCSK6Q&oe=6AC5B70F",
+        "date": null,
+        "description": "40 000 CFA Canapé Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "40000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.68,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Prix",
+        "valeur": "40000 FCFA",
+        "extrait": "40 000 CFA Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Prix : 40000 FCFA (« 40 000 CFA Canapé ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "fb-4161256930675657",
+        "source": "facebook",
+        "title": "Canapé fauteuil",
+        "price": 30000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.facebook.com/marketplace/item/4161256930675657/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+        "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/800152862_2212782902630057_6517654005172712793_n.jpg?stp=c0.32.261.261a_dst-jpg_p261x260_tt6&_nc_cat=110&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=bWMiF6yWp2QQ7kNvwHMi4D5&_nc_oc=AdrPiHu3Em5qQXLp25zxQk2YRXFqji2ItGr5phQFuzMNQ8RF2rq9k01-W0r9vIjPwqFv8E0XSpMD4d2ZAClOWdhe&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=JQjmEAMOwC2WWMadsyUa1w&_nc_ss=7b289&oh=00_AQPUB2w3YHo0iRSQ-qWJIjjLmwA_FSl0SwQGcPWZe9BN6g&oe=6AC5A5B4",
+        "date": null,
+        "description": "30 000 CFA Canapé fauteuil Abidjan"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "30000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.68,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Prix",
+        "valeur": "30000 FCFA",
+        "extrait": "30 000 CFA Canapé fauteuil"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Prix : 30000 FCFA (« 30 000 CFA Canapé fauteuil ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6057815",
+        "source": "coinafrique",
+        "title": "Canapé ",
+        "price": 250000,
+        "currency": "FCFA",
+        "zone": "Marcory, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-6057815",
+        "photo": "https://images.coinafrique.com/thumb_6057815_uploaded_image1_1789822969.jpg",
+        "date": "il y a 13 jours",
+        "description": "Meubles — Canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "250000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Marcory, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.67,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé",
+        "extrait": "Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Marcory",
+        "extrait": "Marcory, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Marcory, Abidjan) · Type de meuble : Canapé (« Canapé ») · Zone : Marcory (« Marcory, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5672118",
+        "source": "coinafrique",
+        "title": "Canapé simili en cuir confortable",
+        "price": 120000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-simili-en-cuir-confortable-5672118",
+        "photo": "https://images.coinafrique.com/thumb_5672118_uploaded_image1_1765728961.jpg",
+        "date": "il y a 9 mois",
+        "description": "Meubles — Canapé simili en cuir confortable"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "120000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.67,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé simili en cuir",
+        "extrait": "Meubles — Canapé simili en cuir confortable"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "zone : Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de meuble : Canapé simili en cuir (« Meubles — Canapé simili en cuir confortable ») · Zone : Abidjan (« zone : Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5612466",
+        "source": "coinafrique",
+        "title": "Canapé",
+        "price": 500000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-5612466",
+        "photo": "https://images.coinafrique.com/thumb_5612466_uploaded_image1_1762653774.jpg",
+        "date": "il y a 10 mois",
+        "description": "Meubles — Canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "500000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.67,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Meubles — Canapé"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de produit : Canapé (« Meubles — Canapé ») · Zone : Abidjan (« Meubles — Canapé »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5599270",
+        "source": "coinafrique",
+        "title": "Canapé 7 places",
+        "price": 250000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-7-places-5599270",
+        "photo": "https://images.coinafrique.com/thumb_5599270_uploaded_image1_1761941075.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Canapé 7 places"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "250000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.67,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé",
+        "extrait": "Canapé 7 places"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Yopougon",
+        "extrait": "Yopougon, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · Type de meuble : Canapé (« Canapé 7 places ») · Zone : Yopougon (« Yopougon, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5570186",
+        "source": "coinafrique",
+        "title": "Canapé",
+        "price": 48000,
+        "currency": "FCFA",
+        "zone": "Adjamé, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-5570186",
+        "photo": "https://images.coinafrique.com/thumb_5570186_uploaded_image1_1760266507.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "48000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Adjamé, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.67,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé",
+        "extrait": "Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Adjamé",
+        "extrait": "Adjamé, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Adjamé, Abidjan) · Type de meuble : Canapé (« Canapé ») · Zone : Adjamé (« Adjamé, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-9244787480",
+        "source": "locanto",
+        "title": "Canapé fauteuil pour salon, Deux plateaux",
+        "price": 25000,
+        "currency": "FCFA",
+        "zone": "Deux plateaux",
+        "vendor": null,
+        "url": "https://www.locanto.ci/abidjan/ID_9244787480/Canape-fauteuil-pour-salon.html",
+        "photo": "https://images.locanto.info/7017438955/Canape-fauteuil-pour-salon_1.jpg",
+        "date": "il y a 2 mois",
+        "description": "Livraison rapide paiement sécurisé, avec Karim service vous êtes livré avec respect. Vente de canapé fauteuil"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "25000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Deux plateaux",
+        "note": "autre zone : plateau"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.63,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé fauteuil",
+        "extrait": "Vente de canapé fauteuil"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Deux plateaux",
+        "extrait": "zone : Deux plateaux"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Deux plateaux — autre zone : plateau · Type de produit : Canapé fauteuil (« Vente de canapé fauteuil ») · Zone : Deux plateaux (« zone : Deux plateaux »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5742515",
+        "source": "coinafrique",
+        "title": "Canapé ",
+        "price": 35500,
+        "currency": "FCFA",
+        "zone": "Angré, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-5742515",
+        "photo": "https://images.coinafrique.com/thumb_5742515_uploaded_image1_1769439834.jpg",
+        "date": "il y a 8 mois",
+        "description": "Meubles — Canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "35500 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Angré, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.62,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Angré",
+        "extrait": "zone : Angré, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Angré, Abidjan) · Type de meuble : Canapé (« Meubles — Canapé ») · Zone : Angré (« zone : Angré, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5722710",
+        "source": "coinafrique",
+        "title": "Canapé en cuir ",
+        "price": 1600000,
+        "currency": "FCFA",
+        "zone": "Angré, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-en-cuir-5722710",
+        "photo": "https://images.coinafrique.com/thumb_5722710_uploaded_image1_1768490364.jpg",
+        "date": "il y a 8 mois",
+        "description": "Meubles — Canapé en cuir"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "1600000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Angré, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.62,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé en cuir",
+        "extrait": "Meubles — Canapé en cuir"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Angré",
+        "extrait": "zone : Angré, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Angré, Abidjan) · Type de meuble : Canapé en cuir (« Meubles — Canapé en cuir ») · Zone : Angré (« zone : Angré, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5484519",
+        "source": "coinafrique",
+        "title": "Canapé ",
+        "price": 1800000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-5484519",
+        "photo": "https://images.coinafrique.com/thumb_5484519_uploaded_image1_1755706778.jpg",
+        "date": "il y a 1 année",
+        "description": "Meubles — Canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "1800000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.62,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Meubles — Canapé ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6050422",
+        "source": "coinafrique",
+        "title": "Fauteuil canapé ",
+        "price": 35000,
+        "currency": "FCFA",
+        "zone": "Koumassi, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/fauteuil-canape-6050422",
+        "photo": "https://images.coinafrique.com/thumb_6050422_uploaded_image1_1789212827.jpg",
+        "date": "il y a 20 jours",
+        "description": "Meubles — Fauteuil canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "35000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Koumassi, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.57,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Fauteuil canapé",
+        "extrait": "Fauteuil canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Koumassi",
+        "extrait": "Koumassi, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Koumassi, Abidjan) · Type de meuble : Fauteuil canapé (« Fauteuil canapé ») · Zone : Koumassi (« Koumassi, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-7878271173",
+        "source": "locanto",
+        "title": "Canapé Gonflable Relax",
+        "price": 25000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.locanto.ci/abidjan/ID_7878271173/Canape-Gonflable-Relax.html",
+        "photo": "https://images.locanto.info/6681537068/Canape-Gonflable-Relax_1.jpg",
+        "date": "il y a 10 mois",
+        "description": "Plongez dans le confort avec ce fauteuil gonflable à l’élégance sobre. Sa finition noire avec assise beige crée un look chic et intemporel, parfait pour un salon, une chambre ou même un bureau. Il reprend la même structure que le modèle rose/gris mais dans une version plus neutre"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "25000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.57,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé gonflable",
+        "extrait": "Canapé Gonflable Relax"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "zone : Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de produit : Canapé gonflable (« Canapé Gonflable Relax ») · Zone : Abidjan (« zone : Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-7607381095",
+        "source": "locanto",
+        "title": "Canapé Gonflable Leedssoy – Confort Assis ou Allongé (Single Siz",
+        "price": 20000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.locanto.ci/abidjan/ID_7607381095/Canape-Gonflable-Leedssoy-Confort-Assis-ou-Allonge-Single-Siz.html",
+        "photo": "https://images.locanto.info/6577721450/Canape-Gonflable-Leedssoy-Confort-Assis-ou-Allonge-Single-Siz_1.jpg",
+        "date": "il y a 13 mois",
+        "description": "Description : Profitez d’un confort exceptionnel avec ce canapé gonflable 2 en 1 ! Idéal pour se relaxer, lire, regarder la télé ou même dormir. Son design ergonomique assure un excellent soutien du dos et du corps. Résistant, respirant et anti-basculement, il se gonfle et se ran"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "20000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.57,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé gonflable",
+        "extrait": "Canapé Gonflable Leedssoy"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "zone : Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de produit : Canapé gonflable (« Canapé Gonflable Leedssoy ») · Zone : Abidjan (« zone : Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6067705",
+        "source": "coinafrique",
+        "title": "Salon complet moderne à vendre – très bon état",
+        "price": 550000,
+        "currency": "FCFA",
+        "zone": "Marcory, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/salon-complet-moderne-a-vendre-tres-bon-etat-6067705",
+        "photo": "https://images.coinafrique.com/thumb_6067705_uploaded_image1_1790758220.jpg",
+        "date": "il y a 2 jours",
+        "description": "Meubles — Salon complet moderne à vendre – très bon état"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "550000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Marcory, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.56,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Salon complet",
+        "extrait": "Salon complet moderne à vendre – très bon état"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Marcory",
+        "extrait": "Marcory, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Marcory, Abidjan) · Type de meuble : Salon complet (« Salon complet moderne à vendre – très bon état ») · Zone : Marcory (« Marcory, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5602599",
+        "source": "coinafrique",
+        "title": "Ensemble de salon",
+        "price": 450000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/ensemble-de-salon-5602599",
+        "photo": "https://images.coinafrique.com/thumb_5602599_uploaded_image1_1762158590.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Ensemble de salon"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "450000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.56,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Ensemble de salon",
+        "extrait": "Meubles — Ensemble de salon"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Meubles — Ensemble de salon"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Ensemble de salon (« Meubles — Ensemble de salon ») · Zone : Cocody (« Meubles — Ensemble de salon »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5584787",
+        "source": "coinafrique",
+        "title": "Ensemble salon complet",
+        "price": 650000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/ensemble-salon-complet-5584787",
+        "photo": "https://images.coinafrique.com/thumb_5584787_uploaded_image1_1761059349.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Ensemble salon complet"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "650000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.56,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Ensemble salon",
+        "extrait": "Ensemble salon complet"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de meuble : Ensemble salon (« Ensemble salon complet ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5579240",
+        "source": "coinafrique",
+        "title": "Salon complet ",
+        "price": 300000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/salon-complet-5579240",
+        "photo": "https://images.coinafrique.com/thumb_5579240_uploaded_image1_1760734069.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Salon complet"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "300000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.56,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Salon complet",
+        "extrait": "Salon complet"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de meuble : Salon complet (« Salon complet ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5578789",
+        "source": "coinafrique",
+        "title": "Ensemble fauteuil salon",
+        "price": 285000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/ensemble-fauteuil-salon-5578789",
+        "photo": "https://images.coinafrique.com/thumb_5578789_uploaded_image1_1760709667.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Ensemble fauteuil salon"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "285000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.56,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Ensemble fauteuil salon",
+        "extrait": "Ensemble fauteuil salon"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de meuble : Ensemble fauteuil salon (« Ensemble fauteuil salon ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5578783",
+        "source": "coinafrique",
+        "title": "Ensemble salon moderne",
+        "price": 450000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/ensemble-salon-moderne-5578783",
+        "photo": "https://images.coinafrique.com/thumb_5578783_uploaded_image1_1760709434.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Ensemble salon moderne"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "450000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.56,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Ensemble salon",
+        "extrait": "Ensemble salon moderne"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de meuble : Ensemble salon (« Ensemble salon moderne ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5576063",
+        "source": "coinafrique",
+        "title": "Salon complet ",
+        "price": 500000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/salon-complet-5576063",
+        "photo": "https://images.coinafrique.com/thumb_5576063_uploaded_image1_1760573524.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Salon complet"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "500000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.56,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Salon complet",
+        "extrait": "Salon complet"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de meuble : Salon complet (« Salon complet ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6017703",
+        "source": "coinafrique",
+        "title": "Canapé d’angle",
+        "price": 65000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-dangle-6017703",
+        "photo": "https://images.coinafrique.com/thumb_6017703_uploaded_image1_1786555683.jpg",
+        "date": "il y a 1 mois",
+        "description": "Meubles — Canapé d’angle"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "65000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.52,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé d’angle",
+        "extrait": "Canapé d’angle"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Yopougon",
+        "extrait": "Yopougon, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · Type de meuble : Canapé d’angle (« Canapé d’angle ») · Zone : Yopougon (« Yopougon, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6017695",
+        "source": "coinafrique",
+        "title": "Canapé 2 places confortable ",
+        "price": 25000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-2-places-confortable-6017695",
+        "photo": "https://images.coinafrique.com/thumb_6017695_uploaded_image1_1786554908.jpg",
+        "date": "il y a 1 mois",
+        "description": "Meubles — Canapé 2 places confortable"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "25000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.52,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé 2 places",
+        "extrait": "Canapé 2 places confortable"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Yopougon",
+        "extrait": "Yopougon, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · Type de meuble : Canapé 2 places (« Canapé 2 places confortable ») · Zone : Yopougon (« Yopougon, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6027575",
+        "source": "coinafrique",
+        "title": "fauteuil 6 places à brader",
+        "price": 800000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/fauteuil-6-places-a-brader-6027575",
+        "photo": "https://images.coinafrique.com/thumb_6027575_uploaded_image1_1787311026.jpg",
+        "date": "il y a 1 mois",
+        "description": "Meubles — fauteuil 6 places à brader"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "800000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.51,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Fauteuil 6 places",
+        "extrait": "fauteuil 6 places à brader"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de meuble : Fauteuil 6 places (« fauteuil 6 places à brader ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5916777",
+        "source": "coinafrique",
+        "title": "Fauteuil canapé ",
+        "price": 200000,
+        "currency": "FCFA",
+        "zone": "Koumassi, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/fauteuil-canape-5916777",
+        "photo": "https://images.coinafrique.com/thumb_5916777_uploaded_image1_1779201981.jpg",
+        "date": "il y a 4 mois",
+        "description": "Meubles — Fauteuil canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "200000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Koumassi, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.42,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "fauteuil canapé",
+        "extrait": "Meubles — Fauteuil canapé"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Koumassi, Abidjan) · Type de meuble : fauteuil canapé (« Meubles — Fauteuil canapé »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5892537",
+        "source": "coinafrique",
+        "title": "Canapé 3 places ",
+        "price": 45000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-3-places-5892537",
+        "photo": "https://images.coinafrique.com/thumb_5892537_uploaded_image1_1777771294.jpg",
+        "date": "il y a 5 mois",
+        "description": "Meubles — Canapé 3 places"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "45000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.42,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "canapé",
+        "extrait": "Meubles — Canapé 3 places"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de meuble : canapé (« Meubles — Canapé 3 places »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5841001",
+        "source": "coinafrique",
+        "title": "Canapé ",
+        "price": 210000,
+        "currency": "FCFA",
+        "zone": "Koumassi, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-5841001",
+        "photo": "https://images.coinafrique.com/thumb_5841001_uploaded_image1_1774874989.jpg",
+        "date": "il y a 6 mois",
+        "description": "Meubles — Canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "210000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Koumassi, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.42,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé",
+        "extrait": "Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Koumassi",
+        "extrait": "Koumassi, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Koumassi, Abidjan) · Type de meuble : Canapé (« Canapé ») · Zone : Koumassi (« Koumassi, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5816192",
+        "source": "coinafrique",
+        "title": "Canapé",
+        "price": 450000,
+        "currency": "FCFA",
+        "zone": "Marcory, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-5816192",
+        "photo": "https://images.coinafrique.com/thumb_5816192_uploaded_image1_1773308122.jpg",
+        "date": "il y a 6 mois",
+        "description": "Meubles — Canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "450000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Marcory, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.42,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé",
+        "extrait": "Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Marcory",
+        "extrait": "Marcory, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Marcory, Abidjan) · Type de meuble : Canapé (« Canapé ») · Zone : Marcory (« Marcory, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5816141",
+        "source": "coinafrique",
+        "title": "Canapé",
+        "price": 600000,
+        "currency": "FCFA",
+        "zone": "Marcory, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-5816141",
+        "photo": "https://images.coinafrique.com/thumb_5816141_uploaded_image1_1773305652.jpg",
+        "date": "il y a 6 mois",
+        "description": "Meubles — Canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "600000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Marcory, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.42,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé",
+        "extrait": "Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Marcory",
+        "extrait": "Marcory, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Marcory, Abidjan) · Type de meuble : Canapé (« Canapé ») · Zone : Marcory (« Marcory, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5810002",
+        "source": "coinafrique",
+        "title": "Canapé importer neuf",
+        "price": 45000,
+        "currency": "FCFA",
+        "zone": "Marcory, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-importer-neuf-5810002",
+        "photo": "https://images.coinafrique.com/thumb_5810002_uploaded_image1_1772959627.jpg",
+        "date": "il y a 6 mois",
+        "description": "Meubles — Canapé importer neuf"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "45000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Marcory, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.42,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé",
+        "extrait": "Canapé importer neuf"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Marcory",
+        "extrait": "Marcory, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Marcory, Abidjan) · Type de meuble : Canapé (« Canapé importer neuf ») · Zone : Marcory (« Marcory, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5810000",
+        "source": "coinafrique",
+        "title": "Canapé importer neuf",
+        "price": 42000,
+        "currency": "FCFA",
+        "zone": "Marcory, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/pour-la-maison/canape-importer-neuf-5810000",
+        "photo": "https://images.coinafrique.com/thumb_5810000_uploaded_image1_1772959559.jpg",
+        "date": "il y a 6 mois",
+        "description": "Pour la maison — Canapé importer neuf"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "42000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Marcory, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.42,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé",
+        "extrait": "Canapé importer neuf"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Marcory",
+        "extrait": "Marcory, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Marcory, Abidjan) · Type de meuble : Canapé (« Canapé importer neuf ») · Zone : Marcory (« Marcory, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5666901",
+        "source": "coinafrique",
+        "title": "Canapés 2 places",
+        "price": 55000,
+        "currency": "FCFA",
+        "zone": "Adjamé, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canapes-2-places-5666901",
+        "photo": "https://images.coinafrique.com/thumb_5666901_uploaded_image1_1765432229.jpg",
+        "date": "il y a 9 mois",
+        "description": "Meubles — Canapés 2 places"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "55000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Adjamé, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.42,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapés 2 places",
+        "extrait": "Meubles — Canapés 2 places"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Adjamé",
+        "extrait": "zone : Adjamé, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Adjamé, Abidjan) · Type de meuble : Canapés 2 places (« Meubles — Canapés 2 places ») · Zone : Adjamé (« zone : Adjamé, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5640984",
+        "source": "coinafrique",
+        "title": "Canapé ",
+        "price": 80000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-5640984",
+        "photo": "https://images.coinafrique.com/thumb_5640984_uploaded_image1_1764098611.jpg",
+        "date": "il y a 10 mois",
+        "description": "Meubles — Canapé"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "80000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.42,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé",
+        "extrait": "Meubles — Canapé"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Yopougon",
+        "extrait": "zone : Yopougon, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · Type de meuble : Canapé (« Meubles — Canapé ») · Zone : Yopougon (« zone : Yopougon, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5599272",
+        "source": "coinafrique",
+        "title": "Canapé 7 places ",
+        "price": 180000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-7-places-5599272",
+        "photo": "https://images.coinafrique.com/thumb_5599272_uploaded_image1_1761941140.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Canapé 7 places"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "180000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.42,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Yopougon",
+        "extrait": "Meubles — Canapé 7 places"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · Zone : Yopougon (« Meubles — Canapé 7 places »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5518344",
+        "source": "coinafrique",
+        "title": "Canapé 2 places + Table",
+        "price": 95000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-2-places-table-5518344",
+        "photo": "https://images.coinafrique.com/thumb_5518344_uploaded_image1_1757505865.jpg",
+        "date": "il y a 1 année",
+        "description": "Meubles — Canapé 2 places + Table"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "95000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.42,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Yopougon",
+        "extrait": "Yopougon, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · Zone : Yopougon (« Yopougon, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5448007",
+        "source": "coinafrique",
+        "title": "House de canapé 1,2,3 places ",
+        "price": 5000,
+        "currency": "FCFA",
+        "zone": "Adjamé, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/house-de-canape-1-2-3-places-5448007",
+        "photo": "https://images.coinafrique.com/thumb_5448007_uploaded_image1_1753805321.jpg",
+        "date": "il y a 1 année",
+        "description": "Meubles — House de canapé 1,2,3 places"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "5000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Adjamé, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.42,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Adjamé",
+        "extrait": "Adjamé, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Adjamé, Abidjan) · Zone : Adjamé (« Adjamé, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5443024",
+        "source": "coinafrique",
+        "title": "Housse de canape",
+        "price": 40000,
+        "currency": "FCFA",
+        "zone": "Adjamé, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/housse-de-canape-5443024",
+        "photo": "https://images.coinafrique.com/thumb_5443024_uploaded_image1_1753539453.jpg",
+        "date": "il y a 1 année",
+        "description": "Meubles — Housse de canape"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "40000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Adjamé, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.42,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Adjamé",
+        "extrait": "Adjamé, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Adjamé, Abidjan) · Zone : Adjamé (« Adjamé, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5807381",
+        "source": "coinafrique",
+        "title": "Ensemble salon",
+        "price": 420000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/ensemble-salon-5807381",
+        "photo": "https://images.coinafrique.com/thumb_5807381_uploaded_image1_1772789577.jpg",
+        "date": "il y a 7 mois",
+        "description": "Meubles — Ensemble salon"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "420000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.41,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Ensemble salon",
+        "extrait": "Meubles — Ensemble salon"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de meuble : Ensemble salon (« Meubles — Ensemble salon »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5502310",
+        "source": "coinafrique",
+        "title": "Salon",
+        "price": 170000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/salon-5502310",
+        "photo": "https://images.coinafrique.com/thumb_5502310_uploaded_image1_1756722814.jpg",
+        "date": "il y a 1 année",
+        "description": "Meubles — Salon"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "170000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.41,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Salon",
+        "extrait": "Meubles — Salon"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Salon (« Meubles — Salon ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5616792",
+        "source": "coinafrique",
+        "title": "Canapé en cuir",
+        "price": 80000,
+        "currency": "FCFA",
+        "zone": "Bouaké",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/canape-en-cuir-5616792",
+        "photo": "https://images.coinafrique.com/thumb_5616792_uploaded_image1_1762885459.jpg",
+        "date": "il y a 10 mois",
+        "description": "Meubles — Canapé en cuir"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "80000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Bouaké",
+        "note": "autre zone : bouake"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Bouaké",
+        "extrait": "Canapé en cuir"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Bouaké — autre zone : bouake · Zone : Bouaké (« Canapé en cuir »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6041683",
+        "source": "coinafrique",
+        "title": "Location appartement meublé 2 pièces à la Riviera 4 ciad ",
+        "price": 300000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements-meubles/location-appartement-meuble-2-pieces-a-la-riviera-4-ciad-6041683",
+        "photo": "https://images.coinafrique.com/thumb_6041683_uploaded_image1_1788513975.jpg",
+        "date": "il y a 3 heures",
+        "description": "Appartements meublés — Location appartement meublé 2 pièces à la Riviera 4 ciad"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "300000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Riviera",
+        "extrait": "Riviera 4 ciad"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Zone : Riviera (« Riviera 4 ciad »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6041656",
+        "source": "coinafrique",
+        "title": "Location appartement 2 pièces Riviera 4 ciad_Riviera 4 ciad",
+        "price": 2700000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements/location-appartement-2-pieces-riviera-4-ciad-riviera-4-ciad-6041656",
+        "photo": "https://images.coinafrique.com/thumb_6041656_uploaded_image1_1788512781.jpg",
+        "date": "il y a 3 heures",
+        "description": "Appartements — Location appartement 2 pièces Riviera 4 ciad_Riviera 4 ciad"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "2700000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Riviera",
+        "extrait": "Riviera 4 ciad"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Zone : Riviera (« Riviera 4 ciad »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6058389",
+        "source": "coinafrique",
+        "title": "Location résidence meublé type studio mode 2 pièces  -  Cocody golf ",
+        "price": 30000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements/location-residence-meuble-type-studio-mode-2-pieces-cocody-golf-6058389",
+        "photo": "https://images.coinafrique.com/thumb_6058389_uploaded_image1_1789857696.jpg",
+        "date": "il y a 15 heures",
+        "description": "Appartements — Location résidence meublé type studio mode 2 pièces  -  Coc..."
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "30000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody golf"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Zone : Cocody (« Cocody golf »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5985064",
+        "source": "coinafrique",
+        "title": "Location appartement  4 pièces Cocody Deux Plateaux Polyclinique",
+        "price": 2000000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements/location-appartement-4-pieces-cocody-deux-plateaux-polyclinique-5985064",
+        "photo": "https://images.coinafrique.com/thumb_5985064_uploaded_image1_1784116385.jpg",
+        "date": "il y a 1 mois",
+        "description": "Appartements — Location appartement  4 pièces Cocody Deux Plateaux Polycli..."
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "2000000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Location d'appartement",
+        "extrait": "Location appartement  4 pièces Cocody Deux Plateaux Polyclinique"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Location d'appartement (« Location appartement  4 pièces Cocody Deux Plateaux Polyclinique ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5981288",
+        "source": "coinafrique",
+        "title": "Location appartement 4 pièces  à Cocody 2 Plateaux",
+        "price": 2000000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements-meubles/location-appartement-4-pieces-a-cocody-2-plateaux-5981288",
+        "photo": "https://images.coinafrique.com/thumb_5981288_uploaded_image1_1783840822.jpg",
+        "date": "il y a 1 mois",
+        "description": "Appartements meublés — Location appartement 4 pièces  à Cocody 2 Plateaux"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "2000000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Location d'appartement",
+        "extrait": "Location appartement 4 pièces  à Cocody 2 Plateaux"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Location d'appartement (« Location appartement 4 pièces  à Cocody 2 Plateaux ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6002903",
+        "source": "coinafrique",
+        "title": "Ensemble fauteuil salon ",
+        "price": 300000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/ensemble-fauteuil-salon-6002903",
+        "photo": "https://images.coinafrique.com/thumb_6002903_uploaded_image1_1785500099.jpg",
+        "date": "il y a 2 mois",
+        "description": "Meubles — Ensemble fauteuil salon"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "300000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "fauteuil",
+        "extrait": "Ensemble fauteuil salon"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de meuble : fauteuil (« Ensemble fauteuil salon »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5964423",
+        "source": "coinafrique",
+        "title": "Location appartement 2 pièces à Riviera Golf",
+        "price": 325000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements-meubles/location-appartement-2-pieces-a-riviera-golf-5964423",
+        "photo": "https://images.coinafrique.com/thumb_5964423_uploaded_image1_1782648342.jpg",
+        "date": "il y a 2 mois",
+        "description": "Appartements meublés — Location appartement 2 pièces à Riviera Golf"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "325000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "appartement",
+        "extrait": "Location appartement 2 pièces à Riviera Golf"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : appartement (« Location appartement 2 pièces à Riviera Golf »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5953669",
+        "source": "coinafrique",
+        "title": "Location appartement de 4 pieces deja meublée au 2 plateau ena",
+        "price": 2000000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements/location-appartement-de-4-pieces-deja-meublee-au-2-plateau-ena-5953669",
+        "photo": "https://images.coinafrique.com/thumb_5953669_uploaded_image1_1781806105.jpg",
+        "date": "il y a 2 mois",
+        "description": "Appartements — Location appartement de 4 pieces deja meublée au 2 plateau ..."
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "2000000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "appartement",
+        "extrait": "Location appartement de 4 pieces deja meublée au 2 plateau ..."
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : appartement (« Location appartement de 4 pieces deja meublée au 2 plateau ... »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5959273",
+        "source": "coinafrique",
+        "title": "Meuble  ",
+        "price": 200000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/meuble-5959273",
+        "photo": "https://images.coinafrique.com/thumb_5959273_uploaded_image1_1782234356.jpg",
+        "date": "il y a 3 mois",
+        "description": "Meubles — Meuble"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "200000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "meuble",
+        "extrait": "Meubles — Meuble"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de meuble : meuble (« Meubles — Meuble »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5916302",
+        "source": "coinafrique",
+        "title": "Location appartement 4 pièces - Cocody Deux Plateaux Polyclinique",
+        "price": 2000000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements/location-appartement-4-pieces-cocody-deux-plateaux-polyclinique-5916302",
+        "photo": "https://images.coinafrique.com/thumb_5916302_uploaded_image1_1779183045.jpg",
+        "date": "il y a 3 mois",
+        "description": "Appartements — Location appartement 4 pièces - Cocody Deux Plateaux Polycl..."
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "2000000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "appartement",
+        "extrait": "Location appartement 4 pièces - Cocody Deux Plateaux Polyclinique"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : appartement (« Location appartement 4 pièces - Cocody Deux Plateaux Polyclinique »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5880351",
+        "source": "coinafrique",
+        "title": "Je  liquide mon meuble.",
+        "price": 35000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/je-liquide-mon-meuble-5880351",
+        "photo": "https://images.coinafrique.com/thumb_5880351_uploaded_image1_1777059769.jpg",
+        "date": "il y a 5 mois",
+        "description": "Meubles — Je  liquide mon meuble."
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "35000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Canapé",
+        "extrait": "Je liquide mon meuble."
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · Type de meuble : Canapé (« Je liquide mon meuble. »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5873697",
+        "source": "coinafrique",
+        "title": "Table ajustable pour ordinateur",
+        "price": 14000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/table-ajustable-pour-ordinateur-5873697",
+        "photo": "https://images.coinafrique.com/thumb_5873697_uploaded_image1_1776721447.jpg",
+        "date": "il y a 5 mois",
+        "description": "Meubles — Table ajustable pour ordinateur"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "14000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Table",
+        "extrait": "Table ajustable pour ordinateur"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de meuble : Table (« Table ajustable pour ordinateur »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5839817",
+        "source": "coinafrique",
+        "title": "Meuble",
+        "price": 130000,
+        "currency": "FCFA",
+        "zone": "Adjamé, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/meuble-5839817",
+        "photo": "https://images.coinafrique.com/thumb_5839817_uploaded_image1_1774796734.jpg",
+        "date": "il y a 6 mois",
+        "description": "Meubles — Meuble"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "130000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Adjamé, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Meuble",
+        "extrait": "Meuble"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Adjamé, Abidjan) · Type de meuble : Meuble (« Meuble »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5816563",
+        "source": "coinafrique",
+        "title": "Ensemble fauteuil salon",
+        "price": 450000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/ensemble-fauteuil-salon-5816563",
+        "photo": "https://images.coinafrique.com/thumb_5816563_uploaded_image1_1773325097.jpg",
+        "date": "il y a 6 mois",
+        "description": "Meubles — Ensemble fauteuil salon"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "450000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Fauteuil",
+        "extrait": "Ensemble fauteuil salon"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de meuble : Fauteuil (« Ensemble fauteuil salon »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5766653",
+        "source": "coinafrique",
+        "title": "Aspirateur injecteur-extracteur",
+        "price": 200000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/autre-electromenager/aspirateur-injecteur-extracteur-5766653",
+        "photo": "https://images.coinafrique.com/thumb_5766653_uploaded_image1_1770651763.jpg",
+        "date": "il y a 7 mois",
+        "description": "Autre électromenager — Aspirateur injecteur-extracteur"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "200000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Aspirateur",
+        "extrait": "Autre électromenager — Aspirateur injecteur-extracteur"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Aspirateur (« Autre électromenager — Aspirateur injecteur-extracteur »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5753003",
+        "source": "coinafrique",
+        "title": "Fauteuil salon",
+        "price": 300000,
+        "currency": "FCFA",
+        "zone": "Angré, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/fauteuil-salon-5753003",
+        "photo": "https://images.coinafrique.com/thumb_5753003_uploaded_image1_1769961003.jpg",
+        "date": "il y a 8 mois",
+        "description": "Meubles — Fauteuil salon"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "300000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Angré, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Fauteuil",
+        "extrait": "Meubles — Fauteuil salon"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Angré, Abidjan) · Type de meuble : Fauteuil (« Meubles — Fauteuil salon »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5658060",
+        "source": "coinafrique",
+        "title": "Meuble maison",
+        "price": 350000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/meuble-maison-5658060",
+        "photo": "https://images.coinafrique.com/thumb_5658060_uploaded_image1_1764967235.jpg",
+        "date": "il y a 10 mois",
+        "description": "Meubles — Meuble maison"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "350000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Meuble maison",
+        "extrait": "Meubles — Meuble maison"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de meuble : Meuble maison (« Meubles — Meuble maison »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5604441",
+        "source": "coinafrique",
+        "title": "Commune de cocody, rivièra faya ephrata ( zone pharmacie ephrata) tres chic grand studio americain au 2eme etage disponible a 110 000×5 + frais annexes) ",
+        "price": 110000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements/commune-de-cocody-riviera-faya-ephrata-zone-pharmacie-ephrata-tres-chic-grand-studio-americain-au-2eme-etage-disponible-a-110-0005-frais-annexes-5604441",
+        "photo": "https://images.coinafrique.com/thumb_5604441_uploaded_image1_1762244419.jpg",
+        "date": "il y a 10 mois",
+        "description": "Appartements — Commune de cocody, rivièra faya ephrata ( zone pharmacie ep..."
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "110000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Appartement",
+        "extrait": "Appartements — Commune de cocody, rivièra faya ephrata"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Appartement (« Appartements — Commune de cocody, rivièra faya ephrata »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5587939",
+        "source": "coinafrique",
+        "title": "Location appartements meublés 4 pièces - Cocody",
+        "price": 1600000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements-meubles/location-appartements-meubles-4-pieces-cocody-5587939",
+        "photo": "https://images.coinafrique.com/thumb_5587939_uploaded_image1_1761235158.jpg",
+        "date": "il y a 10 mois",
+        "description": "Appartements meublés — Location appartements meublés 4 pièces - Cocody"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "1600000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Location appartements meublés 4 pièces - Cocody"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Location appartements meublés 4 pièces - Cocody »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5584371",
+        "source": "coinafrique",
+        "title": "Location appartement meublé 4 pièces  à Cocody Deux Plateaux Polyclinique",
+        "price": 2000000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements-meubles/location-appartement-meuble-4-pieces-a-cocody-deux-plateaux-polyclinique-5584371",
+        "photo": "https://images.coinafrique.com/thumb_5584371_uploaded_image1_1761043385.jpg",
+        "date": "il y a 10 mois",
+        "description": "Appartements meublés — Location appartement meublé 4 pièces  à Cocody Deux Plateau..."
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "2000000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Location appartement meublé 4 pièces  à Cocody Deux Plateaux Polyclinique"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Location appartement meublé 4 pièces  à Cocody Deux Plateaux Polyclinique »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5600143",
+        "source": "coinafrique",
+        "title": "Location appartement meublé - Riviera 2",
+        "price": 35000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements-meubles/location-appartement-meuble-riviera-2-5600143",
+        "photo": "https://images.coinafrique.com/thumb_5600143_uploaded_image1_1762003986.jpg",
+        "date": "il y a 11 mois",
+        "description": "Appartements meublés — Location appartement meublé - Riviera 2"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "35000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Canapé",
+        "extrait": "Location appartement meublé - Riviera 2"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Canapé (« Location appartement meublé - Riviera 2 »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5593914",
+        "source": "coinafrique",
+        "title": "Table d'appoint multifonctions avec roues",
+        "price": 20000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/table-dappoint-multifonctions-avec-roues-5593914",
+        "photo": "https://images.coinafrique.com/thumb_5593914_uploaded_image1_1761656333.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Table d'appoint multifonctions avec roues"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "20000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Table d'appoint",
+        "extrait": "Table d'appoint multifonctions avec roues"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de meuble : Table d'appoint (« Table d'appoint multifonctions avec roues ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5593050",
+        "source": "coinafrique",
+        "title": "Table d'appoint extensible -deux planches avec roues",
+        "price": 28000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/table-dappoint-extensible-deux-planches-avec-roues-5593050",
+        "photo": "https://images.coinafrique.com/thumb_5593050_uploaded_image1_1761597788.jpg",
+        "date": "il y a 11 mois",
+        "description": "Meubles — Table d'appoint extensible -deux planches avec roues"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "28000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Table d'appoint",
+        "extrait": "Table d'appoint extensible -deux planches avec roues"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de meuble : Table d'appoint (« Table d'appoint extensible -deux planches avec roues ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5579210",
+        "source": "coinafrique",
+        "title": "Valises",
+        "price": 225000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/maroquinerie-et-bagagerie/valises-5579210",
+        "photo": "https://images.coinafrique.com/thumb_5579210_uploaded_image1_1760732791.jpg",
+        "date": "il y a 11 mois",
+        "description": "Maroquinerie & Bagagerie — Valises"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "225000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Valises",
+        "extrait": "Valises"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de meuble : Valises (« Valises ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5559058",
+        "source": "coinafrique",
+        "title": "Location appartements meublés 2 pièces - Cocody",
+        "price": 35000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements-meubles/location-appartements-meubles-2-pieces-cocody-5559058",
+        "photo": "https://images.coinafrique.com/thumb_5559058_uploaded_image1_1759623124.jpg",
+        "date": "il y a 12 mois",
+        "description": "Appartements meublés — Location appartements meublés 2 pièces - Cocody"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "35000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Location",
+        "extrait": "Appartements meublés — Location appartements meublés 2 pièces - Cocody"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Location (« Appartements meublés — Location appartements meublés 2 pièces - Cocody »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5508908",
+        "source": "coinafrique",
+        "title": "Salon complet ",
+        "price": 60000,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/salon-complet-5508908",
+        "photo": "https://images.coinafrique.com/thumb_5508908_uploaded_image1_1757008664.jpg",
+        "date": "il y a 1 année",
+        "description": "Meubles — Salon complet"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "60000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Salon complet",
+        "extrait": "Meubles — Salon complet"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Abidjan) · Type de produit : Salon complet (« Meubles — Salon complet ») · Zone : Abidjan (« Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5485251",
+        "source": "coinafrique",
+        "title": "Collection prestige – mobilier et objets d’art",
+        "price": 400000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/collection-prestige-mobilier-et-objets-dart-5485251",
+        "photo": "https://images.coinafrique.com/thumb_5485251_uploaded_image1_1755730946.jpg",
+        "date": "il y a 1 année",
+        "description": "Meubles — Collection prestige – mobilier et objets d’art"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "400000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Mobilier et objets d’art",
+        "extrait": "Meubles — Collection prestige – mobilier et objets d’art"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Cocody",
+        "extrait": "Cocody, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Mobilier et objets d’art (« Meubles — Collection prestige – mobilier et objets d’art ») · Zone : Cocody (« Cocody, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5505748",
+        "source": "coinafrique",
+        "title": "Location appartement 3 pièces - Playce Palmeraie",
+        "price": 650000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements/location-appartement-3-pieces-playce-palmeraie-5505748",
+        "photo": "https://images.coinafrique.com/thumb_5505748_uploaded_image1_1756856224.jpg",
+        "date": "il y a 1 année",
+        "description": "Appartements — Location appartement 3 pièces - Playce Palmeraie"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "650000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Appartement",
+        "extrait": "Location appartement 3 pièces - Playce Palmeraie"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · Type de produit : Appartement (« Location appartement 3 pièces - Playce Palmeraie »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5445437",
+        "source": "coinafrique",
+        "title": "Jeté de fauteuil",
+        "price": 4000,
+        "currency": "FCFA",
+        "zone": "Adjamé, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/jete-de-fauteuil-5445437",
+        "photo": "https://images.coinafrique.com/thumb_5445437_uploaded_image1_1753689967.jpg",
+        "date": "il y a 1 année",
+        "description": "Meubles — Jeté de fauteuil"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "4000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Adjamé, Abidjan",
+        "note": "commune d'Abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.62,
+    "score": 0.31,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Adjamé",
+        "extrait": "Adjamé, Abidjan"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone ok (Adjamé, Abidjan) · Zone : Adjamé (« Adjamé, Abidjan »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6066746",
+        "source": "coinafrique",
+        "title": "Villa duplex 4 pieces en vente",
+        "price": 165000000,
+        "currency": "FCFA",
+        "zone": "Bingerville",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/villas/villa-duplex-4-pieces-en-vente-6066746",
+        "photo": "https://images.coinafrique.com/thumb_6066746_uploaded_image1_1790637111.jpg",
+        "date": "il y a 15 heures",
+        "description": "Villas — Villa duplex 4 pieces en vente"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "165000000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Bingerville",
+        "note": "zone annexe d'Abidjan : bingerville"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.53,
+    "score": 0.27,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Bingerville",
+        "extrait": "Bingerville"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone : Bingerville — zone annexe d'Abidjan : bingerville · Zone : Bingerville (« Bingerville »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6008083",
+        "source": "coinafrique",
+        "title": "Ensemble de salon",
+        "price": 450000,
+        "currency": "FCFA",
+        "zone": "Bouaké",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/ensemble-de-salon-6008083",
+        "photo": "https://images.coinafrique.com/thumb_6008083_uploaded_image1_1785918252.jpg",
+        "date": "il y a 1 mois",
+        "description": "Meubles — Ensemble de salon"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "450000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Bouaké",
+        "note": "autre zone : bouake"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.53,
+    "score": 0.27,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "Ensemble de salon",
+        "extrait": "Ensemble de salon"
+      },
+      {
+        "nom": "Zone",
+        "valeur": "Bouaké",
+        "extrait": "Bouaké"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone : Bouaké — autre zone : bouake · Type de meuble : Ensemble de salon (« Ensemble de salon ») · Zone : Bouaké (« Bouaké »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5958886",
+        "source": "coinafrique",
+        "title": "Salon complet",
+        "price": 150000,
+        "currency": "FCFA",
+        "zone": "Abobo, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/meubles/salon-complet-5958886",
+        "photo": "https://images.coinafrique.com/thumb_5958886_uploaded_image1_1782211098.jpg",
+        "date": "il y a 3 mois",
+        "description": "Meubles — Salon complet"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "150000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Abobo, Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.53,
+    "score": 0.27,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de meuble",
+        "valeur": "salon complet",
+        "extrait": "Meubles — Salon complet"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone : Abobo, Abidjan — autre zone : abidjan · Type de meuble : salon complet (« Meubles — Salon complet »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5549736",
+        "source": "coinafrique",
+        "title": "Offre d'emploi  - Freelance ",
+        "price": 0,
+        "currency": "FCFA",
+        "zone": "M'Bahiakro",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/offres-demploi/offre-demploi-freelance-5549736",
+        "photo": "https://images.coinafrique.com/thumb_5549736_uploaded_image1_1759220912.jpg",
+        "date": "il y a 1 année",
+        "description": "Offres d'emploi — Offre d'emploi  - Freelance"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "0 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "M'Bahiakro",
+        "note": "zone à vérifier"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.53,
+    "score": 0.27,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Emploi",
+        "extrait": "Offres d'emploi — Offre d'emploi  - Freelance"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone : M'Bahiakro — zone à vérifier · Type de produit : Emploi (« Offres d'emploi — Offre d'emploi  - Freelance »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5485239",
+        "source": "coinafrique",
+        "title": "Location appartements 2 pièces - Grand Bassam",
+        "price": 25000,
+        "currency": "FCFA",
+        "zone": "Grand-Bassam",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements/location-appartements-2-pieces-grand-bassam-5485239",
+        "photo": "https://images.coinafrique.com/thumb_5485239_uploaded_image1_1755730415.jpg",
+        "date": "il y a 1 année",
+        "description": "Appartements — Location appartements 2 pièces - Grand Bassam"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "25000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Grand-Bassam",
+        "note": "zone annexe d'Abidjan : grand-bassam"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.53,
+    "score": 0.27,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Grand-Bassam",
+        "extrait": "Grand-Bassam"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone : Grand-Bassam — zone annexe d'Abidjan : grand-bassam · Zone : Grand-Bassam (« Grand-Bassam »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5485236",
+        "source": "coinafrique",
+        "title": "Location appartements 2 pièces - Grand Bassam",
+        "price": 25000,
+        "currency": "FCFA",
+        "zone": "Grand-Bassam",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/appartements/location-appartements-2-pieces-grand-bassam-5485236",
+        "photo": "https://images.coinafrique.com/thumb_5485236_uploaded_image1_1755730274.jpg",
+        "date": "il y a 1 année",
+        "description": "Appartements — Location appartements 2 pièces - Grand Bassam"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "25000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Grand-Bassam",
+        "note": "zone annexe d'Abidjan : grand-bassam"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.53,
+    "score": 0.27,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Grand-Bassam",
+        "extrait": "Grand-Bassam"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · zone : Grand-Bassam — zone annexe d'Abidjan : grand-bassam · Zone : Grand-Bassam (« Grand-Bassam »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "serp-1",
+        "source": "jiji.co.ci",
+        "title": "Apple iPhone 12 en Côte d'Ivoire à vendre Prix sur Jiji.co.ci",
+        "price": null,
+        "currency": "FCFA",
+        "zone": null,
+        "vendor": null,
+        "url": "https://jiji.co.ci/mobile-phones/apple-iphone-12",
+        "photo": null,
+        "date": null,
+        "description": null
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "prix non affiché — à confirmer auprès du vendeur"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "zone non indiquée"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.45,
+    "score": 0.23,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Inconnu",
+        "extrait": "Apple iPhone 12 en Côte d'Ivoire à vendre"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · prix sur demande · Type de produit : Inconnu (« Apple iPhone 12 en Côte d'Ivoire à vendre »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "serp-2",
+        "source": "ci.coinafrique.com",
+        "title": "iPhone 12",
+        "price": 135000,
+        "currency": "CFA",
+        "zone": null,
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/telephones-et-tablettes/iphone-12-5341396",
+        "photo": null,
+        "date": null,
+        "description": "Téléphone super en forme tout passe bon prix tout est ok"
+      },
+      "model": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "135000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "zone non indiquée"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.45,
+    "score": 0.23,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Type de produit",
+        "valeur": "Inconnu",
+        "extrait": "iPhone 12"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle à confirmer · capacité inconnue (non confirmée) · budget à préciser · Type de produit : Inconnu (« iPhone 12 »)"
+  }
+]

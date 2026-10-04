@@ -1,0 +1,74 @@
+{
+  "rows": [
+    {
+      "task": "google-online",
+      "model": "openai/gpt-4o-mini:online",
+      "cost": 0.00740155,
+      "promptTokens": 1337,
+      "completionTokens": 335,
+      "ts": "2026-10-02T17:47:57.456Z"
+    },
+    {
+      "task": "page-extraction",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0004512,
+      "promptTokens": 2432,
+      "completionTokens": 144,
+      "ts": "2026-10-02T17:48:02.903Z"
+    },
+    {
+      "task": "page-extraction",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0004599,
+      "promptTokens": 2462,
+      "completionTokens": 151,
+      "ts": "2026-10-02T17:48:09.820Z"
+    },
+    {
+      "task": "page-extraction",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0004578,
+      "promptTokens": 2456,
+      "completionTokens": 149,
+      "ts": "2026-10-02T17:48:15.208Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.00052905,
+      "promptTokens": 975,
+      "completionTokens": 638,
+      "ts": "2026-10-02T17:48:25.470Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0005148,
+      "promptTokens": 968,
+      "completionTokens": 616,
+      "ts": "2026-10-02T17:48:35.259Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0003054,
+      "promptTokens": 620,
+      "completionTokens": 354,
+      "ts": "2026-10-02T17:48:42.449Z"
+    }
+  ],
+  "parModele": {
+    "openai/gpt-4o-mini:online": {
+      "calls": 1,
+      "cost": 0.00740155
+    },
+    "openai/gpt-4o-mini": {
+      "calls": 6,
+      "cost": 0.00271815
+    }
+  },
+  "total": {
+    "total": 0.010119699999999999,
+    "known": true
+  }
+}

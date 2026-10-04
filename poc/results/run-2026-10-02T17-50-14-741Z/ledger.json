@@ -1,0 +1,50 @@
+{
+  "rows": [
+    {
+      "task": "google-online",
+      "model": "openai/gpt-4o-mini:online",
+      "cost": 0.00749785,
+      "promptTokens": 1979,
+      "completionTokens": 335,
+      "ts": "2026-10-02T17:49:31.675Z"
+    },
+    {
+      "task": "page-extraction",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.00045645,
+      "promptTokens": 2035,
+      "completionTokens": 252,
+      "ts": "2026-10-02T17:49:40.645Z"
+    },
+    {
+      "task": "serp-extraction",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.00062415,
+      "promptTokens": 889,
+      "completionTokens": 818,
+      "ts": "2026-10-02T17:50:01.023Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0006687,
+      "promptTokens": 934,
+      "completionTokens": 881,
+      "ts": "2026-10-02T17:50:14.738Z"
+    }
+  ],
+  "parModele": {
+    "openai/gpt-4o-mini:online": {
+      "calls": 1,
+      "cost": 0.00749785
+    },
+    "openai/gpt-4o-mini": {
+      "calls": 3,
+      "cost": 0.0017493
+    }
+  },
+  "total": {
+    "total": 0.00924715,
+    "known": true
+  }
+}

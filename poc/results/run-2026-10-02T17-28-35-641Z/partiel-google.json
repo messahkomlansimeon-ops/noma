@@ -1,0 +1,45 @@
+{
+  "source": "google",
+  "status": "ok",
+  "annonces": [
+    {
+      "id": "gpage-1",
+      "source": "ci.coinafrique.com",
+      "title": "iPhone 12",
+      "price": 85000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/telephones-et-tablettes/iphone-12-5830022",
+      "photo": null,
+      "date": null,
+      "description": "Iphone 12 simple (sans face id) original couleur : bleu élégant état : très propre, comme neuf stockage : 128go fonctionnel à 100% face id indisponible (n’affecte pas l’utilisation classique) caméra, wi-fi, bluetooth, réseau : ok batterie tient bien la charge"
+    },
+    {
+      "id": "gpage-2",
+      "source": "jiji.co.ci",
+      "title": "Apple iPhone 12 en Côte d'Ivoire à vendre ▷ Prix sur Jiji.co.ci",
+      "price": null,
+      "currency": "FCFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://jiji.co.ci/mobile-phones/apple-iphone-12",
+      "photo": null,
+      "date": null,
+      "description": null
+    },
+    {
+      "id": "gpage-3",
+      "source": "annonces.abidjan.net",
+      "title": "Détails Iphone 12 pro 256 giga - Annonces.abidjan.net",
+      "price": null,
+      "currency": "FCFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://annonces.abidjan.net/achat-vente/8024/details/iphone-12-pro-256-giga",
+      "photo": null,
+      "date": null,
+      "description": null
+    }
+  ]
+}

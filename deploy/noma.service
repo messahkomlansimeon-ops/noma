@@ -1,0 +1,22 @@
+[Unit]
+Description=Noma — instance unique (préproduction privée)
+After=network.target
+
+[Service]
+Type=simple
+User=noma
+WorkingDirectory=/opt/noma/current
+# secrets et configuration via l'environnement du service, jamais dans Git
+EnvironmentFile=/opt/noma/shared/.env.production
+# écoute UNIQUEMENT sur 127.0.0.1 : le port Node n'est jamais public,
+# seul nginx (restrictions allow/deny) expose l'application.
+ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1
+Restart=on-failure
+RestartSec=5
+# durcissement : aucune sortie de secrets, journal propre
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/noma /opt/noma
+
+[Install]
+WantedBy=multi-user.target

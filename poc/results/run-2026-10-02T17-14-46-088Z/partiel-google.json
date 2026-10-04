@@ -1,0 +1,58 @@
+{
+  "source": "google",
+  "status": "ok",
+  "annonces": [
+    {
+      "id": "gpage-1",
+      "source": "ci.coinafrique.com",
+      "title": "Accessoires Téléphonie Chargeur iPhone boîtier 20WW en Côte d'Ivoire - CoinAfrique Côte d'Ivoire",
+      "price": 12000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/accessoires-telephonie/chargeur-iphone-boitier-20ww-5704711",
+      "photo": null,
+      "date": null,
+      "description": "Boîtier iphone 20w original"
+    },
+    {
+      "id": "gpage-2",
+      "source": "bwooci.com",
+      "title": "BWOO Chargeur complet 20W type C vers iPhone | BWOO CI",
+      "price": null,
+      "currency": "FCFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://bwooci.com/produit/detail/85",
+      "photo": null,
+      "date": null,
+      "description": null
+    },
+    {
+      "id": "gpage-3",
+      "source": "onesalam.ci",
+      "title": "Adaptateur Boîtier USB-C 20W Power Adapter IPhone / Apple - Acheter Moins Cher - Onesalam Côte D'Ivoire",
+      "price": null,
+      "currency": "FCFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://onesalam.ci/produit/adaptateur-boitier-usb-c-20w-power-adapter-iphone-apple/",
+      "photo": null,
+      "date": null,
+      "description": null
+    },
+    {
+      "id": "gpage-4",
+      "source": "mrsmart.ci",
+      "title": "Apple Adaptateur secteur USB‑C 20 W - Mr smart-revendeur agréé apple à abidjan",
+      "price": null,
+      "currency": "FCFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://mrsmart.ci/produit/apple-adaptateur-secteur-usb%e2%80%91c-20-w/",
+      "photo": null,
+      "date": null,
+      "description": null
+    }
+  ]
+}

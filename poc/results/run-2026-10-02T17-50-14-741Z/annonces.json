@@ -1,0 +1,478 @@
+[
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-3615007",
+        "source": "coinafrique",
+        "title": "Téléviseur LG 55\"",
+        "price": 950000,
+        "currency": "FCFA",
+        "zone": "Koumassi, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/tv-box-et-video-projecteurs/televiseur-lg-55-3615007",
+        "photo": "https://images.coinafrique.com/thumb_3615007_uploaded_image1_1647674466.jpg",
+        "date": "il y a 4 années",
+        "description": "TV, box  & Vidéo projecteurs — Téléviseur LG 55\""
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "950000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Koumassi, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "compatible",
+          "observed": "55 pouces"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.9,
+    "score": 0.95,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Koumassi, Abidjan) · pouces : 55 confirmé — informations confirmées : 3/3",
+    "confirmedRatio": {
+      "known": 3,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-3312283",
+        "source": "coinafrique",
+        "title": "Téléviseur LG Oled 55 pouces ",
+        "price": 950000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/tv-box-et-video-projecteurs/televiseur-lg-oled-55-pouces-3312283",
+        "photo": "https://images.coinafrique.com/thumb_3312283_uploaded_image1_1630598257.jpg",
+        "date": "il y a 5 années",
+        "description": "TV, box  & Vidéo projecteurs — Téléviseur LG Oled 55 pouces"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "950000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "compatible",
+          "observed": "55 pouces"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.9,
+    "score": 0.95,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Taille",
+        "valeur": "55 pouces",
+        "extrait": "Téléviseur LG Oled 55 pouces"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · pouces : 55 confirmé · Taille : 55 pouces (« Téléviseur LG Oled 55 pouces ») — informations confirmées : 3/3",
+    "confirmedRatio": {
+      "known": 3,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-3240175",
+        "source": "coinafrique",
+        "title": "Téléviseur LG 55 pouces ",
+        "price": 450000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/tv-box-et-video-projecteurs/televiseur-lg-55-pouces-3240175",
+        "photo": "https://images.coinafrique.com/thumb_3240175_uploaded_image1_1626959145.jpg",
+        "date": "il y a 5 années",
+        "description": "TV, box  & Vidéo projecteurs — Téléviseur LG 55 pouces"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "450000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Cocody, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "compatible",
+          "observed": "55 pouces"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.9,
+    "score": 0.95,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Taille",
+        "valeur": "55 pouces",
+        "extrait": "Téléviseur LG 55 pouces"
+      }
+    ],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · pouces : 55 confirmé · Taille : 55 pouces (« Téléviseur LG 55 pouces ») — informations confirmées : 3/3",
+    "confirmedRatio": {
+      "known": 3,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6014619",
+        "source": "coinafrique",
+        "title": " Téléviseur 55 pouces",
+        "price": 190000,
+        "currency": "FCFA",
+        "zone": "Bouaké",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/tv-box-et-video-projecteurs/televiseur-55-pouces-6014619",
+        "photo": "https://images.coinafrique.com/thumb_6014619_uploaded_image1_1786380877.jpg",
+        "date": "il y a 1 mois",
+        "description": "TV, box  & Vidéo projecteurs — Téléviseur 55 pouces"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "190000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Bouaké",
+        "note": "autre zone : bouake"
+      },
+      "attributes": [
+        {
+          "state": "compatible",
+          "observed": "55 pouces"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.86,
+    "score": 0.93,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Taille",
+        "valeur": "55 pouces",
+        "extrait": "Téléviseur 55 pouces"
+      }
+    ],
+    "raison": "Correspondance forte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Bouaké — autre zone : bouake · pouces : 55 confirmé · Taille : 55 pouces (« Téléviseur 55 pouces ») — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-2367165",
+        "source": "coinafrique",
+        "title": "Téléviseur LED  Samsung",
+        "price": 435000,
+        "currency": "FCFA",
+        "zone": "Le plateau, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/tv-box-et-video-projecteurs/televiseur-led-samsung-2367165",
+        "photo": "https://images.coinafrique.com/thumb_2367165_uploaded_image1_1593454287.jpg",
+        "date": "il y a 6 années",
+        "description": "TV, box  & Vidéo projecteurs — Téléviseur LED  Samsung"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "435000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Le plateau, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pouces 55 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Le plateau, Abidjan) · pouces 55 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-1463632",
+        "source": "coinafrique",
+        "title": "Téléviseur smart Samsung",
+        "price": 685000,
+        "currency": "FCFA",
+        "zone": "Le plateau, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/tv-box-et-video-projecteurs/televiseur-smart-samsung-1463632",
+        "photo": "https://images.coinafrique.com/thumb_1463632_uploaded_image1_1578742815.0.png",
+        "date": "il y a 6 années",
+        "description": "TV, box  & Vidéo projecteurs — Téléviseur smart Samsung"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "685000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Le plateau, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pouces 55 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Le plateau, Abidjan) · pouces 55 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-1139554",
+        "source": "coinafrique",
+        "title": "Téléviseur smart",
+        "price": 230000,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/tv-box-et-video-projecteurs/televiseur-smart-1139554",
+        "photo": "https://images.coinafrique.com/thumb_1139554_uploaded_image1_1572595384.52.png",
+        "date": "il y a 6 années",
+        "description": "TV, box  & Vidéo projecteurs — Téléviseur smart"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "230000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Yopougon, Abidjan"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pouces 55 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Yopougon, Abidjan) · pouces 55 non confirmé — informations confirmées : 2/3",
+    "confirmedRatio": {
+      "known": 2,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-6028226",
+        "source": "coinafrique",
+        "title": "Téléviseur smart technology",
+        "price": 220000,
+        "currency": "FCFA",
+        "zone": "San-Pedro",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/tv-box-et-video-projecteurs/televiseur-smart-technology-6028226",
+        "photo": "https://images.coinafrique.com/thumb_6028226_uploaded_image1_1787368801.jpg",
+        "date": "il y a 1 mois",
+        "description": "TV, box  & Vidéo projecteurs — Téléviseur smart technology"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "220000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "San-Pedro",
+        "note": "autre zone : san-pedro"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pouces 55 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.71,
+    "score": 0.36,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance possible — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : San-Pedro — autre zone : san-pedro · pouces 55 non confirmé — informations confirmées : 1/3",
+    "confirmedRatio": {
+      "known": 1,
+      "total": 3
+    }
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-959014",
+        "source": "coinafrique",
+        "title": "Téléviseur Samsung Série 7",
+        "price": 390000,
+        "currency": "FCFA",
+        "zone": null,
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/tv-box-et-video-projecteurs/televiseur-samsung-serie-7-959014",
+        "photo": "https://images.coinafrique.com/thumb_959014_uploaded_image1_1568810978.29.png",
+        "date": "il y a 7 années",
+        "description": "TV, box  & Vidéo projecteurs — Téléviseur Samsung Série 7"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "390000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "zone non indiquée"
+      },
+      "attributes": [
+        {
+          "state": "inconnu",
+          "observed": null,
+          "note": "pouces 55 non confirmé sur l'annonce"
+        }
+      ],
+      "priceNonComparable": false
+    },
+    "baseScore": 0.69,
+    "score": 0.35,
+    "aiStatus": "évalué par IA",
+    "criteria": [],
+    "raison": "Correspondance possible — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone non indiquée · pouces 55 non confirmé — informations confirmées : 1/3",
+    "confirmedRatio": {
+      "known": 1,
+      "total": 3
+    }
+  }
+]

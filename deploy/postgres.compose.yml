@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: noma_local
+      POSTGRES_PASSWORD: noma_local_only
+      POSTGRES_DB: noma_dev
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - noma_postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U noma_local -d noma_dev"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+volumes:
+  noma_postgres_data:

@@ -1,0 +1,45 @@
+{
+  "source": "locanto",
+  "status": "ok",
+  "annonces": [
+    {
+      "id": "loc-8224229878",
+      "source": "locanto",
+      "title": "Vélo électrique OneSport OT10 Folding E-Bike",
+      "price": null,
+      "currency": "unknown",
+      "zone": "Abidjan",
+      "vendor": null,
+      "url": "https://www.locanto.ci/abidjan/ID_8224229878/Velo-electrique-OneSport-OT10-Folding-E-Bike.html",
+      "photo": "https://images.locanto.info/6813067421/Velo-electrique-OneSport-OT10-Folding-E-Bike_1.jpg",
+      "date": "il y a 8 mois",
+      "description": "Prix sur demande — Matériau Alliage d'aluminium Couleur Noir Charge maximale 120 kg Vitesse maximale 25 KM/H Gamme 30 KM en mode purement électrique Tablette arrière Avec tablette arrière non réglable Angle de montée maximal 30-40 degrés Affichage des instruments Écran LCD multifonctionnel Éclairag"
+    },
+    {
+      "id": "loc-8224237945",
+      "source": "locanto",
+      "title": "Moto électrique YVY C20(Q20) 20 Fat Tires Vélo électrique 1000W",
+      "price": 500000,
+      "currency": "FCFA",
+      "zone": "Abidjan",
+      "vendor": null,
+      "url": "https://www.locanto.ci/abidjan/ID_8224237945/Moto-electrique-YVY-C20-Q20-20-Fat-Tires-Velo-electrique-1000W.html",
+      "photo": "https://images.locanto.info/6813074326/Moto-electrique-YVY-C20-Q20-20-Fat-Tires-Velo-electrique-1000W_1.jpg",
+      "date": "il y a 8 mois",
+      "description": "Terrain tout-terrain Notre vélo électrique tout-terrain antidérapant 20 \"x4.0 est adapté à une grande variété de terrains, y compris la neige, les plages, les montagnes et les routes urbaines. Vous pouvez vous attendre à une expérience de conduite exceptionnelle quelle que soit l"
+    },
+    {
+      "id": "loc-8224251570",
+      "source": "locanto",
+      "title": "Vélo électrique de ville OT05",
+      "price": 490000,
+      "currency": "FCFA",
+      "zone": "Abidjan",
+      "vendor": null,
+      "url": "https://www.locanto.ci/abidjan/ID_8224251570/Velo-electrique-de-ville-OT05.html",
+      "photo": "https://images.locanto.info/6813089061/Velo-electrique-de-ville-OT05_1.jpg",
+      "date": "il y a 8 mois",
+      "description": "enu 0 Portefeuille HomePortefeuilleVélo de cyclisme récréatif OT05 OT05 OT05-16 OT05-19 OT05-20 OT05-21 BK6-17 Vélo électrique de ville OT05 NOUS SERVONS VOS DÉPLACEMENTS OT05 a adopté un nouveau capteur de couple qui ajuste la puissance du moteur en temps réel en fonction de vot"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "id": "openai/gpt-4o-mini",
+    "prompt": "$0.1500/M",
+    "completion": "$0.6000/M",
+    "ctx": 128000,
+    "modality": "text+image+file->text"
+  },
+  {
+    "id": "deepseek/deepseek-chat",
+    "prompt": "$0.2574/M",
+    "completion": "$1.0287/M",
+    "ctx": 163840,
+    "modality": "text->text"
+  },
+  {
+    "id": "google/gemini-2.5-flash",
+    "prompt": "$0.3000/M",
+    "completion": "$2.5000/M",
+    "ctx": 1048576,
+    "modality": "text+image+file+audio+video->text"
+  }
+]

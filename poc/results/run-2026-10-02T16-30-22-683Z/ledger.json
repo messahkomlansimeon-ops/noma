@@ -1,0 +1,30 @@
+{
+  "rows": [
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0008487,
+      "promptTokens": 1006,
+      "completionTokens": 1163,
+      "ts": "2026-10-02T16:30:14.731Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0003501,
+      "promptTokens": 454,
+      "completionTokens": 470,
+      "ts": "2026-10-02T16:30:22.680Z"
+    }
+  ],
+  "parModele": {
+    "openai/gpt-4o-mini": {
+      "calls": 2,
+      "cost": 0.0011987999999999999
+    }
+  },
+  "total": {
+    "total": 0.0011987999999999999,
+    "known": true
+  }
+}

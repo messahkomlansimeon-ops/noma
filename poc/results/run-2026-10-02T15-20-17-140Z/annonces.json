@@ -1,0 +1,941 @@
+[
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5931440",
+        "source": "coinafrique",
+        "title": "Plombier",
+        "price": 500,
+        "currency": "FCFA",
+        "zone": "Bouaké",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-5931440",
+        "photo": "https://images.coinafrique.com/thumb_5931440_uploaded_image1_1780302690.jpg",
+        "date": "il y a 4 mois",
+        "description": "Travaux, bricolage et jardinage — Plombier"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "500 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "compatible",
+        "observed": "Bouaké"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.84,
+    "score": 0.92,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Bouaké",
+        "extrait": "Plombier"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Bouaké) · Zone : Bouaké (« Plombier »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5987428",
+        "source": "coinafrique",
+        "title": "Plombier professionnel",
+        "price": 500,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-professionnel-5987428",
+        "photo": "https://images.coinafrique.com/thumb_5987428_uploaded_image1_1784247333.jpg",
+        "date": "il y a 2 mois",
+        "description": "Travaux, bricolage et jardinage — Plombier professionnel"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "500 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Plombier professionnel"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Abidjan — autre zone : abidjan · Zone : Abidjan (« Plombier professionnel »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5944540",
+        "source": "coinafrique",
+        "title": "Plombier",
+        "price": 500,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-5944540",
+        "photo": "https://images.coinafrique.com/thumb_5944540_uploaded_image1_1781171263.jpg",
+        "date": "il y a 3 mois",
+        "description": "Travaux, bricolage et jardinage — Plombier"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "500 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Yopougon, Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Yopougon, Abidjan",
+        "extrait": "Plombier"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Yopougon, Abidjan — autre zone : abidjan · Zone : Yopougon, Abidjan (« Plombier »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5902055",
+        "source": "coinafrique",
+        "title": "Plombier",
+        "price": 500,
+        "currency": "FCFA",
+        "zone": "Bingerville",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-5902055",
+        "photo": "https://images.coinafrique.com/thumb_5902055_uploaded_image1_1778302973.jpg",
+        "date": "il y a 4 mois",
+        "description": "Travaux, bricolage et jardinage — Plombier"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "500 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Bingerville",
+        "note": "zone annexe d'Abidjan : bingerville"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Bingerville",
+        "extrait": "Plombier"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Bingerville — zone annexe d'Abidjan : bingerville · Zone : Bingerville (« Plombier »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5896296",
+        "source": "coinafrique",
+        "title": "Plombier professionnel",
+        "price": 500,
+        "currency": "FCFA",
+        "zone": "Bingerville",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-professionnel-5896296",
+        "photo": "https://images.coinafrique.com/thumb_5896296_uploaded_image2_1777982025.jpeg",
+        "date": "il y a 5 mois",
+        "description": "Travaux, bricolage et jardinage — Plombier professionnel"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "500 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Bingerville",
+        "note": "zone annexe d'Abidjan : bingerville"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Bingerville",
+        "extrait": "Plombier professionnel"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Bingerville — zone annexe d'Abidjan : bingerville · Zone : Bingerville (« Plombier professionnel »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-5385662",
+        "source": "coinafrique",
+        "title": "Plombier sanitaire",
+        "price": 1,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/autres-services/plombier-sanitaire-5385662",
+        "photo": "https://images.coinafrique.com/thumb_5385662_uploaded_image1_1750523264.jpg",
+        "date": "il y a 1 année",
+        "description": "Autres services — Plombier sanitaire"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "1 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Cocody, Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Cocody, Abidjan",
+        "extrait": "Plombier sanitaire"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Cocody, Abidjan — autre zone : abidjan · Zone : Cocody, Abidjan (« Plombier sanitaire »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-4150212",
+        "source": "coinafrique",
+        "title": "Plombier ",
+        "price": 0,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-4150212",
+        "photo": "https://images.coinafrique.com/thumb_4150212_uploaded_image1_1679871879.jpg",
+        "date": "il y a 3 années",
+        "description": "Travaux, bricolage et jardinage — Plombier"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "0 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Cocody, Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Cocody, Abidjan",
+        "extrait": "Plombier"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Cocody, Abidjan — autre zone : abidjan · Zone : Cocody, Abidjan (« Plombier »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-4150199",
+        "source": "coinafrique",
+        "title": "Plombier ",
+        "price": 0,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-4150199",
+        "photo": "https://images.coinafrique.com/thumb_4150199_uploaded_image1_1679871252.jpg",
+        "date": "il y a 3 années",
+        "description": "Travaux, bricolage et jardinage — Plombier"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "0 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Cocody, Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Cocody, Abidjan",
+        "extrait": "Plombier"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Cocody, Abidjan — autre zone : abidjan · Zone : Cocody, Abidjan (« Plombier »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-3909762",
+        "source": "coinafrique",
+        "title": "Allô plombier",
+        "price": 0,
+        "currency": "FCFA",
+        "zone": "Marcory, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/autres-services/allo-plombier-3909762",
+        "photo": "https://images.coinafrique.com/thumb_3909762_uploaded_image1_1665096501.jpg",
+        "date": "il y a 3 années",
+        "description": "Autres services — Allô plombier"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "0 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Marcory, Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Marcory, Abidjan",
+        "extrait": "Allô plombier"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Marcory, Abidjan — autre zone : abidjan · Zone : Marcory, Abidjan (« Allô plombier »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-3543704",
+        "source": "coinafrique",
+        "title": "Plombier professionnel",
+        "price": 15000,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-professionnel-3543704",
+        "photo": "https://images.coinafrique.com/thumb_3543704_uploaded_image1_1643446273.jpg",
+        "date": "il y a 4 années",
+        "description": "Travaux, bricolage et jardinage — Plombier professionnel"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "15000 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Cocody, Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Cocody, Abidjan",
+        "extrait": "Plombier professionnel"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Cocody, Abidjan — autre zone : abidjan · Zone : Cocody, Abidjan (« Plombier professionnel »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-3204340",
+        "source": "coinafrique",
+        "title": "Clé de tube plombier",
+        "price": 0,
+        "currency": "FCFA",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/autre-materiel-professionnel/cle-de-tube-plombier-3204340",
+        "photo": "https://images.coinafrique.com/thumb_3204340_uploaded_image1_1625233870.jpg",
+        "date": "il y a 5 années",
+        "description": "Autre matériel professionnel — Clé de tube plombier"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "0 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Clé de tube plombier"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Abidjan — autre zone : abidjan · Zone : Abidjan (« Clé de tube plombier »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-2599921",
+        "source": "coinafrique",
+        "title": "Plombier",
+        "price": 0,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-2599921",
+        "photo": "https://images.coinafrique.com/thumb_2599921_uploaded_image1_1599214403.jpg",
+        "date": "il y a 6 années",
+        "description": "Travaux, bricolage et jardinage — Plombier"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "0 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Cocody, Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Cocody, Abidjan",
+        "extrait": "Plombier"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Cocody, Abidjan — autre zone : abidjan · Zone : Cocody, Abidjan (« Plombier »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-2259459",
+        "source": "coinafrique",
+        "title": "Plombier pro",
+        "price": 0,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-pro-2259459",
+        "photo": "https://images.coinafrique.com/thumb_2259459_uploaded_image1_1591786884.jpg",
+        "date": "il y a 6 années",
+        "description": "Travaux, bricolage et jardinage — Plombier pro"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "0 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Cocody, Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Cocody, Abidjan",
+        "extrait": "Plombier pro"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Cocody, Abidjan — autre zone : abidjan · Zone : Cocody, Abidjan (« Plombier pro »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-2117776",
+        "source": "coinafrique",
+        "title": "Plombier professionnel ",
+        "price": 0,
+        "currency": "FCFA",
+        "zone": "Yopougon, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-professionnel-2117776",
+        "photo": "https://images.coinafrique.com/thumb_2117776_uploaded_image1_1589546033.jpg",
+        "date": "il y a 6 années",
+        "description": "Travaux, bricolage et jardinage — Plombier professionnel"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "0 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Yopougon, Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Yopougon, Abidjan",
+        "extrait": "Plombier professionnel"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Yopougon, Abidjan — autre zone : abidjan · Zone : Yopougon, Abidjan (« Plombier professionnel »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-1383256",
+        "source": "coinafrique",
+        "title": "Plombier",
+        "price": 0,
+        "currency": "FCFA",
+        "zone": "Cocody, Abidjan",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-1383256",
+        "photo": "https://images.coinafrique.com/thumb_1383256_uploaded_image1_1577167326.86.png",
+        "date": "il y a 6 années",
+        "description": "Travaux, bricolage et jardinage — Plombier"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "0 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Cocody, Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Cocody, Abidjan",
+        "extrait": "Plombier"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Cocody, Abidjan — autre zone : abidjan · Zone : Cocody, Abidjan (« Plombier »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "coin-973961",
+        "source": "coinafrique",
+        "title": "Plombier professionnel",
+        "price": 0,
+        "currency": "FCFA",
+        "zone": "Bingerville",
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-professionnel-973961",
+        "photo": "https://images.coinafrique.com/thumb_973961_uploaded_image1_1569151456.02.png",
+        "date": "il y a 7 années",
+        "description": "Travaux, bricolage et jardinage — Plombier professionnel"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "0 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Bingerville",
+        "note": "zone annexe d'Abidjan : bingerville"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Bingerville",
+        "extrait": "Plombier professionnel"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Bingerville — zone annexe d'Abidjan : bingerville · Zone : Bingerville (« Plombier professionnel »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-9388841061",
+        "source": "locanto",
+        "title": "Petit plombier endurant petit 1er en direct bien en duo",
+        "price": null,
+        "currency": "unknown",
+        "zone": "Abidjan",
+        "vendor": null,
+        "url": "https://www.locanto.ci/abidjan/ID_9388841061/Petit-plombier-endurant-petit-1er-en-direct-bien-en-duo.html",
+        "photo": "https://static.locanto.info/assets/0000_0000/images/bg/icons/svg/mobile/bst2/image_placeholder--white.svg",
+        "date": "il y a 26 j",
+        "description": "Prix sur demande — Respectueux et très confident confident Sincères respectueus confident respectueux et très confident"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "prix non affiché — à confirmer auprès du vendeur"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Abidjan",
+        "note": "autre zone : abidjan"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Abidjan",
+        "extrait": "Petit plombier endurant petit 1er en direct bien en duo"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · prix sur demande · zone : Abidjan — autre zone : abidjan · Zone : Abidjan (« Petit plombier endurant petit 1er en direct bien en duo »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-8635098273",
+        "source": "locanto",
+        "title": "Technicien plombier pour vos travaux et depnnage, Anyama",
+        "price": null,
+        "currency": "unknown",
+        "zone": "Anyama",
+        "vendor": null,
+        "url": "https://www.locanto.ci/anyama/ID_8635098273/Technicien-plombier-pour-vos-travaux-et-depnnage.html",
+        "photo": "https://images.locanto.info/6913860945/Technicien-plombier-pour-vos-travaux-et-depnnage_1.jpg",
+        "date": "il y a 5 mois",
+        "description": "Prix sur demande — Spécialiste en installation, maintenance et dépannage de systèmes de plomberie, je vous propose des services complets et de qualité pour tous vos projets. Mes prestations : · Réalisation de schémas d’installation de plomberie · Métrés précis pour l’élaboration de devis détaillés "
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "prix non affiché — à confirmer auprès du vendeur"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": "Anyama",
+        "note": "zone annexe d'Abidjan : anyama"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Anyama",
+        "extrait": "Technicien plombier pour vos travaux et depnnage, Anyama"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · prix sur demande · zone : Anyama — zone annexe d'Abidjan : anyama · Zone : Anyama (« Technicien plombier pour vos travaux et depnnage, Anyama »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "loc-7872066337",
+        "source": "locanto",
+        "title": "Hydrix service (plombier à Yamoussoukro - disponible 7/7j",
+        "price": null,
+        "currency": "unknown",
+        "zone": null,
+        "vendor": null,
+        "url": "https://www.locanto.ci/yamoussoukro/ID_7872066337/Hydrix-service-plombier-a-Yamoussoukro-disponible-7-7j.html",
+        "photo": "https://images.locanto.info/6678712635/Hydrix-service-plombier-a-Yamoussoukro-disponible-7-7j_1.jpg",
+        "date": "il y a 12 mois",
+        "description": "Prix sur demande — Besoin d’un plombier à Yamoussoukro ? Je suis un plombier qualifié disponible pour tous vos travaux de plomberie : Réparation de fuites d’eau Installation de robinets, lavabos, chauffe-eau Changement de chasse d’eau…"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "prix non affiché — à confirmer auprès du vendeur"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "zone non indiquée"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.75,
+    "score": 0.38,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Yamoussoukro",
+        "extrait": "Hydrix service (plombier à Yamoussoukro - disponible 7/7j"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · prix sur demande · Zone : Yamoussoukro (« Hydrix service (plombier à Yamoussoukro - disponible 7/7j »)"
+  },
+  {
+    "evaluated": {
+      "listing": {
+        "id": "gpage-1",
+        "source": "ci.coinafrique.com",
+        "title": "Travaux, bricolage et jardinage Plombier en Côte d'Ivoire - CoinAfrique Côte d'Ivoire",
+        "price": 500,
+        "currency": "CFA",
+        "zone": null,
+        "vendor": null,
+        "url": "https://ci.coinafrique.com/annonce/travaux-bricolage-et-jardinage/plombier-5944540",
+        "photo": null,
+        "date": null,
+        "description": "Plombier professionnel bonjour mr & mm contacter moi disponible moi c'est emmanuel plombier professionnel ‎vous voulez un plombier professionnel, propre avec tout fini ‎le secret, c’est le travail ‎je réalise vos travaux de plomberie avec une finition propre, solide et élégante : ‎✔️ évacuation ‎✔️ alimentation pvc ‎✔️ pose wc ‎✔️ travail soigné et durable ✔️ etanchiétte ✔️ debouchement ✔️ goutiere ✔️ installation chauffe eau ✔️ installation complète avec moi c'est du travail avec du mesure (maison,chantier,immeuble) ‎avec moi, ce n’est pas du travail pressé. ‎c’est du travail bien"
+      },
+      "model": {
+        "state": "compatible",
+        "observed": "mots-clés présents"
+      },
+      "capacity": {
+        "state": "inconnu",
+        "observed": null
+      },
+      "budget": {
+        "state": "inconnu",
+        "observed": "500 XOF",
+        "note": "budget non défini"
+      },
+      "zone": {
+        "state": "inconnu",
+        "observed": null,
+        "note": "zone non indiquée"
+      },
+      "priceNonComparable": false
+    },
+    "baseScore": 0.67,
+    "score": 0.34,
+    "aiStatus": "évalué par IA",
+    "criteria": [
+      {
+        "nom": "Zone",
+        "valeur": "Inconnue",
+        "extrait": "Travaux, bricolage et jardinage Plombier en Côte d'Ivoire - CoinAfrique Côte d'Ivoire"
+      }
+    ],
+    "raison": "Correspondance partielle — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · Zone : Inconnue (« Travaux, bricolage et jardinage Plombier en Côte d'Ivoire - CoinAfrique Côte d'Ivoire »)"
+  }
+]

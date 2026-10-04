@@ -1,0 +1,54 @@
+{
+  "started": "2026-10-02T13:48:35.189Z",
+  "rows": [
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.00036705,
+      "promptTokens": 907,
+      "completionTokens": 385,
+      "ts": "2026-10-02T13:48:41.498Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.00034755,
+      "promptTokens": 909,
+      "completionTokens": 352,
+      "ts": "2026-10-02T13:48:49.076Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.00037725,
+      "promptTokens": 975,
+      "completionTokens": 385,
+      "ts": "2026-10-02T13:48:56.106Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.00036105,
+      "promptTokens": 911,
+      "completionTokens": 374,
+      "ts": "2026-10-02T13:49:02.359Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.00035925,
+      "promptTokens": 879,
+      "completionTokens": 379,
+      "ts": "2026-10-02T13:49:10.538Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.000351,
+      "promptTokens": 868,
+      "completionTokens": 368,
+      "ts": "2026-10-02T13:49:18.069Z"
+    }
+  ],
+  "total": 0.00216315
+}

@@ -1,0 +1,19 @@
+{
+  "source": "google",
+  "status": "ok",
+  "annonces": [
+    {
+      "id": "gpage-1",
+      "source": "www.abidjandeals.com",
+      "title": "Table À Manger 6 Places Bouaké",
+      "price": 200000,
+      "currency": "F CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://www.abidjandeals.com/annonce/table-a-manger-6-places-bouake",
+      "photo": null,
+      "date": null,
+      "description": "Très belle table à manger 6 places neuve disponible. Très esthétique et solide. Livraison partout en Côte d'Ivoire. Payement par échelonnement possible. Garantie 24 mois."
+    }
+  ]
+}

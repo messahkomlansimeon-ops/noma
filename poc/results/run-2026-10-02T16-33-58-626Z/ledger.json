@@ -1,0 +1,54 @@
+{
+  "rows": [
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0008487,
+      "promptTokens": 1006,
+      "completionTokens": 1163,
+      "ts": "2026-10-02T16:33:30.196Z"
+    },
+    {
+      "task": "scoring",
+      "model": "openai/gpt-4o-mini",
+      "cost": 0.0003171,
+      "promptTokens": 454,
+      "completionTokens": 415,
+      "ts": "2026-10-02T16:33:37.703Z"
+    },
+    {
+      "task": "scoring",
+      "model": "deepseek/deepseek-chat",
+      "cost": 0.0006710796,
+      "promptTokens": 489,
+      "completionTokens": 530,
+      "ts": "2026-10-02T16:33:53.956Z"
+    },
+    {
+      "task": "scoring",
+      "model": "google/gemini-2.5-flash",
+      "cost": 0.0021233,
+      "promptTokens": 511,
+      "completionTokens": 788,
+      "ts": "2026-10-02T16:33:58.619Z"
+    }
+  ],
+  "parModele": {
+    "openai/gpt-4o-mini": {
+      "calls": 2,
+      "cost": 0.0011658
+    },
+    "deepseek/deepseek-chat": {
+      "calls": 1,
+      "cost": 0.0006710796
+    },
+    "google/gemini-2.5-flash": {
+      "calls": 1,
+      "cost": 0.0021233
+    }
+  },
+  "total": {
+    "total": 0.0039601796,
+    "known": true
+  }
+}

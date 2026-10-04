@@ -1,0 +1,208 @@
+{
+  "need": "iPhone 12 · 128 Go, bon état, à Abidjan",
+  "needParsed": {
+    "text": "iPhone 12 · 128 Go, bon état, à Abidjan",
+    "budgetMax": 150000,
+    "capacity": 128,
+    "keywords": [
+      "iphone",
+      "12",
+      "abidjan"
+    ],
+    "zone": "abidjan"
+  },
+  "started": "2026-10-02T13:48:35.189Z",
+  "facebook": {
+    "status": "ok",
+    "listings": 20,
+    "withPhoto": 20,
+    "notes": [
+      "tentative 1 : 20 liens item, 20 cartes parsées, titre=\"Facebook\""
+    ],
+    "evidence": [
+      "evidence/fb-attempt-1.png"
+    ]
+  },
+  "coinafrique": {
+    "httpStatus": 200,
+    "listings": 84
+  },
+  "locanto": {
+    "status": "ok",
+    "listings": 6,
+    "notes": [
+      "6 annonces · 0 « call view » (prix sur demande, conservées avec prix=null)"
+    ]
+  },
+  "google": {
+    "via": "online",
+    "note": "via openai/gpt-4o-mini:online",
+    "liens": 5,
+    "cibles": 4,
+    "extraites": 2
+  },
+  "prefilter": {
+    "total": 84,
+    "retenues": 59,
+    "rejetees": 25,
+    "rejeteesParSource": {
+      "coinafrique": {
+        "prix 180000 > budget 150000": 2,
+        "hors sujet": 15,
+        "prix 650000 > budget 150000": 1,
+        "prix 175000 > budget 150000": 1,
+        "prix 195000 > budget 150000": 1
+      },
+      "facebook": {
+        "hors sujet": 4
+      },
+      "www.jumia.ci": {
+        "prix 169000 > budget 150000": 1
+      }
+    },
+    "economieIA": "30% d'appels évités"
+  },
+  "final": {
+    "totalBrut": 112,
+    "deduplique": 84,
+    "doublonsRetires": 28,
+    "candidates": 59,
+    "avecPrix": 59,
+    "avecDate": 50,
+    "scoreMoyen": "0.23",
+    "scoringModel": "openai/gpt-4o-mini"
+  },
+  "latenceMs": 42883,
+  "cacheHits": 8,
+  "cout": {
+    "total": 0.00216315,
+    "parModele": {
+      "openai/gpt-4o-mini": {
+        "calls": 6,
+        "cost": 0.00216315
+      }
+    }
+  },
+  "top8": [
+    {
+      "id": "coin-6069491",
+      "source": "coinafrique",
+      "title": "Iphone 12  128gb",
+      "price": 79000,
+      "currency": "FCFA",
+      "zone": "Adjamé, Abidjan",
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/telephones-et-tablettes/iphone-12-128gb-6069491",
+      "photo": "https://images.coinafrique.com/thumb_6069491_uploaded_image1_1790885992.jpg",
+      "date": "il y a 17 heures",
+      "description": "Téléphones & Tablettes — Iphone 12  128gb",
+      "score": 1,
+      "raison": "Correspond à l'iPhone 12, 128 Go, bon état, prix dans le budget."
+    },
+    {
+      "id": "coin-6055716",
+      "source": "coinafrique",
+      "title": "iphone 12",
+      "price": 65000,
+      "currency": "FCFA",
+      "zone": "Cocody, Abidjan",
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/telephones-et-tablettes/iphone-12-6055716",
+      "photo": "https://images.coinafrique.com/thumb_6055716_uploaded_image1_1789646218.jpg",
+      "date": "il y a 15 jours",
+      "description": "Téléphones & Tablettes — iphone 12",
+      "score": 1,
+      "raison": "Correspond à l'iPhone 12, prix dans le budget."
+    },
+    {
+      "id": "coin-6049819",
+      "source": "coinafrique",
+      "title": "iPhone 12  - 128Gb",
+      "price": 90000,
+      "currency": "FCFA",
+      "zone": "Cocody, Abidjan",
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/telephones-et-tablettes/iphone-12-128gb-6049819",
+      "photo": "https://images.coinafrique.com/thumb_6049819_uploaded_image1_1789146119.jpg",
+      "date": "il y a 19 jours",
+      "description": "Téléphones & Tablettes — iPhone 12  - 128Gb",
+      "score": 1,
+      "raison": "Correspondance exacte : iPhone 12, 128 Go, bon état, à Cocody."
+    },
+    {
+      "id": "coin-6001588",
+      "source": "coinafrique",
+      "title": "Iphone 12 128 gigas",
+      "price": 120000,
+      "currency": "FCFA",
+      "zone": "Treichville, Abidjan",
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/telephones-et-tablettes/iphone-12-128-gigas-6001588",
+      "photo": "https://images.coinafrique.com/thumb_6001588_uploaded_image1_1785409403.jpg",
+      "date": "il y a 1 mois",
+      "description": "Téléphones & Tablettes — Iphone 12 128 gigas",
+      "score": 1,
+      "raison": "Correspondance exacte (iPhone 12, 128 Go, bon état, zone proche, prix dans le budget)."
+    },
+    {
+      "id": "coin-6000929",
+      "source": "coinafrique",
+      "title": "iPhone 12  - 128Gb",
+      "price": 115000,
+      "currency": "FCFA",
+      "zone": "Treichville, Abidjan",
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/telephones-et-tablettes/iphone-12-128gb-6000929",
+      "photo": "https://images.coinafrique.com/thumb_6000929_uploaded_image1_1785346027.jpg",
+      "date": "il y a 1 mois",
+      "description": "Téléphones & Tablettes — iPhone 12  - 128Gb",
+      "score": 1,
+      "raison": "Correspondance exacte (iPhone 12, 128 Go, bon état, zone proche, prix dans le budget)."
+    },
+    {
+      "id": "coin-5981750",
+      "source": "coinafrique",
+      "title": "iphone 12 simple casi neuf",
+      "price": 120000,
+      "currency": "FCFA",
+      "zone": "Treichville, Abidjan",
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/telephones-et-tablettes/iphone-12-simple-casi-neuf-5981750",
+      "photo": "https://images.coinafrique.com/thumb_5981750_uploaded_image1_1783877959.jpg",
+      "date": "il y a 1 mois",
+      "description": "Téléphones & Tablettes — iphone 12 simple casi neuf",
+      "score": 1,
+      "raison": "Correspond exactement au modèle, capacité, état et budget."
+    },
+    {
+      "id": "fb-3699949763501094",
+      "source": "facebook",
+      "title": "iPhone 12 simple 128GB (pas de troc)",
+      "price": 85000,
+      "currency": "FCFA",
+      "zone": "Bingerville",
+      "vendor": null,
+      "url": "https://www.facebook.com/marketplace/item/3699949763501094/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+      "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/807590916_971112732684607_6487043347960463810_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=109&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=le71fngNa_kQ7kNvwG4ANEi&_nc_oc=Adq79lLS7l4TqBcpuCVVv4s6s6ScRA8W16cr-P5Lk4QR2mHQ18yhYzznjf0wDAbJzN_fPfMkBfdM6cwQ8thoRJBG&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=uaUte1UtlYLf3K3V_LCcFQ&_nc_ss=7b289&oh=00_AQMJoFwu2TUbWZ-N9WW8p_z0Ig0-XhuxfMS9bqt9UUmjXA&oe=6AC58606",
+      "date": null,
+      "description": "85 000 CFA 100 000 CFA iPhone 12 simple 128GB (pas de troc) Bingerville",
+      "score": 1,
+      "raison": "Correspond au modèle, capacité, bon état et budget."
+    },
+    {
+      "id": "serp-1",
+      "source": "ci.coinafrique.com",
+      "title": "Iphone 12 128gigas",
+      "price": 140000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/telephones-et-tablettes/iphone-12-128gigas-5940903",
+      "photo": null,
+      "date": null,
+      "description": "en excellent état ✅ batterie durable ✅ tout passe ???? reçu et garantie en boutique",
+      "score": 0.93,
+      "raison": "Capacité de 128 Go, bon état, mais zone non spécifiée."
+    }
+  ]
+}

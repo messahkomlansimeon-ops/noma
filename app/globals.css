@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-cream: #faf8f1;
+  --color-ink: #1a2142;
+  --color-ink-soft: #5e657f;
+  --color-forest: #0e5f3b;
+  --color-forest-deep: #0b4e31;
+  --color-sage: #e9f1e3;
+  --color-sage-ink: #3e7c55;
+  --color-carrot: #f97316;
+  --color-carrot-soft: #fce9d8;
+  --color-carrot-ink: #c2410c;
+  --color-sky: #dcedfd;
+  --color-sky-ink: #1d4ed8;
+  --color-line: #e9e4d6;
+  --color-wash: #f2efe6;
+  --font-display: var(--font-bricolage);
+  --font-sans: var(--font-manrope);
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.animate-toast {
+  animation: toast-in 0.25s ease-out;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-sheet {
+  animation: sheet-in 0.34s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+input,
+textarea,
+button {
+  font-family: inherit;
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--color-forest);
+}

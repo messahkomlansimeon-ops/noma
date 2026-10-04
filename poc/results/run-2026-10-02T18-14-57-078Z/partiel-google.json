@@ -1,0 +1,19 @@
+{
+  "source": "google",
+  "status": "ok",
+  "annonces": [
+    {
+      "id": "gpage-1",
+      "source": "annonces.abidjan.net",
+      "title": "DEMANAGEMENT ABIDJAN",
+      "price": 75000,
+      "currency": "XOF",
+      "zone": null,
+      "vendor": null,
+      "url": "https://annonces.abidjan.net/achat-vente/8381/details/demenagement-abidjan",
+      "photo": null,
+      "date": null,
+      "description": "Votre déménagement A ABIDJAN Vous venez d’accéder au site de Je2ménage, Le spécialiste du déménagement en Côte d'ivoire, pour les entreprises, les services et les particuliers. Merci de cette démarche et bienvenue dans notre entreprise. Notre objectif au cours de cette visite est de vous convaincre de notre capacité à réaliser votre déménagement dans toutes les ville de la Côte d'ivoire."
+    }
+  ]
+}

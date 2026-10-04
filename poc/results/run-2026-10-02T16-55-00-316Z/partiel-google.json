@@ -1,0 +1,45 @@
+{
+  "source": "google",
+  "status": "ok",
+  "annonces": [
+    {
+      "id": "gpage-1",
+      "source": "annonces.abidjan.net",
+      "title": "Détails Iphone 12 pro 256 giga - Annonces.abidjan.net",
+      "price": null,
+      "currency": "FCFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://annonces.abidjan.net/achat-vente/8024/details/iphone-12-pro-256-giga",
+      "photo": null,
+      "date": null,
+      "description": null
+    },
+    {
+      "id": "gpage-2",
+      "source": "www.meiteshop.fr",
+      "title": "iPhone 12 pro Occasion Pas chère, Côte d'Ivoire, Abidjan - MeiteShop",
+      "price": null,
+      "currency": "FCFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://www.meiteshop.fr/produit/iphone-12-pro-occasion/",
+      "photo": null,
+      "date": null,
+      "description": null
+    },
+    {
+      "id": "gpage-3",
+      "source": "jeven.ci",
+      "title": "Apple iPhone 12 Pro Max - 128Go – Jeven",
+      "price": null,
+      "currency": "FCFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://jeven.ci/products/apple-iphone-12-pro-max-128go",
+      "photo": null,
+      "date": null,
+      "description": null
+    }
+  ]
+}

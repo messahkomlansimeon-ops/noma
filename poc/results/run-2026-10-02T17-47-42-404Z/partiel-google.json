@@ -1,0 +1,45 @@
+{
+  "source": "google",
+  "status": "ok",
+  "annonces": [
+    {
+      "id": "gpage-1",
+      "source": "ci.coinafrique.com",
+      "title": "Chaussures Homme Baskets Jordan 40 neufs et occasions en Côte d'Ivoire - CoinAfrique Côte d'Ivoire",
+      "price": 39000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/chaussures-homme/baskets-jordan-40-6040985",
+      "photo": null,
+      "date": null,
+      "description": "Baskets Jordan 40, pointure : 42, 43, 44 avec carton."
+    },
+    {
+      "id": "gpage-2",
+      "source": "ci.coinafrique.com",
+      "title": "Chaussures Homme Nike jordan 1 low neufs et occasions en Côte d'Ivoire - CoinAfrique Côte d'Ivoire",
+      "price": 23000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/chaussures-homme/nike-jordan-1-low-5892219",
+      "photo": null,
+      "date": null,
+      "description": "Nike jordan 1 low pointures disponibles : 39, 40, 41, 42, 43, 44, 45"
+    },
+    {
+      "id": "gpage-3",
+      "source": "ci.coinafrique.com",
+      "title": "Chaussures Homme Nike jordan cactus jack neufs et occasions en Côte d'Ivoire - CoinAfrique Côte d'Ivoire",
+      "price": 23000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/chaussures-homme/nike-jordan-cactus-jack-5892193",
+      "photo": null,
+      "date": null,
+      "description": "Nike jordan cactus jack pointures disponibles : 39, 40, 41, 42, 43, 44, 45"
+    }
+  ]
+}

@@ -1,0 +1,2504 @@
+{
+  "besoin": "table à manger 6 places à Cocody",
+  "besoinParse": {
+    "text": "table à manger 6 places à Cocody",
+    "kind": "produit",
+    "product": "table manger",
+    "model": null,
+    "variant": null,
+    "capacity": null,
+    "budget": null,
+    "zone": "cocody",
+    "criteria": [],
+    "attributes": [
+      {
+        "label": "places",
+        "value": 6
+      }
+    ],
+    "keywords": [
+      "table",
+      "manger"
+    ]
+  },
+  "offresBrutes": 109,
+  "apresDedup": 109,
+  "fusionsCertaines": 0,
+  "groupesDoublonsPossibles": 3,
+  "candidates": 51,
+  "alternativesHorsBudget": 0,
+  "alternativesScorees": 0,
+  "rejetsIncompatibilite": 58,
+  "appelsIA": 11,
+  "lotsScoring": 6,
+  "tokens": {
+    "prompt": 16023,
+    "completion": 5002
+  },
+  "cout": {
+    "total": 0.01240465,
+    "known": true
+  },
+  "couvertureScoring": "51/51",
+  "cache": {
+    "hits": 0,
+    "misses": 9,
+    "writes": 8,
+    "skipped": 0,
+    "bySource": {
+      "facebook": {
+        "hits": 0,
+        "misses": 1,
+        "writes": 1,
+        "skipped": 0
+      },
+      "locanto": {
+        "hits": 0,
+        "misses": 1,
+        "writes": 1,
+        "skipped": 0
+      },
+      "coinafrique": {
+        "hits": 0,
+        "misses": 1,
+        "writes": 1,
+        "skipped": 0
+      },
+      "google": {
+        "hits": 0,
+        "misses": 1,
+        "writes": 1,
+        "skipped": 0
+      },
+      "page": {
+        "hits": 0,
+        "misses": 5,
+        "writes": 4,
+        "skipped": 0
+      }
+    }
+  },
+  "cacheEtat": "froid",
+  "premierResultatMs": 2226,
+  "dureeSourcesMs": 30390,
+  "dureeTotaleMs": 112879,
+  "syntheseSources": {
+    "ok": 4,
+    "empty": 0,
+    "indisponibles": 0,
+    "verdict": "résultats disponibles"
+  },
+  "bilanSources": [
+    "facebook : succès — 20 annonces · 7.8 s",
+    "coinafrique : succès — 84 annonces · 2.2 s",
+    "locanto : succès — 4 annonces · 12.8 s",
+    "google : succès — 1 annonce · 30.4 s — motif : https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-: http: https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3139769 — HTTP 404"
+  ],
+  "parSource": [
+    {
+      "source": "facebook",
+      "status": "ok",
+      "annonces": 20,
+      "dureeMs": 7781,
+      "erreurs": []
+    },
+    {
+      "source": "coinafrique",
+      "status": "ok",
+      "annonces": 84,
+      "dureeMs": 2191,
+      "erreurs": []
+    },
+    {
+      "source": "locanto",
+      "status": "ok",
+      "annonces": 4,
+      "dureeMs": 12812,
+      "erreurs": []
+    },
+    {
+      "source": "google",
+      "status": "ok",
+      "annonces": 1,
+      "dureeMs": 30354,
+      "erreurs": [
+        "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-: http: https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3139769 — HTTP 404"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "source": "facebook",
+      "query": "https://www.facebook.com/marketplace/abidjan/search?query=6+places+table+manger",
+      "capabilities": {
+        "search": true,
+        "location": true,
+        "pagination": false,
+        "itemCheck": true,
+        "services": false,
+        "unsupported": []
+      },
+      "warnings": [],
+      "listings": [
+        {
+          "id": "fb-1531993718165618",
+          "source": "facebook",
+          "title": "Gratuit Table de salle a mangé",
+          "price": null,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1531993718165618/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/779995931_1081362324365718_6512172989824128938_n.jpg?stp=c0.152.261.261a_dst-jpg_p261x260_tt6&_nc_cat=108&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=ANLz7CaFZhkQ7kNvwEJ78eB&_nc_oc=Adqo4ywme6TYAbHONU1UORUnqrCHmzBrBANSy5EZncc1_6avzq5kEnGf8cPqb_AGuZwj4gr0bxUhMOwCouMSGeBE&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQPlko-b0_ANMn6U7TazUC2gh93TjbtV6UhUdyuEFkHAVA&oe=6AC5DC87",
+          "date": null,
+          "description": "Gratuit Table de salle a mangé Abidjan"
+        },
+        {
+          "id": "fb-1059294180204023",
+          "source": "facebook",
+          "title": "Table à manger",
+          "price": 600,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1059294180204023/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/791684060_1037856525725044_860013720659652628_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=110&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=qZ6aBphXJVoQ7kNvwGKOXKp&_nc_oc=Adpdp1oCsiIqOBuuK2Js1R7V_ky__5gEmL84nefyLJMHDzr3GwBPL-WvmFrGIAlVjFXnmlKp_RQc7fvAnDA1-2o-&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQOjj5HQQbMkH6E7BE5JCXJ7ff7hhm7I3Ff_GDKojVjPog&oe=6AC5ECC1",
+          "date": null,
+          "description": "600 CFA Table à manger Abidjan"
+        },
+        {
+          "id": "fb-1789951469054527",
+          "source": "facebook",
+          "title": "Table à manger 6 places",
+          "price": 130000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1789951469054527/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/704614821_1458223572653905_546840495741148002_n.jpg?stp=c42.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=SjlymQBbppAQ7kNvwE3esW_&_nc_oc=Adrm6h7nxG75Iz2ajh3NDWJ1lHPA4V8nsTrlxd0ildNbxVZx45FY1N5jUArYc_aPvF_x3cKK94PO2NuR9eLaDbMr&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQN0x5uEsxXVA3f_iBTdcv9KWY6f50wmB-lIFcvM9ehvCg&oe=6AC5F8D9",
+          "date": null,
+          "description": "130 000 CFA 150 000 CFA Table à manger 6 places Abidjan"
+        },
+        {
+          "id": "fb-1581480423006823",
+          "source": "facebook",
+          "title": "Gratuit Table à manger vitrer +6 chaises deuxieme main à vendre [hidden information]",
+          "price": null,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1581480423006823/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/818960846_959005803239270_2689520800427438622_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=104&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=ACbx3OgJrcUQ7kNvwFqwZuk&_nc_oc=Adqz5mh6ehIIcIE8JInNjp8rkG4vX-nKCnZQvo-0ruYN_05ydLs3AhBkGrp5lttXzXFhyXhJSKlWduUakS_Nrmkl&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQPD9enwls1EXJ8NgeRPsLra4-dlZIqZJg0uRvm5ZJBdsA&oe=6AC5CA97",
+          "date": null,
+          "description": "Gratuit Table à manger vitrer +6 chaises deuxieme main à vendre [hidden information] Abidjan"
+        },
+        {
+          "id": "fb-1812380296422838",
+          "source": "facebook",
+          "title": "TABLE À MANGER ( 1 TABLE + 2 CHAISES )",
+          "price": 35000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1812380296422838/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/801883763_3612828392214666_1069999353516597833_n.jpg?stp=c0.101.261.261a_dst-jpg_p261x260_tt6&_nc_cat=111&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=RnE6JNgZOkgQ7kNvwFBibWN&_nc_oc=AdrBGWk5JztMvgLWLL1wnV46TzX4MICCWCQYmRMjig73zhhxFokWKiWR_qvQJHdX4NDTujITy4-Q8vDIVH6Hqmf2&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQNJ0Bcta-WKJlw2kne6135xQbDfAmOfBtRs2CNe1nhGpA&oe=6AC5EB80",
+          "date": null,
+          "description": "35 000 CFA TABLE À MANGER ( 1 TABLE + 2 CHAISES ) Abidjan"
+        },
+        {
+          "id": "fb-1059241170414474",
+          "source": "facebook",
+          "title": "Table à manger 6 places 📱 [hidden information]",
+          "price": 16,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1059241170414474/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/793097095_1770266967453659_287224461775443020_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=111&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=OGhNVC2EU9kQ7kNvwGqb7Sy&_nc_oc=AdqeKoyGnOpx37pEOp0S-EGEDA7F4KvcC1VYliHh_OQ5eDbnS1Xn4vvixXhOpIfAsbE1wfIcygxqXEwk_8B16mlA&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQPhMCVn321043MBV76GmcSQfdFrIQQ-nuQbcMoIlZEo3g&oe=6AC5DDB1",
+          "date": null,
+          "description": "16 CFA Table à manger 6 places 📱 [hidden information] Abidjan"
+        },
+        {
+          "id": "fb-2317576492312241",
+          "source": "facebook",
+          "title": "Salle à manger 6 places table en marbre",
+          "price": 150000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/2317576492312241/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/830990457_1409802460591343_5897408370922056676_n.jpg?stp=c65.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=110&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=ylp1cJMQidAQ7kNvwFTCUyV&_nc_oc=AdqDZV3NHK3BOHRIXlZkfNC1yZRRJPap89_OfQpnwgvMsx8I-4pG50rzbY6y4jULCMqYczT5OtNLBb_piweZr4So&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQNmqsxuCHPq3AX8rjCQteuAjxXOShAxv-CJvVksZc2BAg&oe=6AC5FD7A",
+          "date": null,
+          "description": "150 000 CFA Salle à manger 6 places table en marbre Abidjan"
+        },
+        {
+          "id": "fb-1857073035464558",
+          "source": "facebook",
+          "title": "Table à manger 6 places",
+          "price": 190000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1857073035464558/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/776133074_1074206011647212_2138861258661140527_n.jpg?stp=c32.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=oiP_T3qhmBkQ7kNvwHTEb1H&_nc_oc=AdrvswQyg8rdcX4DBMyyW1nz5EgXaMMlhTk1YkUPpS_3liyXKHQ-ptImjYixrmjxxUwziCgXiai4pAhZ5xCYrAaM&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQNyHRf3-Dm-3-VNzhcBa7NEMXRL_9EdNxx9mIhzy9Awyg&oe=6AC5FA3A",
+          "date": null,
+          "description": "190 000 CFA Table à manger 6 places Abidjan"
+        },
+        {
+          "id": "fb-1078463948369093",
+          "source": "facebook",
+          "title": "Salle à manger 6 places table extensible",
+          "price": 185000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1078463948369093/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/828484463_1089543113927061_4363082741506686308_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=RN6i8m5zI5gQ7kNvwENMN9z&_nc_oc=AdoJrPcZ2C7Yb3N0aovY3I7qXoG6fGpY_kOXewcLCK8RzotSlB3EoA8eBcNWd7NueogkOv4-q61iJz07zU0nxYYw&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQPQGQZc-lqoA2BLtYmtoYRsKH887K2yEc62TXSga8oMWA&oe=6AC5D610",
+          "date": null,
+          "description": "185 000 CFA Salle à manger 6 places table extensible Abidjan"
+        },
+        {
+          "id": "fb-1417718746873399",
+          "source": "facebook",
+          "title": "Table à manger",
+          "price": 155000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1417718746873399/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/796460501_2261607191271940_2185731083909137284_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=111&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=8zK7_4g5vjAQ7kNvwHLLEPO&_nc_oc=AdqKAYHZ5pd681R724KTCA3AGj-35JJfF-iFm-WY0g0-Gq_LUIyByX1Z26oTAQnDcRWrgjAAVjCjpyFjsR75rO8g&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQMQJqx8Q6N0yiQJNCVtFkBWWey_bKA-6YPmT4-lI-G5ZQ&oe=6AC5DB77",
+          "date": null,
+          "description": "155 000 CFA Table à manger Abidjan"
+        },
+        {
+          "id": "fb-1818857879535169",
+          "source": "facebook",
+          "title": "Gratuit Table manger",
+          "price": null,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1818857879535169/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/792238830_1380286480399476_3472115878763021137_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=102&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=v-NMJklf1h4Q7kNvwFOBG5u&_nc_oc=AdpNGRV1ayw8d0aKe1EtBQZg0nlgjnKfngeFHDtjw7QGEd7aT6OQ25mthQveZZjQMNrg3fjdswVFixzhroR2qbKi&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQPOnqPSICL-7TlbhehcIZyKi7XUmShCgDQ06hklLexxRg&oe=6AC5D6B5",
+          "date": null,
+          "description": "Gratuit Table manger Abidjan"
+        },
+        {
+          "id": "fb-946883221339447",
+          "source": "facebook",
+          "title": "Salle à manger 6 places luxueuse Table à manger et 6 chaises",
+          "price": 365000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/946883221339447/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/825266282_1093529626766678_3612017688646828166_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=108&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=szUgxmTQPZ0Q7kNvwGJo0XG&_nc_oc=AdoBVRJ-aa9A00ItP4NlqiajSHefZwmo7nv1nGCylKjRBeEqU8e4qLJt820foVlPcYKJ_GpI-1ecEN1woIFPmPdt&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQOcNaFzTf4r5IwD-kQQqvFU3vi59zKMZAHz2iS0CNI6AQ&oe=6AC5C91D",
+          "date": null,
+          "description": "365 000 CFA Salle à manger 6 places luxueuse Table à manger et 6 chaises Abidjan"
+        },
+        {
+          "id": "fb-1580686370276423",
+          "source": "facebook",
+          "title": "Table a manger 4chaises",
+          "price": 75000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1580686370276423/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/737046180_2131545221079602_4673376884769010137_n.jpg?stp=c54.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=106&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=L-boqUs2GiUQ7kNvwE5aAgh&_nc_oc=AdpnUYbAUragv4SR_Yrzfcd_HfocfY5W6WnLeO3xBOxv5wfKybOBg2Muzh3O0BYrVP2AJXgAAQKrP3rNeVA_PPih&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQMe_4ypKk7BA07PIp-BJipUnpTKP4P5xnagMrDmGyY-Ow&oe=6AC5F609",
+          "date": null,
+          "description": "75 000 CFA Table a manger 4chaises Abidjan"
+        },
+        {
+          "id": "fb-1560565295277758",
+          "source": "facebook",
+          "title": "Gratuit Tables à manger",
+          "price": null,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1560565295277758/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/819040979_1740001810437001_5965565745196429954_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=106&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=qo8bL0IExHQQ7kNvwGbXESr&_nc_oc=Adp9ed8fyDl7tKCwqfh5EEfi1Xc0TALCcNlootyyucy1UJmhfEldiCtV63R942b001-VzgaKHUgcRygoc28pRTdV&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQNfpKju_mRdOTtrYrUDjKzLxNjow73b3x7L6Lbj7lQThQ&oe=6AC5F2DF",
+          "date": null,
+          "description": "Gratuit Tables à manger Abidjan"
+        },
+        {
+          "id": "fb-1020380981018234",
+          "source": "facebook",
+          "title": "Table à manger 4,6 places à vendre",
+          "price": 100000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1020380981018234/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/833216625_2318289805634320_8703777935419685580_n.jpg?stp=c33.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=101&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=h0Rk4X1JR1QQ7kNvwFvCBCY&_nc_oc=Adpx5T_SsmaouDt9FAE06F2gP-s3qbelfaandzseONjyo6JbNKFDSBe8P-ent8D1PEc1R453cDd-WrKw1i0QRlfP&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQOraSl2gM1jOFwIdDko9n-9uwrGC6sHjfyrbElwA72_fw&oe=6AC5C832",
+          "date": "récente",
+          "description": "Annonce récente 100 000 CFA Table à manger 4,6 places à vendre Abidjan"
+        },
+        {
+          "id": "fb-2172204813707903",
+          "source": "facebook",
+          "title": "Table a manger 6 place",
+          "price": 185000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/2172204813707903/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/825286512_1075256355121266_2294701561583296534_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=108&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=UTuz-yacspIQ7kNvwEjWmTG&_nc_oc=AdrJV5qhy_K2K_oRVH_wZ3IdnkoRP_DpUbk9k-2QoN9HGczpX0MmQaEPAVqghx50Q4O0UJ7VV7D026rwSG3eYOXD&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQN4MhUUez90nLXpVeXh4ivaM1tJ3TKUOg1Sm9kWI77w8w&oe=6AC5DEB6",
+          "date": null,
+          "description": "185 000 CFA Table a manger 6 place Abidjan"
+        },
+        {
+          "id": "fb-28022744284076360",
+          "source": "facebook",
+          "title": "Gratuit Table à manger",
+          "price": null,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/28022744284076360/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/774198066_1690245528743833_5674256785786015166_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=PgKfe9GMzgEQ7kNvwEqFcHg&_nc_oc=AdpioFVeSch3fO-BkLfcDGd-gkYKC5vB30Q5kgSkmY63VFOADDvahFg8FGNKx2yH3irP6_CeW8gpJU4i0maoU3pK&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQPJ2bPDqmH7bbEwJhvjI-WwnXf9x-A6xTcL07jElmw51A&oe=6AC5D2B1",
+          "date": null,
+          "description": "Gratuit Table à manger Abidjan"
+        },
+        {
+          "id": "fb-1465413178861496",
+          "source": "facebook",
+          "title": "Table à mange 6places disponible",
+          "price": 150000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1465413178861496/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/829508306_1359857565950419_6027382236219781249_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=103&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=jFp6ezXRF9kQ7kNvwG1QMQe&_nc_oc=AdpChoFAhJCpWYzMwwHdcjuPbXDEjgzcPOwDp4eHfepDKs2n5LMMaEIkJKcjA2MiozLgewxQhvc9f1Wy7XsrJ0ME&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQNyoJB7laS6de6N6Acdct9AoM2kP-FAL0gI6wbDYRZ3Tw&oe=6AC5F8EB",
+          "date": null,
+          "description": "150 000 CFA Table à mange 6places disponible Abidjan"
+        },
+        {
+          "id": "fb-2524178978078767",
+          "source": "facebook",
+          "title": "Table à manger à vendre",
+          "price": 100000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/2524178978078767/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/806049991_1080195967936791_3764506782038323535_n.jpg?stp=c0.99.261.261a_dst-jpg_p261x260_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=jcr-MTK1C2kQ7kNvwHPgR2F&_nc_oc=Adpf8WEuKwL-zqOygC_UVwfyKrBB2cUh2jgChA_MgD6wjEVL7pXg90d-BAwxyWikq4VzZ0vS2LMLTb4WNpnwPhdq&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQO6cx1W0RWDtklmuHn0JCz7UIgMvmm3xJLe92kdrl-neg&oe=6AC5E121",
+          "date": null,
+          "description": "100 000 CFA Table à manger à vendre Abidjan"
+        },
+        {
+          "id": "fb-1600896178427413",
+          "source": "facebook",
+          "title": "Gratuit Table à manger 6 chaises",
+          "price": null,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1600896178427413/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/788689872_1730328791351669_7328458841585250429_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=80s37d_4u-UQ7kNvwGVt0xZ&_nc_oc=Adp5diyimAAc5YYDb9BxiO6k2JZOWbqUCjeHcRn3nYUesV2SQlPN3mCUDltINxpJgpSO4gtwbEuuFK-1Yxn-hyZz&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQMJIisFTEFpfI2x5ih_gKQmBoKV7LMOBAUt_1XcJvvWZg&oe=6AC5D92B",
+          "date": null,
+          "description": "Gratuit Table à manger 6 chaises Abidjan"
+        }
+      ],
+      "status": "ok",
+      "durationMs": 7781,
+      "errors": [],
+      "evidence": [
+        "evidence/fb-attempt-1.png"
+      ]
+    },
+    {
+      "source": "coinafrique",
+      "query": "https://ci.coinafrique.com/search?keyword=6+places+table+manger",
+      "capabilities": {
+        "search": true,
+        "location": false,
+        "pagination": true,
+        "itemCheck": false,
+        "services": false,
+        "unsupported": [
+          "zone « cocody » non filtrée côté site (filtrage local ensuite)"
+        ]
+      },
+      "warnings": [
+        "zone « cocody » non filtrée côté site (filtrage local ensuite)"
+      ],
+      "listings": [
+        {
+          "id": "coin-6070523",
+          "source": "coinafrique",
+          "title": "Vente villa avec piscine Bingerville zone palais",
+          "price": 160000000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/villas/vente-villa-avec-piscine-bingerville-zone-palais-6070523",
+          "photo": "https://images.coinafrique.com/thumb_6070523_uploaded_image1_1790962271.jpg",
+          "date": null,
+          "description": "Villas — Vente villa avec piscine Bingervill..."
+        },
+        {
+          "id": "coin-6063200",
+          "source": "coinafrique",
+          "title": "Location villa duplex 4 pièces -Bingerville ",
+          "price": 160000000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/villas/location-villa-duplex-4-pieces-bingerville-6063200",
+          "photo": "https://images.coinafrique.com/thumb_6063200_uploaded_image1_1790270396.jpg",
+          "date": "il y a 2 heures",
+          "description": "Villas — Location villa duplex 4 pièces -Bingerville"
+        },
+        {
+          "id": "coin-6066746",
+          "source": "coinafrique",
+          "title": "Villa duplex 4 pieces en vente",
+          "price": 165000000,
+          "currency": "FCFA",
+          "zone": "Bingerville",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/villas/villa-duplex-4-pieces-en-vente-6066746",
+          "photo": "https://images.coinafrique.com/thumb_6066746_uploaded_image1_1790637111.jpg",
+          "date": "il y a 20 heures",
+          "description": "Villas — Villa duplex 4 pieces en vente"
+        },
+        {
+          "id": "coin-5849782",
+          "source": "coinafrique",
+          "title": "Table à mange en marbe 8 places",
+          "price": 150000,
+          "currency": "FCFA",
+          "zone": "Le plateau, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-mange-en-marbe-8-places-5849782",
+          "photo": "https://images.coinafrique.com/thumb_5849782_uploaded_image1_1775340781.jpg",
+          "date": "il y a 6 mois",
+          "description": "Meubles — Table à mange en marbe 8 places"
+        },
+        {
+          "id": "coin-5839817",
+          "source": "coinafrique",
+          "title": "Meuble",
+          "price": 130000,
+          "currency": "FCFA",
+          "zone": "Adjamé, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/meuble-5839817",
+          "photo": "https://images.coinafrique.com/thumb_5839817_uploaded_image1_1774796734.jpg",
+          "date": "il y a 6 mois",
+          "description": "Meubles — Meuble"
+        },
+        {
+          "id": "coin-5821087",
+          "source": "coinafrique",
+          "title": "Table à manger",
+          "price": 0,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-5821087",
+          "photo": "https://images.coinafrique.com/thumb_5821087_uploaded_image1_1773617327.jpg",
+          "date": "il y a 6 mois",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-5818663",
+          "source": "coinafrique",
+          "title": "Tables Vitrée 6 chaises ",
+          "price": 210000,
+          "currency": "FCFA",
+          "zone": "Adjamé, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/tables-vitree-6-chaises-5818663",
+          "photo": "https://images.coinafrique.com/thumb_5818663_uploaded_image1_1773441144.jpg",
+          "date": "il y a 6 mois",
+          "description": "Meubles — Tables Vitrée 6 chaises"
+        },
+        {
+          "id": "coin-5769581",
+          "source": "coinafrique",
+          "title": "Table à manger",
+          "price": 15000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-5769581",
+          "photo": "https://images.coinafrique.com/thumb_5769581_uploaded_image1_1770816886.jpg",
+          "date": "il y a 7 mois",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-5655318",
+          "source": "coinafrique",
+          "title": "Table à manger",
+          "price": 130000,
+          "currency": "FCFA",
+          "zone": "Bingerville",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-5655318",
+          "photo": "https://images.coinafrique.com/thumb_5655318_uploaded_image1_1764840935.jpg",
+          "date": "il y a 10 mois",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-5531397",
+          "source": "coinafrique",
+          "title": "Salon",
+          "price": 200000,
+          "currency": "FCFA",
+          "zone": "Bingerville",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/salon-5531397",
+          "photo": "https://images.coinafrique.com/thumb_5531397_uploaded_image1_1758181282.jpg",
+          "date": "il y a 1 année",
+          "description": "Meubles — Salon"
+        },
+        {
+          "id": "coin-5501339",
+          "source": "coinafrique",
+          "title": "Table à manger 6 chaises",
+          "price": 225000,
+          "currency": "FCFA",
+          "zone": "Adjamé, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-chaises-5501339",
+          "photo": "https://images.coinafrique.com/thumb_5501339_uploaded_image1_1756665775.jpg",
+          "date": "il y a 1 année",
+          "description": "Meubles — Table à manger 6 chaises"
+        },
+        {
+          "id": "coin-5446457",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places ",
+          "price": 110000,
+          "currency": "FCFA",
+          "zone": "Adjamé, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-5446457",
+          "photo": "https://images.coinafrique.com/thumb_5446457_uploaded_image1_1753725079.jpg",
+          "date": "il y a 1 année",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-5236067",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 160000,
+          "currency": "FCFA",
+          "zone": "Bonoua",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-5236067",
+          "photo": "https://images.coinafrique.com/thumb_5236067_uploaded_image1_1742210591.jpg",
+          "date": "il y a 1 année",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-5221839",
+          "source": "coinafrique",
+          "title": "Smart TV ",
+          "price": 500000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/tv-box-et-video-projecteurs/smart-tv-5221839",
+          "photo": "https://images.coinafrique.com/thumb_5221839_uploaded_image1_1741462419.jpg",
+          "date": "il y a 1 année",
+          "description": "TV, box  & Vidéo projecteurs — Smart TV"
+        },
+        {
+          "id": "coin-5220138",
+          "source": "coinafrique",
+          "title": "Table à manger 4 chaises",
+          "price": 195000,
+          "currency": "FCFA",
+          "zone": "Adjamé, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-4-chaises-5220138",
+          "photo": "https://images.coinafrique.com/thumb_5220138_uploaded_image1_1741365399.jpg",
+          "date": "il y a 1 année",
+          "description": "Meubles — Table à manger 4 chaises"
+        },
+        {
+          "id": "coin-5029301",
+          "source": "coinafrique",
+          "title": "Table À manger 6 places ",
+          "price": 300000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/literie-et-matelas/table-a-manger-6-places-5029301",
+          "photo": "https://images.coinafrique.com/thumb_5029301_uploaded_image1_1730881728.jpg",
+          "date": "il y a 1 année",
+          "description": "Literie & Matelas — Table À manger 6 places"
+        },
+        {
+          "id": "coin-4987977",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 250000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4987977",
+          "photo": "https://images.coinafrique.com/thumb_4987977_uploaded_image1_1728625764.jpg",
+          "date": "il y a 1 année",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-4923813",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 350000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4923813",
+          "photo": "https://images.coinafrique.com/thumb_4923813_uploaded_image1_1725305280.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-4901197",
+          "source": "coinafrique",
+          "title": "Table à manger 8 chaises",
+          "price": 1800000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-8-chaises-4901197",
+          "photo": "https://images.coinafrique.com/thumb_4901197_uploaded_image1_1724066402.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table à manger 8 chaises"
+        },
+        {
+          "id": "coin-4888620",
+          "source": "coinafrique",
+          "title": "Table a Manger de luxe",
+          "price": 240000,
+          "currency": "FCFA",
+          "zone": "Koumassi, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-de-luxe-4888620",
+          "photo": "https://images.coinafrique.com/thumb_4888620_uploaded_image1_1723383492.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table a Manger de luxe"
+        },
+        {
+          "id": "coin-4885184",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 300000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4885184",
+          "photo": "https://images.coinafrique.com/thumb_4885184_uploaded_image1_1723183022.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-4807313",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 250000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4807313",
+          "photo": "https://images.coinafrique.com/thumb_4807313_uploaded_image1_1719182471.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-4794344",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 300000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4794344",
+          "photo": "https://images.coinafrique.com/thumb_4794344_uploaded_image1_1718295913.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-4747762",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places ",
+          "price": 155000,
+          "currency": "FCFA",
+          "zone": "Koumassi, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4747762",
+          "photo": "https://images.coinafrique.com/thumb_4747762_uploaded_image1_1715897928.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-4739825",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 150000,
+          "currency": "FCFA",
+          "zone": "Koumassi, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4739825",
+          "photo": "https://images.coinafrique.com/thumb_4739825_uploaded_image1_1715539019.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-4708816",
+          "source": "coinafrique",
+          "title": "Location appartement meublé 2 pièces - Cocody Vallon",
+          "price": 250000,
+          "currency": "FCFA",
+          "zone": "Adjamé, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/appartements-meubles/location-appartement-meuble-2-pieces-cocody-vallon-4708816",
+          "photo": "https://images.coinafrique.com/thumb_4708816_uploaded_image1_1713967819.jpg",
+          "date": "il y a 2 années",
+          "description": "Appartements meublés — Location appartement meublé 2 pièces - Cocody Vallon"
+        },
+        {
+          "id": "coin-4671988",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 275000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4671988",
+          "photo": "https://images.coinafrique.com/thumb_4671988_uploaded_image1_1712078212.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-4612467",
+          "source": "coinafrique",
+          "title": "Location résidence meublée 4 pièces - Cocody Riviera Faya Ephrata",
+          "price": 7000000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/appartements-meubles/location-residence-meublee-4-pieces-cocody-riviera-faya-ephrata-4612467",
+          "photo": "https://images.coinafrique.com/thumb_4612467_uploaded_image1_1708951518.jpg",
+          "date": "il y a 2 années",
+          "description": "Appartements meublés — Location résidence meublée 4 pièces - Cocody Riviera Faya E..."
+        },
+        {
+          "id": "coin-4624143",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 330000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4624143",
+          "photo": "https://images.coinafrique.com/thumb_4624143_uploaded_image1_1709544627.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-4604196",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 250000,
+          "currency": "FCFA",
+          "zone": "Koumassi, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4604196",
+          "photo": "https://images.coinafrique.com/thumb_4604196_uploaded_image1_1708508693.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-4482544",
+          "source": "coinafrique",
+          "title": "Table à manger 4 et 6 places",
+          "price": 200000,
+          "currency": "FCFA",
+          "zone": "Koumassi, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-4-et-6-places-4482544",
+          "photo": "https://images.coinafrique.com/thumb_4482544_uploaded_image1_1701562400.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table à manger 4 et 6 places"
+        },
+        {
+          "id": "coin-4410036",
+          "source": "coinafrique",
+          "title": "Table à manger + 4 chaises ",
+          "price": 200000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-4-chaises-4410036",
+          "photo": "https://images.coinafrique.com/thumb_4410036_uploaded_image1_1696877003.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table à manger + 4 chaises"
+        },
+        {
+          "id": "coin-4403089",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 places",
+          "price": 300000,
+          "currency": "FCFA",
+          "zone": "Yopougon, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4403089",
+          "photo": "https://images.coinafrique.com/thumb_4403089_uploaded_image1_1696456750.jpg",
+          "date": "il y a 2 années",
+          "description": "Meubles — Table à manger - 6 places"
+        },
+        {
+          "id": "coin-4293998",
+          "source": "coinafrique",
+          "title": "Location appartement 3 piéces meublées - Au Plateau ",
+          "price": 2500000,
+          "currency": "FCFA",
+          "zone": "Le plateau, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/appartements-meubles/location-appartement-3-pieces-meublees-au-plateau-4293998",
+          "photo": "https://images.coinafrique.com/thumb_4293998_uploaded_image1_1689327822.jpg",
+          "date": "il y a 3 années",
+          "description": "Appartements meublés — Location appartement 3 piéces meublées - Au Plateau"
+        },
+        {
+          "id": "coin-4301899",
+          "source": "coinafrique",
+          "title": "Table à manger",
+          "price": 239000,
+          "currency": "FCFA",
+          "zone": "Koumassi, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-4301899",
+          "photo": "https://images.coinafrique.com/thumb_4301899_uploaded_image1_1689860666.jpg",
+          "date": "il y a 3 années",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-4193403",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 places",
+          "price": 400000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4193403",
+          "photo": "https://images.coinafrique.com/thumb_4193403_uploaded_image3_1682670794.jpeg",
+          "date": "il y a 3 années",
+          "description": "Meubles — Table à manger - 6 places"
+        },
+        {
+          "id": "coin-4188571",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 places",
+          "price": 290000,
+          "currency": "FCFA",
+          "zone": "Grand-Bassam",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4188571",
+          "photo": "https://images.coinafrique.com/thumb_4188571_uploaded_image1_1682352098.jpg",
+          "date": "il y a 3 années",
+          "description": "Meubles — Table à manger - 6 places"
+        },
+        {
+          "id": "coin-4170357",
+          "source": "coinafrique",
+          "title": "Table à manger  ",
+          "price": 270000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-4170357",
+          "photo": "https://images.coinafrique.com/thumb_4170357_uploaded_image1_1681086539.jpg",
+          "date": "il y a 3 années",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-4113994",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 places",
+          "price": 250000,
+          "currency": "FCFA",
+          "zone": "Yopougon, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4113994",
+          "photo": "https://images.coinafrique.com/thumb_4113994_uploaded_image1_1677659160.jpg",
+          "date": "il y a 3 années",
+          "description": "Meubles — Table à manger - 6 places"
+        },
+        {
+          "id": "coin-4048724",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places ",
+          "price": 300000,
+          "currency": "FCFA",
+          "zone": "Adjamé, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4048724",
+          "photo": "https://images.coinafrique.com/thumb_4048724_uploaded_image3_1673638058.jpeg",
+          "date": "il y a 3 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-4038324",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places ",
+          "price": 10,
+          "currency": "FCFA",
+          "zone": "Adjamé, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4038324",
+          "photo": "https://images.coinafrique.com/thumb_4038324_uploaded_image2_1673045566.jpeg",
+          "date": "il y a 3 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-4022164",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places flexible ",
+          "price": 255000,
+          "currency": "FCFA",
+          "zone": "Koumassi, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-flexible-4022164",
+          "photo": "https://images.coinafrique.com/thumb_4022164_uploaded_image1_1671913322.jpg",
+          "date": "il y a 3 années",
+          "description": "Meubles — Table à manger 6 places flexible"
+        },
+        {
+          "id": "coin-4018685",
+          "source": "coinafrique",
+          "title": "Table à manger ",
+          "price": 80000,
+          "currency": "FCFA",
+          "zone": "Angré, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-4018685",
+          "photo": "https://images.coinafrique.com/thumb_4018685_uploaded_image1_1671652477.jpg",
+          "date": "il y a 3 années",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-3994378",
+          "source": "coinafrique",
+          "title": "Location appartement meublé 3 pièces - Plateau ",
+          "price": 2500000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/appartements-meubles/location-appartement-meuble-3-pieces-plateau-3994378",
+          "photo": "https://images.coinafrique.com/thumb_3994378_uploaded_image1_1670238364.jpg",
+          "date": "il y a 3 années",
+          "description": "Appartements meublés — Location appartement meublé 3 pièces - Plateau"
+        },
+        {
+          "id": "coin-4002036",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 200000,
+          "currency": "FCFA",
+          "zone": "Treichville, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4002036",
+          "photo": "https://images.coinafrique.com/thumb_4002036_uploaded_image1_1670608967.jpg",
+          "date": "il y a 3 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-3999800",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 places ",
+          "price": 160000,
+          "currency": "FCFA",
+          "zone": "Koumassi, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3999800",
+          "photo": "https://images.coinafrique.com/thumb_3999800_uploaded_image1_1670505260.jpg",
+          "date": "il y a 3 années",
+          "description": "Meubles — Table à manger - 6 places"
+        },
+        {
+          "id": "coin-3964279",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 places ",
+          "price": 370000,
+          "currency": "FCFA",
+          "zone": "Marcory, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3964279",
+          "photo": "https://images.coinafrique.com/thumb_3964279_uploaded_image1_1668425071.jpg",
+          "date": "il y a 3 années",
+          "description": "Meubles — Table à manger - 6 places"
+        },
+        {
+          "id": "coin-3897986",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places ",
+          "price": 2450000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3897986",
+          "photo": "https://images.coinafrique.com/thumb_3897986_uploaded_image1_1664448874.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-3864748",
+          "source": "coinafrique",
+          "title": "Table à manger ",
+          "price": 145000,
+          "currency": "FCFA",
+          "zone": "Yopougon, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-3864748",
+          "photo": "https://images.coinafrique.com/thumb_3864748_uploaded_image1_1662421879.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-3864746",
+          "source": "coinafrique",
+          "title": "Table à manger 4 places",
+          "price": 140000,
+          "currency": "FCFA",
+          "zone": "Yopougon, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-4-places-3864746",
+          "photo": "https://images.coinafrique.com/thumb_3864746_uploaded_image1_1662421769.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger 4 places"
+        },
+        {
+          "id": "coin-3864743",
+          "source": "coinafrique",
+          "title": "Table à manger",
+          "price": 235000,
+          "currency": "FCFA",
+          "zone": "Yopougon, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-3864743",
+          "photo": "https://images.coinafrique.com/thumb_3864743_uploaded_image1_1662421671.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-3864741",
+          "source": "coinafrique",
+          "title": "Table à manger ",
+          "price": 0,
+          "currency": "FCFA",
+          "zone": "Yopougon, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-3864741",
+          "photo": "https://images.coinafrique.com/thumb_3864741_uploaded_image2_1662421542.jpeg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-3864288",
+          "source": "coinafrique",
+          "title": "Table à manger ",
+          "price": 240000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-3864288",
+          "photo": "https://images.coinafrique.com/thumb_3864288_uploaded_image2_1662400946.jpeg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-3822847",
+          "source": "coinafrique",
+          "title": "Salon",
+          "price": 510000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/salon-3822847",
+          "photo": "https://images.coinafrique.com/thumb_3822847_uploaded_image1_1660075547.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Salon"
+        },
+        {
+          "id": "coin-3833859",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 180000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3833859",
+          "photo": "https://images.coinafrique.com/thumb_3833859_uploaded_image1_1660732397.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-3806086",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 200000,
+          "currency": "FCFA",
+          "zone": "Yopougon, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3806086",
+          "photo": "https://images.coinafrique.com/thumb_3806086_uploaded_image1_1659184701.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-3760278",
+          "source": "coinafrique",
+          "title": "Table à manger",
+          "price": 800000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-3760278",
+          "photo": "https://images.coinafrique.com/thumb_3760278_uploaded_image1_1656330865.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-3564304",
+          "source": "coinafrique",
+          "title": "Table à manger extensible - 6 places",
+          "price": 249900,
+          "currency": "FCFA",
+          "zone": "Treichville, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-extensible-6-places-3564304",
+          "photo": "https://images.coinafrique.com/thumb_3564304_uploaded_image1_1644610646.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger extensible - 6 places"
+        },
+        {
+          "id": "coin-3562577",
+          "source": "coinafrique",
+          "title": "Table à manger extensible + 6 places ",
+          "price": 239900,
+          "currency": "FCFA",
+          "zone": "Treichville, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-extensible-6-places-3562577",
+          "photo": "https://images.coinafrique.com/thumb_3562577_uploaded_image1_1644514451.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger extensible + 6 places"
+        },
+        {
+          "id": "coin-3562585",
+          "source": "coinafrique",
+          "title": "Table à manger + 6 places ",
+          "price": 175000,
+          "currency": "FCFA",
+          "zone": "Treichville, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3562585",
+          "photo": "https://images.coinafrique.com/thumb_3562585_uploaded_image1_1644514922.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger + 6 places"
+        },
+        {
+          "id": "coin-3561418",
+          "source": "coinafrique",
+          "title": "Table à manger ",
+          "price": 274900,
+          "currency": "FCFA",
+          "zone": "Treichville, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-3561418",
+          "photo": "https://images.coinafrique.com/thumb_3561418_uploaded_image1_1644445521.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-3561381",
+          "source": "coinafrique",
+          "title": "Table à manger extensible - 6 places",
+          "price": 249900,
+          "currency": "FCFA",
+          "zone": "Treichville, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-extensible-6-places-3561381",
+          "photo": "https://images.coinafrique.com/thumb_3561381_uploaded_image1_1644443609.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger extensible - 6 places"
+        },
+        {
+          "id": "coin-3575797",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 135000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3575797",
+          "photo": "https://images.coinafrique.com/thumb_3575797_uploaded_image1_1645390209.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-3562811",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 places",
+          "price": 260000,
+          "currency": "FCFA",
+          "zone": "Koumassi, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3562811",
+          "photo": "https://images.coinafrique.com/thumb_3562811_uploaded_image1_1644523354.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger - 6 places"
+        },
+        {
+          "id": "coin-3498946",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 places",
+          "price": 179000,
+          "currency": "FCFA",
+          "zone": "Koumassi, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3498946",
+          "photo": "https://images.coinafrique.com/thumb_3498946_uploaded_image1_1640607194.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger - 6 places"
+        },
+        {
+          "id": "coin-3499012",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 places",
+          "price": 285000,
+          "currency": "FCFA",
+          "zone": "Marcory, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3499012",
+          "photo": "https://images.coinafrique.com/thumb_3499012_uploaded_image1_1640609611.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger - 6 places"
+        },
+        {
+          "id": "coin-3481998",
+          "source": "coinafrique",
+          "title": "Location appartement 3 pièces meublées - 2 Plateaux 7éme Tranche",
+          "price": 60000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/appartements-meubles/location-appartement-3-pieces-meublees-2-plateaux-7eme-tranche-3481998",
+          "photo": "https://images.coinafrique.com/thumb_3481998_uploaded_image1_1639402146.jpg",
+          "date": "il y a 4 années",
+          "description": "Appartements meublés — Location appartement 3 pièces meublées - 2 Plateaux 7éme Tr..."
+        },
+        {
+          "id": "coin-3480857",
+          "source": "coinafrique",
+          "title": "Table à manger de 6 places",
+          "price": 380000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-de-6-places-3480857",
+          "photo": "https://images.coinafrique.com/thumb_3480857_uploaded_image1_1639320894.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger de 6 places"
+        },
+        {
+          "id": "coin-3475390",
+          "source": "coinafrique",
+          "title": "Table à manger  ",
+          "price": 350000,
+          "currency": "FCFA",
+          "zone": "Marcory, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-3475390",
+          "photo": "https://images.coinafrique.com/thumb_3475390_uploaded_image1_1638985446.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-3466841",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 145000,
+          "currency": "FCFA",
+          "zone": "Adjamé, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3466841",
+          "photo": "https://images.coinafrique.com/thumb_3466841_uploaded_image1_1638547336.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-3440680",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 270000,
+          "currency": "FCFA",
+          "zone": "Marcory, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3440680",
+          "photo": "https://images.coinafrique.com/thumb_3440680_uploaded_image1_1637073150.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-3365832",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 places",
+          "price": 230000,
+          "currency": "FCFA",
+          "zone": "Yopougon, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3365832",
+          "photo": "https://images.coinafrique.com/thumb_3365832_uploaded_image1_1633274413.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger - 6 places"
+        },
+        {
+          "id": "coin-3404718",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 150000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3404718",
+          "photo": "https://images.coinafrique.com/thumb_3404718_uploaded_image1_1635256786.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-3397949",
+          "source": "coinafrique",
+          "title": "Table à manger",
+          "price": 260000,
+          "currency": "FCFA",
+          "zone": "Grand-Bassam",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-3397949",
+          "photo": "https://images.coinafrique.com/thumb_3397949_uploaded_image1_1634882254.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-3393707",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 0,
+          "currency": "FCFA",
+          "zone": "Yopougon, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3393707",
+          "photo": "https://images.coinafrique.com/thumb_3393707_uploaded_image1_1634661735.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-3356840",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 230000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3356840",
+          "photo": "https://images.coinafrique.com/thumb_3356840_uploaded_image1_1632854373.jpg",
+          "date": "il y a 5 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-3288484",
+          "source": "coinafrique",
+          "title": "Table à manger",
+          "price": 120000,
+          "currency": "FCFA",
+          "zone": "Yopougon, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-3288484",
+          "photo": "https://images.coinafrique.com/thumb_3288484_uploaded_image1_1629383504.jpg",
+          "date": "il y a 5 années",
+          "description": "Meubles — Table à manger"
+        },
+        {
+          "id": "coin-3283220",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 chaises ",
+          "price": 160000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-chaises-3283220",
+          "photo": "https://images.coinafrique.com/thumb_3283220_uploaded_image1_1629136498.jpg",
+          "date": "il y a 5 années",
+          "description": "Meubles — Table à manger - 6 chaises"
+        },
+        {
+          "id": "coin-3242885",
+          "source": "coinafrique",
+          "title": "Table vitrée - 6 places",
+          "price": 150000,
+          "currency": "FCFA",
+          "zone": "Adjamé, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-vitree-6-places-3242885",
+          "photo": "https://images.coinafrique.com/thumb_3242885_uploaded_image1_1627123112.jpg",
+          "date": "il y a 5 années",
+          "description": "Meubles — Table vitrée - 6 places"
+        },
+        {
+          "id": "coin-3172861",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 285000,
+          "currency": "FCFA",
+          "zone": "Marcory, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3172861",
+          "photo": "https://images.coinafrique.com/thumb_3172861_uploaded_image1_1623745685.jpg",
+          "date": "il y a 5 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-3146602",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 175000,
+          "currency": "FCFA",
+          "zone": "Marcory, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3146602",
+          "photo": "https://images.coinafrique.com/thumb_3146602_uploaded_image1_1622585747.jpg",
+          "date": "il y a 5 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        {
+          "id": "coin-3139769",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 places",
+          "price": 150000,
+          "currency": "FCFA",
+          "zone": "Yopougon, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3139769",
+          "photo": "https://images.coinafrique.com/thumb_3139769_uploaded_image1_1622288515.jpg",
+          "date": "il y a 5 années",
+          "description": "Meubles — Table à manger - 6 places"
+        },
+        {
+          "id": "coin-3128364",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 places ",
+          "price": 100000,
+          "currency": "FCFA",
+          "zone": "Yopougon, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3128364",
+          "photo": "https://images.coinafrique.com/thumb_3128364_uploaded_image1_1621692879.jpg",
+          "date": "il y a 5 années",
+          "description": "Meubles — Table à manger - 6 places"
+        },
+        {
+          "id": "coin-3123714",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 175000,
+          "currency": "FCFA",
+          "zone": "Yopougon, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3123714",
+          "photo": "https://images.coinafrique.com/thumb_3123714_uploaded_image1_1621448614.jpg",
+          "date": "il y a 5 années",
+          "description": "Meubles — Table à manger 6 places"
+        }
+      ],
+      "status": "ok",
+      "durationMs": 2191,
+      "errors": []
+    },
+    {
+      "source": "locanto",
+      "query": "https://www.locanto.ci/g/q/?query=6+places+table+manger",
+      "capabilities": {
+        "search": true,
+        "location": true,
+        "pagination": true,
+        "itemCheck": false,
+        "services": true,
+        "unsupported": []
+      },
+      "warnings": [],
+      "listings": [
+        {
+          "id": "loc-8242276633",
+          "source": "locanto",
+          "title": "Table à manger 4 places",
+          "price": 35000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.locanto.ci/abidjan/ID_8242276633/Table-a-manger-4-places.html",
+          "photo": "https://images.locanto.info/6819247632/Table-a-manger-4-places_1.jpg",
+          "date": "il y a 8 mois",
+          "description": "Table à manger noir avec 4 chaises deuxième mains en bon état juste une chaise qui bouge un peu a récupérer a la riviera triangle. Possibilité de vous livrer a vos frais. Les sièges sont en rose Possibilité de changer ou de …"
+        },
+        {
+          "id": "loc-8016348179",
+          "source": "locanto",
+          "title": "Table à manger de 4 chaises",
+          "price": 185000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.locanto.ci/abidjan/ID_8016348179/Table-a-manger-de-4-chaises.html",
+          "photo": "https://images.locanto.info/6730218662/Table-a-manger-de-4-chaises_1.jpg",
+          "date": "il y a 7 mois",
+          "description": "Table à manger de 4 chaises Dimensions Longueur 1m40 Largeur 80 cm Excellente qualité, nous livrons partout."
+        },
+        {
+          "id": "loc-8016352354",
+          "source": "locanto",
+          "title": "Table à manger de 6 chaises",
+          "price": 255000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.locanto.ci/abidjan/ID_8016352354/Table-a-manger-de-6-chaises.html",
+          "photo": "https://images.locanto.info/6730222889/Table-a-manger-de-6-chaises_1.jpg",
+          "date": "il y a 7 mois",
+          "description": "Table à manger de 6 chaises Dimensions Longueur 1m40 Largeur 80 cm Hauteur 75 cm Meuble importé, nous livrons partout. Prix légèrement négociable."
+        },
+        {
+          "id": "loc-7706261703",
+          "source": "locanto",
+          "title": "Table à manger Ultra Propre, Bouaké",
+          "price": 40000,
+          "currency": "FCFA",
+          "zone": "Bouaké",
+          "vendor": null,
+          "url": "https://www.locanto.ci/bouake/ID_7706261703/Table-a-manger-Ultra-Propre.html",
+          "photo": "https://images.locanto.info/6619074755/Table-a-manger-Ultra-Propre_1.jpg",
+          "date": "il y a 14 mois",
+          "description": "Je vend ma table à manger ultra propre pour des raisons de départ de Bouake. J’ai acheté le complet avec 4 chaises à 100.000f mais je vends uniquement la table à 40.000. J’offre également 2 chaises gratuitement à …"
+        }
+      ],
+      "status": "ok",
+      "durationMs": 12812,
+      "errors": []
+    },
+    {
+      "source": "google",
+      "query": "6 places table manger côte d'ivoire annonce",
+      "capabilities": {
+        "search": true,
+        "location": true,
+        "pagination": false,
+        "itemCheck": true,
+        "services": true,
+        "unsupported": []
+      },
+      "warnings": [
+        "recherche online (via openai/gpt-4o-mini:online)"
+      ],
+      "listings": [
+        {
+          "id": "gpage-1",
+          "source": "www.abidjandeals.com",
+          "title": "Table À Manger 6 Places Bouaké",
+          "price": 200000,
+          "currency": "F CFA",
+          "zone": null,
+          "vendor": null,
+          "url": "https://www.abidjandeals.com/annonce/table-a-manger-6-places-bouake",
+          "photo": null,
+          "date": null,
+          "description": "Très belle table à manger 6 places neuve disponible. Très esthétique et solide. Livraison partout en Côte d'Ivoire. Payement par échelonnement possible. Garantie 24 mois."
+        }
+      ],
+      "status": "ok",
+      "durationMs": 30354,
+      "errors": [
+        "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-: http: https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3139769 — HTTP 404"
+      ]
+    }
+  ],
+  "top": [
+    {
+      "evaluated": {
+        "listing": {
+          "id": "coin-4193403",
+          "source": "coinafrique",
+          "title": "Table à manger - 6 places",
+          "price": 400000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-4193403",
+          "photo": "https://images.coinafrique.com/thumb_4193403_uploaded_image3_1682670794.jpeg",
+          "date": "il y a 3 années",
+          "description": "Meubles — Table à manger - 6 places"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "400000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "compatible",
+          "observed": "Cocody, Abidjan"
+        },
+        "attributes": [
+          {
+            "state": "compatible",
+            "observed": "6 places"
+          }
+        ],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.9,
+      "score": 0.95,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Correspondance du produit",
+          "valeur": "Table à manger 6 places",
+          "extrait": "Table à manger - 6 places"
+        }
+      ],
+      "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · places : 6 confirmé · Correspondance du produit : Table à manger 6 places (« Table à manger - 6 places ») — informations confirmées : 3/3",
+      "confirmedRatio": {
+        "known": 3,
+        "total": 3
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "coin-3833859",
+          "source": "coinafrique",
+          "title": "Table à manger 6 places",
+          "price": 180000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-6-places-3833859",
+          "photo": "https://images.coinafrique.com/thumb_3833859_uploaded_image1_1660732397.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger 6 places"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "180000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "compatible",
+          "observed": "Cocody, Abidjan"
+        },
+        "attributes": [
+          {
+            "state": "compatible",
+            "observed": "6 places"
+          }
+        ],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.9,
+      "score": 0.95,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Correspondance du produit",
+          "valeur": "Table à manger 6 places",
+          "extrait": "Table à manger 6 places"
+        }
+      ],
+      "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · places : 6 confirmé · Correspondance du produit : Table à manger 6 places (« Table à manger 6 places ») — informations confirmées : 3/3",
+      "confirmedRatio": {
+        "known": 3,
+        "total": 3
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "coin-3480857",
+          "source": "coinafrique",
+          "title": "Table à manger de 6 places",
+          "price": 380000,
+          "currency": "FCFA",
+          "zone": "Cocody, Abidjan",
+          "vendor": null,
+          "url": "https://ci.coinafrique.com/annonce/meubles/table-a-manger-de-6-places-3480857",
+          "photo": "https://images.coinafrique.com/thumb_3480857_uploaded_image1_1639320894.jpg",
+          "date": "il y a 4 années",
+          "description": "Meubles — Table à manger de 6 places"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "380000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "compatible",
+          "observed": "Cocody, Abidjan"
+        },
+        "attributes": [
+          {
+            "state": "compatible",
+            "observed": "6 places"
+          }
+        ],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.9,
+      "score": 0.95,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de meuble",
+          "valeur": "Table à manger de 6 places",
+          "extrait": "Meubles — Table à manger de 6 places"
+        }
+      ],
+      "raison": "Correspondance exacte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone ok (Cocody, Abidjan) · places : 6 confirmé · Type de meuble : Table à manger de 6 places (« Meubles — Table à manger de 6 places ») — informations confirmées : 3/3",
+      "confirmedRatio": {
+        "known": 3,
+        "total": 3
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "fb-1789951469054527",
+          "source": "facebook",
+          "title": "Table à manger 6 places",
+          "price": 130000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1789951469054527/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/704614821_1458223572653905_546840495741148002_n.jpg?stp=c42.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=SjlymQBbppAQ7kNvwE3esW_&_nc_oc=Adrm6h7nxG75Iz2ajh3NDWJ1lHPA4V8nsTrlxd0ildNbxVZx45FY1N5jUArYc_aPvF_x3cKK94PO2NuR9eLaDbMr&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQN0x5uEsxXVA3f_iBTdcv9KWY6f50wmB-lIFcvM9ehvCg&oe=6AC5F8D9",
+          "date": null,
+          "description": "130 000 CFA 150 000 CFA Table à manger 6 places Abidjan"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "130000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": "Abidjan",
+          "note": "commune non précisée (Abidjan)"
+        },
+        "attributes": [
+          {
+            "state": "compatible",
+            "observed": "6 places"
+          }
+        ],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.84,
+      "score": 0.92,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de produit",
+          "valeur": "Table à manger 6 places",
+          "extrait": "Table à manger 6 places"
+        },
+        {
+          "nom": "Zone",
+          "valeur": "Abidjan",
+          "extrait": "Abidjan"
+        }
+      ],
+      "raison": "Correspondance forte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Abidjan — commune non précisée (Abidjan) · places : 6 confirmé · Type de produit : Table à manger 6 places (« Table à manger 6 places ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+      "confirmedRatio": {
+        "known": 2,
+        "total": 3
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "fb-1059241170414474",
+          "source": "facebook",
+          "title": "Table à manger 6 places 📱 [hidden information]",
+          "price": 16,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1059241170414474/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/793097095_1770266967453659_287224461775443020_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=111&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=OGhNVC2EU9kQ7kNvwGqb7Sy&_nc_oc=AdqeKoyGnOpx37pEOp0S-EGEDA7F4KvcC1VYliHh_OQ5eDbnS1Xn4vvixXhOpIfAsbE1wfIcygxqXEwk_8B16mlA&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQPhMCVn321043MBV76GmcSQfdFrIQQ-nuQbcMoIlZEo3g&oe=6AC5DDB1",
+          "date": null,
+          "description": "16 CFA Table à manger 6 places 📱 [hidden information] Abidjan"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "16 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": "Abidjan",
+          "note": "commune non précisée (Abidjan)"
+        },
+        "attributes": [
+          {
+            "state": "compatible",
+            "observed": "6 places"
+          }
+        ],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.84,
+      "score": 0.92,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de produit",
+          "valeur": "Table à manger 6 places",
+          "extrait": "Table à manger 6 places"
+        },
+        {
+          "nom": "Zone",
+          "valeur": "Abidjan",
+          "extrait": "Abidjan"
+        }
+      ],
+      "raison": "Correspondance forte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Abidjan — commune non précisée (Abidjan) · places : 6 confirmé · Type de produit : Table à manger 6 places (« Table à manger 6 places ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+      "confirmedRatio": {
+        "known": 2,
+        "total": 3
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "fb-2317576492312241",
+          "source": "facebook",
+          "title": "Salle à manger 6 places table en marbre",
+          "price": 150000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/2317576492312241/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/830990457_1409802460591343_5897408370922056676_n.jpg?stp=c65.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=110&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=ylp1cJMQidAQ7kNvwFTCUyV&_nc_oc=AdqDZV3NHK3BOHRIXlZkfNC1yZRRJPap89_OfQpnwgvMsx8I-4pG50rzbY6y4jULCMqYczT5OtNLBb_piweZr4So&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQNmqsxuCHPq3AX8rjCQteuAjxXOShAxv-CJvVksZc2BAg&oe=6AC5FD7A",
+          "date": null,
+          "description": "150 000 CFA Salle à manger 6 places table en marbre Abidjan"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "150000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": "Abidjan",
+          "note": "commune non précisée (Abidjan)"
+        },
+        "attributes": [
+          {
+            "state": "compatible",
+            "observed": "6 places"
+          }
+        ],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.84,
+      "score": 0.92,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de produit",
+          "valeur": "Salle à manger 6 places",
+          "extrait": "Salle à manger 6 places"
+        },
+        {
+          "nom": "Zone",
+          "valeur": "Abidjan",
+          "extrait": "Abidjan"
+        }
+      ],
+      "raison": "Correspondance forte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Abidjan — commune non précisée (Abidjan) · places : 6 confirmé · Type de produit : Salle à manger 6 places (« Salle à manger 6 places ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+      "confirmedRatio": {
+        "known": 2,
+        "total": 3
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "fb-1857073035464558",
+          "source": "facebook",
+          "title": "Table à manger 6 places",
+          "price": 190000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1857073035464558/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj2-1.fna.fbcdn.net/v/t39.84726-6/776133074_1074206011647212_2138861258661140527_n.jpg?stp=c32.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=oiP_T3qhmBkQ7kNvwHTEb1H&_nc_oc=AdrvswQyg8rdcX4DBMyyW1nz5EgXaMMlhTk1YkUPpS_3liyXKHQ-ptImjYixrmjxxUwziCgXiai4pAhZ5xCYrAaM&_nc_zt=14&_nc_ht=scontent.fabj2-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQNyHRf3-Dm-3-VNzhcBa7NEMXRL_9EdNxx9mIhzy9Awyg&oe=6AC5FA3A",
+          "date": null,
+          "description": "190 000 CFA Table à manger 6 places Abidjan"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "190000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": "Abidjan",
+          "note": "commune non précisée (Abidjan)"
+        },
+        "attributes": [
+          {
+            "state": "compatible",
+            "observed": "6 places"
+          }
+        ],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.84,
+      "score": 0.92,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de produit",
+          "valeur": "Table à manger 6 places",
+          "extrait": "Table à manger 6 places"
+        },
+        {
+          "nom": "Zone",
+          "valeur": "Abidjan",
+          "extrait": "Abidjan"
+        }
+      ],
+      "raison": "Correspondance forte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Abidjan — commune non précisée (Abidjan) · places : 6 confirmé · Type de produit : Table à manger 6 places (« Table à manger 6 places ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+      "confirmedRatio": {
+        "known": 2,
+        "total": 3
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "fb-1078463948369093",
+          "source": "facebook",
+          "title": "Salle à manger 6 places table extensible",
+          "price": 185000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/1078463948369093/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/828484463_1089543113927061_4363082741506686308_n.jpg?stp=c0.43.261.261a_dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=RN6i8m5zI5gQ7kNvwENMN9z&_nc_oc=AdoJrPcZ2C7Yb3N0aovY3I7qXoG6fGpY_kOXewcLCK8RzotSlB3EoA8eBcNWd7NueogkOv4-q61iJz07zU0nxYYw&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQPQGQZc-lqoA2BLtYmtoYRsKH887K2yEc62TXSga8oMWA&oe=6AC5D610",
+          "date": null,
+          "description": "185 000 CFA Salle à manger 6 places table extensible Abidjan"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "185000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": "Abidjan",
+          "note": "commune non précisée (Abidjan)"
+        },
+        "attributes": [
+          {
+            "state": "compatible",
+            "observed": "6 places"
+          }
+        ],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.84,
+      "score": 0.92,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de produit",
+          "valeur": "Salle à manger 6 places",
+          "extrait": "Salle à manger 6 places"
+        },
+        {
+          "nom": "Zone",
+          "valeur": "Abidjan",
+          "extrait": "Abidjan"
+        }
+      ],
+      "raison": "Correspondance forte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Abidjan — commune non précisée (Abidjan) · places : 6 confirmé · Type de produit : Salle à manger 6 places (« Salle à manger 6 places ») · Zone : Abidjan (« Abidjan ») — informations confirmées : 2/3",
+      "confirmedRatio": {
+        "known": 2,
+        "total": 3
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "fb-946883221339447",
+          "source": "facebook",
+          "title": "Salle à manger 6 places luxueuse Table à manger et 6 chaises",
+          "price": 365000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/946883221339447/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/825266282_1093529626766678_3612017688646828166_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=108&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=szUgxmTQPZ0Q7kNvwGJo0XG&_nc_oc=AdoBVRJ-aa9A00ItP4NlqiajSHefZwmo7nv1nGCylKjRBeEqU8e4qLJt820foVlPcYKJ_GpI-1ecEN1woIFPmPdt&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQOcNaFzTf4r5IwD-kQQqvFU3vi59zKMZAHz2iS0CNI6AQ&oe=6AC5C91D",
+          "date": null,
+          "description": "365 000 CFA Salle à manger 6 places luxueuse Table à manger et 6 chaises Abidjan"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "365000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": "Abidjan",
+          "note": "commune non précisée (Abidjan)"
+        },
+        "attributes": [
+          {
+            "state": "compatible",
+            "observed": "6 places"
+          }
+        ],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.84,
+      "score": 0.92,
+      "aiStatus": "évalué par IA",
+      "criteria": [
+        {
+          "nom": "Type de produit",
+          "valeur": "Salle à manger 6 places",
+          "extrait": "Salle à manger 6 places luxueuse Table à manger et 6 chaises"
+        }
+      ],
+      "raison": "Correspondance forte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Abidjan — commune non précisée (Abidjan) · places : 6 confirmé · Type de produit : Salle à manger 6 places (« Salle à manger 6 places luxueuse Table à manger et 6 chaises ») — informations confirmées : 2/3",
+      "confirmedRatio": {
+        "known": 2,
+        "total": 3
+      }
+    },
+    {
+      "evaluated": {
+        "listing": {
+          "id": "fb-2172204813707903",
+          "source": "facebook",
+          "title": "Table a manger 6 place",
+          "price": 185000,
+          "currency": "FCFA",
+          "zone": "Abidjan",
+          "vendor": null,
+          "url": "https://www.facebook.com/marketplace/item/2172204813707903/?ref=search&referral_code=null&referral_story_type=post&__tn__=!%3AD",
+          "photo": "https://scontent.fabj1-1.fna.fbcdn.net/v/t39.84726-6/825286512_1075256355121266_2294701561583296534_n.jpg?stp=c43.0.260.260a_dst-jpg_p261x260_tt6&_nc_cat=108&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=92e707&_nc_ohc=UTuz-yacspIQ7kNvwEjWmTG&_nc_oc=AdrJV5qhy_K2K_oRVH_wZ3IdnkoRP_DpUbk9k-2QoN9HGczpX0MmQaEPAVqghx50Q4O0UJ7VV7D026rwSG3eYOXD&_nc_zt=14&_nc_ht=scontent.fabj1-1.fna&_nc_gid=REBOCJEijPGVltfbgbseSA&_nc_ss=7b289&oh=00_AQN4MhUUez90nLXpVeXh4ivaM1tJ3TKUOg1Sm9kWI77w8w&oe=6AC5DEB6",
+          "date": null,
+          "description": "185 000 CFA Table a manger 6 place Abidjan"
+        },
+        "model": {
+          "state": "compatible",
+          "observed": "mots-clés présents"
+        },
+        "capacity": {
+          "state": "inconnu",
+          "observed": null
+        },
+        "budget": {
+          "state": "inconnu",
+          "observed": "185000 XOF",
+          "note": "budget non défini"
+        },
+        "zone": {
+          "state": "inconnu",
+          "observed": "Abidjan",
+          "note": "commune non précisée (Abidjan)"
+        },
+        "attributes": [
+          {
+            "state": "compatible",
+            "observed": "6 places"
+          }
+        ],
+        "priceNonComparable": false
+      },
+      "baseScore": 0.84,
+      "score": 0.92,
+      "aiStatus": "évalué par IA",
+      "criteria": [],
+      "raison": "Correspondance forte — modèle confirmé (mots-clés présents) · capacité inconnue (non confirmée) · budget à préciser · zone : Abidjan — commune non précisée (Abidjan) · places : 6 confirmé — informations confirmées : 2/3",
+      "confirmedRatio": {
+        "known": 2,
+        "total": 3
+      }
+    }
+  ],
+  "doublonsPossibles": [
+    {
+      "ids": [
+        "fb-1059294180204023",
+        "coin-5821087",
+        "coin-3864288"
+      ],
+      "sources": [
+        "facebook",
+        "coinafrique"
+      ]
+    },
+    {
+      "ids": [
+        "fb-1789951469054527",
+        "coin-5029301",
+        "coin-4987977",
+        "coin-4923813",
+        "coin-4885184",
+        "coin-4807313",
+        "coin-4794344",
+        "coin-4671988",
+        "coin-4624143",
+        "coin-3897986",
+        "coin-3575797",
+        "coin-3356840",
+        "loc-8242276633",
+        "gpage-1"
+      ],
+      "sources": [
+        "facebook",
+        "coinafrique",
+        "locanto",
+        "www.abidjandeals.com"
+      ]
+    },
+    {
+      "ids": [
+        "fb-1812380296422838",
+        "coin-3283220",
+        "loc-8016348179",
+        "loc-8016352354"
+      ],
+      "sources": [
+        "facebook",
+        "coinafrique",
+        "locanto"
+      ]
+    }
+  ],
+  "fusions": {},
+  "rejets": [
+    {
+      "title": "Table à manger 4,6 places à vendre",
+      "reason": "caractéristique incompatible (4.6 places (≠ 6))"
+    },
+    {
+      "title": "Vente villa avec piscine Bingerville zone palais",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "Location villa duplex 4 pièces -Bingerville ",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "Villa duplex 4 pieces en vente",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "Table à mange en marbe 8 places",
+      "reason": "caractéristique incompatible (8 places (≠ 6))"
+    },
+    {
+      "title": "Meuble",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "Tables Vitrée 6 chaises ",
+      "reason": "zone incompatible (autre commune d'Abidjan : adjame (≠ cocody))"
+    },
+    {
+      "title": "Salon",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "Table à manger 6 chaises",
+      "reason": "zone incompatible (autre commune d'Abidjan : adjame (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 6 places ",
+      "reason": "zone incompatible (autre commune d'Abidjan : adjame (≠ cocody))"
+    },
+    {
+      "title": "Smart TV ",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "Table à manger 4 chaises",
+      "reason": "zone incompatible (autre commune d'Abidjan : adjame (≠ cocody))"
+    },
+    {
+      "title": "Table a Manger de luxe",
+      "reason": "zone incompatible (autre commune d'Abidjan : koumassi (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 6 places ",
+      "reason": "zone incompatible (autre commune d'Abidjan : koumassi (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : koumassi (≠ cocody))"
+    },
+    {
+      "title": "Location appartement meublé 2 pièces - Cocody Vallon",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "Location résidence meublée 4 pièces - Cocody Riviera Faya Ephrata",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "Table à manger 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : koumassi (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 4 et 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : koumassi (≠ cocody))"
+    },
+    {
+      "title": "Table à manger - 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : yopougon (≠ cocody))"
+    },
+    {
+      "title": "Location appartement 3 piéces meublées - Au Plateau ",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "Table à manger",
+      "reason": "zone incompatible (autre commune d'Abidjan : koumassi (≠ cocody))"
+    },
+    {
+      "title": "Table à manger - 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : yopougon (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 6 places ",
+      "reason": "zone incompatible (autre commune d'Abidjan : adjame (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 6 places ",
+      "reason": "zone incompatible (autre commune d'Abidjan : adjame (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 6 places flexible ",
+      "reason": "zone incompatible (autre commune d'Abidjan : koumassi (≠ cocody))"
+    },
+    {
+      "title": "Location appartement meublé 3 pièces - Plateau ",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "Table à manger 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : treichville (≠ cocody))"
+    },
+    {
+      "title": "Table à manger - 6 places ",
+      "reason": "zone incompatible (autre commune d'Abidjan : koumassi (≠ cocody))"
+    },
+    {
+      "title": "Table à manger - 6 places ",
+      "reason": "zone incompatible (autre commune d'Abidjan : marcory (≠ cocody))"
+    },
+    {
+      "title": "Table à manger ",
+      "reason": "zone incompatible (autre commune d'Abidjan : yopougon (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 4 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : yopougon (≠ cocody))"
+    },
+    {
+      "title": "Table à manger",
+      "reason": "zone incompatible (autre commune d'Abidjan : yopougon (≠ cocody))"
+    },
+    {
+      "title": "Table à manger ",
+      "reason": "zone incompatible (autre commune d'Abidjan : yopougon (≠ cocody))"
+    },
+    {
+      "title": "Salon",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "Table à manger 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : yopougon (≠ cocody))"
+    },
+    {
+      "title": "Table à manger extensible - 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : treichville (≠ cocody))"
+    },
+    {
+      "title": "Table à manger extensible + 6 places ",
+      "reason": "zone incompatible (autre commune d'Abidjan : treichville (≠ cocody))"
+    },
+    {
+      "title": "Table à manger + 6 places ",
+      "reason": "zone incompatible (autre commune d'Abidjan : treichville (≠ cocody))"
+    },
+    {
+      "title": "Table à manger ",
+      "reason": "zone incompatible (autre commune d'Abidjan : treichville (≠ cocody))"
+    },
+    {
+      "title": "Table à manger extensible - 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : treichville (≠ cocody))"
+    },
+    {
+      "title": "Table à manger - 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : koumassi (≠ cocody))"
+    },
+    {
+      "title": "Table à manger - 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : koumassi (≠ cocody))"
+    },
+    {
+      "title": "Table à manger - 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : marcory (≠ cocody))"
+    },
+    {
+      "title": "Location appartement 3 pièces meublées - 2 Plateaux 7éme Tranche",
+      "reason": "autre modèle (produit sans rapport)"
+    },
+    {
+      "title": "Table à manger  ",
+      "reason": "zone incompatible (autre commune d'Abidjan : marcory (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : adjame (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : marcory (≠ cocody))"
+    },
+    {
+      "title": "Table à manger - 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : yopougon (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : yopougon (≠ cocody))"
+    },
+    {
+      "title": "Table à manger",
+      "reason": "zone incompatible (autre commune d'Abidjan : yopougon (≠ cocody))"
+    },
+    {
+      "title": "Table vitrée - 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : adjame (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : marcory (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : marcory (≠ cocody))"
+    },
+    {
+      "title": "Table à manger - 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : yopougon (≠ cocody))"
+    },
+    {
+      "title": "Table à manger - 6 places ",
+      "reason": "zone incompatible (autre commune d'Abidjan : yopougon (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 6 places",
+      "reason": "zone incompatible (autre commune d'Abidjan : yopougon (≠ cocody))"
+    },
+    {
+      "title": "Table à manger 4 places",
+      "reason": "caractéristique incompatible (4 places (≠ 6))"
+    }
+  ]
+}

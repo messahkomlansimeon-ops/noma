@@ -1,0 +1,57 @@
+{
+  "listings": [
+    {
+      "id": "coin-12345",
+      "source": "coinafrique",
+      "title": "iPhone 12 Pro 128 Go",
+      "price": 145000,
+      "currency": "FCFA",
+      "zone": "Cocody",
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/iphone-12-pro-12345",
+      "photo": "/images/iphone.jpg",
+      "date": "il y a 2 heures",
+      "description": "Téléphones — Très bon état"
+    },
+    {
+      "id": "coin-67890",
+      "source": "coinafrique",
+      "title": "Smart TV Samsung 55 pouces",
+      "price": null,
+      "currency": "FCFA",
+      "zone": "Abidjan",
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/smart-tv-67890",
+      "photo": null,
+      "date": null,
+      "description": null
+    },
+    {
+      "id": "coin-24680",
+      "source": "coinafrique",
+      "title": "Chargeur USB-C 20 W",
+      "price": 20000.5,
+      "currency": "FCFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/chargeur-usb-c-24680",
+      "photo": null,
+      "date": "il y a 39 minutes",
+      "description": "Téléphonie — Chargeur USB-C 20 W"
+    },
+    {
+      "id": "coin-12345",
+      "source": "coinafrique",
+      "title": "iPhone 12 Pro 128 Go",
+      "price": 145000,
+      "currency": "FCFA",
+      "zone": "Cocody",
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/iphone-12-pro-12345",
+      "photo": "/images/iphone.jpg",
+      "date": "il y a 2 heures",
+      "description": "Téléphones — Très bon état"
+    }
+  ],
+  "errors": ["1 cartes illisibles ignorées"]
+}

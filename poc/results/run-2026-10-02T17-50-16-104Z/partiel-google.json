@@ -1,0 +1,45 @@
+{
+  "source": "google",
+  "status": "ok",
+  "annonces": [
+    {
+      "id": "gpage-1",
+      "source": "ci.coinafrique.com",
+      "title": "Climatiseurs & ventilateurs Samsung Split (12 000 BTU / 1,5 Cheval, 3,52 kW)",
+      "price": 80000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/samsung-split-12-000-btu-1-5-cheval-3-52-kw-6034676",
+      "photo": null,
+      "date": null,
+      "description": "Super occasion climatiseur samsung 1,5 cv d'excellente qualité ! Vous cherchez un climatiseur fiable, puissant et bien entretenu pour rafraîchir votre salon, votre chambre ou votre bureau ? Ne cherchez plus ! Marque de confiance : samsung (modèle robuste et performant) Puissance : 1,5 cv (12 000 btu), idéal pour une pièce de taille moyenne à grande, garantissant un froid rapide et homogène. État impeccable : appareil de très bonne qualité, démonté avec soin et protégé sous film plastique prêt pour le transport."
+    },
+    {
+      "id": "gpage-2",
+      "source": "ci.coinafrique.com",
+      "title": "Climatiseur Samsung 1,5 Chevaux (12000 BTU) Très Bon État",
+      "price": 80000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-samsung-1-5-chevaux-12000-btu-tres-bon-etat-6033355",
+      "photo": null,
+      "date": null,
+      "description": "Climatiseur Samsung de 1,5 chevaux (12000 BTU) en très bon état de fonctionnement. Déjà installé et démonté avec soin (film plastique de protection remis en place). Froid puissant et de très bonne qualité. Idéal pour rafraîchir efficacement votre salon ou votre chambre."
+    },
+    {
+      "id": "gpage-3",
+      "source": "ci.coinafrique.com",
+      "title": "Climatiseur split neufs et occasions en Côte d'Ivoire - CoinAfrique",
+      "price": 80000,
+      "currency": "CFA",
+      "zone": null,
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/climatiseurs-et-ventilateurs/climatiseur-split-5602441",
+      "photo": null,
+      "date": null,
+      "description": "Climatiseur split westpoint 3.3 kw (≈12 000 btu) refroidissez votre espace rapidement avec ce split puissant et économique ! Puissance : 3.3 kw – idéal pour 20-30 m². Conso : 1.23 kw seulement. Silencieux : ≤38/51 db. Gaz : r22 – facile à entretenir. 220-240 v / 50 hz. Fiable, durable et prêt à l’installation. Parfait pour maison, bureau ou boutique."
+    }
+  ]
+}

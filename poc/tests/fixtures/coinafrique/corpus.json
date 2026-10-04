@@ -1,0 +1,29 @@
+{
+  "baseUrl": "https://ci.coinafrique.com/search?keyword=test",
+  "cases": [
+    {
+      "id": "nominal",
+      "html": "nominal.html",
+      "expected": "nominal.expected.json",
+      "adaptiveTrain": "nominal.html"
+    },
+    {
+      "id": "empty",
+      "html": "empty.html",
+      "expected": "empty.expected.json",
+      "adaptiveTrain": "nominal.html"
+    },
+    {
+      "id": "page-not-found-existing",
+      "html": "../../../results/coinafrique-raw.html",
+      "expected": "empty.expected.json",
+      "adaptiveTrain": "nominal.html"
+    },
+    {
+      "id": "adaptive-structure-change",
+      "html": "adaptive-changed.html",
+      "expected": "adaptive.expected.json",
+      "adaptiveTrain": "adaptive-base.html"
+    }
+  ]
+}

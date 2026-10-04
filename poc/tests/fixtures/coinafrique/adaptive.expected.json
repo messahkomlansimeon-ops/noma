@@ -1,0 +1,18 @@
+{
+  "listings": [
+    {
+      "id": "coin-55555",
+      "source": "coinafrique",
+      "title": "TV LG 55 pouces",
+      "price": 175000,
+      "currency": "FCFA",
+      "zone": "Abidjan",
+      "vendor": null,
+      "url": "https://ci.coinafrique.com/annonce/tv-lg-55-55555",
+      "photo": null,
+      "date": null,
+      "description": "Téléviseurs — Smart TV 4K"
+    }
+  ],
+  "errors": []
+}
