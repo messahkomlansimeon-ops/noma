@@ -6,7 +6,11 @@
  * Voir MATCHING-RELEVANCE.md.
  */
 export interface RelevanceConfig {
-  /** Poids de la pertinence. Une composante absente (null / non applicable) est retirée et les poids restants sont renormalisés. */
+  /**
+   * Poids de la pertinence. Seule une composante NON APPLICABLE selon le sens (côté offre : disponibilité et prix) est
+   * retirée et les poids restants renormalisés. Une valeur INCONNUE dans une composante applicable n'est PAS retirée :
+   * elle est remplacée par une valeur de `relevance.substitutes` (voir MATCHING-RELEVANCE.md).
+   */
   readonly weights: {
     /** Score de compatibilité enregistré (0 à 100). */
     readonly compatibility: number;
@@ -65,6 +69,28 @@ export interface RelevanceConfig {
     /** Décalage maximal accepté dans un curseur de pertinence. */
     readonly maxOffset: number;
     readonly decimals: number;
+    /**
+     * Valeurs de SUBSTITUTION, utilisées UNIQUEMENT dans le calcul de la pertinence quand une composante applicable est
+     * inconnue. Les indicateurs exposés restent honnêtes (score null). Retirer une valeur inconnue puis renormaliser
+     * récompenserait celui qui cache l'information : déclarer ne doit jamais faire perdre.
+     */
+    readonly substitutes: {
+      /** Disponibilité inconnue (statut NULL) : sous `unconfirmed` (40), au-dessus de `reserved` (20). */
+      readonly availabilityUnknown: number;
+      /** Prix absent de l'offre (le vendeur ne l'a pas donné) : pas mieux qu'un prix au-dessus du marché (20). */
+      readonly priceMissing: number;
+      /** Prix présent mais marché insuffisant (ce n'est pas un choix du vendeur) : neutre, sous `in_market` (60). */
+      readonly priceInsufficientMarket: number;
+      /** Score de compatibilité null sur une correspondance confirmée. */
+      readonly compatibilityNull: number;
+    };
+    /** Plage de validité de `at` dans un curseur de pertinence, relativement à l'horloge de la base. */
+    readonly cursorAt: {
+      /** `at` postérieur à (horloge + ce délai) : refusé. */
+      readonly maxFutureSkewMs: number;
+      /** `at` antérieur à (horloge − cet âge) : curseur expiré, le client recommence à la première page. */
+      readonly maxAgeMs: number;
+    };
   };
 }
 
@@ -97,7 +123,14 @@ export const RELEVANCE_CONFIG: RelevanceConfig = Object.freeze({
       demand: Object.freeze(["category", "brand", "model", "condition", "location"] as const),
     }),
   }),
-  relevance: Object.freeze({ window: 200, maxWindowOption: 1000, maxOffset: 100_000, decimals: 2 }),
+  relevance: Object.freeze({
+    window: 200,
+    maxWindowOption: 1000,
+    maxOffset: 100_000,
+    decimals: 2,
+    substitutes: Object.freeze({ availabilityUnknown: 30, priceMissing: 20, priceInsufficientMarket: 50, compatibilityNull: 50 }),
+    cursorAt: Object.freeze({ maxFutureSkewMs: 5_000, maxAgeMs: 3_600_000 }),
+  }),
 }) as RelevanceConfig;
 
 export const RELEVANCE_WINDOW = RELEVANCE_CONFIG.relevance.window;

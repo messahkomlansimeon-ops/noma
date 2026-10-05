@@ -33,10 +33,14 @@ seconde, le score est **plafonné à 30** (jamais relevé) et `insufficient_quan
 `unavailable` (score 0) est inatteignable : une offre indisponible n'est pas éligible.
 
 ### Prix (`price`)
-Position du prix de l'offre dans le marché observé, **hors l'offre elle-même** : `≤ p25` → `below_market` (100) ;
-`≤ p75` → `in_market` (60) ; au-dessus → `above_market` (20) ; prix absent, marché absent, médiane nulle ou échantillon
-< 5 → `insufficient_data` (null). `deltaPercent` = arrondi entier de (prix − médiane) / médiane × 100. Le marché brut
-(percentiles, prix d'autres offres) n'est jamais exposé : seuls position, `deltaPercent` et `sampleSize` le sont.
+Position du prix de l'offre dans le marché observé, **hors l'offre elle-même** : **strictement sous p25** →
+`below_market` (100) ; **p25 ≤ prix ≤ p75** → `in_market` (60) ; au-dessus de p75 → `above_market` (20). Dans un marché
+dégénéré (p25 = médiane = p75, par exemple toutes les offres au même prix), un prix égal est donc `in_market`
+(écart 0), jamais `below_market`. Prix absent, marché absent, médiane nulle ou échantillon < 5 →
+`insufficient_data` (score null) avec un facteur qui distingue les deux causes : **`price_missing`** (le vendeur n'a
+pas donné de prix, prioritaire) ou **`insufficient_market`** (prix présent, marché insuffisant : ce n'est pas un choix
+du vendeur). `deltaPercent` = arrondi entier de (prix − médiane) / médiane × 100. Le marché brut (percentiles, prix
+d'autres offres) n'est jamais exposé : seuls position, `deltaPercent`, `sampleSize` et `factors` le sont.
 
 ### Confiance (`confidence`)
 Points : téléphone vérifié 40 ; ancienneté du compte ≥ 30 jours 20 (≥ 7 jours 10) ; complétude des champs structurés
@@ -51,16 +55,44 @@ facteur ne s'applique pas : le total est renormalisé sur 90. `level` : `high` �
 
 Nombre 0..100 arrondi à 2 décimales, calculé **uniquement pour une correspondance confirmée** (compatible ET éligible
 ET fraîche, voir `MATCHING-STORED-READ.md`). Poids : compatibilité 0,55, disponibilité 0,20, prix 0,15, confiance
-0,10. Une composante null ou non applicable est **retirée** et les poids restants sont **renormalisés** (exemple :
-sans prix, (44 + 20 + 5) / 0,85 pour compat 80, disponibilité 100, confiance 50).
+0,10. **Seule une composante non applicable selon le sens est retirée** (poids restants renormalisés) ; une valeur
+**inconnue** dans une composante applicable est **remplacée** par une valeur de substitution, jamais retirée (voir
+« Information inconnue ou cachée »).
 
 - **Sens demande** (`/api/demands/[id]/stored-matches` : l'acheteur voit des offres) : les quatre composantes.
 - **Sens offre** (`/api/offers/[id]/stored-matches` : le vendeur voit des demandes) : compatibilité et confiance de
   l'acheteur seulement. La disponibilité et le prix de SA propre offre sont identiques pour tous les éléments : non
   applicables. Dans ce sens, `indicators.availability` et `indicators.price` valent **null** dans chaque item.
 
-Propriétés testées : monotone (améliorer une composante définie ne fait jamais baisser la pertinence),
-déterministe, aucune pertinence pour une ligne non confirmée.
+Propriétés testées : monotone (améliorer une composante définie ne fait jamais baisser la pertinence), « déclarer ne
+fait jamais perdre », déterministe, aucune pertinence pour une ligne non confirmée.
+
+## Information inconnue ou cachée
+
+**Règle.** Quand une composante applicable est inconnue, la pertinence utilise une valeur de **substitution** définie
+dans `relevance-config.ts` (`relevance.substitutes`) :
+
+| Cas (sens demande) | Substitution | Position relative |
+| --- | --- | --- |
+| disponibilité inconnue (statut NULL) | 30 | sous `unconfirmed` (40), au-dessus de `reserved` (20) |
+| prix absent de l'offre (le vendeur ne l'a pas donné) | 20 | pas mieux qu'un prix `above_market` (20) |
+| prix présent, marché insuffisant (échantillon < 5, percentiles indisponibles) | 50 | neutre, sous `in_market` (60) |
+| compatibilité null sur une correspondance confirmée | 50 | — |
+
+La substitution ne sert **qu'au calcul de la pertinence** : les indicateurs exposés restent honnêtes
+(`availability.score` et `price.score` valent `null` quand l'information est inconnue ; `price.factors` indique
+`price_missing` ou `insufficient_market`).
+
+**Pourquoi.** La première version retirait toute composante `null` puis renormalisait les poids. Une valeur inconnue
+disparaissait donc du calcul alors qu'une valeur déclarée mais médiocre y figurait : pour quatre offres par ailleurs
+identiques (compatibilité 100), une disponibilité non renseignée donnait 90, une disponibilité « available » non
+confirmée 80 ; un prix caché donnait 75,88, un prix au-dessus du marché 68. Ne rien dire battait le vendeur honnête :
+une incitation à cacher l'information, inacceptable puisque le boost (§15) reposera sur ce classement. Avec la
+substitution, **déclarer ne fait jamais perdre** : une disponibilité `available` (même non confirmée) et tout prix
+déclaré (même au-dessus du marché) donnent une pertinence au moins égale à l'information cachée (propriété testée par
+une grille exhaustive). `reserved` (20) reste **strictement** sous l'inconnu (30) : c'est un état réellement moins bon,
+pas une information cachée. La renormalisation, elle, ne subsiste que pour les composantes **non applicables** du sens
+offre (disponibilité et prix de sa propre offre).
 
 ## Tri, fenêtre et pagination
 
@@ -72,7 +104,11 @@ suivantes ne sont jamais servies avec ce tri). La fenêtre est réglable par une
 
 Pagination par **décalage** avec le curseur strict `{ v: 1, sort: "relevance", sourceKind, sourceId, offset, at }` (`at` =
 `readAt` de la première page, ISO à 6 décimales). Les pages suivantes recalculent les indicateurs avec **now = at**,
-figé : le passage du temps entre deux pages ne déplace aucun seuil (72 h, 14 jours, ancienneté). Un curseur de score
+figé : le passage du temps entre deux pages ne déplace aucun seuil (72 h, 14 jours, ancienneté). **`at` est borné par
+l'horloge de la base**, lue dans le même instantané avant tout calcul : un `at` postérieur à l'horloge + 5 s est
+refusé (sinon un client déplacerait à volonté les échéances) et un `at` antérieur à l'horloge − 1 h est un curseur
+**expiré** (le client recommence à la première page) ; les deux donnent une erreur de validation (400). Les bornes sont
+dans `relevance-config.ts` (`relevance.cursorAt`). Un curseur de score
 avec `sort=relevance` (ou l'inverse), ou d'une autre source ou d'un autre sens, est refusé (400). **Limite** : `at`
 fige l'horloge, pas les données : une modification de `availability_confirmed_at`, de prix ou de statut entre deux
 pages qui change un niveau à `at` change légitimement l'ordre (une modification qui reste dans la même tranche ne le

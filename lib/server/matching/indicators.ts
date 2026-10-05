@@ -84,26 +84,34 @@ export interface MarketReference {
   p75: number | null;
 }
 
+/** Pourquoi le prix est « inconnu » : le vendeur ne l'a pas donné, ou le marché est insuffisant (pas un choix du vendeur). */
+export type PriceFactor = "price_missing" | "insufficient_market";
+
 export interface PriceIndicator {
   position: PricePosition;
   score: number | null;
   /** Écart entier à la médiane, en pourcentage ; null si indisponible. */
   deltaPercent: number | null;
   sampleSize: number;
+  /** `price_missing` ou `insufficient_market` quand `position` vaut `insufficient_data` ; vide sinon. */
+  factors: PriceFactor[];
 }
 
 export function computePriceIndicator(input: { price: number | null; market: MarketReference | null }): PriceIndicator {
   const { market, price } = input;
   const sampleSize = market?.sampleSize ?? 0;
-  const insufficient: PriceIndicator = { position: "insufficient_data", score: null, deltaPercent: null, sampleSize };
-  if (price === null || market === null || sampleSize < C.price.minSampleSize) return insufficient;
+  // Prix absent : le vendeur ne l'a pas donné (prioritaire sur l'état du marché).
+  if (price === null) return { position: "insufficient_data", score: null, deltaPercent: null, sampleSize, factors: ["price_missing"] };
+  const insufficient: PriceIndicator = { position: "insufficient_data", score: null, deltaPercent: null, sampleSize, factors: ["insufficient_market"] };
+  if (market === null || sampleSize < C.price.minSampleSize) return insufficient;
   if (market.p25 === null || market.median === null || market.p75 === null || market.median <= 0) return insufficient;
 
   const deltaPercent = Math.round(((price - market.median) / market.median) * 100);
   const { scores } = C.price;
-  if (price <= market.p25) return { position: "below_market", score: scores.belowMarket, deltaPercent, sampleSize };
-  if (price <= market.p75) return { position: "in_market", score: scores.inMarket, deltaPercent, sampleSize };
-  return { position: "above_market", score: scores.aboveMarket, deltaPercent, sampleSize };
+  // Strictement sous p25 : dans un marché dégénéré (p25 = médiane = p75), un prix égal est « dans le marché ».
+  if (price < market.p25) return { position: "below_market", score: scores.belowMarket, deltaPercent, sampleSize, factors: [] };
+  if (price <= market.p75) return { position: "in_market", score: scores.inMarket, deltaPercent, sampleSize, factors: [] };
+  return { position: "above_market", score: scores.aboveMarket, deltaPercent, sampleSize, factors: [] };
 }
 
 // ───────────── Confiance (concerne le PROPRIÉTAIRE et l'annonce du candidat) ─────────────
@@ -181,29 +189,45 @@ export interface RelevanceInput {
   confirmed: boolean;
   /** `demand_source` : l'acheteur voit des offres (quatre composantes). `offer_source` : le vendeur voit des demandes
    *  (compatibilité et confiance de l'acheteur seulement : disponibilité et prix de SA propre offre sont identiques
-   *  pour tous les éléments, donc non applicables). */
+   *  pour tous les éléments, donc NON APPLICABLES : seules ces composantes-là sont retirées et renormalisées). */
   sense: RelevanceSense;
-  /** Score de compatibilité enregistré (0 à 100), ou null. */
+  /** Score de compatibilité enregistré (0 à 100) ; null → valeur de substitution. */
   compatibility: number | null;
+  /** Score de disponibilité ; null (statut inconnu) → valeur de substitution (sens demande). */
   availability: number | null;
+  /** Score de prix ; null (inconnu) → valeur de substitution selon `priceFactor` (sens demande). */
   price: number | null;
+  /** Raison d'un prix inconnu ; absente ou `insufficient_market` → substitution neutre. */
+  priceFactor?: PriceFactor | null;
   confidence: number | null;
 }
 
-/** Pertinence 0..100 arrondie à 2 décimales, ou null pour une ligne non confirmée. */
+/**
+ * Pertinence 0..100 arrondie à 2 décimales, ou null pour une ligne non confirmée.
+ * Une composante NON APPLICABLE selon le sens est retirée (poids renormalisés). Une valeur INCONNUE d'une composante
+ * applicable est remplacée par sa valeur de substitution (relevance-config.ts) : jamais retirée, sinon cacher
+ * l'information serait récompensé. La substitution ne sert qu'à ce calcul ; les indicateurs exposés restent null.
+ */
 export function computeRelevance(input: RelevanceInput): number | null {
   if (!input.confirmed) return null;
   const { weights } = C;
+  const substitutes = C.relevance.substitutes;
+  const priceSubstitute = input.priceFactor === "price_missing" ? substitutes.priceMissing : substitutes.priceInsufficientMarket;
   const components: Array<[number, number | null]> = [
-    [weights.compatibility, input.compatibility],
+    [weights.compatibility, input.compatibility ?? substitutes.compatibilityNull],
     [weights.confidence, input.confidence],
   ];
-  if (input.sense === "demand_source") components.push([weights.availability, input.availability], [weights.price, input.price]);
+  if (input.sense === "demand_source") {
+    components.push(
+      [weights.availability, input.availability ?? substitutes.availabilityUnknown],
+      [weights.price, input.price ?? priceSubstitute],
+    );
+  }
 
   let weightSum = 0;
   let weighted = 0;
   for (const [weight, value] of components) {
-    if (value === null) continue; // composante absente : retirée, les poids restants sont renormalisés
+    if (value === null) continue; // seule la confiance peut être absente ici (jamais le cas en pratique)
     weightSum += weight;
     weighted += weight * value;
   }

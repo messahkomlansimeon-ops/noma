@@ -11,6 +11,7 @@ import {
   computeAvailabilityIndicator, computeConfidenceIndicator, computePriceIndicator, computeRelevance, type MarketReference,
 } from "../../lib/server/matching/indicators";
 import { readMarketReferences } from "../../lib/server/matching/market";
+import { runMatchingCycle } from "../../lib/server/matching/runner";
 import { computeScoringConfigHash, normalizeScoringConfig } from "../../lib/server/matching/persistence";
 import { RELEVANCE_CONFIG } from "../../lib/server/matching/relevance-config";
 import {
@@ -124,12 +125,12 @@ function newOffer(options: OfferOptions): Promise<OfferRecord> {
   }, pool);
 }
 
-function newDemand(ownerId: string, extra: { quantity?: number | null; condition?: string | null; location?: string | null } = {}): Promise<DemandRecord> {
+function newDemand(ownerId: string, extra: { quantity?: number | null; condition?: string | null; location?: string | null; budget?: null } = {}): Promise<DemandRecord> {
   return createDemand({
     ownerId, rawText: "RAW_SECRET_TEXT demande iPhone 13", category: "smartphones", brand: "Apple", model: "iPhone 13",
     condition: "condition" in extra ? extra.condition : "good", location: "location" in extra ? extra.location : "Cocody",
     quantity: extra.quantity ?? null,
-    budget: { amount: 500_000, currency: "XOF" }, status: "active",
+    budget: "budget" in extra ? extra.budget : { amount: 500_000, currency: "XOF" }, status: "active",
   }, pool);
 }
 
@@ -319,7 +320,7 @@ interface Candidate { offer: OfferRecord; ownerId: string; evaluationId: string;
 
 async function seedTwentyFive(demand: DemandRecord): Promise<Candidate[]> {
   const candidates: Candidate[] = [];
-  const confirmations = [1, 71, 73, 300, 400, null, 5, 71, 200, null];
+  const confirmations = [1, 71, 72.4, 300, 400, null, 5, 71, 200, null];
   const prices = [95_000, 105_000, 125_000, 135_000, 145_000, 155_000, 210_000, 320_000, 99_500, 135_500];
   for (let index = 0; index < 25; index++) {
     const ownerId = await makeOwner({ verified: index % 2 === 0, ageDays: [1, 10, 40][index % 3] });
@@ -442,14 +443,16 @@ test("pagination relevance : 25 éléments, limit 7 → ni doublon ni trou, ordr
   const second = walked.pages[1];
   assert.ok(second.readAt.getTime() > at.getTime(), "readAt de la page 2 est l'horloge courante, postérieure à at");
   const forge = (shiftMs: number) => Buffer.from(JSON.stringify({ ...cursor, at: new Date(at.getTime() + shiftMs).toISOString().replace(/Z$/, "000Z") }), "utf8").toString("base64url");
-  const later = new Date(at.getTime() + 3 * HOUR);
-  const expectedLater = await referenceOrder(demand, candidates, universe, later);
-  assert.notDeepEqual(expectedLater, expected, "le jeu est sensible à l'horloge (confirmations à 71 h)");
-  const pageAtLater = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7, cursor: forge(3 * HOUR) }, pool);
-  assert.deepEqual(ids(pageAtLater), expectedLater.slice(7, 14), "at forgé (+3 h) : l'ordre suit at");
+  // `at` ne peut plus être dans le futur (borne +5 s) : on le recule de 50 min (dans la limite d'une heure), ce qui fait
+  // passer sous 72 h les confirmations à 72,4 h.
+  const earlier = new Date(at.getTime() - 50 * 60_000);
+  const expectedEarlier = await referenceOrder(demand, candidates, universe, earlier);
+  assert.notDeepEqual(expectedEarlier, expected, "le jeu est sensible à l'horloge (confirmations à 72,4 h)");
+  const pageAtEarlier = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7, cursor: forge(-50 * 60_000) }, pool);
+  assert.deepEqual(ids(pageAtEarlier), expectedEarlier.slice(7, 14), "at forgé (−50 min) : l'ordre suit at");
   const pageAtOriginal = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7, cursor: forge(0) }, pool);
   assert.deepEqual(ids(pageAtOriginal), expected.slice(7, 14), "at d'origine : ordre d'origine");
-  assert.notDeepEqual(ids(pageAtLater), ids(pageAtOriginal));
+  assert.notDeepEqual(ids(pageAtEarlier), ids(pageAtOriginal));
 
   // Une modification de availability_confirmed_at qui ne change pas la tranche (même niveau à at) ne change pas l'ordre.
   const target = candidates.find((candidate) => candidate.offer.id === ids(second)[0])!;
@@ -576,7 +579,7 @@ test("sens offre : seules la compatibilité et la confiance de l'acheteur compte
     assert.equal(item.indicators.price, null, "prix de SA propre offre : non applicable");
     const confidence = item.indicators.confidence;
     const compat = item.score;
-    const expected = Math.round(((compat === null ? 0 : 0.55 * compat) + 0.1 * confidence.score) / (compat === null ? 0.1 : 0.65) * 100) / 100;
+    const expected = Math.round(((0.55 * (compat ?? 50) + 0.1 * confidence.score) / 0.65) * 100) / 100; // compatibilité nulle → substitution 50
     assert.ok(Math.abs(item.relevance - expected) <= 0.011, `pertinence = (0,55 × compat + 0,10 × confiance) renormalisée (${item.candidateId}) : ${item.relevance} vs ${expected}`);
   }
   assert.ok(baseline.items.every((item) => item.indicators.confidence.factors.every((factor) => factor !== "availability_confirmed")), "pas de facteur d'offre pour une demande");
@@ -711,7 +714,7 @@ test("HTTP : forme exacte des indicateurs et de la pertinence, et aucune fuite (
       assert.deepEqual(Object.keys(item).sort(), ["candidate", "candidateContentVersion", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "evaluation", "indicators", "relevance", "score", "scoring"]);
       assert.deepEqual(Object.keys(item.indicators).sort(), ["availability", "confidence", "price"]);
       assert.deepEqual(Object.keys(item.indicators.availability).sort(), ["confirmedAgeHours", "factors", "level", "score"]);
-      assert.deepEqual(Object.keys(item.indicators.price).sort(), ["deltaPercent", "position", "sampleSize", "score"]);
+      assert.deepEqual(Object.keys(item.indicators.price).sort(), ["deltaPercent", "factors", "position", "sampleSize", "score"]);
       assert.deepEqual(Object.keys(item.indicators.confidence).sort(), ["accountAgeBand", "factors", "level", "score"]);
       assert.equal(typeof item.relevance, "number");
       assert.ok(["lt_7d", "7d_30d", "gte_30d"].includes(item.indicators.confidence.accountAgeBand));
@@ -730,4 +733,116 @@ test("HTTP : forme exacte des indicateurs et de la pertinence, et aucune fuite (
     ];
     for (const needle of forbidden) assert.ok(!text.includes(needle), `fuite (${sort}) : ${needle}`);
   }
+});
+
+// ═════════════ 2H1-bis : information inconnue ou cachée ═════════════
+
+async function cyclesUntilIdle(): Promise<void> {
+  for (let i = 0; i < 80; i++) {
+    const cycle = await runMatchingCycle({ pool, workerId: "relevance-test" });
+    assert.deepEqual(cycle.errors, []);
+    if (cycle.idle) return;
+  }
+  assert.fail("le cycle n'atteint pas l'état idle");
+}
+
+test("information cachée (vrai pipeline : catalogue → cycles jusqu'à idle → sort=relevance) : déclarer ne fait plus perdre", async () => {
+  await resetCatalog();
+  // Demande sans budget : aucune comparaison de prix dans la compatibilité, toutes les offres sont compatibles.
+  const demand = await newDemand(buyer.userId, { budget: null });
+  const offerOf = async (options: Partial<OfferOptions>) => newOffer({ ownerId: await makeOwner(), price: 100_000, ...options });
+  const references: OfferRecord[] = [];
+  for (let index = 0; index < 6; index++) references.push(await offerOf({}));
+  const a = await offerOf({ availability: null });        // disponibilité NON renseignée
+  const b = await offerOf({ availability: "available" }); // « available », non confirmée
+  const c = await offerOf({ price: null });               // prix CACHÉ
+  const d = await offerOf({ price: 150_000 });            // prix déclaré, au-dessus du marché
+  await cyclesUntilIdle();
+
+  const page = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 100 }, pool);
+  assert.equal(page.items.length, 10, "les dix offres sont compatibles et confirmées");
+  const byId = new Map(page.items.map((item) => [item.candidateId, item]));
+  const order = ids(page);
+  const item = (offer: OfferRecord) => byId.get(offer.id)!;
+
+  // Défaut 1 : B (disponibilité déclarée) passe devant A (disponibilité cachée).
+  assert.ok(order.indexOf(b.id) < order.indexOf(a.id), "B devant A");
+  assert.ok(Math.abs(item(b).relevance - item(a).relevance - 2) < 0.011, `B − A = 0,20 × (40 − 30) : ${item(b).relevance} − ${item(a).relevance}`);
+  // D (prix déclaré au-dessus du marché) n'est pas battu par C (prix caché) : devant ou ex æquo.
+  assert.ok(item(d).relevance >= item(c).relevance, `D ≥ C : ${item(d).relevance} vs ${item(c).relevance}`);
+  assert.ok(order.indexOf(d.id) < order.indexOf(c.id) || item(d).relevance === item(c).relevance);
+
+  // Les indicateurs exposés restent honnêtes : inconnu = null.
+  assert.deepEqual({ level: item(a).indicators.availability!.level, score: item(a).indicators.availability!.score }, { level: "unknown", score: null });
+  assert.deepEqual({ level: item(b).indicators.availability!.level, score: item(b).indicators.availability!.score }, { level: "unconfirmed", score: 40 });
+  assert.deepEqual(
+    { position: item(c).indicators.price!.position, score: item(c).indicators.price!.score, delta: item(c).indicators.price!.deltaPercent, factors: item(c).indicators.price!.factors },
+    { position: "insufficient_data", score: null, delta: null, factors: ["price_missing"] });
+  assert.deepEqual(
+    { position: item(d).indicators.price!.position, score: item(d).indicators.price!.score, delta: item(d).indicators.price!.deltaPercent },
+    { position: "above_market", score: 20, delta: 50 });
+
+  // Défaut 2 : à prix égal, les offres de référence sont « in_market » (jamais « below_market »), écart nul.
+  for (const reference of [...references, a, b]) {
+    const price = item(reference).indicators.price!;
+    assert.deepEqual({ position: price.position, score: price.score, delta: price.deltaPercent, factors: price.factors, sample: price.sampleSize }, { position: "in_market", score: 60, delta: 0, factors: [], sample: 8 });
+  }
+});
+
+test("marché dégénéré (p25 = médiane = p75) : le prix égal donne in_market et un écart nul", async () => {
+  await resetCatalog();
+  const owner = await makeOwner();
+  const target = await newOffer({ ownerId: owner, price: 100_000 });
+  for (let index = 0; index < 5; index++) await newOffer({ ownerId: owner, price: 100_000 });
+  const market = (await readMarketReferences(pool, [{ offerId: target.id, category: "smartphones", brand: "Apple", model: "iPhone 13", currency: "XOF" }])).get(target.id)!;
+  assert.deepEqual(market, { sampleSize: 5, p25: 100_000, median: 100_000, p75: 100_000 });
+  const equal = computePriceIndicator({ price: 100_000, market });
+  assert.deepEqual({ position: equal.position, delta: equal.deltaPercent }, { position: "in_market", delta: 0 });
+  assert.equal(computePriceIndicator({ price: 99_999, market }).position, "below_market");
+  assert.equal(computePriceIndicator({ price: 100_001, market }).position, "above_market");
+  // Bornes strictes sur un marché non dégénéré : p25 = 110 000 exactement, p75 = 140 000 exactement.
+  await resetCatalog();
+  const probe = await newOffer({ ownerId: owner, price: 1 });
+  for (const price of [100_000, 110_000, 120_000, 130_000, 140_000, 150_000, 160_000]) await newOffer({ ownerId: owner, price });
+  const spread = (await readMarketReferences(pool, [{ offerId: probe.id, category: "smartphones", brand: "Apple", model: "iPhone 13", currency: "XOF" }])).get(probe.id)!;
+  assert.deepEqual({ p25: spread.p25, median: spread.median, p75: spread.p75 }, { p25: 115_000, median: 130_000, p75: 145_000 });
+  assert.equal(computePriceIndicator({ price: 115_000, market: spread }).position, "in_market", "prix = p25 : dans le marché");
+  assert.equal(computePriceIndicator({ price: 114_999, market: spread }).position, "below_market");
+  assert.equal(computePriceIndicator({ price: 145_000, market: spread }).position, "in_market", "prix = p75 : dans le marché");
+  assert.equal(computePriceIndicator({ price: 145_001, market: spread }).position, "above_market");
+});
+
+test("curseur relevance : at futur (> +5 s) ou expiré (> 1 h) → 400 ; at valide → OK ; an 2999 refusé", async () => {
+  await resetCatalog();
+  const demand = await newDemand(buyer.userId);
+  for (let index = 0; index < 9; index++) {
+    await insertEvaluation(await newOffer({ ownerId: await makeOwner(), price: 100_000 + index }), demand, { score: `${90 - index}.000000` });
+  }
+  const first = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7 }, pool);
+  assert.ok(first.nextCursor);
+  const base = JSON.parse(Buffer.from(first.nextCursor!, "base64url").toString("utf8"));
+  const withAt = (at: Date | string) => Buffer.from(JSON.stringify({ ...base, at: typeof at === "string" ? at : at.toISOString().replace(/Z$/, "000Z") }), "utf8").toString("base64url");
+  const read = (at: Date | string) => listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7, cursor: withAt(at) }, pool);
+  const now = Date.now();
+
+  for (const [label, at] of [
+    ["+10 s", new Date(now + 10_000)], ["+1 min", new Date(now + 60_000)], ["+3 h", new Date(now + 3 * HOUR)],
+    ["an 2999", "2999-01-01T00:00:00.000000Z"], ["−61 min (expiré)", new Date(now - 61 * 60_000)], ["−2 h", new Date(now - 2 * HOUR)],
+    ["an 2000", "2000-01-01T00:00:00.000000Z"],
+  ] as Array<[string, Date | string]>) {
+    await assert.rejects(read(at), (error: unknown) => error instanceof CatalogValidationError, label);
+  }
+  for (const [label, at] of [
+    ["maintenant", new Date(now)], ["+2 s", new Date(now + 2_000)], ["−59 min", new Date(now - 59 * 60_000)], ["−1 min", new Date(now - 60_000)],
+  ] as Array<[string, Date]>) {
+    assert.equal((await read(at)).items.length, 2, label); // 9 éléments, offset 7 : la page restante
+  }
+  assert.equal((await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7, cursor: first.nextCursor! }, pool)).items.length, 2, "le curseur d'origine est valide");
+
+  // En HTTP : 400 invalid_request.
+  const response = await storedHandler("demand")(request(urlOf("demand", demand.id, "stored-matches", `?sort=relevance&cursor=${withAt("2999-01-01T00:00:00.000000Z")}`), buyer.cookie), demand.id);
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: { code: "invalid_request", message: "Requête invalide." } });
+  const expired = await storedHandler("demand")(request(urlOf("demand", demand.id, "stored-matches", `?sort=relevance&cursor=${withAt(new Date(now - 2 * HOUR))}`), buyer.cookie), demand.id);
+  assert.equal(expired.status, 400);
 });

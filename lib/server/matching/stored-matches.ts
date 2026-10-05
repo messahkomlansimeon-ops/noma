@@ -491,6 +491,7 @@ async function buildItems<TCandidate extends OfferRecord | DemandRecord, TRow ex
       compatibility: score,
       availability: indicators.availability?.score ?? null,
       price: indicators.price?.score ?? null,
+      priceFactor: indicators.price?.factors[0] ?? null,
       confidence: indicators.confidence.score,
     });
     return {
@@ -521,6 +522,16 @@ function compareByRelevance<T extends OfferRecord | DemandRecord>(a: RankedItem<
   if (a.item.score !== null && b.item.score !== null && a.item.score !== b.item.score) return b.item.score - a.item.score;
   if (a.evaluatedAtIso !== b.evaluatedAtIso) return a.evaluatedAtIso < b.evaluatedAtIso ? 1 : -1;
   return a.evaluationId < b.evaluationId ? 1 : a.evaluationId > b.evaluationId ? -1 : 0;
+}
+
+/**
+ * Plage de validité de `at` : horloge de la base − `maxAgeMs` ≤ at ≤ horloge + `maxFutureSkewMs`. Un `at` futur
+ * décalerait toutes les échéances (72 h, 14 jours, ancienneté) à volonté ; un `at` ancien est un curseur expiré.
+ */
+function assertCursorAtInRange(at: Date, databaseNow: Date): void {
+  const { maxFutureSkewMs, maxAgeMs } = RELEVANCE_CONFIG.relevance.cursorAt;
+  if (at.getTime() > databaseNow.getTime() + maxFutureSkewMs) throw invalidCursor("date postérieure à l'horloge");
+  if (at.getTime() < databaseNow.getTime() - maxAgeMs) throw invalidCursor("curseur expiré : recommencez à la première page");
 }
 
 /** processing + readAt, dans le même instantané que la lecture des lignes. */
@@ -589,8 +600,10 @@ async function readStored<TSource extends OfferRecord | DemandRecord, TCandidate
     const rowsInput = { sourceKind: input.sourceKind, sourceId: input.sourceId, freshness: input.freshness, candidateColumns: input.candidateColumns };
 
     if (input.sort === "relevance") {
-      // Les pages suivantes recalculent avec now = at, figé à la première page.
+      // Les pages suivantes recalculent avec now = at, figé à la première page. `at` doit rester proche de l'horloge de la
+      // base (lue ci-dessus, avant tout calcul) : ni dans le futur au-delà de la tolérance, ni expiré.
       const at = input.relevanceCursor ? new Date(input.relevanceCursor.at) : readAt;
+      if (input.relevanceCursor) assertCursorAtInRange(at, readAt);
       const rows = await fetchRows<TRow>(client, { ...rowsInput, rowLimit: input.window + 1, cursor: null });
       const truncated = rows.length > input.window;
       const ranked = await buildItems<TCandidate, TRow>(client, {

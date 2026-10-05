@@ -80,21 +80,31 @@ test("disponibilité : quantité insuffisante plafonne à 30, jamais ne relève,
 
 const market = (overrides: Partial<MarketReference> = {}): MarketReference => ({ sampleSize: 5, p25: 100, median: 150, p75: 200, ...overrides });
 
-test("prix : positions aux bornes exactes p25 et p75, et juste à côté", () => {
+test("prix : positions aux bornes — strictement sous p25 = below ; p25 ≤ prix ≤ p75 = in ; au-dessus de p75 = above", () => {
   const at = (price: number) => computePriceIndicator({ price, market: market() });
-  assert.deepEqual([at(99), at(100)].map((r) => [r.position, r.score]), [["below_market", 100], ["below_market", 100]]);
-  assert.deepEqual([at(101), at(200)].map((r) => [r.position, r.score]), [["in_market", 60], ["in_market", 60]]);
+  assert.deepEqual([at(99)].map((r) => [r.position, r.score]), [["below_market", 100]]);
+  assert.deepEqual([at(100), at(101), at(200)].map((r) => [r.position, r.score]), [["in_market", 60], ["in_market", 60], ["in_market", 60]], "p25 inclus dans le marché, p75 inclus");
   assert.deepEqual([at(201)].map((r) => [r.position, r.score]), [["above_market", 20]]);
 });
 
-test("prix : données insuffisantes (échantillon < 5, prix ou marché absent, médiane nulle)", () => {
-  const insufficient = (input: Parameters<typeof computePriceIndicator>[0]) => computePriceIndicator(input);
-  assert.deepEqual(insufficient({ price: 100, market: market({ sampleSize: 4 }) }), { position: "insufficient_data", score: null, deltaPercent: null, sampleSize: 4 });
-  assert.equal(insufficient({ price: 100, market: market({ sampleSize: 5 }) }).position, "below_market", "5 suffit");
-  assert.deepEqual(insufficient({ price: null, market: market() }), { position: "insufficient_data", score: null, deltaPercent: null, sampleSize: 5 });
-  assert.deepEqual(insufficient({ price: 100, market: null }), { position: "insufficient_data", score: null, deltaPercent: null, sampleSize: 0 });
-  assert.equal(insufficient({ price: 100, market: market({ median: 0, p25: 0, p75: 0 }) }).position, "insufficient_data");
-  assert.equal(insufficient({ price: 100, market: market({ median: null }) }).position, "insufficient_data");
+test("prix : marché dégénéré (p25 = médiane = p75) — le prix égal est dans le marché", () => {
+  const flat = market({ p25: 100_000, median: 100_000, p75: 100_000 });
+  const result = computePriceIndicator({ price: 100_000, market: flat });
+  assert.deepEqual({ position: result.position, score: result.score, delta: result.deltaPercent, factors: result.factors }, { position: "in_market", score: 60, delta: 0, factors: [] });
+  assert.equal(computePriceIndicator({ price: 99_999, market: flat }).position, "below_market");
+  assert.equal(computePriceIndicator({ price: 100_001, market: flat }).position, "above_market");
+});
+
+test("prix : données insuffisantes — price_missing (le vendeur n'a pas donné de prix) ou insufficient_market", () => {
+  const compute = (input: Parameters<typeof computePriceIndicator>[0]) => computePriceIndicator(input);
+  assert.deepEqual(compute({ price: 100, market: market({ sampleSize: 4 }) }), { position: "insufficient_data", score: null, deltaPercent: null, sampleSize: 4, factors: ["insufficient_market"] });
+  const five = compute({ price: 100, market: market({ sampleSize: 5 }) });
+  assert.deepEqual({ position: five.position, factors: five.factors }, { position: "in_market", factors: [] }, "5 suffit (100 = p25 : dans le marché)");
+  assert.deepEqual(compute({ price: null, market: market() }), { position: "insufficient_data", score: null, deltaPercent: null, sampleSize: 5, factors: ["price_missing"] });
+  assert.deepEqual(compute({ price: null, market: null }), { position: "insufficient_data", score: null, deltaPercent: null, sampleSize: 0, factors: ["price_missing"] }, "prix absent prioritaire sur le marché");
+  assert.deepEqual(compute({ price: 100, market: null }), { position: "insufficient_data", score: null, deltaPercent: null, sampleSize: 0, factors: ["insufficient_market"] });
+  assert.deepEqual(compute({ price: 100, market: market({ median: 0, p25: 0, p75: 0 }) }).factors, ["insufficient_market"]);
+  assert.deepEqual(compute({ price: 100, market: market({ median: null }) }).factors, ["insufficient_market"]);
 });
 
 test("prix : deltaPercent = arrondi entier de (prix − médiane) / médiane × 100", () => {
@@ -183,15 +193,58 @@ test("pertinence : poids 0.55 / 0.20 / 0.15 / 0.10, arrondi à 2 décimales", ()
   assert.equal(relevance({ compatibility: 60, availability: 40, price: 20, confidence: 30 }), 47, "33 + 8 + 3 + 3");
 });
 
-test("pertinence : renormalisation quand une composante est absente", () => {
-  assert.equal(relevance({ price: null }), 81.18, "(44 + 20 + 5) / 0.85");
-  assert.equal(relevance({ availability: null }), 72.5, "(44 + 9 + 5) / 0.80");
-  assert.equal(relevance({ availability: null, price: null }), 75.38, "(44 + 5) / 0.65");
-  assert.equal(relevance({ compatibility: null }), 75.56, "sans compatibilité : (20 + 9 + 5) / 0.45");
-  assert.equal(relevance({ compatibility: null, availability: null, price: null }), 50, "confiance seule");
-  assert.equal(relevance({ compatibility: null, availability: null, price: null, confidence: null }), null, "aucune composante");
-  // La renormalisation garde l'échelle 0..100 : tout à 100 sauf une composante absente donne 100.
-  assert.equal(relevance({ compatibility: 100, availability: 100, price: null, confidence: 100 }), 100);
+test("pertinence : une valeur INCONNUE est remplacée par sa valeur de substitution, jamais retirée (aucune renormalisation)", () => {
+  assert.equal(relevance({ price: null }), 76.5, "prix inconnu (marché insuffisant par défaut) → 50 : 44 + 20 + 7,5 + 5");
+  assert.equal(relevance({ price: null, priceFactor: "insufficient_market" }), 76.5);
+  assert.equal(relevance({ price: null, priceFactor: "price_missing" }), 72, "prix absent → 20 : 44 + 20 + 3 + 5");
+  assert.equal(relevance({ availability: null }), 64, "disponibilité inconnue → 30 : 44 + 6 + 9 + 5");
+  assert.equal(relevance({ compatibility: null }), 61.5, "compatibilité nulle → 50 : 27,5 + 20 + 9 + 5");
+  assert.equal(relevance({ availability: null, price: null, priceFactor: "price_missing" }), 58, "44 + 6 + 3 + 5");
+  assert.equal(relevance({ compatibility: null, availability: null, price: null, priceFactor: "price_missing" }), 41.5, "27,5 + 6 + 3 + 5");
+  // Les poids ne sont pas renormalisés dans le sens demande : somme 1 → la pertinence reste dans l'échelle des composantes.
+  assert.equal(relevance({ compatibility: 100, availability: null, price: 100, confidence: 100 }), 86, "55 + 6 + 15 + 10 : l'inconnu coûte 14 points (20 − 6) au lieu de les redistribuer");
+});
+
+test("pertinence : déclarer ne fait jamais perdre (grille exhaustive, sens demande)", () => {
+  const values = [0, 20, 40, 60, 80, 100];
+  const nullable = [null, ...values];
+  const AVAILABLE = [40, 70, 100]; // available non confirmée, confirmée, récente
+  const DECLARED_PRICE = [20, 60, 100]; // au-dessus, dans, sous le marché (marché suffisant)
+  let checked = 0;
+  for (const compatibility of nullable) for (const confidence of values) {
+    for (const price of [...DECLARED_PRICE, null] as Array<number | null>) {
+      const unknown = relevance({ compatibility, confidence, availability: null, price });
+      for (const declared of AVAILABLE) {
+        assert.ok(relevance({ compatibility, confidence, availability: declared, price })! >= unknown!, `disponibilité ${declared} ≥ inconnue (compat ${compatibility}, conf ${confidence}, prix ${price})`);
+        checked++;
+      }
+      // « reserved » (20) reste STRICTEMENT sous l'inconnu : c'est un état réellement moins bon.
+      assert.ok(relevance({ compatibility, confidence, availability: 20, price })! < unknown!, "reserved < inconnu");
+      checked++;
+    }
+    for (const availability of [...AVAILABLE, 20, null] as Array<number | null>) {
+      const missing = relevance({ compatibility, confidence, availability, price: null, priceFactor: "price_missing" });
+      for (const declared of DECLARED_PRICE) {
+        assert.ok(relevance({ compatibility, confidence, availability, price: declared })! >= missing!, `prix ${declared} ≥ prix absent (compat ${compatibility}, conf ${confidence}, dispo ${availability})`);
+        checked++;
+      }
+      // Marché insuffisant (50, pas un choix du vendeur) est entre « au-dessus » (20) et « dans le marché » (60).
+      const insufficient = relevance({ compatibility, confidence, availability, price: null, priceFactor: "insufficient_market" })!;
+      assert.ok(insufficient >= missing! && insufficient <= relevance({ compatibility, confidence, availability, price: 60 })!, "absent ≤ marché insuffisant ≤ in_market");
+      checked++;
+    }
+  }
+  assert.ok(checked > 1_000);
+});
+
+test("pertinence : les valeurs de substitution viennent de la configuration et s'ordonnent comme documenté", () => {
+  const { substitutes } = RELEVANCE_CONFIG.relevance;
+  assert.deepEqual({ ...substitutes }, { availabilityUnknown: 30, priceMissing: 20, priceInsufficientMarket: 50, compatibilityNull: 50 });
+  const scores = RELEVANCE_CONFIG.availability.scores;
+  assert.ok(scores.reserved < substitutes.availabilityUnknown && substitutes.availabilityUnknown < scores.unconfirmed, "reserved 20 < inconnu 30 < unconfirmed 40");
+  assert.ok(substitutes.priceMissing <= RELEVANCE_CONFIG.price.scores.aboveMarket, "prix absent : pas mieux qu'au-dessus du marché");
+  assert.ok(substitutes.priceInsufficientMarket < RELEVANCE_CONFIG.price.scores.inMarket && substitutes.priceInsufficientMarket > substitutes.priceMissing);
+  assert.deepEqual({ ...RELEVANCE_CONFIG.relevance.cursorAt }, { maxFutureSkewMs: 5_000, maxAgeMs: 3_600_000 });
 });
 
 test("pertinence : sens offre (vendeur) = compatibilité et confiance de l'acheteur seulement", () => {

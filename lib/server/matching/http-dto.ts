@@ -86,7 +86,7 @@ export interface EvaluatedMatchesResponseDto {
 export interface StoredMatchIndicatorsDto {
   availability: { level: AvailabilityLevel; score: number | null; confirmedAgeHours: number | null; factors: string[] } | null;
   /** Position par rapport au marché observé : jamais le prix de marché brut ni les offres d'autrui. */
-  price: { position: PricePosition; score: number | null; deltaPercent: number | null; sampleSize: number } | null;
+  price: { position: PricePosition; score: number | null; deltaPercent: number | null; sampleSize: number; factors: string[] } | null;
   /** Ancienneté du compte par tranche seulement ; jamais de téléphone ni de date de création. */
   confidence: { level: ConfidenceLevel; score: number; accountAgeBand: AccountAgeBand; factors: string[] };
 }
@@ -272,6 +272,7 @@ function mapStoredMatchItem<TCandidate extends OfferRecord | DemandRecord>(
         score: item.indicators.price.score,
         deltaPercent: item.indicators.price.deltaPercent,
         sampleSize: item.indicators.price.sampleSize,
+        factors: [...item.indicators.price.factors],
       },
       confidence: {
         level: item.indicators.confidence.level,
