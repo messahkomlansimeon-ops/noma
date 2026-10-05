@@ -11,6 +11,7 @@ import {
   OtpResendDelayError,
   OtpVerificationError,
 } from "./errors";
+import { resolveDevOtpTransport } from "./dev-otp-transport";
 import { requestOtp as requestOtpService, verifyOtp as verifyOtpService } from "./otp";
 import { isUuid, requireCanonicalPhone } from "./primitives";
 import { resolveSession, revokeSession } from "./sessions";
@@ -33,7 +34,13 @@ export interface AuthHttpDependencies {
   pool?: Pool;
   now?: AuthClock;
   authSecret?: AuthSecretInput;
+  /** Transport injecté (tests, futur adaptateur) : il prime toujours sur `resolveSendOtp`. */
   sendOtp?: SendOtp;
+  /**
+   * Résolveur appelé à chaque demande d'OTP, seulement si `sendOtp` n'est pas injecté. Il reçoit
+   * l'environnement des gestionnaires. Sans lui et sans `sendOtp`, aucun transport n'est installé.
+   */
+  resolveSendOtp?: (env: Environment) => SendOtp | undefined;
   env?: Environment;
 }
 
@@ -182,7 +189,7 @@ export function createAuthHttpHandlers(
           pool: dependencies.pool,
           now: dependencies.now,
           authSecret: dependencies.authSecret,
-          sendOtp: dependencies.sendOtp,
+          sendOtp: dependencies.sendOtp ?? dependencies.resolveSendOtp?.(env),
           requestIp,
         });
         return jsonResponse(202, {
@@ -282,4 +289,13 @@ export function createAuthHttpHandlers(
   };
 }
 
-export const defaultAuthHttpHandlers = createAuthHttpHandlers();
+/**
+ * Dépendances par défaut des routes HTTP. Seul point où le transport OTP de développement est branché :
+ * il n'existe que si NODE_ENV=development ET NOMA_DEV_OTP_CONSOLE=1 (voir dev-otp-transport.ts). L'objet est gelé :
+ * les gestionnaires lisent ces dépendances à chaque requête, une mutation (transport injecté) serait donc effective.
+ */
+export const defaultAuthHttpDependencies: AuthHttpDependencies = Object.freeze({
+  resolveSendOtp: resolveDevOtpTransport,
+});
+
+export const defaultAuthHttpHandlers = createAuthHttpHandlers(defaultAuthHttpDependencies);

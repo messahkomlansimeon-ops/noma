@@ -5,30 +5,96 @@ import { useRouter } from "next/navigation";
 import { Delete, MessageSquareText } from "lucide-react";
 import { TopBar } from "@/components/top-bar";
 import { Btn } from "@/components/ui";
+import { api, describeApiError } from "@/lib/client/api";
+import { clearOtpFlow, readOtpFlow, saveOtpFlow } from "@/lib/client/otp-flow";
+import { STORAGE_BLOCKED_MESSAGE, changeNumberHref } from "@/lib/client/otp-start";
+import { maskPhoneForDisplay } from "@/lib/client/phone";
+import { useOtpFlow } from "@/lib/client/use-otp-flow";
 import { useNoma } from "@/lib/store";
+
+const CODE_LENGTH = 6;
+
+function countdown(resendAvailableAt: string, now: number): { seconds: number; label: string } {
+  const seconds = Math.max(0, Math.ceil((Date.parse(resendAvailableAt) - now) / 1000));
+  const label = `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+  return { seconds, label };
+}
 
 export default function Verification() {
   const router = useRouter();
-  const setRole = useNoma((s) => s.setRole);
   const showToast = useNoma((s) => s.showToast);
+  const flow = useOtpFlow();
   const [code, setCode] = useState("");
-  const [left, setLeft] = useState(28);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<"verify" | "resend" | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  // Sans parcours dans cet onglet (page ouverte directement, onglet rouvert) : retour à la saisie du numéro.
+  // La lecture se fait directement dans le stockage : la valeur rendue pendant l'hydratation est encore nulle.
+  useEffect(() => {
+    if (!readOtpFlow()) router.replace("/connexion");
+  }, [router]);
 
   useEffect(() => {
-    const t = setInterval(() => setLeft((l) => (l > 0 ? l - 1 : 0)), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
-  const push = (d: string) => setCode((c) => (c.length >= 5 ? c : c + d));
-  const pop = () => setCode((c) => c.slice(0, -1));
-
-  const verify = () => {
-    setRole("buyer");
-    showToast("Numéro vérifié · Bienvenue !");
-    router.push("/");
+  const push = (digit: string) => {
+    setError(null);
+    setCode((current) => (current.length >= CODE_LENGTH ? current : current + digit));
+  };
+  const pop = () => {
+    setError(null);
+    setCode((current) => current.slice(0, -1));
   };
 
-  const mmss = `00:${left.toString().padStart(2, "0")}`;
+  const verify = async () => {
+    if (!flow || pending || code.length !== CODE_LENGTH) return;
+    setPending("verify");
+    setError(null);
+    try {
+      await api.auth.verifyOtp(flow.challengeId, code);
+      clearOtpFlow();
+      showToast("Numéro vérifié · Bienvenue !");
+      router.replace(flow.next);
+    } catch (failure) {
+      setError(describeApiError(failure, "otp-verify"));
+      setCode("");
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const resend = async () => {
+    if (!flow || pending) return;
+    setPending("resend");
+    setError(null);
+    try {
+      const challenge = await api.auth.requestOtp(flow.phone);
+      if (!saveOtpFlow({ phone: flow.phone, ...challenge, next: flow.next })) {
+        // Le nouveau challenge n'a pas pu être conservé : le code reçu ne pourrait pas être vérifié.
+        setError(STORAGE_BLOCKED_MESSAGE);
+        return;
+      }
+      setCode("");
+      setNow(Date.now());
+      showToast("Nouveau code envoyé");
+    } catch (failure) {
+      setError(describeApiError(failure, "otp-request"));
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const changeNumber = () => {
+    // La destination est lue avant l'effacement du parcours : elle suit l'utilisateur jusqu'à /connexion?next=…
+    const href = changeNumberHref(flow);
+    clearOtpFlow();
+    router.push(href);
+  };
+
+  const wait = flow ? countdown(flow.resendAvailableAt, now) : null;
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -53,19 +119,22 @@ export default function Verification() {
           Vérifiez votre numéro
         </h1>
         <p className="mt-1 text-center text-[14px] text-ink-soft">
-          Code envoyé au +225 07 •• •••• 42
+          {flow ? `Code envoyé au ${maskPhoneForDisplay(flow.phone)}` : " "}
         </p>
         <div className="mt-2 text-center">
-          <button className="text-[13px] font-bold text-forest underline underline-offset-2">
+          <button
+            onClick={changeNumber}
+            className="text-[13px] font-bold text-forest underline underline-offset-2"
+          >
             Modifier le numéro
           </button>
         </div>
 
-        <div className="mt-6 flex justify-center gap-2.5">
-          {[0, 1, 2, 3, 4].map((i) => (
+        <div className="relative mt-6 flex justify-center gap-2">
+          {Array.from({ length: CODE_LENGTH }, (_, i) => (
             <div
               key={i}
-              className={`flex h-14 w-12 items-center justify-center rounded-xl border-2 bg-white font-display text-[24px] font-extrabold text-ink ${
+              className={`flex h-14 w-11 items-center justify-center rounded-xl border-2 bg-white font-display text-[24px] font-extrabold text-ink ${
                 code.length === i
                   ? "border-carrot"
                   : code.length > i
@@ -76,14 +145,50 @@ export default function Verification() {
               {code[i] ?? ""}
             </div>
           ))}
+          <input
+            value={code}
+            onChange={(event) => {
+              setError(null);
+              setCode(event.target.value.replace(/[^0-9]/g, "").slice(0, CODE_LENGTH));
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void verify();
+            }}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            aria-label="Code reçu par SMS, 6 chiffres"
+            maxLength={CODE_LENGTH}
+            className="absolute inset-0 w-full cursor-text opacity-0"
+          />
         </div>
 
-        <Btn onClick={verify} disabled={code.length < 5} className="mt-6 py-4">
-          Vérifier
+        {error ? (
+          <div role="alert" className="mt-3 text-center text-[13px] font-semibold text-carrot-ink">
+            {error}
+          </div>
+        ) : null}
+
+        <Btn
+          onClick={() => void verify()}
+          disabled={!flow || code.length !== CODE_LENGTH || pending !== null}
+          className="mt-6 py-4"
+        >
+          {pending === "verify" ? "Vérification…" : "Vérifier"}
         </Btn>
         <div className="mt-3 text-center text-[13px] text-ink-soft">
-          Renvoyer le code dans{" "}
-          <span className="font-bold text-ink">{mmss}</span>
+          {wait && wait.seconds > 0 ? (
+            <>
+              Renvoyer le code dans <span className="font-bold text-ink">{wait.label}</span>
+            </>
+          ) : (
+            <button
+              onClick={() => void resend()}
+              disabled={!flow || pending !== null}
+              className="font-bold text-forest underline underline-offset-2 disabled:opacity-40"
+            >
+              {pending === "resend" ? "Envoi…" : "Renvoyer le code"}
+            </button>
+          )}
         </div>
 
         <div className="mt-auto rounded-2xl bg-wash p-3">

@@ -16,6 +16,7 @@ import {
   Store,
 } from "lucide-react";
 import { LogoMark } from "@/components/logo";
+import { useLogout } from "@/components/session-gate";
 import {
   Avatar,
   Badge,
@@ -27,6 +28,7 @@ export default function MonCompte() {
   const router = useRouter();
   const setRole = useNoma((s) => s.setRole);
   const showToast = useNoma((s) => s.showToast);
+  const { logout, pending: loggingOut } = useLogout();
 
   const soon = () => showToast("Prototype : écran non maquetté");
 
@@ -104,11 +106,12 @@ export default function MonCompte() {
         </div>
 
         <button
-          onClick={() => router.push("/connexion")}
-          className="mt-4 flex w-full items-center justify-center gap-2 py-2 text-[14px] font-bold text-ink-soft transition hover:text-ink"
+          onClick={() => void logout()}
+          disabled={loggingOut}
+          className="mt-4 flex w-full items-center justify-center gap-2 py-2 text-[14px] font-bold text-ink-soft transition hover:text-ink disabled:opacity-40"
         >
           <LogOut className="size-4" />
-          Se déconnecter
+          {loggingOut ? "Déconnexion…" : "Se déconnecter"}
         </button>
       </div>
     </main>

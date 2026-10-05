@@ -1,13 +1,52 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Phone, Smartphone } from "lucide-react";
 import { LogoMark } from "@/components/logo";
 import { TopBar } from "@/components/top-bar";
 import { Btn } from "@/components/ui";
+import { api, describeApiError } from "@/lib/client/api";
+import { isOtpFlowStorageAvailable, saveOtpFlow } from "@/lib/client/otp-flow";
+import { startOtpFlow } from "@/lib/client/otp-start";
+import { COUNTRY_PREFIX, toCanonicalPhone } from "@/lib/client/phone";
+import { safeNextPath } from "@/lib/client/session";
 
-export default function Connexion() {
+const INVALID_PHONE_MESSAGE =
+  "Numéro invalide. Saisissez les 10 chiffres de votre numéro, par exemple 07 00 00 00 42.";
+
+function ConnexionScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Chemin interne uniquement : toute URL absolue ou « // » est ramenée à l'accueil.
+  const next = safeNextPath(searchParams.get("next"));
+  const [phoneInput, setPhoneInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  const submit = async () => {
+    if (pending) return;
+    const phone = toCanonicalPhone(phoneInput);
+    if (!phone) {
+      setError(INVALID_PHONE_MESSAGE);
+      return;
+    }
+    setPending(true);
+    setError(null);
+    try {
+      const result = await startOtpFlow(phone, next, {
+        canStore: () => isOtpFlowStorageAvailable(),
+        requestOtp: (value) => api.auth.requestOtp(value),
+        save: (flow) => saveOtpFlow(flow),
+        describeError: (failure) => describeApiError(failure, "otp-request"),
+      });
+      // Stockage bloqué : on reste ici avec un message fixe (aller sur /verification ramènerait à /connexion).
+      if (result.ok) router.push("/verification");
+      else setError(result.message);
+    } finally {
+      setPending(false);
+    }
+  };
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -40,28 +79,51 @@ export default function Connexion() {
         </p>
 
         <div className="relative mt-6 rounded-2xl border border-line bg-white p-4">
-          <div className="text-[14px] font-bold text-ink">
+          <label htmlFor="phone" className="text-[14px] font-bold text-ink">
             Numéro de téléphone
-          </div>
+          </label>
           <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-line bg-cream/50 px-3 py-3">
             <Smartphone className="size-5 text-ink-soft" strokeWidth={1.8} />
             <span className="flex items-center gap-1 border-r border-line pr-2 text-[15px] font-bold text-ink">
-              +225
+              {COUNTRY_PREFIX}
               <ChevronDown className="size-3.5 text-ink-soft" />
             </span>
             <input
-              defaultValue="07 00 00 00 42"
+              id="phone"
+              value={phoneInput}
+              onChange={(event) => {
+                setPhoneInput(event.target.value);
+                setError(null);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void submit();
+              }}
+              type="tel"
               inputMode="tel"
+              autoComplete="tel-national"
+              placeholder="07 00 00 00 42"
+              maxLength={24}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "phone-error" : undefined}
               className="w-full bg-transparent text-[15px] font-semibold text-ink"
             />
           </div>
           <div className="mt-2 text-[12px] text-ink-soft">
             Un code vous sera envoyé par SMS.
           </div>
+          {error ? (
+            <div id="phone-error" role="alert" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+              {error}
+            </div>
+          ) : null}
         </div>
 
-        <Btn onClick={() => router.push("/verification")} className="relative mt-5 py-4">
-          Recevoir un code
+        <Btn
+          onClick={() => void submit()}
+          disabled={pending || phoneInput.trim().length === 0}
+          className="relative mt-5 py-4"
+        >
+          {pending ? "Envoi du code…" : "Recevoir un code"}
           <Phone className="size-4" />
         </Btn>
 
@@ -81,5 +143,14 @@ export default function Connexion() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function Connexion() {
+  // useSearchParams exige une frontière Suspense pour que le reste de la page reste pré-rendu.
+  return (
+    <Suspense fallback={null}>
+      <ConnexionScreen />
+    </Suspense>
   );
 }

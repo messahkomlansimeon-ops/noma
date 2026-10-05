@@ -19,8 +19,38 @@ openssl rand -base64 32
 ```
 
 L'absence de secret ou de transport fait échouer `requestOtp` avant tout accès à
-la base. Le runtime actuel ne fournit volontairement aucun transport. Un futur
-adaptateur devra seulement implémenter `SendOtp` : noma génère et vérifie le code.
+la base. Le runtime ne fournit volontairement aucun transport de production. Un
+futur adaptateur devra seulement implémenter `SendOtp` : noma génère et vérifie
+le code. Seul le transport de développement ci-dessous existe.
+
+### Transport OTP de développement (console du serveur)
+
+`lib/server/auth/dev-otp-transport.ts` écrit le code sur la sortie du serveur,
+uniquement dans la combinaison exacte `NODE_ENV=development` **et**
+`NOMA_DEV_OTP_CONSOLE=1`. Une ligne fixe, rien d'autre (ni numéro complet, ni
+identifiant de challenge, ni IP) :
+
+```
+[auth:dev] code OTP pour +***********12 : 123456 (expire à 10:05:09 UTC)
+```
+
+Le numéro est masqué sauf ses deux derniers chiffres. Avec `NOMA_DEV_OTP_CONSOLE=1`
+et toute autre valeur de `NODE_ENV` (production comprise), le transport n'est
+jamais installé : la demande d'OTP échoue comme sans transport (`503`) et un
+avertissement fixe est journalisé une seule fois par processus. Il est branché
+uniquement dans les dépendances par défaut des gestionnaires HTTP
+(`defaultAuthHttpDependencies.resolveSendOtp`, résolu à chaque demande) ; un
+`sendOtp` injecté prime toujours, donc les tests existants sont inchangés.
+
+La demande d'OTP exige toujours les en-têtes du proxy de confiance
+(`X-Noma-Proxy-Secret`, `X-Forwarded-For`) : un navigateur qui parle directement à
+`next dev` reçoit `503`. En développement il faut donc un proxy qui les ajoute
+(les scripts `e2e:core` et `e2e:ui` jouent ce rôle, voir `ECRANS-E1A.md`).
+
+```shell
+export TEST_DATABASE_URL='postgresql://noma_local:noma_local_only@127.0.0.1:55432/noma_test'
+npm run test:auth-dev-otp
+```
 
 La couche HTTP requiert également :
 

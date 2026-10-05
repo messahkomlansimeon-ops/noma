@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Check, CircleCheck, CirclePlus, Phone, Plus, Store, X } from "lucide-react";
+import { Check, CircleCheck, CirclePlus, LogOut, Phone, Plus, Store, X } from "lucide-react";
+import { useLogout } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
 import { FieldLabel, Input, Switch } from "@/components/ui";
 import { useNoma } from "@/lib/store";
 
 export default function ProfilVendeur() {
   const showToast = useNoma((s) => s.showToast);
+  const { logout, pending: loggingOut } = useLogout();
   const [profil, setProfil] = useState("Professionnel");
   const [accept, setAccept] = useState(true);
   const categories = ["Téléphones", "Accessoires"];
@@ -146,6 +148,15 @@ export default function ProfilVendeur() {
           <Switch checked onChange={() => {}} />
           Vendeur vérifié par téléphone
         </div>
+
+        <button
+          onClick={() => void logout()}
+          disabled={loggingOut}
+          className="flex w-full items-center justify-center gap-2 py-2 text-[14px] font-bold text-ink-soft transition hover:text-ink disabled:opacity-40"
+        >
+          <LogOut className="size-4" />
+          {loggingOut ? "Déconnexion…" : "Se déconnecter"}
+        </button>
       </div>
     </main>
   );
