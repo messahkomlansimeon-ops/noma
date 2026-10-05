@@ -536,14 +536,14 @@ function compareByRelevance<T extends OfferRecord | DemandRecord>(a: RankedItem<
  * Boost (brief §15 : compatibles, puis pertinence, puis boost À L'INTÉRIEUR du classement). `organic` est la fenêtre
  * entière déjà triée par pertinence. Sont promouvables les éléments dont l'offre a un boost EFFECTIF à `at` et dont la
  * pertinence atteint le seuil des réglages de la catégorie de la demande ; au plus floor(part promue × N) sont promus,
- * placés aux positions k × ceil(1 / part). Aucune ligne n'est ajoutée ni retirée : seules des lignes confirmées et
- * fraîches (déjà dans `organic`) peuvent apparaître. Voir BOOST.md.
+ * à des positions k × ceil(1 / part), et un promu ne peut que MONTER (« sponsorisé » = a gagné des places). Aucune ligne
+ * n'est ajoutée ni retirée : seules des lignes confirmées et fraîches (déjà dans `organic`) peuvent apparaître.
+ * Voir BOOST.md.
  */
-async function applyBoost<TCandidate extends OfferRecord | DemandRecord>(
+async function computeBoostedOrder<TCandidate extends OfferRecord | DemandRecord>(
   client: SqlExecutor,
   input: { organic: Array<RankedItem<TCandidate>>; demand: DemandRecord; at: Date },
 ): Promise<Array<StoredMatchItem<TCandidate>>> {
-  if (input.organic.length === 0) return [];
   const boosted = await readEffectiveBoostedOfferIds(client, input.organic.map((entry) => entry.item.candidateId), toIsoMicros(input.at));
   if (boosted.size === 0) return input.organic.map((entry) => entry.item);
   const settings = await readBoostSettings(client, input.demand.category);
@@ -553,6 +553,30 @@ async function applyBoost<TCandidate extends OfferRecord | DemandRecord>(
     settings.maxPromotedShare,
   );
   return placed.map(({ item, promoted }) => (promoted ? { ...item.item, sponsored: true } : item.item));
+}
+
+/**
+ * Étape boost CLOISONNÉE : sous un SAVEPOINT de la transaction de lecture. Une panne du boost (réglages absents, table
+ * absente, toute erreur SQL) ne casse JAMAIS le classement : ROLLBACK TO SAVEPOINT, puis l'ordre organique avec
+ * `sponsored` faux partout. Les résultats organiques passent avant le revenu. Seul le code de l'erreur est journalisé
+ * côté serveur ; rien n'en est renvoyé au client.
+ */
+async function applyBoost<TCandidate extends OfferRecord | DemandRecord>(
+  client: SqlExecutor,
+  input: { organic: Array<RankedItem<TCandidate>>; demand: DemandRecord; at: Date },
+): Promise<Array<StoredMatchItem<TCandidate>>> {
+  if (input.organic.length === 0) return [];
+  await client.query("SAVEPOINT boost_step");
+  try {
+    const items = await computeBoostedOrder<TCandidate>(client, input);
+    await client.query("RELEASE SAVEPOINT boost_step");
+    return items;
+  } catch (error) {
+    await client.query("ROLLBACK TO SAVEPOINT boost_step");
+    const code = (error as { code?: unknown } | null)?.code;
+    console.error(`[matching] étape boost ignorée (${typeof code === "string" && /^[A-Za-z0-9_]{1,40}$/.test(code) ? code : "erreur"}) : classement organique servi.`);
+    return input.organic.map((entry) => entry.item);
+  }
 }
 
 /**

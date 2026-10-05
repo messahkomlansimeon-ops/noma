@@ -238,6 +238,47 @@ test("migration 0010 absente : code 2 (schema_not_ready), aucune lecture des tab
   assert.equal((await statusJson()).code, 0);
 });
 
+test("boost_settings_missing : sans ligne « default » → code 2 et message fixe ; ligne rétablie → 0 ; migration 0011 non enregistrée → pas d'avertissement", async () => {
+  await reset();
+  const defaults = (await pool.query("SELECT * FROM boost_settings WHERE key = 'default'")).rows[0];
+  assert.ok(defaults);
+  assert.deepEqual(warningCodes((await statusJson()).report), [], "base saine");
+  await pool.query("DELETE FROM boost_settings WHERE key = 'default'");
+  try {
+    const { code, report } = await statusJson();
+    assert.equal(code, 2);
+    assert.deepEqual(warningCodes(report), ["boost_settings_missing"]);
+    assert.match(report.warnings[0].message, /^Aucune ligne « default » dans boost_settings : le boost est inactif/);
+    const human = await statusScript();
+    assert.equal(human.code, 2);
+    assert.match(human.output, /boost_settings_missing : Aucune ligne « default »/);
+    // Une ligne de catégorie ne remplace pas la ligne « default ».
+    await pool.query("INSERT INTO boost_settings (key, slot_ratio, min_slots, max_slots, max_active_per_seller, max_seller_slot_share, max_promoted_share, min_relevance) VALUES ('smartphones', 0.15, 1, 50, 2, 0.34, 0.15, 60)");
+    assert.deepEqual(warningCodes((await statusJson()).report), ["boost_settings_missing"]);
+    await pool.query("DELETE FROM boost_settings WHERE key = 'smartphones'");
+
+    // Migration 0011 non enregistrée : la table n'est pas lue, aucun avertissement de boost.
+    const migration = (await pool.query("SELECT * FROM noma_schema_migrations WHERE version = '0011_offer_boosts'")).rows[0];
+    await pool.query("DELETE FROM noma_schema_migrations WHERE version = '0011_offer_boosts'");
+    try {
+      const bare = await statusJson();
+      assert.equal(bare.code, 0);
+      assert.deepEqual(bare.report.warnings, []);
+      assert.deepEqual(bare.report.migrations, { count: 10, latest: "0010_matching_job_leases" });
+    } finally {
+      await pool.query("INSERT INTO noma_schema_migrations (version, checksum) VALUES ($1, $2)", [migration.version, migration.checksum]);
+    }
+  } finally {
+    await pool.query(
+      `INSERT INTO boost_settings (key, slot_ratio, min_slots, max_slots, max_active_per_seller, max_seller_slot_share, max_promoted_share, min_relevance, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [defaults.key, defaults.slot_ratio, defaults.min_slots, defaults.max_slots, defaults.max_active_per_seller, defaults.max_seller_slot_share, defaults.max_promoted_share, defaults.min_relevance, defaults.updated_at]);
+  }
+  const healthy = await statusJson();
+  assert.equal(healthy.code, 0);
+  assert.deepEqual(healthy.report.warnings, []);
+});
+
 test("plusieurs avertissements simultanés : tous rapportés, code 2", async () => {
   await reset();
   await insertJob({ status: "dead_letter", lastError: "x" });

@@ -44,6 +44,7 @@ dernier job `completed`.
 | `oldest_pending_too_old` | un événement attend la projection depuis plus de 300 s | le worker ne tourne pas : lancer `dev:full` ou `matching:worker` |
 | `job_lease_expired` | un job `running` a un bail expiré | worker mort ou bloqué : le prochain cycle d'un worker vivant le reprend (ou le met en `dead_letter` si épuisé) ; lancer un worker |
 | `active_evaluation_expired` | des évaluations actives ont dépassé `expires_at` | le balayeur temporel ne tourne pas : lancer un worker (il les périme au cycle suivant) |
+| `boost_settings_missing` | la migration 0011 est enregistrée mais `boost_settings` n'a pas de ligne `default` | le boost est inactif (classement organique servi, `sponsored` faux) : réinsérer la ligne `default` (0.150 / 1 / 50 / 2 / 0.340 / 0.150 / 60.00, voir `BOOST.md`) |
 
 Les événements `ignored` d'un autre code que `job_integrity_conflict` sont comptés mais n'avertissent pas. Si le
 schéma n'est pas prêt, seules les informations de schéma sont rapportées (les tables de matching peuvent manquer).

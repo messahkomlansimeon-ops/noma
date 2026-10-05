@@ -89,83 +89,122 @@ test("computeMaxPromoted et computePromotionStep : entiers exacts (part 0,15 →
 });
 
 const labels = (count: number): string[] => Array.from({ length: count }, (_, index) => `item-${index}`);
+const indexOfLabel = (label: string) => Number(label.slice("item-".length));
 
-test("placeBoostedItems : promus aux positions 0, 7, 14, 21 ; les autres gardent leur ordre relatif ; aucun doublon", () => {
-  const organic = labels(30);
-  const promotable = new Set([5, 9, 12, 20, 25]);
-  const placed = placeBoostedItems(organic, (_, index) => promotable.has(index), 0.15);
-  assert.equal(placed.length, 30);
-  assert.equal(computeMaxPromoted(30, 0.15), 4);
-  // Quatre promus au plus : les quatre premiers promouvables dans l'ordre organique ; le cinquième (25) reste non promu.
-  const promotedPositions = placed.map((entry, position) => (entry.promoted ? position : -1)).filter((position) => position >= 0);
-  assert.deepEqual(promotedPositions, [0, 7, 14, 21]);
-  assert.deepEqual(promotedPositions.map((position) => placed[position].item), ["item-5", "item-9", "item-12", "item-20"]);
-  assert.equal(placed.find((entry) => entry.item === "item-25")!.promoted, false);
-  // Permutation exacte.
-  assert.deepEqual([...placed.map((entry) => entry.item)].sort(), [...organic].sort());
-  assert.equal(new Set(placed.map((entry) => entry.item)).size, 30);
-  // Ordre relatif des non-promus = ordre organique.
-  assert.deepEqual(placed.filter((entry) => !entry.promoted).map((entry) => entry.item), organic.filter((_, index) => ![5, 9, 12, 20].includes(index)));
+/** Ordre final sous forme d'indices organiques, et ensemble des promus. */
+function run(count: number, promotable: ReadonlySet<number>, share: number) {
+  const placed = placeBoostedItems(labels(count), (_, index) => promotable.has(index), share);
+  return { order: placed.map((entry) => indexOfLabel(entry.item)), promoted: new Set(placed.filter((entry) => entry.promoted).map((entry) => indexOfLabel(entry.item))) };
+}
+
+test("placeBoostedItems : le cas de l'audit (promouvables 3, 5, 8 sur 30, part 0,15) — calculé à la main", () => {
+  // maxPromus = floor(0,15 × 30) = 4, pas = 7.
+  // p0 (promotion) : tête 0, premier promouvable 3 ≠ tête → 3 est placé en 0, promu. File : 0 1 2 4 5 6 7 8 9 …
+  // p1 à p6 (hors promotion) : on place la tête → 0 1 2 4 5 6. Le 5 est donc placé en 5, sa position organique : AUCUN avantage, non promu.
+  // p7 (promotion) : tête 7, premier promouvable restant 8 ≠ tête → 8 est placé en 7, promu (il gagne une place). File : 7 9 10 …
+  // p14 et p21 (promotion) : plus aucun promouvable → la tête, non promu. Le reste suit l'ordre organique.
+  const result = run(30, new Set([3, 5, 8]), 0.15);
+  const expected = [3, 0, 1, 2, 4, 5, 6, 8, 7, ...Array.from({ length: 21 }, (_, index) => 9 + index)];
+  assert.deepEqual(result.order, expected);
+  assert.deepEqual([...result.promoted].sort((a, b) => a - b), [3, 8]);
+  assert.equal(result.order.indexOf(3), 0);
+  assert.equal(result.order.indexOf(5), 5, "5 reste à sa place organique (l'ancien placement le descendait en 7)");
+  assert.equal(result.order.indexOf(8), 7, "8 monte de 8 à 7 (l'ancien placement le descendait en 14)");
 });
 
-test("placeBoostedItems : aucun promouvable → ordre inchangé ; moins de 7 éléments → aucun promu ; liste vide", () => {
-  const organic = labels(12);
-  assert.deepEqual(placeBoostedItems(organic, () => false, 0.15).map((entry) => [entry.item, entry.promoted]), organic.map((item) => [item, false]));
-  const six = labels(6);
-  assert.equal(computeMaxPromoted(6, 0.15), 0);
-  assert.ok(placeBoostedItems(six, () => true, 0.15).every((entry) => !entry.promoted));
-  assert.deepEqual(placeBoostedItems(six, () => true, 0.15).map((entry) => entry.item), six);
+test("placeBoostedItems : exemples calculés à la main (tête déjà promouvable, quota, petites listes)", () => {
+  // Le premier promouvable est déjà en tête : rien à gagner, rien de promu, quota intact. p7 : tête 7, promouvable 9 → promu en 7.
+  const headAlready = run(30, new Set([0, 9]), 0.15);
+  assert.deepEqual(headAlready.order, [0, 1, 2, 3, 4, 5, 6, 9, 7, 8, ...Array.from({ length: 20 }, (_, index) => 10 + index)]);
+  assert.deepEqual([...headAlready.promoted], [9]);
+  // Tous promouvables : le premier promouvable est toujours la tête → personne n'est promu, ordre organique.
+  const all = run(30, new Set(Array.from({ length: 30 }, (_, index) => index)), 0.15);
+  assert.deepEqual(all.order, Array.from({ length: 30 }, (_, index) => index));
+  assert.equal(all.promoted.size, 0);
+  // N = 7 : maxPromus = 1, un seul créneau (p0).
+  assert.deepEqual(run(7, new Set([6]), 0.15).order, [6, 0, 1, 2, 3, 4, 5]);
+  // N = 6 : maxPromus = 0.
+  assert.deepEqual(run(6, new Set([5]), 0.15).order, [0, 1, 2, 3, 4, 5]);
+  // N = 20, promouvables 10 à 14 : maxPromus = 3. p0 : 10 promu ; p7 : 11 promu ; p12 et p13 prennent 12 et 13 (hors promotion) ;
+  // p14 : le premier promouvable restant, 14, est la tête → pas de promotion, le quota (3) n'est pas consommé.
+  const quota = run(20, new Set([10, 11, 12, 13, 14]), 0.15);
+  assert.deepEqual(quota.order, [10, 0, 1, 2, 3, 4, 5, 11, 6, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19]);
+  assert.deepEqual([...quota.promoted].sort((a, b) => a - b), [10, 11]);
+  // Le quota n'est consommé QUE par une vraie montée : N = 13 → maxPromus = 1. p0 : le promouvable 0 est la tête, aucun avantage, quota intact ;
+  // p7 : tête 7, promouvable 12 → 12 monte en 7 (avec un quota consommé à tort en p0, 12 resterait en 12).
+  const quotaKept = run(13, new Set([0, 12]), 0.15);
+  assert.deepEqual(quotaKept.order, [0, 1, 2, 3, 4, 5, 6, 12, 7, 8, 9, 10, 11]);
+  assert.deepEqual([...quotaKept.promoted], [12]);
+  // Aucun promouvable, liste vide.
+  assert.deepEqual(run(12, new Set(), 0.15).order, Array.from({ length: 12 }, (_, index) => index));
   assert.deepEqual(placeBoostedItems([], () => true, 0.15), []);
-  // 7 éléments : un promu, en position 0.
-  const seven = labels(7);
-  const placed = placeBoostedItems(seven, (_, index) => index === 4 || index === 6, 0.15);
-  assert.deepEqual(placed.map((entry) => entry.item), ["item-4", "item-0", "item-1", "item-2", "item-3", "item-5", "item-6"]);
-  assert.deepEqual(placed.map((entry) => entry.promoted), [true, false, false, false, false, false, false]);
+  // Plusieurs promus qui montent réellement : quota atteint (N = 30, maxPromus = 4, promouvables lointains).
+  const far = run(30, new Set([25, 26, 27, 28, 29]), 0.15);
+  assert.deepEqual(far.order.slice(0, 22), [25, 0, 1, 2, 3, 4, 5, 26, 6, 7, 8, 9, 10, 11, 27, 12, 13, 14, 15, 16, 17, 28]);
+  assert.equal(far.order[21], 28);
+  assert.deepEqual([...far.promoted].sort((a, b) => a - b), [25, 26, 27, 28]);
 });
 
-test("placeBoostedItems : un promu déjà bien classé est promu aussi (même place), un promouvable au-delà du maximum ne l'est pas", () => {
-  const organic = labels(20);
-  const placed = placeBoostedItems(organic, (_, index) => index < 6, 0.15); // N = 20 → 3 promus, positions 0, 7, 14
-  assert.deepEqual(placed.map((entry, position) => (entry.promoted ? position : -1)).filter((position) => position >= 0), [0, 7, 14]);
-  assert.deepEqual([0, 7, 14].map((position) => placed[position].item), ["item-0", "item-1", "item-2"]);
-  assert.deepEqual(placed.filter((entry) => !entry.promoted).map((entry) => entry.item), organic.filter((_, index) => index >= 3));
+/** Pas et plafond recalculés SANS les fonctions du module (entiers, centièmes). */
+const independent = (count: number, hundredths: number) => ({
+  step: Math.ceil(100 / hundredths),
+  maxPromoted: Math.floor((hundredths * count) / 100),
 });
 
-test("placeBoostedItems : les positions doivent tenir dans la liste (part 0,19 sur 100 éléments : 17 promus, pas 19)", () => {
-  const organic = labels(100);
-  assert.equal(computeMaxPromoted(100, 0.19), 19);
-  assert.equal(computePromotionStep(0.19), 6);
-  const placed = placeBoostedItems(organic, () => true, 0.19);
-  const positions = placed.map((entry, position) => (entry.promoted ? position : -1)).filter((position) => position >= 0);
-  assert.equal(positions.length, 17, "ceil(100 / 6) = 17 positions disponibles");
-  assert.deepEqual(positions, Array.from({ length: 17 }, (_, rank) => rank * 6));
-  assert.equal(new Set(placed.map((entry) => entry.item)).size, 100);
-});
-
-test("placeBoostedItems : propriétés sur 300 cas pseudo-aléatoires (permutation, plafond, positions, ordre relatif, déterminisme)", () => {
-  let seed = 123_456_789;
-  const next = () => { seed = (seed * 1_103_515_245 + 12_345) & 0x7fffffff; return seed / 0x7fffffff; };
-  for (let run = 0; run < 300; run++) {
-    const count = Math.floor(next() * 120);
-    const share = [0.05, 0.1, 0.125, 0.15, 0.17, 0.2][Math.floor(next() * 6)];
-    const organic = labels(count);
-    const flags = organic.map(() => next() < 0.4);
-    const placed = placeBoostedItems(organic, (_, index) => flags[index], share);
-    const again = placeBoostedItems(organic, (_, index) => flags[index], share);
-    assert.deepEqual(placed, again, "déterminisme");
-    assert.equal(placed.length, count);
-    assert.equal(new Set(placed.map((entry) => entry.item)).size, count, "aucun doublon");
-    const promoted = placed.filter((entry) => entry.promoted);
-    assert.ok(promoted.length <= computeMaxPromoted(count, share), `plafond (N=${count}, part=${share})`);
-    const step = computePromotionStep(share);
-    placed.forEach((entry, position) => { if (entry.promoted) assert.equal(position % step, 0, "positions k × pas"); });
-    // Seuls les promouvables sont promus, et ce sont les premiers dans l'ordre organique.
-    const promouvables = organic.filter((_, index) => flags[index]);
-    assert.deepEqual(promoted.map((entry) => entry.item), promouvables.slice(0, promoted.length));
-    const promotedSet = new Set(promoted.map((entry) => entry.item));
-    assert.deepEqual(placed.filter((entry) => !entry.promoted).map((entry) => entry.item), organic.filter((item) => !promotedSet.has(item)));
-    // Promus consécutifs : positions 0, step, 2 × step, … sans trou.
-    const positions = placed.map((entry, position) => (entry.promoted ? position : -1)).filter((position) => position >= 0);
-    assert.deepEqual(positions, positions.map((_, rank) => rank * step));
+function checkInvariants(count: number, promotable: ReadonlySet<number>, hundredths: number): void {
+  const share = hundredths / 100;
+  const { order, promoted } = run(count, promotable, share);
+  const context = `N=${count} part=${share} promouvables=${[...promotable].join(",")}`;
+  const { step, maxPromoted } = independent(count, hundredths);
+  // (f) permutation exacte : aucun doublon, aucun ajout, aucun retrait.
+  assert.equal(order.length, count, context);
+  assert.deepEqual([...order].sort((a, b) => a - b), Array.from({ length: count }, (_, index) => index), context);
+  const finalOf = new Map(order.map((organicIndex, position) => [organicIndex, position]));
+  // (a) un promu monte strictement ; (b) promu ⇔ position finale < position organique.
+  for (let organicIndex = 0; organicIndex < count; organicIndex += 1) {
+    const final = finalOf.get(organicIndex)!;
+    if (promoted.has(organicIndex)) assert.ok(final < organicIndex, `(a) ${organicIndex} → ${final} ; ${context}`);
+    assert.equal(promoted.has(organicIndex), final < organicIndex, `(b) ${organicIndex} → ${final} ; ${context}`);
+    if (promoted.has(organicIndex)) assert.ok(promotable.has(organicIndex), `promu non promouvable ; ${context}`);
   }
+  // (c) plafond, positions k × pas.
+  assert.ok(promoted.size <= maxPromoted, `(c) ${promoted.size} > ${maxPromoted} ; ${context}`);
+  for (const organicIndex of promoted) assert.equal(finalOf.get(organicIndex)! % step, 0, `(c) position ; ${context}`);
+  // (d) ordre relatif des non-promus = ordre organique.
+  const others = order.filter((organicIndex) => !promoted.has(organicIndex));
+  assert.deepEqual(others, [...others].sort((a, b) => a - b), `(d) ; ${context}`);
+  // (e) chaque non-promu descend d'au plus le nombre de promus placés devant lui.
+  const promotedPositions = [...promoted].map((organicIndex) => finalOf.get(organicIndex)!);
+  for (const organicIndex of others) {
+    const final = finalOf.get(organicIndex)!;
+    const ahead = promotedPositions.filter((position) => position < final).length;
+    assert.ok(final - organicIndex <= ahead, `(e) ${organicIndex} → ${final}, ${ahead} promus devant ; ${context}`);
+  }
+  // Déterminisme.
+  assert.deepEqual(run(count, promotable, share).order, order, context);
+}
+
+test("placeBoostedItems : invariants (a) à (f) sur la grille exhaustive des parts 0,05 à 0,20 et N de 0 à 60 (≥ 5 000 cas reproductibles)", () => {
+  let seed = 20_261_005;
+  const random = () => { seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0; return seed / 0x1_0000_0000; };
+  let cases = 0;
+  for (let hundredths = 5; hundredths <= 20; hundredths += 1) {
+    for (let count = 0; count <= 60; count += 1) {
+      const sets: Array<Set<number>> = [new Set(), new Set(Array.from({ length: count }, (_, index) => index)), new Set(Array.from({ length: count }, (_, index) => index).filter((index) => index >= count - 5))];
+      for (const density of [0.1, 0.3, 0.5, 0.8]) sets.push(new Set(Array.from({ length: count }, (_, index) => index).filter(() => random() < density)));
+      for (let extra = 0; extra < 2; extra += 1) sets.push(new Set(Array.from({ length: count }, (_, index) => index).filter(() => random() < 0.2)));
+      for (const promotable of sets) { checkInvariants(count, promotable, hundredths); cases += 1; }
+    }
+  }
+  assert.ok(cases >= 5_000, `${cases} cas`);
+});
+
+test("placeBoostedItems : au moins un promu monte réellement quand c'est possible (le boost n'est pas inerte)", () => {
+  // Part 0,15, N = 30, un promouvable lointain : il passe en tête.
+  assert.equal(run(30, new Set([20]), 0.15).order[0], 20);
+  // Part 0,2 : promus aux positions 0 et 5 (promouvables lointains).
+  const result = run(20, new Set([15, 16]), 0.2);
+  assert.equal(result.order[0], 15);
+  assert.equal(result.order[5], 16);
+  assert.equal(result.promoted.size, 2);
 });

@@ -118,10 +118,26 @@ Dans `stored-matches`, `sort=relevance`, **sens demande uniquement**, après le 
    toujours éligible, clé produit actuelle de l'offre égale au périmètre du boost) **et** dont la pertinence est `>=`
    `min_relevance` des réglages de la catégorie de la demande ;
 2. `maxPromus = floor(max_promoted_share × N)`, `N` = nombre d'éléments de la fenêtre (au plus 200) ;
-3. les promus sont les premiers promouvables dans l'ordre organique (donc par pertinence décroissante, puis ordre organique),
-   dans la limite de `maxPromus`, **placés aux positions k × ceil(1 / max_promoted_share)**, k = 0, 1, … (avec 0,15 : 0, 7, 14, …).
-   Une position hors de la liste n'est pas utilisée (le nombre de promus est aussi borné par le nombre de positions) ;
-4. les autres éléments gardent leur ordre organique relatif ; aucun élément n'est ajouté, retiré ni dupliqué.
+3. **placement avec plancher** : on parcourt les positions finales p = 0 … N−1 avec la file des éléments non encore placés
+   (ordre organique). À une **position de promotion** (p multiple de `ceil(1 / max_promoted_share)` : 0, 7, 14, … avec 0,15)
+   tant que `maxPromus` n'est pas atteint, soit `h` la tête de la file et `x` le premier élément promouvable de la file :
+   - si `x` existe **et x ≠ h** : `x` est placé en p et **promu** (il monte strictement, le quota est consommé) ;
+   - sinon `h` est placé, **non promu** : aucun avantage, aucun quota consommé ;
+   à toute autre position, on place la tête, non promue ;
+4. aucun élément n'est ajouté, retiré ni dupliqué ; les non-promus gardent leur ordre organique relatif.
+
+**Le boost ne peut qu'améliorer la position d'une offre promue.** Un promu ne descend jamais ; « sponsorisé » signifie « a
+gagné des places grâce au boost » (`sponsored` ⇔ position finale < position organique). Un élément boosté qui atteint sa
+place avant une position de promotion, ou qui est déjà en tête, n'est pas sponsorisé : il n'a rien gagné. Un non-promu
+descend d'au plus le nombre de promus placés devant lui.
+
+**Exemple chiffré** (N = 30, part 0,15 → `maxPromus` = 4, pas = 7 ; classement organique 0, 1, 2, …, 29 ; promouvables 3, 5 et 8) :
+- p0 : tête 0, premier promouvable 3 ≠ tête → **3 passe en 0** (promu). File : 0 1 2 4 5 6 7 8 9 …
+- p1 à p6 : on place la tête → 0 1 2 4 5 6. L'élément 5 est placé en 5, sa place organique : **aucun avantage, non sponsorisé**.
+- p7 : tête 7, premier promouvable restant 8 ≠ tête → **8 passe en 7** (promu). File : 7 9 10 …
+- p14 et p21 : plus aucun promouvable → la tête. Résultat : 3, 0, 1, 2, 4, 5, 6, **8**, 7, 9, 10, … 29 ; sponsorisés : 3 et 8.
+  (L'ancien placement strict aux positions k × 7 donnait 3 → 0, 5 → 7 et 8 → 14 : deux offres payantes descendaient, tout en
+  étant marquées sponsorisées.)
 
 **§15, garanti par construction** : le boost ne s'applique qu'à des éléments **déjà présents** dans la fenêtre, c'est-à-dire des
 correspondances confirmées et fraîches (compatibles, éligibles, non périmées). Un boost sur une offre non confirmée,
@@ -134,8 +150,8 @@ ou dont la clé produit a changé depuis l'attribution.
 
 ## Transparence : `sponsored`
 
-Chaque item `stored-matches` porte `sponsored: boolean` : **vrai uniquement pour un élément promu**, faux partout ailleurs (tri
-par score, tri par défaut, sens offre, éléments non promus, y compris une offre boostée non promue). Le DTO n'expose **jamais**
+Chaque item `stored-matches` porte `sponsored: boolean` : **vrai uniquement pour un élément promu, c'est-à-dire qui a gagné des places**, faux partout ailleurs (tri
+par score, tri par défaut, sens offre, éléments non promus, y compris une offre boostée qui n'a rien gagné). Le DTO n'expose **jamais**
 l'identifiant du boost, ses dates, sa durée, sa source ni le vendeur (vérifié sur la réponse HTTP brute). `contractVersion` ne
 change pas (ajout rétrocompatible d'un champ).
 
@@ -150,10 +166,25 @@ page, bornée à la base : voir `MATCHING-RELEVANCE.md`). Conséquences, testée
   l'horloge est figée. De même, une attribution de boost peut modifier l'ordre entre deux parcours différents. L'ordre des pages
   suivantes est recalculé (la liste des correspondances elle-même est déjà relue à chaque page : limite héritée de 2H1).
 
+## Panne du boost : jamais une panne du classement
+
+Les résultats organiques passent avant le revenu (§15). L'étape boost de `stored-matches` s'exécute sous un **SAVEPOINT** dans
+la transaction de lecture. En cas de réglages absents (`boost_settings_missing`, aucune ligne `default`) ou de **toute**
+erreur de l'étape (par exemple `42P01` si la migration 0011 est absente, délai, erreur SQL), la lecture fait
+`ROLLBACK TO SAVEPOINT` et renvoie la liste complète en **ordre organique, `sponsored` faux partout** ; la transaction reste
+utilisable (`processing` et `readAt` sont présents, le `COMMIT` reste un `COMMIT`). Rien n'est renvoyé au client : la réponse
+garde exactement la même forme, sans message d'erreur. Côté serveur, seul le **code** de l'erreur est journalisé
+(`[matching] étape boost ignorée (<code>)`), jamais un message brut. Sans boost effectif parmi les éléments de la fenêtre, les
+réglages ne sont pas lus (pas de panne possible, pas de journal).
+
+**Avertissement `matching:status`** : `boost_settings_missing` signale l'absence de la ligne `default` de `boost_settings`
+(le boost est alors inactif, le classement organique est servi). Il n'est émis que si la migration 0011 est enregistrée ; le
+code de sortie vaut alors 2. Remède : réinsérer les réglages par défaut (valeurs de la migration 0011).
+
 ## Prérequis d'exploitation
 
-`sort=relevance` côté demande lit `boost_settings` et `offer_boosts` : **la migration 0011 doit être appliquée avant** de servir ce
-tri (sinon erreur SQL `42P01`, donc 503/500 sur cette route). Elle n'est volontairement pas appliquée à `noma_dev` par ce lot.
+`sort=relevance` côté demande lit `boost_settings` et `offer_boosts` ; sans la migration 0011, l'étape boost échoue en `42P01`
+et le classement organique est servi (voir « Panne du boost »). Appliquer la migration reste nécessaire pour activer le boost.
 `MATCHING_REQUIRED_MIGRATION` reste 0010 : le worker et le bootstrap n'utilisent pas le boost.
 
 ## Limites
@@ -164,9 +195,9 @@ tri (sinon erreur SQL `42P01`, donc 503/500 sur cette route). Elle n'est volonta
   places.
 - **Boost uniquement dans `stored-matches`, tri `relevance`, sens demande** : aucun boost dans `/api/search` ni dans les routes
   `/matches` en direct, ni dans le sens offre.
-- **Placement strict aux positions k × pas** : un promu dont le rang organique est meilleur que sa position cible est déplacé vers
-  cette position (par exemple un deuxième promu classé 4ᵉ organiquement est placé 8ᵉ). Règle appliquée telle que spécifiée ;
-  un plancher « jamais plus bas que son rang organique » serait une évolution à valider.
+- **Placement avec plancher** : un boost n'améliore la position d'une offre que s'il la fait monter ; une offre déjà bien
+  classée (ou qui atteint sa place avant la position de promotion suivante) n'est ni déplacée ni sponsorisée, et le quota
+  n'est pas consommé. Le nombre d'offres sponsorisées peut donc être inférieur à `floor(max_promoted_share × N)`.
 - Un boost échu garde le statut `active` en base jusqu'à la prochaine attribution ou annulation sur la même offre (aucun
   balayeur) ; il n'a aucun effet ni ne compte.
 - Pas d'index fonctionnel sur `lower(btrim(...))` : le comptage des offres d'un périmètre est proportionnel à la taille du

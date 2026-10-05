@@ -874,21 +874,31 @@ const boostOffer = (offer: OfferRecord, durationCode: "24h" | "3d" | "7d" = "24h
 const relevanceOrder = (demand: DemandRecord, extra: StoredMatchesQueryOptions = {}) =>
   listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 100, ...extra }, pool);
 
-/** Modèle de référence INDÉPENDANT de placeBoostedItems : boucles explicites, flottants avec tolérance. */
+/** Modèle de référence INDÉPENDANT de placeBoostedItems (règle du plancher) : file d'ids, flottants avec tolérance. */
 function referencePlacement(organic: string[], relevances: Map<string, number>, boosted: Set<string>, minRelevance: number, share: number) {
   const n = organic.length;
   const step = Math.ceil(1 / share - 1e-9);
   const maxPromoted = Math.floor(n * share + 1e-9);
-  const promoted = organic.filter((id) => boosted.has(id) && relevances.get(id)! >= minRelevance).slice(0, maxPromoted);
-  const order: Array<string | null> = new Array(n).fill(null);
-  promoted.forEach((id, rank) => { if (rank * step < n) order[rank * step] = id; });
-  const rest = organic.filter((id) => !promoted.includes(id));
-  let cursor = 0;
-  for (let position = 0; position < n; position++) if (order[position] === null) order[position] = rest[cursor++];
-  return { order: order as string[], promoted };
+  const queue = [...organic];
+  const order: string[] = [];
+  const promoted: string[] = [];
+  for (let position = 0; position < n; position++) {
+    let pick = queue[0];
+    if (position % step === 0 && promoted.length < maxPromoted) {
+      const candidate = queue.find((id) => boosted.has(id) && relevances.get(id)! >= minRelevance);
+      if (candidate !== undefined && candidate !== queue[0]) { pick = candidate; promoted.push(candidate); }
+    }
+    queue.splice(queue.indexOf(pick), 1);
+    order.push(pick);
+  }
+  return { order, promoted };
 }
 
-test("boost (vrai pipeline, 30 offres) : promus aux positions 0, 7, 14, 21, au plus floor(0,15 × N), seuil de pertinence, ordre relatif des autres, aucun doublon, pagination, déterminisme", async () => {
+/** Positions des éléments sponsorisés d'une page. */
+const sponsoredPositions = (page: { items: Array<{ sponsored: boolean }> }) =>
+  page.items.map((item, position) => (item.sponsored ? position : -1)).filter((position) => position >= 0);
+
+test("boost (vrai pipeline, 30 offres) : un promu ne descend jamais (sponsored ⇔ montée stricte), au plus floor(0,15 × N), seuil de pertinence, ordre relatif des autres, aucun doublon, pagination, déterminisme", async () => {
   await resetCatalog();
   const demand = await newDemand(buyer.userId, { budget: null });
   const patterns: Array<Partial<OfferOptions>> = [{ confirmedHoursAgo: 2 }, { confirmedHoursAgo: 100 }, { confirmedHoursAgo: null }, { availability: "reserved" }, { availability: null }];
@@ -903,14 +913,15 @@ test("boost (vrai pipeline, 30 offres) : promus aux positions 0, 7, 14, 21, au p
     assert.equal(organic.items.length, 30, "fenêtre réelle : 30 correspondances confirmées");
     assert.ok(organic.items.every((item) => item.sponsored === false), "aucun boost : personne n'est sponsorisé");
     const organicIds = ids(organic);
+    const organicPosition = new Map(organicIds.map((id, index) => [id, index]));
     const relevances = new Map(organic.items.map((item) => [item.candidateId, item.relevance]));
-    const threshold = organic.items[12].relevance;
+    // Seuil placé au rang 22 : les offres boostées classées 15 à 21 sont promouvables et bien en dessous de la tête.
+    const threshold = organic.items[22].relevance;
     const low = organicIds.map((id, index) => ({ id, index })).filter((entry) => relevances.get(entry.id)! < threshold);
-    assert.ok(low.length >= 4, "des offres sont sous le seuil de pertinence");
+    assert.ok(low.length >= 2, "des offres sont sous le seuil de pertinence");
     await tuneBoostSettings({ slot_ratio: 0.5, min_slots: 40, max_slots: 40, max_active_per_seller: 5, max_seller_slot_share: 1, min_relevance: threshold });
 
-    // Cinq offres au-dessus du seuil (organiques 1, 4, 6, 8, 10) et deux sous le seuil.
-    const highIndexes = [1, 4, 6, 8, 10];
+    const highIndexes = [15, 17, 19, 20, 21];
     const lowIndexes = [low[0].index, low[low.length - 1].index];
     const byId = new Map(offers.map((offer) => [offer.id, offer]));
     for (const index of [...highIndexes, ...lowIndexes]) await boostOffer(byId.get(organicIds[index])!);
@@ -919,29 +930,32 @@ test("boost (vrai pipeline, 30 offres) : promus aux positions 0, 7, 14, 21, au p
     const page = await relevanceOrder(demand);
     const expected = referencePlacement(organicIds, relevances, boosted, threshold, 0.15);
     assert.deepEqual(ids(page), expected.order, "ordre final = modèle de référence");
-    // Structure attendue : quatre promus (floor(0,15 × 30)), aux positions 0, 7, 14, 21, dans l'ordre de pertinence.
-    const sponsoredPositions = page.items.map((item, position) => (item.sponsored ? position : -1)).filter((position) => position >= 0);
-    assert.deepEqual(sponsoredPositions, [0, 7, 14, 21]);
-    assert.deepEqual(sponsoredPositions.map((position) => page.items[position].candidateId), highIndexes.slice(0, 4).map((index) => organicIds[index]));
-    const promotedRelevances = sponsoredPositions.map((position) => page.items[position].relevance);
-    assert.deepEqual(promotedRelevances, [...promotedRelevances].sort((a, b) => b - a), "promus par pertinence décroissante");
-    assert.ok(sponsoredPositions.length <= Math.floor(0.15 * 30), "§8 : au plus 15 % des annonces visibles");
-    // Le cinquième promouvable au-dessus du seuil dépasse le maximum : non sponsorisé, place organique.
-    const overflow = page.items.find((item) => item.candidateId === organicIds[highIndexes[4]])!;
-    assert.equal(overflow.sponsored, false);
-    // (b) Les offres sous le seuil n'ont AUCUN avantage : non sponsorisées, même rang relatif que dans le classement organique.
+    const promoted = page.items.filter((item) => item.sponsored).map((item) => item.candidateId);
+    assert.deepEqual(promoted, expected.promoted);
+    // À la main : p0 → 15 monte ; p7 → 17 monte ; p14 → 19 monte ; p15 à p20 consomment la tête, dont 20 et 21 (promouvables) qui
+    // atteignent leur place organique avant la position 21 : aucun avantage, donc non sponsorisés et quota non consommé.
+    assert.deepEqual(sponsoredPositions(page), [0, 7, 14], "trois promus qui montent réellement : positions k × 7");
+    assert.deepEqual(promoted, [15, 17, 19].map((index) => organicIds[index]));
+    assert.ok(sponsoredPositions(page).length <= Math.floor(0.15 * 30), "§8 : au plus 15 % des annonces visibles");
+    // Le plancher : sponsored ⇔ montée stricte ; aucun élément boosté ne descend ; un non-promu ne monte jamais.
+    page.items.forEach((item, position) => {
+      const before = organicPosition.get(item.candidateId)!;
+      assert.equal(item.sponsored, position < before, `sponsored ⇔ montée stricte (${before} → ${position})`);
+      if (boosted.has(item.candidateId)) assert.ok(position <= before, "un élément boosté ne descend jamais");
+    });
+    // Les promouvables 20 et 21 n'ont rien gagné : non sponsorisés. Les offres sous le seuil n'ont AUCUN avantage.
+    for (const index of [20, 21]) assert.equal(page.items.find((item) => item.candidateId === organicIds[index])!.sponsored, false);
     for (const entry of [low[0], low[low.length - 1]]) {
       const item = page.items.find((candidate) => candidate.candidateId === entry.id)!;
       assert.equal(item.sponsored, false, "sous min_relevance : jamais sponsorisée");
       assert.ok(item.relevance < threshold);
     }
-    // (d) L'ordre relatif des non-promus est celui du classement organique.
-    const promotedIds = new Set(page.items.filter((item) => item.sponsored).map((item) => item.candidateId));
+    // L'ordre relatif des non-promus est celui du classement organique ; aucun doublon, aucun ajout ni retrait.
+    const promotedIds = new Set(promoted);
     assert.deepEqual(ids(page).filter((id) => !promotedIds.has(id)), organicIds.filter((id) => !promotedIds.has(id)));
-    // (f) Aucun doublon, aucun ajout ni retrait.
     assert.equal(new Set(ids(page)).size, 30);
     assert.deepEqual([...ids(page)].sort(), [...organicIds].sort());
-    // La pertinence et le score de chaque élément sont ceux du classement organique : le boost n'y entre jamais.
+    // La pertinence, le score et les indicateurs sont ceux du classement organique : le boost n'y entre jamais.
     for (const item of page.items) {
       const before = organic.items.find((candidate) => candidate.candidateId === item.candidateId)!;
       assert.deepEqual({ relevance: item.relevance, score: item.score, indicators: item.indicators }, { relevance: before.relevance, score: before.score, indicators: before.indicators });
@@ -960,12 +974,14 @@ test("boost (vrai pipeline, 30 offres) : promus aux positions 0, 7, 14, 21, au p
     // Une attribution APRÈS `at` n'a aucun effet sur les pages suivantes du même parcours (starts_at > at)…
     const first = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7 }, pool);
     const secondBefore = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7, cursor: first.nextCursor! }, pool);
-    const latecomer = byId.get(organicIds[3])!;
+    const latecomer = byId.get(organicIds[16])!;
     await boostOffer(latecomer);
     const secondAfter = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7, cursor: first.nextCursor! }, pool);
     assert.deepEqual(ids(secondAfter), ids(secondBefore), "attribution postérieure à `at` : l'ordre du parcours en cours ne change pas");
-    // … mais une nouvelle première page en tient compte (organique 3 devient promouvable avant 4, 6, 8).
+    // … mais une nouvelle première page en tient compte (modèle de référence avec le nouveau boost).
+    const withLatecomer = referencePlacement(organicIds, relevances, new Set([...boosted, organicIds[16]]), threshold, 0.15);
     const fresh = await relevanceOrder(demand);
+    assert.deepEqual(ids(fresh), withLatecomer.order);
     assert.notDeepEqual(ids(fresh), ids(page));
     assert.ok(fresh.items.find((item) => item.candidateId === latecomer.id)!.sponsored);
     // L'annulation entre deux pages, elle, modifie les pages suivantes (limite documentée : le statut est celui de la lecture).
@@ -991,7 +1007,7 @@ test("boost : réglages de la catégorie de la demande (part promue, seuil) et s
     await roomyBoostSettings();
     const organic = await relevanceOrder(demand);
     const organicIds = ids(organic);
-    const target = organic.items[5];
+    const target = organic.items[10];
     const byId = new Map(offers.map((offer) => [offer.id, offer]));
     await boostOffer(byId.get(target.candidateId)!);
 
@@ -999,32 +1015,43 @@ test("boost : réglages de la catégorie de la demande (part promue, seuil) et s
       const page = await relevanceOrder(demand);
       return { position: ids(page).indexOf(target.candidateId), sponsored: page.items.find((item) => item.candidateId === target.candidateId)!.sponsored, page };
     };
-    // Seuil exact : pertinence == min_relevance → promu (>=) ; pertinence + 0,01 → aucun avantage, place organique.
+    // Seuil exact : pertinence == min_relevance → promu (>=), il monte de 10 à 0 ; pertinence + 0,01 → aucun avantage, place organique.
     await roomyBoostSettings({ min_relevance: target.relevance });
     const atThreshold = await placedAt();
     assert.deepEqual({ position: atThreshold.position, sponsored: atThreshold.sponsored }, { position: 0, sponsored: true }, "seuil atteint exactement");
     await roomyBoostSettings({ min_relevance: Math.round((target.relevance + 0.01) * 100) / 100 });
     const aboveThreshold = await placedAt();
-    assert.deepEqual({ position: aboveThreshold.position, sponsored: aboveThreshold.sponsored }, { position: 5, sponsored: false }, "sous le seuil : aucun avantage");
+    assert.deepEqual({ position: aboveThreshold.position, sponsored: aboveThreshold.sponsored }, { position: 10, sponsored: false }, "sous le seuil : aucun avantage");
     assert.deepEqual(ids(aboveThreshold.page), organicIds, "ordre strictement organique");
     await roomyBoostSettings({ min_relevance: 0 });
     assert.equal((await placedAt()).sponsored, true, "seuil 0");
     await roomyBoostSettings({ min_relevance: 100 });
     assert.equal((await placedAt()).sponsored, false, "seuil 100 : plus personne");
 
-    // Part promue : N = 20. 0,15 → 3 promus possibles mais un seul boost → 1 ; la position suit la part (pas de 5 avec 0,2).
-    for (const offer of [organic.items[2], organic.items[3], organic.items[4]]) await boostOffer(byId.get(offer.candidateId)!);
-    await roomyBoostSettings({ min_relevance: 0, max_promoted_share: 0.2 });
-    const wide = await relevanceOrder(demand);
-    assert.deepEqual(wide.items.map((item, position) => (item.sponsored ? position : -1)).filter((position) => position >= 0), [0, 5, 10, 15], "part 0,2 : floor(0,2 × 20) = 4 promus, pas de 5");
-    await roomyBoostSettings({ min_relevance: 0, max_promoted_share: 0.1 });
-    const narrow = await relevanceOrder(demand);
-    assert.deepEqual(narrow.items.map((item, position) => (item.sponsored ? position : -1)).filter((position) => position >= 0), [0, 10], "part 0,1 : floor(0,1 × 20) = 2 promus, pas de 10");
+    // Part promue et pas : la part des réglages fixe le plafond floor(part × 20) et le pas ceil(1 / part).
+    const extra = [13, 14, 15, 16].map((index) => organic.items[index]);
+    for (const item of extra) await boostOffer(byId.get(item.candidateId)!);
+    const boosted = new Set([target, ...extra].map((item) => item.candidateId));
+    const relevances = new Map(organic.items.map((item) => [item.candidateId, item.relevance]));
+    const byShare = async (share: number, key = "default") => {
+      await tuneBoostSettings({ slot_ratio: 0.5, min_slots: 40, max_slots: 40, max_active_per_seller: 5, max_seller_slot_share: 1, max_promoted_share: share, min_relevance: 0 }, key);
+      const page = await relevanceOrder(demand);
+      const expected = referencePlacement(organicIds, relevances, boosted, 0, share);
+      assert.deepEqual(ids(page), expected.order, `part ${share} : ordre = modèle de référence`);
+      assert.deepEqual(page.items.filter((item) => item.sponsored).map((item) => item.candidateId), expected.promoted);
+      for (const position of sponsoredPositions(page)) assert.equal(position % Math.ceil(1 / share - 1e-9), 0, `part ${share} : positions multiples du pas`);
+      assert.ok(sponsoredPositions(page).length <= Math.floor(20 * share + 1e-9), `part ${share} : plafond`);
+      return page;
+    };
+    const wide = await byShare(0.2);
+    assert.ok(sponsoredPositions(wide).length >= 2 && sponsoredPositions(wide).length <= 4, "part 0,2 : au plus 4 promus (floor(0,2 × 20)), positions multiples de 5");
+    const narrow = await byShare(0.1);
+    assert.ok(sponsoredPositions(narrow).length >= 1 && sponsoredPositions(narrow).length <= 2, "part 0,1 : au plus 2 promus (floor(0,1 × 20)), positions multiples de 10");
     // Surcharge par catégorie : la ligne « smartphones » l'emporte sur « default » pour une demande de cette catégorie.
-    await roomyBoostSettings({ min_relevance: 0, max_promoted_share: 0.2 });
-    await tuneBoostSettings({ slot_ratio: 0.5, min_slots: 40, max_slots: 40, max_active_per_seller: 5, max_seller_slot_share: 1, max_promoted_share: 0.05, min_relevance: 0 }, "smartphones");
-    const override = await relevanceOrder(demand);
-    assert.deepEqual(override.items.map((item, position) => (item.sponsored ? position : -1)).filter((position) => position >= 0), [0], "part 0,05 : floor(0,05 × 20) = 1 promu");
+    await tuneBoostSettings({ slot_ratio: 0.5, min_slots: 40, max_slots: 40, max_active_per_seller: 5, max_seller_slot_share: 1, max_promoted_share: 0.2, min_relevance: 0 });
+    const override = await byShare(0.05, "smartphones");
+    assert.equal(sponsoredPositions(override).length, 1, "part 0,05 : 1 promu (floor(0,05 × 20)), en position 0");
+    assert.deepEqual(sponsoredPositions(override), [0]);
   } finally {
     await resetBoostSettings();
   }
@@ -1149,7 +1176,7 @@ test("boost : le tri par score et le sens offre sont strictement inchangés (spo
     assert.ok(offerSenseBefore.relevance.items.length === 14 && byScoreBefore.items.length === 14);
 
     // Tous les vendeurs sont boostés, y compris l'offre du vendeur « seller » elle-même.
-    for (const offer of [...offers.slice(0, 4), own]) await boostOffer(offer);
+    for (const offer of [...offers.slice(8, 12), own]) await boostOffer(offer);
     const relevanceSponsored = (await relevanceOrder(demand)).items.filter((item) => item.sponsored).length;
     assert.equal(relevanceSponsored, 2, "le boost agit bien sur le tri par pertinence, sens demande");
 
@@ -1185,7 +1212,7 @@ test("boost HTTP : forme exacte avec sponsored (booléen), aucune fuite (identif
   }
   try {
     await roomyBoostSettings({ min_relevance: 0 });
-    const boostedOffers = [offers[3], offers[5]];
+    const boostedOffers = [offers[9], offers[11]];
     const boosts = [];
     for (const offer of boostedOffers) boosts.push((await boostOffer(offer, "7d")).boost);
     const call = async (query: string) => storedHandler("demand")(request(urlOf("demand", demand.id, "stored-matches", query), buyer.cookie), demand.id);
@@ -1228,6 +1255,123 @@ test("boost HTTP : forme exacte avec sponsored (booléen), aucune fuite (identif
       assert.equal(senseBody.items[0].sponsored, false);
       assert.deepEqual(Object.keys(senseBody.items[0]).sort(), Object.keys(body.items[0]).sort());
     }
+  } finally {
+    await resetBoostSettings();
+  }
+});
+
+// ═════════════ 2I1-bis : une panne du boost ne casse jamais le classement ═════════════
+
+/** Pool dont les connexions mémorisent la commande renvoyée par chaque COMMIT (un COMMIT d'une transaction avortée répond « ROLLBACK »). */
+function commitSpyPool(): { spy: Pool; commands: string[] } {
+  const commands: string[] = [];
+  const spy = Object.create(pool) as Pool;
+  spy.connect = (async () => {
+    const client = await pool.connect();
+    const original = client.query.bind(client) as (...args: unknown[]) => Promise<{ command?: string }>;
+    (client as unknown as { query: unknown }).query = async (...args: unknown[]) => {
+      const result = await original(...args);
+      if (args[0] === "COMMIT") commands.push(result.command ?? "?");
+      return result;
+    };
+    return client;
+  }) as never;
+  return { spy, commands };
+}
+
+/** Capture ce que l'étape boost journalise : seulement un code, jamais un message brut. */
+async function captureErrors<T>(run: () => Promise<T>): Promise<{ result: T; logged: string[] }> {
+  const original = console.error;
+  const logged: string[] = [];
+  console.error = (...args: unknown[]) => { logged.push(args.map(String).join(" ")); };
+  try { return { result: await run(), logged }; } finally { console.error = original; }
+}
+
+async function brokenBoostWorld() {
+  await resetCatalog();
+  const demand = await newDemand(buyer.userId, { budget: null });
+  const offers: OfferRecord[] = [];
+  for (let index = 0; index < 14; index++) {
+    const offer = await newOffer({ ownerId: await makeOwner({ verified: true, ageDays: 40 }), price: 100_000 + index * 677, confirmedHoursAgo: 1 });
+    offers.push(offer);
+    await insertEvaluation(offer, demand, { score: `${95 - index}.000000` });
+  }
+  await roomyBoostSettings({ min_relevance: 0 });
+  const organic = await relevanceOrder(demand);
+  assert.deepEqual(organic.items.filter((item) => item.sponsored), []);
+  await boostOffer(offers[10]);
+  const working = await relevanceOrder(demand);
+  assert.equal(working.items[0].candidateId, offers[10].id, "contrôle : le boost fonctionne quand rien n'est cassé");
+  assert.equal(working.items[0].sponsored, true);
+  return { demand, offers, organic };
+}
+
+async function assertOrganicFallback(demand: DemandRecord, organic: AnyPage, code: RegExp) {
+  const { spy, commands } = commitSpyPool();
+  const { result, logged } = await captureErrors(() => listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 100 }, spy));
+  assert.deepEqual(ids(result), ids(organic), "la liste complète, en ordre organique");
+  assert.equal(result.items.length, 14);
+  assert.ok(result.items.every((item) => item.sponsored === false), "sponsored faux partout");
+  assert.deepEqual(result.items.map((item) => item.relevance), organic.items.map((item) => item.relevance));
+  assert.equal(typeof result.processing, "boolean");
+  assert.ok(result.readAt instanceof Date && !Number.isNaN(result.readAt.getTime()));
+  assert.equal(result.truncated, false);
+  assert.deepEqual(commands, ["COMMIT"], "la transaction de lecture reste utilisable : son COMMIT n'est pas devenu un ROLLBACK");
+  assert.equal(logged.length, 1);
+  assert.match(logged[0], code);
+  assert.ok(!/boost_settings|offer_boosts|relation|SELECT/i.test(logged[0].replace(/boost_settings_missing/, "")), `journal sans message brut : ${logged[0]}`);
+  // Page suivante (curseur) : même repli.
+  const paged = await captureErrors(() => listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 5 }, pool));
+  assert.deepEqual(ids(paged.result), ids(organic).slice(0, 5));
+  const next = await captureErrors(() => listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 5, cursor: paged.result.nextCursor! }, pool));
+  assert.deepEqual(ids(next.result), ids(organic).slice(5, 10));
+  assert.ok([...paged.result.items, ...next.result.items].every((item) => item.sponsored === false));
+}
+
+test("panne du boost : boost_settings vidé avec un boost effectif → liste complète en ordre organique, sponsored faux, transaction intacte", async () => {
+  const { demand, organic } = await brokenBoostWorld();
+  try {
+    await pool.query("DELETE FROM boost_settings");
+    await assertOrganicFallback(demand, organic, /étape boost ignorée \(boost_settings_missing\)/);
+    // HTTP : la même forme, 200, aucun message brut.
+    const response = await storedHandler("demand")(request(urlOf("demand", demand.id, "stored-matches", "?sort=relevance&limit=100"), buyer.cookie), demand.id);
+    assert.equal(response.status, 200);
+    const text = await response.text();
+    const body = JSON.parse(text);
+    assert.equal(body.items.length, 14);
+    assert.ok(body.items.every((item: { sponsored: boolean }) => item.sponsored === false));
+    assert.deepEqual(Object.keys(body).sort(), ["contractVersion", "hasMore", "items", "limit", "nextCursor", "processing", "readAt", "source", "truncated"]);
+    assert.ok(!/boost|settings|error/i.test(text.replace(/"sponsored"/g, "")), "aucun message de panne dans la réponse");
+  } finally {
+    await resetBoostSettings();
+  }
+  assert.equal((await relevanceOrder(demand)).items[0].sponsored, true, "réglages rétablis : le boost refonctionne");
+});
+
+test("panne du boost : table offer_boosts absente (42P01 simulé par renommage) → même repli, transaction intacte", async () => {
+  const { demand, organic } = await brokenBoostWorld();
+  await pool.query("ALTER TABLE offer_boosts RENAME TO offer_boosts_gone");
+  try {
+    await assertOrganicFallback(demand, organic, /étape boost ignorée \(42P01\)/);
+  } finally {
+    await pool.query("ALTER TABLE offer_boosts_gone RENAME TO offer_boosts");
+    await resetBoostSettings();
+  }
+  assert.equal((await relevanceOrder(demand)).items[0].sponsored, true);
+});
+
+test("panne du boost : aucun boost effectif → aucune requête de réglages, aucun journal ; tri par score et sens offre jamais concernés", async () => {
+  await resetCatalog();
+  const demand = await newDemand(buyer.userId, { budget: null });
+  for (let index = 0; index < 8; index++) {
+    await insertEvaluation(await newOffer({ ownerId: await makeOwner(), price: 100_000 + index }), demand, { score: `${90 - index}.000000` });
+  }
+  try {
+    await pool.query("DELETE FROM boost_settings");
+    const { result, logged } = await captureErrors(() => relevanceOrder(demand));
+    assert.equal(result.items.length, 8);
+    assert.deepEqual(logged, [], "sans boost effectif, les réglages ne sont pas lus : pas de panne, pas de journal");
+    assert.ok((await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "score", limit: 100 }, pool)).items.every((item) => item.sponsored === false));
   } finally {
     await resetBoostSettings();
   }

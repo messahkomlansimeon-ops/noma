@@ -16,7 +16,8 @@ export type MatchingStatusWarningCode =
   | "integrity_quarantine_present"
   | "oldest_pending_too_old"
   | "job_lease_expired"
-  | "active_evaluation_expired";
+  | "active_evaluation_expired"
+  | "boost_settings_missing";
 
 /** Textes fixes : jamais de donnée de la base. */
 export const MATCHING_STATUS_WARNING_MESSAGES: Record<MatchingStatusWarningCode, string> = {
@@ -26,6 +27,7 @@ export const MATCHING_STATUS_WARNING_MESSAGES: Record<MatchingStatusWarningCode,
   oldest_pending_too_old: `Un événement attend la projection depuis plus de ${MATCHING_STATUS_PENDING_AGE_WARNING_SECONDS} s : le worker ne tourne probablement pas.`,
   job_lease_expired: "Des jobs running ont un bail expiré (worker mort ou bloqué).",
   active_evaluation_expired: "Des évaluations actives sont expirées : le balayeur temporel ne tourne pas.",
+  boost_settings_missing: "Aucune ligne « default » dans boost_settings : le boost est inactif (le classement organique est servi) ; réinsérez les réglages par défaut.",
 };
 
 export interface MatchingStatusWarning {
@@ -150,6 +152,12 @@ async function collect(client: PoolClient): Promise<MatchingStatusReport> {
   flag("oldest_pending_too_old", (report.outbox.oldestPending?.ageSeconds ?? 0) > MATCHING_STATUS_PENDING_AGE_WARNING_SECONDS);
   flag("job_lease_expired", report.jobs.runningWithExpiredLease > 0);
   flag("active_evaluation_expired", report.evaluations.activeExpired > 0);
+  // Réglages du boost : seulement si la migration 0011 est enregistrée (sinon la table n'existe pas encore).
+  const boostMigration = await client.query("SELECT 1 FROM noma_schema_migrations WHERE version = '0011_offer_boosts'");
+  if (boostMigration.rowCount === 1) {
+    const defaults = await client.query<{ n: number }>("SELECT count(*)::int AS n FROM boost_settings WHERE key = 'default'");
+    flag("boost_settings_missing", defaults.rows[0].n === 0);
+  }
   return report;
 }
 
