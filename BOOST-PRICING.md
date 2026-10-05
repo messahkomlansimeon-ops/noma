@@ -3,7 +3,8 @@
 Brief SCOUTR §18 et AUDIT-EVOLUTION-SCOUTR.md §6 « Cotation et achat » : un vendeur obtient une **cotation** (un prix daté,
 conservé pendant sa courte validité) pour le boost de son offre. **Ce lot n'a AUCUN paiement, crédit, solde, achat,
 acceptation de cotation ni réservation de place, et aucune route HTTP ni interface** (lot 2I3). Le comportement des lots 2I1 et
-2I1-bis (attribution, annulation, places, placement, classement) n'est pas modifié.
+2I1-bis (attribution, annulation, places, placement, classement) n'est pas modifié. **Depuis le lot 2I3, le vendeur obtient ces
+cotations par HTTP (`POST` et `GET /api/offers/{id}/boost-quotes`) : voir `BOOST-HTTP.md`.**
 
 Code : `lib/server/boost/pricing.ts` (fonctions pures), `lib/server/boost/quotes.ts` (comptages, cotation, historiques),
 `database/migrations/0012_boost_pricing.sql`, `scripts/boost-quote.ts`. Tests : `npm run test:boost-pricing` (pur),
@@ -119,8 +120,8 @@ Cotation disponible : `quote_validity_seconds` (900 s par défaut). Cotation ind
 
 ## Limites
 
-- **Aucun paiement, crédit, solde, achat, acceptation de cotation ni réservation de place**, aucune route HTTP ni interface
-  (lots suivants). Deux vendeurs peuvent détenir en même temps une cotation pour la dernière place : la disponibilité sera
+- **Aucun paiement, crédit, solde, achat, acceptation de cotation ni réservation de place**, aucune interface (les routes HTTP
+  du vendeur existent depuis le lot 2I3, voir `BOOST-HTTP.md` ; il n'y a toujours aucune route d'administration). Deux vendeurs peuvent détenir en même temps une cotation pour la dernière place : la disponibilité sera
   revérifiée à l'achat.
 - **Valeurs tarifaires provisoires**, à calibrer sur des usages réels.
 - **Aucun signal d'activité suspecte** : les acheteurs « uniques » sont des propriétaires de demandes distincts ; la déduplication
