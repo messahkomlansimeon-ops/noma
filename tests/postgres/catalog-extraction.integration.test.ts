@@ -87,6 +87,7 @@ if (!configuredUrl?.trim()) {
         "0010_matching_job_leases",
         "0011_offer_boosts",
         "0012_boost_pricing",
+        "0013_boost_exposures",
       ]);
     });
 

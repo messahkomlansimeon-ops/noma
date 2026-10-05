@@ -23,6 +23,7 @@ async function main(): Promise<void> {
       `${result.projected.selected} événement(s) lu(s), ` +
       `${result.maintenance.deadLettered} job(s) en dead_letter, ${result.jobs.length} job(s) exécuté(s).`,
     );
+    if (result.boost.expired > 0) console.log(`Matching worker : ${result.boost.expired} boost(s) échu(s) marqué(s) expiré(s).`);
     // Un code stable par ligne (jamais de message brut) ; une étape en échec donne le code de sortie 1.
     for (const code of result.errors) console.error(`Matching worker : ${code}`);
     if (result.errors.length > 0) process.exitCode = 1;

@@ -13,7 +13,8 @@ Code : `lib/server/boost/boosts.ts` (réglages, places, attribution, annulation,
 `lib/server/boost/boost-config.ts` (durées, source, espace du verrou), `lib/server/boost/placement.ts` (placement pur),
 `lib/server/matching/stored-matches.ts` (application), `database/migrations/0011_offer_boosts.sql`,
 `scripts/boost-grant.ts`. **Prix dynamique et cotations vendeur (lot 2I2) : `BOOST-PRICING.md`** (migration 0012, `pricing.ts`, `quotes.ts`,
-`npm run boost:quote`). **Routes HTTP des cotations du vendeur (lot 2I3) : `BOOST-HTTP.md`** (`lib/server/boost/http.ts`). Tests : `npm run test:boost` (pur + base) et `npm run test:matching-relevance` (invariants sur une
+`npm run boost:quote`). **Routes HTTP des cotations du vendeur (lot 2I3) : `BOOST-HTTP.md`** (`lib/server/boost/http.ts`). **Expiration
+automatique des boosts et journal d'exposition (lot 2I4) : `BOOST-METRICS.md`** (migration 0013, `exposures.ts`, `npm run boost:stats`). Tests : `npm run test:boost` (pur + base) et `npm run test:matching-relevance` (invariants sur une
 fenêtre réelle).
 
 ## Modèle
@@ -36,9 +37,10 @@ catégorie, marque ou modèle (ou dont l'un est blanc) n'est pas boostable** (`o
 
 ### Boost EFFECTIF
 `status = 'active' AND starts_at <= now < ends_at`, avec `now = clock_timestamp()` de la base. Pour le classement, `now` est `at`,
-l'horloge figée du curseur de pertinence (voir « Pagination »). Un boost échu garde `status = 'active'` jusqu'à la prochaine
-attribution sur la même offre (ou une annulation) : il n'est **jamais** effectif ni compté dans les places, quel que soit son
-statut enregistré.
+l'horloge figée du curseur de pertinence (voir « Pagination »). Un boost échu est marqué `expired` par l'**étape boost du worker**
+(`expireOfferBoosts`, à chaque cycle, voir « Expiration automatique ») ; jusqu'à ce marquage (ou, à défaut de worker, jusqu'à la
+prochaine attribution sur la même offre ou une annulation) il garde `status = 'active'`, mais il n'est **jamais** effectif ni compté
+dans les places, quel que soit son statut enregistré.
 
 ## Réglages (`boost_settings`)
 
@@ -162,9 +164,10 @@ Le décalage du curseur de pertinence s'applique à l'**ordre final** (boost com
 page, bornée à la base : voir `MATCHING-RELEVANCE.md`). Conséquences, testées :
 - une attribution postérieure à `at` n'a aucun effet sur les pages suivantes du même parcours (son `starts_at` est postérieur à
   `at`) ; une nouvelle première page en tient compte ;
-- une **annulation**, la suspension du vendeur, le passage de l'offre à un statut inéligible ou la modification de sa clé
-  produit **entre deux pages** peut modifier l'ordre des pages suivantes : le statut est lu à l'instantané de chaque page, seule
-  l'horloge est figée. De même, une attribution de boost peut modifier l'ordre entre deux parcours différents. L'ordre des pages
+- une **annulation**, **l'expiration marquée par le worker**, la suspension du vendeur, le passage de l'offre à un statut inéligible
+  ou la modification de sa clé produit **entre deux pages** peut modifier l'ordre des pages suivantes : le statut est lu à
+  l'instantané de chaque page, seule l'horloge est figée. Cas de l'expiration : un parcours commencé avant l'échéance d'un boost
+  garde ce boost tant qu'il est `active`, et le perd dès que le worker l'a marqué `expired` (testé, voir `BOOST-METRICS.md`). De même, une attribution de boost peut modifier l'ordre entre deux parcours différents. L'ordre des pages
   suivantes est recalculé (la liste des correspondances elle-même est déjà relue à chaque page : limite héritée de 2H1).
 
 ## Panne du boost : jamais une panne du classement
@@ -182,6 +185,15 @@ réglages ne sont pas lus (pas de panne possible, pas de journal).
 (le boost est alors inactif, le classement organique est servi). Il n'est émis que si la migration 0011 est enregistrée ; le
 code de sortie vaut alors 2. Remède : réinsérer les réglages par défaut (valeurs de la migration 0011).
 
+## Expiration automatique (lot 2I4)
+
+`expireOfferBoosts({ pool, limit })` (`boosts.ts`) marque `expired` les boosts `active` dont `ends_at <= maintenant`, en une requête
+(`limit` de 1 à 1000, 200 par défaut ; `FOR UPDATE SKIP LOCKED`). Elle ne touche ni les boosts annulés, déjà expirés ou futurs, ni
+`cancelled_at`. L'**étape boost** de `runMatchingCycle` l'exécute juste après l'étape temporelle, seulement si la migration
+0011 est enregistrée (sinon ignorée sans erreur) ; en cas d'erreur, `errors` reçoit `boost_error_<code>` et les étapes suivantes
+s'exécutent. `matching:status` avertit (`boost_expiry_overdue`, code de sortie 2) si un boost reste `active` plus de 10 minutes après son
+échéance, et rapporte `boosts.effective` et `boosts.overdue`. Détail et mesures d'exposition : `BOOST-METRICS.md`.
+
 ## Prérequis d'exploitation
 
 `sort=relevance` côté demande lit `boost_settings` et `offer_boosts` ; sans la migration 0011, l'étape boost échoue en `42P01`
@@ -190,7 +202,8 @@ et le classement organique est servi (voir « Panne du boost »). Appliquer la m
 
 ## Limites
 
-- **Aucun paiement, crédit, solde, achat ni réservation de place**, **aucune métrique d'efficacité**, **aucune interface** (le prix dynamique et
+- **Aucun paiement, crédit, solde, achat ni réservation de place**, **aucune métrique d'efficacité au-delà du journal d'apparitions servies**
+  (`BOOST-METRICS.md` : ni clic, ni contact, ni vente), **aucune interface** (le prix dynamique et
   les cotations vendeur existent depuis le lot 2I2, voir `BOOST-PRICING.md`, et leurs routes HTTP depuis le lot 2I3, voir
   `BOOST-HTTP.md` ; une cotation n'est ni un achat ni une réservation) :
   l'attribution n'est possible que par l'administration (`boost:grant`) ; les réglages se modifient en SQL.
@@ -201,8 +214,8 @@ et le classement organique est servi (voir « Panne du boost »). Appliquer la m
 - **Placement avec plancher** : un boost n'améliore la position d'une offre que s'il la fait monter ; une offre déjà bien
   classée (ou qui atteint sa place avant la position de promotion suivante) n'est ni déplacée ni sponsorisée, et le quota
   n'est pas consommé. Le nombre d'offres sponsorisées peut donc être inférieur à `floor(max_promoted_share × N)`.
-- Un boost échu garde le statut `active` en base jusqu'à la prochaine attribution ou annulation sur la même offre (aucun
-  balayeur) ; il n'a aucun effet ni ne compte.
+- Un boost échu garde le statut `active` en base jusqu'au prochain cycle du worker (qui le marque `expired`), ou, sans worker,
+  jusqu'à la prochaine attribution ou annulation sur la même offre ; il n'a aucun effet ni ne compte dans l'intervalle.
 - Pas d'index fonctionnel sur `lower(btrim(...))` : le comptage des offres d'un périmètre est proportionnel à la taille du
   catalogue (acceptable en développement, comme le marché 2H1).
 - Le périmètre d'un boost est figé à l'attribution : si l'offre change de produit, son boost n'a plus d'effet (mais occupe encore

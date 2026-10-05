@@ -6,7 +6,8 @@ import { CatalogValidationError } from "../catalog/errors";
 import { mapDemand, mapOffer, type DemandRow, type OfferRow } from "../catalog/shared";
 import type { DemandRecord, OfferRecord } from "../catalog/types";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
-import { readBoostSettings, readEffectiveBoostedOfferIds } from "../boost/boosts";
+import { readBoostSettings, readEffectiveBoostsByOffer } from "../boost/boosts";
+import { recordBoostExposures, type BoostExposureBatch, type BoostExposureRow } from "../boost/exposures";
 import { placeBoostedItems } from "../boost/placement";
 import { validateCandidateLimit } from "./candidates";
 import {
@@ -532,6 +533,12 @@ function compareByRelevance<T extends OfferRecord | DemandRecord>(a: RankedItem<
   return a.evaluationId < b.evaluationId ? 1 : a.evaluationId > b.evaluationId ? -1 : 0;
 }
 
+interface BoostedOrder<TCandidate extends OfferRecord | DemandRecord> {
+  items: Array<StoredMatchItem<TCandidate>>;
+  /** Une entrée par élément de la fenêtre dont l'offre a un boost effectif à `at`, sponsorisé ou non (position dans l'ordre FINAL complet). */
+  exposures: BoostExposureRow[];
+}
+
 /**
  * Boost (brief §15 : compatibles, puis pertinence, puis boost À L'INTÉRIEUR du classement). `organic` est la fenêtre
  * entière déjà triée par pertinence. Sont promouvables les éléments dont l'offre a un boost EFFECTIF à `at` et dont la
@@ -543,16 +550,27 @@ function compareByRelevance<T extends OfferRecord | DemandRecord>(a: RankedItem<
 async function computeBoostedOrder<TCandidate extends OfferRecord | DemandRecord>(
   client: SqlExecutor,
   input: { organic: Array<RankedItem<TCandidate>>; demand: DemandRecord; at: Date },
-): Promise<Array<StoredMatchItem<TCandidate>>> {
-  const boosted = await readEffectiveBoostedOfferIds(client, input.organic.map((entry) => entry.item.candidateId), toIsoMicros(input.at));
-  if (boosted.size === 0) return input.organic.map((entry) => entry.item);
+): Promise<BoostedOrder<TCandidate>> {
+  // Une SEULE lecture des boosts effectifs sert l'ordre servi ET le journal d'exposition : ils ne peuvent pas diverger.
+  const boosts = await readEffectiveBoostsByOffer(client, input.organic.map((entry) => entry.item.candidateId), toIsoMicros(input.at));
+  if (boosts.size === 0) return { items: input.organic.map((entry) => entry.item), exposures: [] };
   const settings = await readBoostSettings(client, input.demand.category);
   const placed = placeBoostedItems(
     input.organic,
-    (entry) => boosted.has(entry.item.candidateId) && entry.item.relevance >= settings.minRelevance,
+    (entry) => boosts.has(entry.item.candidateId) && entry.item.relevance >= settings.minRelevance,
     settings.maxPromotedShare,
   );
-  return placed.map(({ item, promoted }) => (promoted ? { ...item.item, sponsored: true } : item.item));
+  const organicPosition = new Map(input.organic.map((entry, index) => [entry.item.candidateId, index]));
+  const exposures: BoostExposureRow[] = [];
+  placed.forEach(({ item, promoted }, position) => {
+    const boostId = boosts.get(item.item.candidateId);
+    if (boostId === undefined) return;
+    exposures.push({
+      boostId, offerId: item.item.candidateId, position, sponsored: promoted,
+      gain: Math.max(0, (organicPosition.get(item.item.candidateId) ?? position) - position),
+    });
+  });
+  return { items: placed.map(({ item, promoted }) => (promoted ? { ...item.item, sponsored: true } : item.item)), exposures };
 }
 
 /**
@@ -564,18 +582,36 @@ async function computeBoostedOrder<TCandidate extends OfferRecord | DemandRecord
 async function applyBoost<TCandidate extends OfferRecord | DemandRecord>(
   client: SqlExecutor,
   input: { organic: Array<RankedItem<TCandidate>>; demand: DemandRecord; at: Date },
-): Promise<Array<StoredMatchItem<TCandidate>>> {
-  if (input.organic.length === 0) return [];
+): Promise<{ items: Array<StoredMatchItem<TCandidate>>; exposures: BoostExposureRow[] | null }> {
+  if (input.organic.length === 0) return { items: [], exposures: null };
   await client.query("SAVEPOINT boost_step");
   try {
-    const items = await computeBoostedOrder<TCandidate>(client, input);
+    const { items, exposures } = await computeBoostedOrder<TCandidate>(client, input);
     await client.query("RELEASE SAVEPOINT boost_step");
-    return items;
+    return { items, exposures };
   } catch (error) {
     await client.query("ROLLBACK TO SAVEPOINT boost_step");
-    const code = (error as { code?: unknown } | null)?.code;
-    console.error(`[matching] étape boost ignorée (${typeof code === "string" && /^[A-Za-z0-9_]{1,40}$/.test(code) ? code : "erreur"}) : classement organique servi.`);
-    return input.organic.map((entry) => entry.item);
+    console.error(`[matching] étape boost ignorée (${safeErrorCode(error)}) : classement organique servi.`);
+    // Repli organique : rien n'est journalisé (`exposures: null`).
+    return { items: input.organic.map((entry) => entry.item), exposures: null };
+  }
+}
+
+/** Code d'une erreur pour le journal serveur : jamais le message (il peut contenir hôte, requête ou identifiant). */
+function safeErrorCode(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" && /^[A-Za-z0-9_]{1,40}$/.test(code) ? code : "erreur";
+}
+
+/**
+ * Journal d'exposition (lot 2I4), APRÈS la transaction de lecture : transaction courte et séparée, plafonnée en durée. Toute erreur
+ * est attrapée et seul son code est journalisé : l'enregistrement ne change JAMAIS la réponse.
+ */
+async function journalBoostExposures(pool: Pool, batch: BoostExposureBatch): Promise<void> {
+  try {
+    await recordBoostExposures(pool, batch);
+  } catch (error) {
+    console.error(`[matching] journal d'exposition ignoré (${safeErrorCode(error)})`);
   }
 }
 
@@ -647,7 +683,10 @@ interface StoredReadInput<TSource extends OfferRecord | DemandRecord, TCandidate
 async function readStored<TSource extends OfferRecord | DemandRecord, TCandidate extends OfferRecord | DemandRecord, TRow extends OfferRow | DemandRow>(
   input: StoredReadInput<TSource, TCandidate, TRow>,
 ): Promise<StoredMatchesPage<TSource, TCandidate>> {
-  return withReadSnapshot(input.pool, async (client) => {
+  // Le journal d'exposition est écrit APRÈS la transaction de lecture (qui reste READ ONLY) : `exposure` n'est renseigné que par le tri
+  // par pertinence du sens demande quand l'étape boost a réussi et que la page contient des offres boostées.
+  let exposure = null as BoostExposureBatch | null;
+  const page = await withReadSnapshot(input.pool, async (client) => {
     const source = await input.loadSource(input.ownerId, input.sourceId, client);
     // Lu AVANT les lignes : readAt est l'horloge (« now ») des indicateurs.
     const { processing, readAt } = await readProcessing(client, input.sourceKind, input.sourceId, source.contentVersion);
@@ -666,11 +705,15 @@ async function readStored<TSource extends OfferRecord | DemandRecord, TCandidate
       });
       ranked.sort(compareByRelevance);
       // Boost : sens demande seulement (l'acheteur voit des offres). Le décalage s'applique à l'ordre FINAL, calculé à `at`.
-      const finalOrder = input.sourceKind === "demand"
+      const applied = input.sourceKind === "demand"
         ? await applyBoost<TCandidate>(client, { organic: ranked, demand: source as DemandRecord, at })
-        : ranked.map((entry) => entry.item);
+        : { items: ranked.map((entry) => entry.item), exposures: null };
+      const finalOrder = applied.items;
       const offset = input.relevanceCursor?.offset ?? 0;
       const items = finalOrder.slice(offset, offset + input.limit);
+      // Apparitions servies : les éléments boostés de la PAGE (tranche offset … offset + limit), pas de la fenêtre entière.
+      const served = (applied.exposures ?? []).filter((row) => row.position >= offset && row.position < offset + input.limit);
+      if (served.length > 0) exposure = { demandId: source.id, viewerId: source.ownerId, at: toIsoMicros(at), rows: served };
       const hasMore = offset + input.limit < finalOrder.length;
       const nextCursor = hasMore
         ? encodeRelevanceCursor({ v: 1, sort: "relevance", sourceKind: input.sourceKind, sourceId: input.sourceId, offset: offset + input.limit, at: toIsoMicros(at) })
@@ -693,6 +736,8 @@ async function readStored<TSource extends OfferRecord | DemandRecord, TCandidate
       : null;
     return { source: sourceView, items: ranked.map((entry) => entry.item), nextCursor, hasMore, limit: input.limit, truncated: false, processing, readAt };
   });
+  if (exposure) await journalBoostExposures(input.pool, exposure);
+  return page;
 }
 
 /**

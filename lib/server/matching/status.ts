@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Pool, type PoolClient } from "pg";
+import { BOOST_EXPIRY_OVERDUE_SECONDS } from "../boost/boost-config";
 import { JOB_INTEGRITY_CONFLICT_CODE } from "./projection";
 import { isMatchingSchemaReady } from "./schema-ready";
 
@@ -18,7 +19,8 @@ export type MatchingStatusWarningCode =
   | "job_lease_expired"
   | "active_evaluation_expired"
   | "boost_settings_missing"
-  | "boost_pricing_missing";
+  | "boost_pricing_missing"
+  | "boost_expiry_overdue";
 
 /** Textes fixes : jamais de donnée de la base. */
 export const MATCHING_STATUS_WARNING_MESSAGES: Record<MatchingStatusWarningCode, string> = {
@@ -30,6 +32,7 @@ export const MATCHING_STATUS_WARNING_MESSAGES: Record<MatchingStatusWarningCode,
   active_evaluation_expired: "Des évaluations actives sont expirées : le balayeur temporel ne tourne pas.",
   boost_settings_missing: "Aucune ligne « default » dans boost_settings : le boost est inactif (le classement organique est servi) ; réinsérez les réglages par défaut.",
   boost_pricing_missing: "Aucune ligne « default » dans boost_pricing_settings : les cotations de boost sont impossibles (boost_pricing_missing) ; insérez une version de la configuration tarifaire par défaut.",
+  boost_expiry_overdue: `Des boosts échus depuis plus de ${BOOST_EXPIRY_OVERDUE_SECONDS / 60} minutes sont encore actifs en base : le worker ne tourne probablement pas (ils n'ont aucun effet, mais ne sont pas marqués expirés).`,
 };
 
 export interface MatchingStatusWarning {
@@ -57,6 +60,8 @@ export interface MatchingStatusReport {
     lastCompletedAt: string | null;
   };
   evaluations: { active: number; activeExpired: number };
+  /** Boosts (migration 0011 enregistrée, sinon 0) : effectifs maintenant ; en retard d'expiration (actifs en base, échus depuis plus de 10 minutes). */
+  boosts: { effective: number; overdue: number };
   warnings: MatchingStatusWarning[];
 }
 
@@ -85,6 +90,7 @@ function emptyReport(readAt: string, schemaReady: boolean): MatchingStatusReport
     outbox: { pendingByType: {}, projectedByType: {}, oldestPending: null, ignoredByCode: {} },
     jobs: { byTypeAndStatus: [], runningWithExpiredLease: 0, deadLetter: { count: 0, byErrorCode: {} }, lastCompletedAt: null },
     evaluations: { active: 0, activeExpired: 0 },
+    boosts: { effective: 0, overdue: 0 },
     warnings: [],
   };
 }
@@ -159,6 +165,14 @@ async function collect(client: PoolClient): Promise<MatchingStatusReport> {
   if (boostMigration.rowCount === 1) {
     const defaults = await client.query<{ n: number }>("SELECT count(*)::int AS n FROM boost_settings WHERE key = 'default'");
     flag("boost_settings_missing", defaults.rows[0].n === 0);
+    const boosts = await client.query<{ effective: number; overdue: number }>(
+      `SELECT count(*) FILTER (WHERE status = 'active' AND starts_at <= clock_timestamp() AND clock_timestamp() < ends_at)::int AS effective,
+              count(*) FILTER (WHERE status = 'active' AND ends_at < clock_timestamp() - make_interval(secs => $1::int))::int AS overdue
+         FROM offer_boosts`,
+      [BOOST_EXPIRY_OVERDUE_SECONDS],
+    );
+    report.boosts = { effective: boosts.rows[0].effective, overdue: boosts.rows[0].overdue };
+    flag("boost_expiry_overdue", report.boosts.overdue > 0);
   }
   // Configuration tarifaire du boost : seulement si la migration 0012 est enregistrée.
   const pricingMigration = await client.query("SELECT 1 FROM noma_schema_migrations WHERE version = '0012_boost_pricing'");

@@ -6,7 +6,7 @@ import { CatalogValidationError } from "../catalog/errors";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
 import { withPostgresTransaction, type SqlExecutor } from "../postgres/client";
 import {
-  BOOST_DEFAULT_SETTINGS_KEY, BOOST_DURATION_CODES, BOOST_DURATION_SECONDS, BOOST_LOCK_TIMEOUT_MS,
+  BOOST_DEFAULT_SETTINGS_KEY, BOOST_DURATION_CODES, BOOST_EXPIRY_DEFAULT_LIMIT, BOOST_EXPIRY_MAX_LIMIT, BOOST_DURATION_SECONDS, BOOST_LOCK_TIMEOUT_MS,
   BOOST_SCOPE_LOCK_NAMESPACE, BOOST_SOURCES, type BoostDurationCode, type BoostSource,
 } from "./boost-config";
 
@@ -441,6 +441,35 @@ export async function cancelOfferBoost(input: {
   }, pool);
 }
 
+// ───────────── expiration automatique (lot 2I4) ─────────────
+
+/**
+ * Marque `expired` les boosts `active` dont `ends_at <= maintenant` (balayage du worker). UNE requête ; `limit` (1 à 1000, 200 par
+ * défaut, validé avant tout SQL) borne le travail d'un balayage, les plus anciennes échéances d'abord (`ends_at`, `id`).
+ * `FOR UPDATE SKIP LOCKED` : deux balayages simultanés, ou un balayage face à une attribution ou une annulation en cours sur la
+ * même ligne, ne se bloquent pas et ne traitent jamais deux fois le même boost. Ne touche ni un boost annulé, ni un boost déjà
+ * expiré, ni un boost futur ou encore valable ; ne modifie jamais `cancelled_at`. Idempotent. Un boost échu n'était déjà jamais
+ * effectif : ce balayage ne change que son statut enregistré.
+ */
+export async function expireOfferBoosts(input: { pool: Pool; limit?: number }): Promise<{ expired: number }> {
+  const pool = requireBoostPool(input.pool);
+  const limit = input.limit === undefined ? BOOST_EXPIRY_DEFAULT_LIMIT : input.limit;
+  if (typeof limit !== "number" || !Number.isSafeInteger(limit) || limit < 1 || limit > BOOST_EXPIRY_MAX_LIMIT) {
+    throw new CatalogValidationError(`limit doit être un entier compris entre 1 et ${BOOST_EXPIRY_MAX_LIMIT}.`);
+  }
+  const result = await pool.query(
+    `UPDATE offer_boosts SET status = 'expired'
+      WHERE id IN (
+        SELECT id FROM offer_boosts
+         WHERE status = 'active' AND ends_at <= clock_timestamp()
+         ORDER BY ends_at, id
+         LIMIT $1::int
+         FOR UPDATE SKIP LOCKED)`,
+    [limit],
+  );
+  return { expired: result.rowCount ?? 0 };
+}
+
 // ───────────── lecture pour le classement ─────────────
 
 /**
@@ -470,4 +499,33 @@ export async function readEffectiveBoostedOfferIds(
     [[...offerIds], at],
   );
   return new Set(result.rows.map((row) => row.offer_id));
+}
+
+/**
+ * Comme `readEffectiveBoostedOfferIds` (MÊMES conditions, mot pour mot) mais renvoie aussi le boost : offre → identifiant du boost
+ * effectif à `at`. Une offre a au plus un boost actif (index unique partiel de 0011), donc au plus une entrée par offre. Sert au
+ * classement ET au journal d'exposition (lot 2I4) à partir d'une SEULE lecture : l'ordre servi et les lignes journalisées ne
+ * peuvent pas diverger. Les clés égalent le résultat de `readEffectiveBoostedOfferIds` (vérifié par test différentiel).
+ */
+export async function readEffectiveBoostsByOffer(
+  executor: SqlExecutor,
+  offerIds: readonly string[],
+  at: string,
+): Promise<Map<string, string>> {
+  if (offerIds.length === 0) return new Map();
+  const result = await executor.query<{ offer_id: string; boost_id: string }>(
+    `SELECT b.offer_id, b.id AS boost_id
+       FROM offer_boosts b
+       JOIN offers o ON o.id = b.offer_id AND o.owner_id = b.seller_id
+       JOIN users u ON u.id = b.seller_id
+      WHERE b.offer_id = ANY($1::uuid[])
+        AND b.status = 'active' AND b.starts_at <= $2::timestamptz AND $2::timestamptz < b.ends_at
+        AND o.status = 'published' AND o.archived_at IS NULL AND o.availability_status IS DISTINCT FROM 'unavailable'
+        AND u.status = 'active' AND u.archived_at IS NULL
+        AND lower(btrim(o.category)) = b.scope_category
+        AND lower(btrim(o.brand)) = b.scope_brand
+        AND lower(btrim(o.model)) = b.scope_model`,
+    [[...offerIds], at],
+  );
+  return new Map(result.rows.map((row) => [row.offer_id, row.boost_id]));
 }

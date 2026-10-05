@@ -36,3 +36,10 @@ export const BOOST_QUOTE_LOCK_NAMESPACE = 1_314_664_949;
 
 /** Validité d'une cotation INDISPONIBLE (secondes) : courte, pour que l'indisponibilité ne soit pas figée. */
 export const BOOST_UNAVAILABLE_QUOTE_SECONDS = 60;
+
+/** Expiration automatique (lot 2I4) : nombre maximal de boosts échus marqués `expired` par balayage (1 à 1000, 200 par défaut). */
+export const BOOST_EXPIRY_DEFAULT_LIMIT = 200;
+export const BOOST_EXPIRY_MAX_LIMIT = 1_000;
+
+/** Au-delà de ce retard (secondes), un boost échu resté `active` déclenche l'avertissement `boost_expiry_overdue` du statut. */
+export const BOOST_EXPIRY_OVERDUE_SECONDS = 600;

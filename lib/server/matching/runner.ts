@@ -1,6 +1,8 @@
 import "server-only";
 
 import type { Pool } from "pg";
+import { BOOST_EXPIRY_DEFAULT_LIMIT, BOOST_EXPIRY_MAX_LIMIT } from "../boost/boost-config";
+import { expireOfferBoosts } from "../boost/boosts";
 import {
   MatchingJobValidationError,
   claimMatchingJobs,
@@ -37,12 +39,17 @@ export type MatchingCycleJobSummary =
 export interface MatchingCycleResult {
   /** Évaluations périmées par le balayeur temporel (étape exécutée AVANT la projection). */
   temporal: { expired: number };
+  /**
+   * Boosts échus marqués `expired` (étape exécutée juste après l'étape temporelle). `skipped: true` : la migration 0011_offer_boosts
+   * n'est pas enregistrée, l'étape n'a pas été exécutée (jamais une erreur).
+   */
+  boost: { expired: number; skipped: boolean };
   projected: ProjectOutboxBatchResult;
   maintenance: { deadLettered: number };
   jobs: MatchingCycleJobSummary[];
-  /** Aucun progrès : rien périmé, rien lu par la projection, rien en maintenance, aucun job exécuté (erreurs ou non). */
+  /** Aucun progrès : rien périmé, aucun boost expiré, rien lu par la projection, rien en maintenance, aucun job exécuté (erreurs ou non). */
   idle: boolean;
-  /** Codes stables des étapes en échec (`temporal_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`). */
+  /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`). */
   errors: string[];
 }
 
@@ -54,6 +61,8 @@ export interface RunMatchingCycleOptions {
   projectionLimit?: number;
   /** Nombre maximal d'évaluations périmées par le balayeur temporel en un cycle (1 à 500, 100 par défaut). */
   temporalLimit?: number;
+  /** Nombre maximal de boosts échus marqués `expired` en un cycle (1 à 1000, 200 par défaut). */
+  boostLimit?: number;
   leaseSeconds?: number;
   /** Quand il est déclenché, plus aucun job n'est réservé ; le job en cours se termine. */
   signal?: AbortSignal;
@@ -73,10 +82,18 @@ function requireSignal(value: unknown): AbortSignal {
   return value;
 }
 
+/** La migration 0011 est-elle enregistrée ? Sans elle (ou sans table de migrations) l'étape boost est ignorée, jamais en erreur. */
+async function isBoostMigrationRegistered(pool: Pool): Promise<boolean> {
+  const table = await pool.query<{ present: boolean }>("SELECT to_regclass('noma_schema_migrations') IS NOT NULL AS present");
+  if (table.rows[0]?.present !== true) return false;
+  const result = await pool.query("SELECT 1 FROM noma_schema_migrations WHERE version = '0011_offer_boosts'");
+  return result.rowCount === 1;
+}
+
 /**
- * Un cycle : balayage temporel, projection de l'outbox, maintenance, puis au plus maxJobs jobs réservés UN PAR UN
- * (une réservation en lot laisserait expirer les baux des jobs en attente). Les quatre étapes sont cloisonnées :
- * un échec est rapporté dans `errors` (codes stables) sans empêcher les suivantes.
+ * Un cycle : balayage temporel, expiration des boosts échus, projection de l'outbox, maintenance, puis au plus maxJobs jobs
+ * réservés UN PAR UN (une réservation en lot laisserait expirer les baux des jobs en attente). Les cinq étapes sont
+ * cloisonnées : un échec est rapporté dans `errors` (codes stables) sans empêcher les suivantes.
  */
 export async function runMatchingCycle(options: RunMatchingCycleOptions): Promise<MatchingCycleResult> {
   const pool = requirePool(options.pool);
@@ -86,6 +103,8 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
     options.projectionLimit === undefined ? DEFAULT_PROJECTION_LIMIT : options.projectionLimit, "projectionLimit", 1, MAX_PROJECTION_LIMIT);
   const temporalLimit = requireBoundedInteger(
     options.temporalLimit === undefined ? DEFAULT_TEMPORAL_LIMIT : options.temporalLimit, "temporalLimit", 1, MAX_TEMPORAL_LIMIT);
+  const boostLimit = requireBoundedInteger(
+    options.boostLimit === undefined ? BOOST_EXPIRY_DEFAULT_LIMIT : options.boostLimit, "boostLimit", 1, BOOST_EXPIRY_MAX_LIMIT);
   const pageSize = options.pageSize === undefined ? undefined : requirePageSize(options.pageSize);
   const signal = options.signal === undefined ? undefined : requireSignal(options.signal);
   const leaseSeconds = options.leaseSeconds === undefined ? undefined : requireLeaseSeconds(options.leaseSeconds);
@@ -97,6 +116,17 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
     temporal = await runTemporalExpirySweep({ pool, limit: temporalLimit });
   } catch (error) {
     errors.push(`temporal_error_${errorCodeOf(error)}`);
+  }
+  // Étape boost : seulement si la migration 0011 est enregistrée (sinon ignorée, sans erreur). Cloisonnée comme les autres.
+  let boost = { expired: 0, skipped: false };
+  try {
+    if (await isBoostMigrationRegistered(pool)) {
+      boost = { expired: (await expireOfferBoosts({ pool, limit: boostLimit })).expired, skipped: false };
+    } else {
+      boost = { expired: 0, skipped: true };
+    }
+  } catch (error) {
+    errors.push(`boost_error_${errorCodeOf(error)}`);
   }
   let projected: ProjectOutboxBatchResult = { selected: 0, projected: 0, jobsInserted: 0, jobsAlreadyPresent: 0, ignored: 0, invalid: 0 };
   try {
@@ -130,10 +160,11 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
   }
   return {
     temporal,
+    boost,
     projected,
     maintenance,
     jobs,
-    idle: temporal.expired === 0 && projected.selected === 0 && maintenance.deadLettered === 0 && jobs.length === 0,
+    idle: temporal.expired === 0 && boost.expired === 0 && projected.selected === 0 && maintenance.deadLettered === 0 && jobs.length === 0,
     errors,
   };
 }

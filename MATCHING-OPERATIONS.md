@@ -34,7 +34,8 @@ Strictement en lecture seule (session `default_transaction_read_only = on` et tr
 sortie : **0** sain, **2** au moins un avertissement, **1** erreur (jamais de message brut). Il rapporte les
 événements pending (par type, le plus ancien et son âge), projected et ignored (par code), les jobs par type et
 statut, les baux expirés, les `dead_letter` (nombre et codes), les évaluations actives (dont expirées) et la date du
-dernier job `completed`.
+dernier job `completed`, ainsi que les boosts (`boosts.effective` : effectifs maintenant ; `boosts.overdue` : encore `active` plus de
+10 minutes après leur échéance ; zéros si la migration 0011 n'est pas enregistrée).
 
 | Avertissement | Signification | Action |
 | --- | --- | --- |
@@ -45,12 +46,14 @@ dernier job `completed`.
 | `job_lease_expired` | un job `running` a un bail expiré | worker mort ou bloqué : le prochain cycle d'un worker vivant le reprend (ou le met en `dead_letter` si épuisé) ; lancer un worker |
 | `active_evaluation_expired` | des évaluations actives ont dépassé `expires_at` | le balayeur temporel ne tourne pas : lancer un worker (il les périme au cycle suivant) |
 | `boost_settings_missing` | la migration 0011 est enregistrée mais `boost_settings` n'a pas de ligne `default` | le boost est inactif (classement organique servi, `sponsored` faux) : réinsérer la ligne `default` (0.150 / 1 / 50 / 2 / 0.340 / 0.150 / 60.00, voir `BOOST.md`) |
+| `boost_expiry_overdue` | la migration 0011 est enregistrée et au moins un boost est encore `active` plus de 10 minutes après son `ends_at` | le worker ne tourne pas : lancer `dev:full` ou `matching:worker` (l'étape boost marque les boosts échus `expired` ; ils n'avaient de toute façon aucun effet) |
 | `boost_pricing_missing` | la migration 0012 est enregistrée mais `boost_pricing_settings` n'a pas de ligne `default` | les cotations de boost sont impossibles (`boost_pricing_missing`) : insérer une version de la configuration tarifaire par défaut (valeurs provisoires de la migration 0012 : base 500, grille 100, min 500, max 50 000, voir `BOOST-PRICING.md`) |
 
 **Commandes d'administration du boost** (jamais lancées par Next ni par le worker ; `DATABASE_URL` obligatoire ; aucun paiement) :
 `npm run boost:grant -- --offer <uuid> --duration 24h|3d|7d` (attribution, voir `BOOST.md`) et
-`npm run boost:quote -- --offer <uuid> --duration 24h|3d|7d` (cotation, voir `BOOST-PRICING.md`). Elles sortent en code 1 sur un refus ou
-une erreur, avec un texte fixe.
+`npm run boost:quote -- --offer <uuid> --duration 24h|3d|7d` (cotation, voir `BOOST-PRICING.md`) et
+`npm run boost:stats -- --offer <uuid>` (statistiques d'exposition d'une offre, lecture seule, voir `BOOST-METRICS.md`). Elles sortent en code 1 sur un
+refus ou une erreur, avec un texte fixe.
 
 Les événements `ignored` d'un autre code que `job_integrity_conflict` sont comptés mais n'avertissent pas. Si le
 schéma n'est pas prêt, seules les informations de schéma sont rapportées (les tables de matching peuvent manquer).

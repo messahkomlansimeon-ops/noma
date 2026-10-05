@@ -30,6 +30,7 @@ function formatReport(report: MatchingStatusReport): string[] {
     lines.push(`dead_letter : ${report.jobs.deadLetter.count} (codes : ${formatCounts(report.jobs.deadLetter.byErrorCode)})`);
     lines.push(`Évaluations actives : ${report.evaluations.active}, dont expirées : ${report.evaluations.activeExpired}`);
     lines.push(`Dernier job completed : ${report.jobs.lastCompletedAt ?? "aucun"}`);
+    lines.push(`Boosts : ${report.boosts.effective} effectif(s), ${report.boosts.overdue} en retard d'expiration`);
   }
   if (report.warnings.length === 0) lines.push("Avertissements : aucun");
   else {
