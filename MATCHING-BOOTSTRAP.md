@@ -42,6 +42,15 @@ La sortie ne contient aucun message brut ; le code de sortie vaut 1 en cas d'err
 - **Fin** : l'événement passe à `projected` (`dispatched_at = clock_timestamp()`), conditionnellement
   (`dispatch_status = 'pending'`, une ligne, sinon erreur).
 
+## Transactions et ROLLBACK
+
+Chaque transaction (création de l'événement, un lot) se termine par COMMIT ou par un **ROLLBACK explicite** avant que
+l'erreur ne soit relancée : la connexion ne retourne jamais au pool avec une transaction avortée. Si le ROLLBACK
+lui-même échoue, la connexion est condamnée et libérée par `release(error)` (donc détruite, ce qui libère aussi le
+verrou consultatif de session). Le contrôle de la configuration scellée a lieu APRÈS le COMMIT de l'événement :
+il n'a rien à annuler. Un échec d'écriture au milieu d'un lot annule tout le lot ; l'événement reste `pending` et
+un nouveau bootstrap sur le même pool le reprend aussitôt (test : trigger qui rejette l'INSERT d'un job du 2e lot).
+
 ## Règle « déjà couvert »
 
 Une ressource éligible est ignorée (`alreadyCovered`) si, à sa `content_version` **courante** : (a) un job
@@ -64,4 +73,4 @@ est enregistré).
 - Un job créé pour une ressource devenue inéligible ou modifiée avant son exécution est `superseded` par le worker.
 - Le verrou est par base de données, pas par schéma : deux bootstraps sur deux schémas d'une même base s'excluent.
 - Les compteurs `offersScanned` / `demandsScanned` comptent les ressources éligibles lues, y compris déjà couvertes.
-- Exclus : `scoring_config_sweep`, lecture HTTP des correspondances enregistrées, notifications, UI.
+- Exclus : `scoring_config_sweep`, notifications, UI. (La lecture HTTP des correspondances enregistrées est livrée au lot 2F1 : `MATCHING-STORED-READ.md`.)

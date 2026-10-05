@@ -673,65 +673,105 @@ export async function persistEvaluatedMatch(
   }
 }
 
+/** Versions de moteur et hash de configuration attendus par le prédicat de fraîcheur. */
+export interface MatchingFreshnessParams {
+  engineOfflineVersion: string;
+  engineScoringVersion: string;
+  scoringConfigHash: string;
+}
+
+/**
+ * Résout (valeurs courantes par défaut) et valide les paramètres du prédicat de fraîcheur. Partagé par
+ * getActiveMatchingEvaluation et la lecture des correspondances enregistrées (stored-matches.ts) : usage interne,
+ * non exporté par index.ts.
+ */
+export function resolveMatchingFreshnessParams(expected: {
+  engineOfflineVersion?: string;
+  engineScoringVersion?: string;
+  scoringConfigHash?: string;
+} = {}): MatchingFreshnessParams {
+  const scoringConfigHash = expected.scoringConfigHash ?? computeScoringConfigHash(normalizeScoringConfig());
+  if (typeof scoringConfigHash !== "string" || !/^[0-9a-f]{64}$/.test(scoringConfigHash)) {
+    throw new MatchingPersistenceError("expectedScoringConfigHash doit être un SHA-256 hexadécimal de 64 caractères.");
+  }
+  return {
+    engineOfflineVersion: expected.engineOfflineVersion ?? MATCHING_OFFLINE_CONTRACT_VERSION,
+    engineScoringVersion: expected.engineScoringVersion ?? MATCHING_SCORING_CONTRACT_VERSION,
+    scoringConfigHash,
+  };
+}
+
+/** CTE d'horloge référencée par l'alias `c` du prédicat (`c.fresh_now`). */
+export const MATCHING_CURRENT_CLOCK_CTE = "current_clock AS (\n      SELECT clock_timestamp() AS fresh_now\n    )";
+
+/** FROM du prédicat : alias e (évaluation), o (offre), d (demande), uo / ud (propriétaires), c (horloge). */
+export const MATCHING_FRESHNESS_FROM = `matching_evaluations e
+      JOIN offers o ON o.id = e.offer_id
+      JOIN demands d ON d.id = e.demand_id
+      JOIN users uo ON uo.id = e.offer_owner_id
+      JOIN users ud ON ud.id = e.demand_owner_id
+      CROSS JOIN current_clock c`;
+
+/**
+ * Conditions SQL de fraîcheur d'une évaluation (alias e/o/d/uo/ud/c) : dernière tentative non périmée, versions
+ * courantes des deux ressources, propriétaires actifs et distincts, statuts éligibles, versions de moteur, hash de
+ * configuration, expires_at dans le futur. Les trois paramètres occupent les placeholders `$firstParamIndex` à
+ * `$firstParamIndex + 2` ; `values` les fournit dans cet ordre.
+ */
+export function buildMatchingFreshnessPredicate(
+  params: MatchingFreshnessParams,
+  firstParamIndex: number,
+): { conditions: string[]; values: [string, string, string] } {
+  const offline = `$${firstParamIndex}`;
+  const scoring = `$${firstParamIndex + 1}`;
+  const hash = `$${firstParamIndex + 2}`;
+  return {
+    conditions: [
+      "e.is_latest = TRUE",
+      "e.is_stale = FALSE",
+      "o.content_version = e.offer_content_version",
+      "d.content_version = e.demand_content_version",
+      "e.offer_owner_id = o.owner_id",
+      "e.demand_owner_id = d.owner_id",
+      "o.owner_id <> d.owner_id",
+      "o.status = 'published'",
+      "o.availability_status IS DISTINCT FROM 'unavailable'",
+      "d.status = 'active'",
+      "uo.status = 'active'",
+      "ud.status = 'active'",
+      `e.engine_offline_version = ${offline}`,
+      `e.engine_scoring_version = ${scoring}`,
+      `e.scoring_config_hash = ${hash}`,
+      "(e.expires_at IS NULL OR e.expires_at > c.fresh_now)",
+    ],
+    values: [params.engineOfflineVersion, params.engineScoringVersion, params.scoringConfigHash],
+  };
+}
+
 export async function getActiveMatchingEvaluation(
   options: GetActiveMatchingEvaluationOptions,
   db?: SqlExecutor,
 ): Promise<PersistedMatchingEvaluation | null> {
   const offerId = requireUuid(options.offerId, "offerId");
   const demandId = requireUuid(options.demandId, "demandId");
-  const engineOfflineVersion = options.expectedEngineOfflineVersion ?? MATCHING_OFFLINE_CONTRACT_VERSION;
-  const engineScoringVersion = options.expectedEngineScoringVersion ?? MATCHING_SCORING_CONTRACT_VERSION;
-
-  const expectedConfigHash =
-    options.expectedScoringConfigHash ??
-    computeScoringConfigHash(normalizeScoringConfig());
-
-  if (typeof expectedConfigHash !== "string" || !/^[0-9a-f]{64}$/.test(expectedConfigHash)) {
-    throw new MatchingPersistenceError("expectedScoringConfigHash doit être un SHA-256 hexadécimal de 64 caractères.");
-  }
+  const freshness = buildMatchingFreshnessPredicate(
+    resolveMatchingFreshnessParams({
+      engineOfflineVersion: options.expectedEngineOfflineVersion,
+      engineScoringVersion: options.expectedEngineScoringVersion,
+      scoringConfigHash: options.expectedScoringConfigHash,
+    }),
+    3,
+  );
 
   const executor = (options.db ?? options.pool ?? db ?? getPostgresPool()) as SqlExecutor;
 
-  const conditions = [
-    "e.offer_id = $1",
-    "e.demand_id = $2",
-    "e.is_latest = TRUE",
-    "e.is_stale = FALSE",
-    "o.content_version = e.offer_content_version",
-    "d.content_version = e.demand_content_version",
-    "e.offer_owner_id = o.owner_id",
-    "e.demand_owner_id = d.owner_id",
-    "o.owner_id <> d.owner_id",
-    "o.status = 'published'",
-    "o.availability_status IS DISTINCT FROM 'unavailable'",
-    "d.status = 'active'",
-    "uo.status = 'active'",
-    "ud.status = 'active'",
-    "e.engine_offline_version = $3",
-    "e.engine_scoring_version = $4",
-    "e.scoring_config_hash = $5",
-    "(e.expires_at IS NULL OR e.expires_at > c.fresh_now)",
-  ];
-
-  const values: unknown[] = [
-    offerId,
-    demandId,
-    engineOfflineVersion,
-    engineScoringVersion,
-    expectedConfigHash,
-  ];
+  const conditions = ["e.offer_id = $1", "e.demand_id = $2", ...freshness.conditions];
+  const values: unknown[] = [offerId, demandId, ...freshness.values];
 
   const query = `
-    WITH current_clock AS (
-      SELECT clock_timestamp() AS fresh_now
-    )
+    WITH ${MATCHING_CURRENT_CLOCK_CTE}
     SELECT e.*
-      FROM matching_evaluations e
-      JOIN offers o ON o.id = e.offer_id
-      JOIN demands d ON d.id = e.demand_id
-      JOIN users uo ON uo.id = e.offer_owner_id
-      JOIN users ud ON ud.id = e.demand_owner_id
-      CROSS JOIN current_clock c
+      FROM ${MATCHING_FRESHNESS_FROM}
      WHERE ${conditions.join("\n       AND ")}
      LIMIT 1
   `;

@@ -38,7 +38,7 @@ import {
  * Encapsule l'ensemble des opérations de lecture dans un instantané stable PostgreSQL (REPEATABLE READ READ ONLY).
  * Réserve un client dédié depuis le pool validé et le libère systématiquement à la fin.
  */
-async function withReadSnapshot<T>(
+export async function withReadSnapshot<T>(
   pool: Pool,
   operation: (client: PoolClient) => Promise<T>,
 ): Promise<T> {
@@ -70,7 +70,7 @@ interface SourceOfferRowWithUserStatus extends OfferRow {
   user_archived_at: Date | null;
 }
 
-const SOURCE_DEMAND_COLUMNS = `
+export const SOURCE_DEMAND_COLUMNS = `
   d.id, d.owner_id, d.status, d.budget_amount::text AS budget_amount, d.budget_currency,
   d.requirements, d.preferences, d.content_version,
   d.raw_text, d.category, d.brand, d.model, d.variant, d.attributes, d.condition_text,
@@ -78,7 +78,7 @@ const SOURCE_DEMAND_COLUMNS = `
   d.extraction_metadata, d.extracted_at, d.created_at, d.updated_at, d.archived_at
 `;
 
-const SOURCE_OFFER_COLUMNS = `
+export const SOURCE_OFFER_COLUMNS = `
   o.id, o.owner_id, o.status, o.price_amount::text AS price_amount, o.price_currency,
   o.availability_status, o.availability_confirmed_at, o.content_version,
   o.raw_text, o.category, o.brand, o.model, o.variant, o.attributes, o.condition_text,
@@ -89,7 +89,7 @@ const SOURCE_OFFER_COLUMNS = `
 /**
  * Charge la demande source complète et vérifie son éligibilité ainsi que celle de son propriétaire.
  */
-async function loadSourceDemand(
+export async function loadSourceDemand(
   ownerId: string,
   demandId: string,
   client: SqlExecutor,
@@ -129,7 +129,7 @@ async function loadSourceDemand(
 /**
  * Charge l'offre source complète et vérifie son éligibilité ainsi que celle de son propriétaire.
  */
-async function loadSourceOffer(
+export async function loadSourceOffer(
   ownerId: string,
   offerId: string,
   client: SqlExecutor,

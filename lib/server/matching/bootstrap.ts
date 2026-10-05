@@ -53,6 +53,20 @@ export interface CatalogBootstrapResult {
   dryRun: boolean;
 }
 
+/** Santé de la connexion dédiée : un ROLLBACK impossible la condamne (elle est alors détruite à la libération). */
+interface ConnectionHealth {
+  rollbackFailed: boolean;
+}
+
+/** ROLLBACK explicite au mieux : s'il échoue, la connexion ne doit jamais retourner au pool (`release(error)`). */
+async function rollbackOrCondemn(client: PoolClient, health: ConnectionHealth): Promise<void> {
+  try {
+    await client.query("ROLLBACK");
+  } catch {
+    health.rollbackFailed = true;
+  }
+}
+
 function requireOptions(options: RunCatalogBootstrapOptions): { pool: Pool; batchSize: number; dryRun: boolean } {
   const { pool } = options;
   if (!(pool instanceof Pool)) throw new MatchingBootstrapError("Un pool PostgreSQL (Pool) est requis pour le bootstrap.");
@@ -82,15 +96,18 @@ async function assertSchemaReady(client: PoolClient): Promise<void> {
  * Réutilise le plus ancien événement de bootstrap encore pending (reprise après crash) ou le crée, puis contrôle la
  * configuration scellée qu'il porte. Retourne l'identifiant et le hash scellé.
  */
-async function ensureBootstrapEvent(client: PoolClient): Promise<{ eventId: string; scoringConfigHash: string }> {
+async function ensureBootstrapEvent(
+  client: PoolClient,
+  health: ConnectionHealth,
+): Promise<{ eventId: string; scoringConfigHash: string }> {
+  let eventId: string;
+  let hash: unknown;
   await client.query("BEGIN ISOLATION LEVEL READ COMMITTED");
   try {
     const pending = await client.query<{ id: string; payload: Record<string, unknown> }>(
       `SELECT id, payload FROM matching_outbox_events
         WHERE event_type = 'catalog.bootstrap_sync' AND dispatch_status = 'pending'
         ORDER BY occurred_at, id LIMIT 1`);
-    let eventId: string;
-    let hash: unknown;
     if (pending.rowCount === 1) {
       eventId = pending.rows[0].id;
       hash = pending.rows[0].payload.scoring_config_hash;
@@ -103,14 +120,15 @@ async function ensureBootstrapEvent(client: PoolClient): Promise<{ eventId: stri
       hash = created.payload.scoring_config_hash;
     }
     await client.query("COMMIT");
-    if (typeof hash !== "string") throw new MatchingBootstrapError("Événement de bootstrap sans configuration scellée.");
-    const sealed = await readSealedConfig(client, { sourceEventId: eventId, scoringConfigHash: hash });
-    if (!sealed.ok) throw new MatchingBootstrapError(`Configuration scellée de l'événement de bootstrap invalide (${sealed.errorCode}).`);
-    return { eventId, scoringConfigHash: hash };
   } catch (error) {
-    try { await client.query("ROLLBACK"); } catch { /* aucune transaction ouverte après COMMIT */ }
+    await rollbackOrCondemn(client, health);
     throw error;
   }
+  // Transaction terminée : le contrôle de la configuration scellée n'a plus rien à annuler.
+  if (typeof hash !== "string") throw new MatchingBootstrapError("Événement de bootstrap sans configuration scellée.");
+  const sealed = await readSealedConfig(client, { sourceEventId: eventId, scoringConfigHash: hash });
+  if (!sealed.ok) throw new MatchingBootstrapError(`Configuration scellée de l'événement de bootstrap invalide (${sealed.errorCode}).`);
+  return { eventId, scoringConfigHash: hash };
 }
 
 /**
@@ -154,8 +172,9 @@ export async function runCatalogBootstrap(options: RunCatalogBootstrapOptions): 
   };
 
   const client = await pool.connect();
+  const health: ConnectionHealth = { rollbackFailed: false };
   let lockHeld = false;
-  let releaseError: Error | undefined;
+  let unlockFailed = false;
   try {
     const locked = await client.query<{ locked: boolean }>("SELECT pg_try_advisory_lock($1::bigint) AS locked", [BOOTSTRAP_ADVISORY_LOCK_KEY]);
     if (locked.rows[0].locked !== true) throw new MatchingBootstrapError("Bootstrap déjà en cours : aucune écriture.");
@@ -163,7 +182,7 @@ export async function runCatalogBootstrap(options: RunCatalogBootstrapOptions): 
     await assertSchemaReady(client);
     await hooks?.afterLock?.();
 
-    const event = dryRun ? null : await ensureBootstrapEvent(client);
+    const event = dryRun ? null : await ensureBootstrapEvent(client, health);
     result.eventId = event?.eventId ?? null;
 
     let position = INITIAL_SCAN_POSITION;
@@ -195,7 +214,7 @@ export async function runCatalogBootstrap(options: RunCatalogBootstrapOptions): 
         result.alreadyCovered += alreadyCovered;
         next = nextScanPosition(position, rows, batchSize);
       } catch (error) {
-        try { await client.query("ROLLBACK"); } catch { /* connexion perdue : libérée plus bas */ }
+        await rollbackOrCondemn(client, health);
         throw error;
       }
       await hooks?.afterBatch?.(batchIndex);
@@ -216,9 +235,10 @@ export async function runCatalogBootstrap(options: RunCatalogBootstrapOptions): 
         await client.query("SELECT pg_advisory_unlock($1::bigint)", [BOOTSTRAP_ADVISORY_LOCK_KEY]);
       } catch {
         // Impossible de libérer proprement : fermer la connexion libère le verrou de session.
-        releaseError = new Error("unlock failed");
+        unlockFailed = true;
       }
     }
-    client.release(releaseError);
+    // Connexion condamnée (ROLLBACK ou déverrouillage impossible) : détruite, jamais rendue au pool.
+    client.release(health.rollbackFailed || unlockFailed ? new Error("connection discarded") : undefined);
   }
 }

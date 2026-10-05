@@ -2,9 +2,11 @@ import "server-only";
 
 import type { AvailabilityStatus, DemandRecord, Money, OfferRecord } from "../catalog/types";
 import type { EvaluatedMatchItem, EvaluatedMatchPage } from "./service-types";
+import type { StoredMatchItem, StoredMatchesPage } from "./stored-matches";
 import type { MatchingCompatibilityStatus } from "./types";
 
 export const MATCHING_HTTP_CONTRACT_VERSION = "matching-http/v1" as const;
+export const MATCHING_STORED_HTTP_CONTRACT_VERSION = "matching-stored-http/v1" as const;
 
 export interface EvaluatedMatchProductDto {
   id: string;
@@ -74,6 +76,23 @@ export interface EvaluatedMatchesResponseDto {
   evaluatedAt: string;
   source: EvaluatedMatchProductDto;
   items: EvaluatedMatchItemDto[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  limit: number;
+}
+
+/** Élément de correspondance ENREGISTRÉE : la forme de l'élément en direct, plus la date de l'évaluation. */
+export interface StoredMatchItemDto extends EvaluatedMatchItemDto {
+  evaluatedAt: string;
+}
+
+export interface StoredMatchesResponseDto {
+  contractVersion: typeof MATCHING_STORED_HTTP_CONTRACT_VERSION;
+  source: EvaluatedMatchProductDto;
+  items: StoredMatchItemDto[];
+  /** La version courante de la source est en cours de traitement (voir MATCHING-STORED-READ.md). */
+  processing: boolean;
+  readAt: string;
   nextCursor: string | null;
   hasMore: boolean;
   limit: number;
@@ -173,6 +192,73 @@ export function mapEvaluatedMatchesPageToDto<
     evaluatedAt: page.evaluatedAt.toISOString(),
     source: mapProductRecord(page.source.record),
     items: page.items.map(mapEvaluatedMatchItem),
+    nextCursor: page.nextCursor,
+    hasMore: page.hasMore,
+    limit: page.limit,
+  };
+}
+
+/**
+ * Mappe un élément enregistré vers le DTO public. Liste blanche stricte, champ par champ : ni identifiant de
+ * propriétaire, ni texte brut, ni evaluation_details, ni configuration de scoring, ni clé d'idempotence, ni hash de
+ * tentative (aucun de ces champs n'est même lu par le service).
+ */
+function mapStoredMatchItem<TCandidate extends OfferRecord | DemandRecord>(
+  item: StoredMatchItem<TCandidate>,
+): StoredMatchItemDto {
+  return {
+    candidateId: item.candidateId,
+    candidateContentVersion: item.candidateContentVersion,
+    candidate: mapProductRecord(item.candidate),
+    compatibilityStatus: item.compatibilityStatus,
+    score: item.score,
+    coverage: item.coverage,
+    evaluation: {
+      status: item.compatibilityStatus,
+      summary: {
+        matchedCount: item.evaluationSummary.matchedCount,
+        mismatchedCount: item.evaluationSummary.mismatchedCount,
+        unknownCount: item.evaluationSummary.unknownCount,
+        totalExploitableCriteria: item.evaluationSummary.totalExploitableCriteria,
+      },
+    },
+    scoring: {
+      score: item.score,
+      coverage: item.coverage,
+      summary: {
+        totalApplicableWeight: item.scoringSummary.totalApplicableWeight,
+        matchedWeight: item.scoringSummary.matchedWeight,
+        mismatchedWeight: item.scoringSummary.mismatchedWeight,
+        unknownWeight: item.scoringSummary.unknownWeight,
+        applicableCriteriaCount: item.scoringSummary.applicableCriteriaCount,
+        matchedCount: item.scoringSummary.matchedCount,
+        mismatchedCount: item.scoringSummary.mismatchedCount,
+        unknownCount: item.scoringSummary.unknownCount,
+      },
+      preferences: {
+        preferenceScore: item.preferencesSummary.preferenceScore,
+        preferenceCoverage: item.preferencesSummary.preferenceCoverage,
+        totalPreferencesCount: item.preferencesSummary.totalPreferencesCount,
+        matchedCount: item.preferencesSummary.matchedCount,
+        mismatchedCount: item.preferencesSummary.mismatchedCount,
+        unknownCount: item.preferencesSummary.unknownCount,
+      },
+    },
+    evaluatedAt: item.evaluatedAt.toISOString(),
+  };
+}
+
+/** Convertit une page de correspondances enregistrées en DTO public strictement filtré par liste blanche. */
+export function mapStoredMatchesPageToDto<
+  TSource extends OfferRecord | DemandRecord,
+  TCandidate extends OfferRecord | DemandRecord,
+>(page: StoredMatchesPage<TSource, TCandidate>): StoredMatchesResponseDto {
+  return {
+    contractVersion: MATCHING_STORED_HTTP_CONTRACT_VERSION,
+    source: mapProductRecord(page.source.record),
+    items: page.items.map(mapStoredMatchItem),
+    processing: page.processing,
+    readAt: page.readAt.toISOString(),
     nextCursor: page.nextCursor,
     hasMore: page.hasMore,
     limit: page.limit,

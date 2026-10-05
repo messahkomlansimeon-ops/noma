@@ -24,6 +24,36 @@ réelle. Sans `DATABASE_URL`, le build et la recherche actuelle continuent de
 fonctionner ; seule une fonction PostgreSQL appelée explicitement échoue avec un
 message de configuration.
 
+## Activation du matching sur une base de développement
+
+Procédure exécutée sur `noma_dev` le 2026-10-05 (base alors à 0001 et 0002, sans données). Aucun test ne tourne
+sur cette base ; l'application et tout autre client doivent être arrêtés.
+
+```shell
+CONTAINER=deploy-postgres-1                      # `docker ps` : image postgres:16-alpine, port 127.0.0.1:55432
+# 1. Sauvegarde AVANT toute écriture ; vérifier que le fichier est non vide et contient noma_schema_migrations
+docker exec "$CONTAINER" pg_dump -U noma_local -d noma_dev --no-owner > /tmp/noma-dev-backup-AAAA-MM-JJ.sql
+grep -c noma_schema_migrations /tmp/noma-dev-backup-AAAA-MM-JJ.sql && sha256sum /tmp/noma-dev-backup-AAAA-MM-JJ.sql
+export DATABASE_URL='postgresql://noma_local:noma_local_only@127.0.0.1:55432/noma_dev'
+# 2. Migrations (0003 à 0010 sur une base à 0002) ; relancer : 0 appliquée
+npm run db:migrate
+# 3. Bootstrap du catalogue existant : simulation (par défaut), puis création des jobs
+npm run matching:bootstrap
+npm run matching:bootstrap -- --apply
+# 4. Un cycle du worker, sans le laisser tourner (code de sortie 0 et aucune ligne d'erreur attendus)
+npm run matching:worker -- --once
+```
+
+Restauration de la sauvegarde (efface la base courante : à n'utiliser que si l'activation doit être annulée, avec
+tous les clients arrêtés ; le dump n'inclut pas de `DROP`, la base doit donc être recréée) :
+
+```shell
+docker exec "$CONTAINER" psql -U noma_local -d postgres -c 'DROP DATABASE noma_dev' -c 'CREATE DATABASE noma_dev'
+docker exec -i "$CONTAINER" psql -U noma_local -d noma_dev -v ON_ERROR_STOP=1 < /tmp/noma-dev-backup-AAAA-MM-JJ.sql
+```
+
+Cette commande de restauration est documentée, mais elle n'a pas été exécutée lors de l'activation.
+
 ## Tests d'intégration
 
 Les tests exigent une base dédiée dont le nom contient `test`. Ils créent puis

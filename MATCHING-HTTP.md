@@ -26,6 +26,8 @@ Deux routes GET authentifiées sont exposées :
    - Aucun identifiant de propriétaire (`ownerId`) ou rôle fourni par le client n'est accepté.
 3. **Indiscernabilité des 404 (anti-énumération)** :
    - Si la ressource demandée (`[id]`) n'existe pas, ou si elle appartient à un autre utilisateur, la route renvoie rigoureusement la même réponse `404 Not Found` (`resource_not_found`, `"Ressource introuvable."`). Aucune information sur l'existence d'une ressource tierce n'est divulguée.
+4. **Source inéligible (400)** :
+   - Une ressource qui existe et appartient à l'utilisateur mais n'est pas évaluable (offre brouillon, en pause, archivée ou `unavailable` ; demande brouillon, satisfaite ou archivée ; propriétaire non actif) est rejetée en `400 Bad Request` (`invalid_request`), l'erreur de validation du catalogue étant projetée par `mapMatchingError`. Les routes `stored-matches` (section 6) renvoient les mêmes statuts et les mêmes codes.
 
 ---
 
@@ -90,3 +92,21 @@ Afin de préserver la confidentialité des parties et d'empêcher toute fuite de
    - Aucune écriture n'est opérée en base de données : pas d'incrément de `content_version`, pas d'altération de `updated_at`, aucune table de match n'est créée.
 3. **Erreurs publiques masquées** :
    - En cas d'erreur de base de données ou panne d'infrastructure, un statut `503 Service Unavailable` (`matching_unavailable`) est renvoyé sans fuite de message SQL ou de stack trace.
+
+---
+
+## 6. Correspondances enregistrées (`stored-matches`, lot 2F1)
+
+Deux routes GET supplémentaires relisent les évaluations déjà enregistrées par le worker au lieu de les recalculer :
+
+| Méthode | Route | Description |
+| --- | --- | --- |
+| `GET` | `/api/offers/[id]/stored-matches` | Demandes candidates enregistrées pour une offre source |
+| `GET` | `/api/demands/[id]/stored-matches` | Offres candidates enregistrées pour une demande source |
+
+Elles partagent avec les routes `/matches` l'authentification par cookie, la liste blanche `limit` / `cursor`, la
+validation de l'identifiant, `mapMatchingError` (mêmes 401, 400, 404, 503) et les en-têtes `no-store`. Elles
+diffèrent par : le DTO (`contractVersion: "matching-stored-http/v1"`, `evaluatedAt` par item, `processing`,
+`readAt`), le curseur (opaque, lié à la source et au sens, distinct de celui des routes en direct : un curseur
+d'une route n'est pas valide sur l'autre), le tri (score décroissant) et la limite par défaut (20, comme la
+recherche). Les routes `/matches` en direct restent strictement inchangées. Contrat complet : `MATCHING-STORED-READ.md`.

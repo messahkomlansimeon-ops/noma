@@ -6,6 +6,7 @@ export * from "./candidates-types";
 export * from "./candidates";
 export * from "./service-types";
 export * from "./service";
+export * from "./stored-matches";
 export * from "./http-dto";
 export * from "./http";
 export * from "./persistence-types";

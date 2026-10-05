@@ -290,6 +290,75 @@ test("concurrence : un second bootstrap est refusé (« déjà en cours »), un 
   assert.equal((await runCatalogBootstrap({ pool: second })).jobsInserted, 0);
 });
 
+// ═════════════ 5 bis. Échec d'écriture au milieu d'un lot ═════════════
+
+test("échec de l'INSERT d'un job au milieu du 2e lot : lot atomique, événement pending, connexion rendue propre, reprise immédiate sur le même pool", async () => {
+  const catalog = await legacyCatalog();
+  // 4e offre éligible : avec batchSize 2, le lot 0 écrit 2 jobs, le lot 1 en écrit un 3e puis échoue sur le 4e.
+  await createOffer(offerInput(catalog.seller.id, { rawText: "iPhone 13 n°4" }), pool);
+  await wipeOutboxAndJobs();
+  await pool.query(`CREATE FUNCTION reject_fourth_job() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF (SELECT count(*) FROM matching_jobs) >= 3 THEN RAISE EXCEPTION 'échec injecté du 4e job' USING ERRCODE = 'P0001'; END IF;
+      RETURN NEW;
+    END $$`);
+  await pool.query("CREATE TRIGGER reject_fourth_job BEFORE INSERT ON matching_jobs FOR EACH ROW EXECUTE FUNCTION reject_fourth_job()");
+  const pidOf = async (db: Pool) => (await db.query("SELECT pg_backend_pid() AS pid")).rows[0].pid as number;
+  const pid = await pidOf(pool);
+  const queries: string[] = [];
+  const spy = Object.create(pool) as Pool;
+  spy.connect = (async () => {
+    const client = await pool.connect();
+    const original = client.query.bind(client) as (...a: unknown[]) => unknown;
+    (client as { query: unknown }).query = (...args: unknown[]) => {
+      const text = typeof args[0] === "string" ? args[0] : (args[0] as { text?: string } | undefined)?.text;
+      if (text) queries.push(text);
+      return original(...args);
+    };
+    const release = client.release.bind(client);
+    client.release = ((error?: Error | boolean) => { (client as { query: unknown }).query = original; return release(error); }) as never;
+    return client;
+  }) as never;
+  spy.query = ((...args: unknown[]) => (pool.query as (...a: unknown[]) => unknown)(...args)) as never;
+
+  let failed = false;
+  try {
+    await assert.rejects(runCatalogBootstrap({ pool: spy, batchSize: 2 }), /échec injecté du 4e job/);
+    failed = true;
+    assert.ok(queries.includes("ROLLBACK"), "un ROLLBACK explicite est émis avant la libération");
+    assert.ok(queries.lastIndexOf("ROLLBACK") < queries.findIndex((text) => text.includes("pg_advisory_unlock")), "le ROLLBACK précède le déverrouillage");
+
+    // Lot atomique : seul le lot 0 (2 jobs) est validé ; le 3e job du lot 1 est annulé avec lui.
+    assert.equal((await jobs()).length, 2);
+    const events = await bootstrapEvents();
+    assert.equal(events.length, 1);
+    assert.equal(events[0].dispatch_status, "pending");
+    assert.equal(events[0].dispatched_at, null);
+
+    // Aucune session « idle in transaction » parmi celles du test, et la connexion est la MÊME : rendue au pool propre.
+    assert.equal(await pidOf(pool), pid, "connexion non détruite : le ROLLBACK a nettoyé la transaction");
+    const pids = [pid, await pidOf(second)];
+    const states = await admin.query("SELECT pid, state FROM pg_stat_activity WHERE pid = ANY($1::int[])", [pids]);
+    assert.ok(states.rows.every((row) => !String(row.state).startsWith("idle in transaction")), JSON.stringify(states.rows));
+  } finally {
+    await pool.query("DROP TRIGGER IF EXISTS reject_fourth_job ON matching_jobs");
+    await pool.query("DROP FUNCTION IF EXISTS reject_fourth_job()");
+  }
+  assert.ok(failed);
+
+  // Reprise immédiate sur le MÊME pool : même événement, aucun doublon, tout est couvert.
+  const [pending] = await bootstrapEvents();
+  const resumed = await runCatalogBootstrap({ pool, batchSize: 2 });
+  assert.equal(resumed.eventId, pending.id, "l'événement pending est réutilisé");
+  assert.equal(resumed.jobsInserted, 4, "6 jobs au total : 2 déjà validés, 4 créés");
+  assert.equal(resumed.alreadyCovered, 2);
+  assert.equal((await jobs()).length, 6);
+  assert.equal(new Set((await jobs()).map((job) => job.job_identity)).size, 6);
+  const finalEvents = await bootstrapEvents();
+  assert.equal(finalEvents.length, 1);
+  assert.equal(finalEvents[0].dispatch_status, "projected");
+});
+
 // ═════════════ 6. Schéma non prêt ═════════════
 
 test("refus si la migration 0010 n'est pas enregistrée : aucune écriture, aucune migration appliquée", async () => {

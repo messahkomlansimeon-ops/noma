@@ -17,7 +17,8 @@ import {
   findEvaluatedDemandMatchesForOffer,
   findEvaluatedOfferMatchesForDemand,
 } from "./service";
-import { mapEvaluatedMatchesPageToDto } from "./http-dto";
+import { mapEvaluatedMatchesPageToDto, mapStoredMatchesPageToDto } from "./http-dto";
+import { listStoredDemandMatchesForOffer, listStoredOfferMatchesForDemand } from "./stored-matches";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -30,9 +31,11 @@ export interface MatchingHttpDependencies {
 export interface MatchingHttpHandlers {
   demands: {
     matches(request: Request, id: string): Promise<Response>;
+    storedMatches(request: Request, id: string): Promise<Response>;
   };
   offers: {
     matches(request: Request, id: string): Promise<Response>;
+    storedMatches(request: Request, id: string): Promise<Response>;
   };
 }
 
@@ -156,6 +159,25 @@ export function createMatchingHttpHandlers(
           return mapMatchingError(error);
         }
       },
+      async storedMatches(request: Request, id: string): Promise<Response> {
+        const auth = await authenticate(request);
+        if (!auth.ok) return auth.response;
+
+        if (!UUID.test(id)) return invalidRequest();
+
+        try {
+          const { limit, cursor } = parseQueryParams(request);
+          const page = await listStoredOfferMatchesForDemand(
+            auth.ownerId,
+            id,
+            { limit, cursor },
+            dependencies.pool,
+          );
+          return noStoreJsonResponse(200, mapStoredMatchesPageToDto(page));
+        } catch (error) {
+          return mapMatchingError(error);
+        }
+      },
     },
     offers: {
       async matches(request: Request, id: string): Promise<Response> {
@@ -174,6 +196,25 @@ export function createMatchingHttpHandlers(
           );
           const dto = mapEvaluatedMatchesPageToDto(page);
           return noStoreJsonResponse(200, dto);
+        } catch (error) {
+          return mapMatchingError(error);
+        }
+      },
+      async storedMatches(request: Request, id: string): Promise<Response> {
+        const auth = await authenticate(request);
+        if (!auth.ok) return auth.response;
+
+        if (!UUID.test(id)) return invalidRequest();
+
+        try {
+          const { limit, cursor } = parseQueryParams(request);
+          const page = await listStoredDemandMatchesForOffer(
+            auth.ownerId,
+            id,
+            { limit, cursor },
+            dependencies.pool,
+          );
+          return noStoreJsonResponse(200, mapStoredMatchesPageToDto(page));
         } catch (error) {
           return mapMatchingError(error);
         }
