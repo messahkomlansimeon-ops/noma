@@ -12,6 +12,7 @@
     "db:migrate": "NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs scripts/migrate-postgres.ts",
     "matching:worker": "NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs scripts/matching-worker.ts",
     "matching:bootstrap": "NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs scripts/matching-bootstrap.ts",
+    "boost:grant": "NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs scripts/boost-grant.ts",
     "matching:status": "NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs scripts/matching-status.ts",
     "test:postgres": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/catalog.integration.test.ts",
     "test:auth": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/auth.integration.test.ts",
@@ -50,6 +51,7 @@
     "test:matching-relevance": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-relevance.integration.test.ts",
     "test:matching-stored": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-stored.integration.test.ts",
     "test:matching-bootstrap": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-bootstrap.integration.test.ts",
+    "test:boost": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/server/boost.test.ts tests/postgres/boost.integration.test.ts",
     "test:cleanup-schemas": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs scripts/cleanup-test-schemas.ts"
   },
   "dependencies": {

@@ -119,3 +119,9 @@ paramètre inconnu → `400`. Les réponses `stored-matches` ajoutent, sans chan
 `confidence`) et `relevance`, en liste blanche : jamais de numéro de téléphone, de date de création exacte,
 d'identifiant de propriétaire ni de prix de marché brut (le marché n'est exposé que par `position`, `deltaPercent` et
 `sampleSize`). Voir `MATCHING-RELEVANCE.md`.
+
+**Boost (lot 2I1)** : chaque item `stored-matches` porte en plus `sponsored` (booléen). Il vaut `true` uniquement pour un élément
+promu par un boost (tri `sort=relevance` des routes `/api/demands/[id]/stored-matches`) et `false` partout ailleurs : tri par
+score, tri par défaut, route `/api/offers/[id]/stored-matches` (sens offre), éléments non promus. La réponse n'expose jamais
+l'identifiant d'un boost, ses dates, sa durée, sa source ni le vendeur. `contractVersion` reste `matching-stored-http/v1` (ajout
+rétrocompatible). Les routes `/matches` en direct n'ont pas ce champ. Contrat complet : `BOOST.md`.

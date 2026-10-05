@@ -6,6 +6,8 @@ import { CatalogValidationError } from "../catalog/errors";
 import { mapDemand, mapOffer, type DemandRow, type OfferRow } from "../catalog/shared";
 import type { DemandRecord, OfferRecord } from "../catalog/types";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
+import { readBoostSettings, readEffectiveBoostedOfferIds } from "../boost/boosts";
+import { placeBoostedItems } from "../boost/placement";
 import { validateCandidateLimit } from "./candidates";
 import {
   computeAvailabilityIndicator, computeConfidenceIndicator, computePriceIndicator, computeRelevance,
@@ -103,8 +105,13 @@ export interface StoredMatchItem<TCandidate extends OfferRecord | DemandRecord> 
   scoringSummary: StoredMatchScoringSummary;
   preferencesSummary: StoredMatchPreferencesSummary;
   indicators: StoredMatchIndicators;
-  /** Pertinence organique 0..100 (2 décimales) ; jamais de boost. */
+  /** Pertinence organique 0..100 (2 décimales) : le boost n'y entre jamais. */
   relevance: number;
+  /**
+   * Vrai UNIQUEMENT pour un élément promu par un boost (tri `relevance`, sens demande, voir BOOST.md). Faux partout
+   * ailleurs : tri par score, sens offre, éléments non promus. N'expose ni identifiant de boost, ni dates, ni vendeur.
+   */
+  sponsored: boolean;
 }
 
 export interface StoredMatchesPage<
@@ -510,6 +517,7 @@ async function buildItems<TCandidate extends OfferRecord | DemandRecord, TRow ex
         preferencesSummary: readPreferencesSummary(row.eval_preferences_summary),
         indicators,
         relevance: relevance ?? 0,
+        sponsored: false,
       },
     };
   });
@@ -522,6 +530,29 @@ function compareByRelevance<T extends OfferRecord | DemandRecord>(a: RankedItem<
   if (a.item.score !== null && b.item.score !== null && a.item.score !== b.item.score) return b.item.score - a.item.score;
   if (a.evaluatedAtIso !== b.evaluatedAtIso) return a.evaluatedAtIso < b.evaluatedAtIso ? 1 : -1;
   return a.evaluationId < b.evaluationId ? 1 : a.evaluationId > b.evaluationId ? -1 : 0;
+}
+
+/**
+ * Boost (brief §15 : compatibles, puis pertinence, puis boost À L'INTÉRIEUR du classement). `organic` est la fenêtre
+ * entière déjà triée par pertinence. Sont promouvables les éléments dont l'offre a un boost EFFECTIF à `at` et dont la
+ * pertinence atteint le seuil des réglages de la catégorie de la demande ; au plus floor(part promue × N) sont promus,
+ * placés aux positions k × ceil(1 / part). Aucune ligne n'est ajoutée ni retirée : seules des lignes confirmées et
+ * fraîches (déjà dans `organic`) peuvent apparaître. Voir BOOST.md.
+ */
+async function applyBoost<TCandidate extends OfferRecord | DemandRecord>(
+  client: SqlExecutor,
+  input: { organic: Array<RankedItem<TCandidate>>; demand: DemandRecord; at: Date },
+): Promise<Array<StoredMatchItem<TCandidate>>> {
+  if (input.organic.length === 0) return [];
+  const boosted = await readEffectiveBoostedOfferIds(client, input.organic.map((entry) => entry.item.candidateId), toIsoMicros(input.at));
+  if (boosted.size === 0) return input.organic.map((entry) => entry.item);
+  const settings = await readBoostSettings(client, input.demand.category);
+  const placed = placeBoostedItems(
+    input.organic,
+    (entry) => boosted.has(entry.item.candidateId) && entry.item.relevance >= settings.minRelevance,
+    settings.maxPromotedShare,
+  );
+  return placed.map(({ item, promoted }) => (promoted ? { ...item.item, sponsored: true } : item.item));
 }
 
 /**
@@ -610,9 +641,13 @@ async function readStored<TSource extends OfferRecord | DemandRecord, TCandidate
         sourceKind: input.sourceKind, source, rows: truncated ? rows.slice(0, input.window) : rows, mapCandidate: input.mapCandidate, now: at,
       });
       ranked.sort(compareByRelevance);
+      // Boost : sens demande seulement (l'acheteur voit des offres). Le décalage s'applique à l'ordre FINAL, calculé à `at`.
+      const finalOrder = input.sourceKind === "demand"
+        ? await applyBoost<TCandidate>(client, { organic: ranked, demand: source as DemandRecord, at })
+        : ranked.map((entry) => entry.item);
       const offset = input.relevanceCursor?.offset ?? 0;
-      const items = ranked.slice(offset, offset + input.limit).map((entry) => entry.item);
-      const hasMore = offset + input.limit < ranked.length;
+      const items = finalOrder.slice(offset, offset + input.limit);
+      const hasMore = offset + input.limit < finalOrder.length;
       const nextCursor = hasMore
         ? encodeRelevanceCursor({ v: 1, sort: "relevance", sourceKind: input.sourceKind, sourceId: input.sourceId, offset: offset + input.limit, at: toIsoMicros(at) })
         : null;

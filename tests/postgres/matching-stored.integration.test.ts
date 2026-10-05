@@ -55,7 +55,7 @@ before(async () => {
   admin = opened.pool;
   await admin.query(`CREATE SCHEMA ${quoted}`);
   pool = await openVerifiedIsolatedPool(opened.target, schema);
-  assert.equal((await runMigrations(pool)).applied.length, 10);
+  assert.equal((await runMigrations(pool)).applied.length, 11);
   handlers = createMatchingHttpHandlers({ pool, now: () => clock.now() });
   seller = await login();
   buyer = await login();
@@ -563,7 +563,7 @@ for (const direction of DIRECTIONS) {
 
 // ═════════════ 6. HTTP ═════════════
 
-const ITEM_KEYS = ["candidate", "candidateContentVersion", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "evaluation", "indicators", "relevance", "score", "scoring"];
+const ITEM_KEYS = ["candidate", "candidateContentVersion", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "evaluation", "indicators", "relevance", "score", "scoring", "sponsored"];
 const TOP_KEYS = ["contractVersion", "hasMore", "items", "limit", "nextCursor", "processing", "readAt", "source", "truncated"];
 
 test("HTTP : 401, 400, 200 avec la forme exacte, no-store et aucune fuite", async () => {

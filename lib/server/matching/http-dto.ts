@@ -97,6 +97,8 @@ export interface StoredMatchItemDto extends EvaluatedMatchItemDto {
   indicators: StoredMatchIndicatorsDto;
   /** Pertinence organique 0..100 (sans boost). */
   relevance: number;
+  /** Vrai uniquement pour un élément promu par un boost (tri relevance, sens demande). Jamais d'identifiant de boost, de date ni de vendeur. */
+  sponsored: boolean;
 }
 
 export interface StoredMatchesResponseDto {
@@ -282,6 +284,7 @@ function mapStoredMatchItem<TCandidate extends OfferRecord | DemandRecord>(
       },
     },
     relevance: item.relevance,
+    sponsored: item.sponsored,
   };
 }
 

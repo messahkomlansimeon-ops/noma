@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { after, before, test } from "node:test";
 import type { Pool } from "pg";
 import { requestOtp, verifyOtp, type SendOtpInput } from "../../lib/server/auth";
+import { cancelOfferBoost, grantOfferBoost } from "../../lib/server/boost/boosts";
 import { createDemand, createOffer, createUser } from "../../lib/server/catalog";
 import { CatalogValidationError } from "../../lib/server/catalog/errors";
 import type { DemandRecord, OfferRecord } from "../../lib/server/catalog/types";
@@ -58,7 +59,7 @@ before(async () => {
   admin = opened.pool;
   await admin.query(`CREATE SCHEMA ${quoted}`);
   pool = await openVerifiedIsolatedPool(opened.target, schema);
-  assert.equal((await runMigrations(pool)).applied.length, 10);
+  assert.equal((await runMigrations(pool)).applied.length, 11);
   handlers = createMatchingHttpHandlers({ pool, now: () => clock.now() });
   buyer = await login();
   seller = await login();
@@ -711,7 +712,7 @@ test("HTTP : forme exacte des indicateurs et de la pertinence, et aucune fuite (
     assert.equal(body.truncated, false);
     assert.equal(body.items.length, 3);
     for (const item of body.items) {
-      assert.deepEqual(Object.keys(item).sort(), ["candidate", "candidateContentVersion", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "evaluation", "indicators", "relevance", "score", "scoring"]);
+      assert.deepEqual(Object.keys(item).sort(), ["candidate", "candidateContentVersion", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "evaluation", "indicators", "relevance", "score", "scoring", "sponsored"]);
       assert.deepEqual(Object.keys(item.indicators).sort(), ["availability", "confidence", "price"]);
       assert.deepEqual(Object.keys(item.indicators.availability).sort(), ["confirmedAgeHours", "factors", "level", "score"]);
       assert.deepEqual(Object.keys(item.indicators.price).sort(), ["deltaPercent", "factors", "position", "sampleSize", "score"]);
@@ -845,4 +846,389 @@ test("curseur relevance : at futur (> +5 s) ou expiré (> 1 h) → 400 ; at vali
   assert.deepEqual(await response.json(), { error: { code: "invalid_request", message: "Requête invalide." } });
   const expired = await storedHandler("demand")(request(urlOf("demand", demand.id, "stored-matches", `?sort=relevance&cursor=${withAt(new Date(now - 2 * HOUR))}`), buyer.cookie), demand.id);
   assert.equal(expired.status, 400);
+});
+
+// ═════════════ 2I1 : boost à l'intérieur du classement par pertinence ═════════════
+
+const BOOST_DEFAULTS = { slot_ratio: 0.15, min_slots: 1, max_slots: 50, max_active_per_seller: 2, max_seller_slot_share: 0.34, max_promoted_share: 0.15, min_relevance: 60 };
+
+/** Règle les réglages d'une clé (par défaut `default`) ; `resetBoostSettings` rétablit les valeurs de la migration. */
+async function tuneBoostSettings(values: Partial<typeof BOOST_DEFAULTS>, key = "default"): Promise<void> {
+  const merged = { ...BOOST_DEFAULTS, ...values };
+  await pool.query(
+    `INSERT INTO boost_settings (key, slot_ratio, min_slots, max_slots, max_active_per_seller, max_seller_slot_share, max_promoted_share, min_relevance)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     ON CONFLICT (key) DO UPDATE SET slot_ratio = $2, min_slots = $3, max_slots = $4, max_active_per_seller = $5,
+       max_seller_slot_share = $6, max_promoted_share = $7, min_relevance = $8`,
+    [key, merged.slot_ratio, merged.min_slots, merged.max_slots, merged.max_active_per_seller, merged.max_seller_slot_share, merged.max_promoted_share, merged.min_relevance]);
+}
+const resetBoostSettings = async () => { await pool.query("DELETE FROM boost_settings WHERE key <> 'default'"); await tuneBoostSettings({}); };
+
+/** Beaucoup de places : ces tests portent sur le classement, pas sur les places. */
+const roomyBoostSettings = (extra: Partial<typeof BOOST_DEFAULTS> = {}) =>
+  tuneBoostSettings({ slot_ratio: 0.5, min_slots: 40, max_slots: 40, max_active_per_seller: 5, max_seller_slot_share: 1, ...extra });
+
+const boostOffer = (offer: OfferRecord, durationCode: "24h" | "3d" | "7d" = "24h") =>
+  grantOfferBoost({ pool, offerId: offer.id, ownerId: offer.ownerId, durationCode, source: "admin_grant" });
+
+const relevanceOrder = (demand: DemandRecord, extra: StoredMatchesQueryOptions = {}) =>
+  listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 100, ...extra }, pool);
+
+/** Modèle de référence INDÉPENDANT de placeBoostedItems : boucles explicites, flottants avec tolérance. */
+function referencePlacement(organic: string[], relevances: Map<string, number>, boosted: Set<string>, minRelevance: number, share: number) {
+  const n = organic.length;
+  const step = Math.ceil(1 / share - 1e-9);
+  const maxPromoted = Math.floor(n * share + 1e-9);
+  const promoted = organic.filter((id) => boosted.has(id) && relevances.get(id)! >= minRelevance).slice(0, maxPromoted);
+  const order: Array<string | null> = new Array(n).fill(null);
+  promoted.forEach((id, rank) => { if (rank * step < n) order[rank * step] = id; });
+  const rest = organic.filter((id) => !promoted.includes(id));
+  let cursor = 0;
+  for (let position = 0; position < n; position++) if (order[position] === null) order[position] = rest[cursor++];
+  return { order: order as string[], promoted };
+}
+
+test("boost (vrai pipeline, 30 offres) : promus aux positions 0, 7, 14, 21, au plus floor(0,15 × N), seuil de pertinence, ordre relatif des autres, aucun doublon, pagination, déterminisme", async () => {
+  await resetCatalog();
+  const demand = await newDemand(buyer.userId, { budget: null });
+  const patterns: Array<Partial<OfferOptions>> = [{ confirmedHoursAgo: 2 }, { confirmedHoursAgo: 100 }, { confirmedHoursAgo: null }, { availability: "reserved" }, { availability: null }];
+  const offers: OfferRecord[] = [];
+  for (let index = 0; index < 30; index++) {
+    offers.push(await newOffer({ ownerId: await makeOwner({ verified: index % 2 === 0, ageDays: index % 3 === 0 ? 40 : 3 }), price: 100_000 + index * 1_000, ...patterns[index % 5] }));
+  }
+  await cyclesUntilIdle();
+  try {
+    await roomyBoostSettings();
+    const organic = await relevanceOrder(demand);
+    assert.equal(organic.items.length, 30, "fenêtre réelle : 30 correspondances confirmées");
+    assert.ok(organic.items.every((item) => item.sponsored === false), "aucun boost : personne n'est sponsorisé");
+    const organicIds = ids(organic);
+    const relevances = new Map(organic.items.map((item) => [item.candidateId, item.relevance]));
+    const threshold = organic.items[12].relevance;
+    const low = organicIds.map((id, index) => ({ id, index })).filter((entry) => relevances.get(entry.id)! < threshold);
+    assert.ok(low.length >= 4, "des offres sont sous le seuil de pertinence");
+    await tuneBoostSettings({ slot_ratio: 0.5, min_slots: 40, max_slots: 40, max_active_per_seller: 5, max_seller_slot_share: 1, min_relevance: threshold });
+
+    // Cinq offres au-dessus du seuil (organiques 1, 4, 6, 8, 10) et deux sous le seuil.
+    const highIndexes = [1, 4, 6, 8, 10];
+    const lowIndexes = [low[0].index, low[low.length - 1].index];
+    const byId = new Map(offers.map((offer) => [offer.id, offer]));
+    for (const index of [...highIndexes, ...lowIndexes]) await boostOffer(byId.get(organicIds[index])!);
+    const boosted = new Set([...highIndexes, ...lowIndexes].map((index) => organicIds[index]));
+
+    const page = await relevanceOrder(demand);
+    const expected = referencePlacement(organicIds, relevances, boosted, threshold, 0.15);
+    assert.deepEqual(ids(page), expected.order, "ordre final = modèle de référence");
+    // Structure attendue : quatre promus (floor(0,15 × 30)), aux positions 0, 7, 14, 21, dans l'ordre de pertinence.
+    const sponsoredPositions = page.items.map((item, position) => (item.sponsored ? position : -1)).filter((position) => position >= 0);
+    assert.deepEqual(sponsoredPositions, [0, 7, 14, 21]);
+    assert.deepEqual(sponsoredPositions.map((position) => page.items[position].candidateId), highIndexes.slice(0, 4).map((index) => organicIds[index]));
+    const promotedRelevances = sponsoredPositions.map((position) => page.items[position].relevance);
+    assert.deepEqual(promotedRelevances, [...promotedRelevances].sort((a, b) => b - a), "promus par pertinence décroissante");
+    assert.ok(sponsoredPositions.length <= Math.floor(0.15 * 30), "§8 : au plus 15 % des annonces visibles");
+    // Le cinquième promouvable au-dessus du seuil dépasse le maximum : non sponsorisé, place organique.
+    const overflow = page.items.find((item) => item.candidateId === organicIds[highIndexes[4]])!;
+    assert.equal(overflow.sponsored, false);
+    // (b) Les offres sous le seuil n'ont AUCUN avantage : non sponsorisées, même rang relatif que dans le classement organique.
+    for (const entry of [low[0], low[low.length - 1]]) {
+      const item = page.items.find((candidate) => candidate.candidateId === entry.id)!;
+      assert.equal(item.sponsored, false, "sous min_relevance : jamais sponsorisée");
+      assert.ok(item.relevance < threshold);
+    }
+    // (d) L'ordre relatif des non-promus est celui du classement organique.
+    const promotedIds = new Set(page.items.filter((item) => item.sponsored).map((item) => item.candidateId));
+    assert.deepEqual(ids(page).filter((id) => !promotedIds.has(id)), organicIds.filter((id) => !promotedIds.has(id)));
+    // (f) Aucun doublon, aucun ajout ni retrait.
+    assert.equal(new Set(ids(page)).size, 30);
+    assert.deepEqual([...ids(page)].sort(), [...organicIds].sort());
+    // La pertinence et le score de chaque élément sont ceux du classement organique : le boost n'y entre jamais.
+    for (const item of page.items) {
+      const before = organic.items.find((candidate) => candidate.candidateId === item.candidateId)!;
+      assert.deepEqual({ relevance: item.relevance, score: item.score, indicators: item.indicators }, { relevance: before.relevance, score: before.score, indicators: before.indicators });
+    }
+    // Déterminisme.
+    assert.deepEqual(ids(await relevanceOrder(demand)), ids(page));
+    assert.deepEqual((await relevanceOrder(demand)).items.map((item) => item.sponsored), page.items.map((item) => item.sponsored));
+
+    // Pagination : le décalage s'applique à l'ordre final, calculé à `at` ; aucun doublon, aucun trou.
+    const walked = await walkRelevance(demand.id, 7);
+    assert.deepEqual(walked.ids, ids(page));
+    assert.deepEqual(walked.pages.flatMap((entry) => entry.items.map((item) => item.sponsored)), page.items.map((item) => item.sponsored));
+    assert.equal(walked.pages[0].items[0].sponsored, true, "page 1 : promu en tête");
+    assert.equal(walked.pages[1].items[0].sponsored, true, "page 2 : promu en position 7");
+
+    // Une attribution APRÈS `at` n'a aucun effet sur les pages suivantes du même parcours (starts_at > at)…
+    const first = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7 }, pool);
+    const secondBefore = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7, cursor: first.nextCursor! }, pool);
+    const latecomer = byId.get(organicIds[3])!;
+    await boostOffer(latecomer);
+    const secondAfter = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7, cursor: first.nextCursor! }, pool);
+    assert.deepEqual(ids(secondAfter), ids(secondBefore), "attribution postérieure à `at` : l'ordre du parcours en cours ne change pas");
+    // … mais une nouvelle première page en tient compte (organique 3 devient promouvable avant 4, 6, 8).
+    const fresh = await relevanceOrder(demand);
+    assert.notDeepEqual(ids(fresh), ids(page));
+    assert.ok(fresh.items.find((item) => item.candidateId === latecomer.id)!.sponsored);
+    // L'annulation entre deux pages, elle, modifie les pages suivantes (limite documentée : le statut est celui de la lecture).
+    const cancelled = await pool.query<{ id: string }>("SELECT id FROM offer_boosts WHERE offer_id = $1", [organicIds[highIndexes[0]]]);
+    await cancelOfferBoost({ pool, boostId: cancelled.rows[0].id, ownerId: byId.get(organicIds[highIndexes[0]])!.ownerId });
+    const secondCancelled = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7, cursor: first.nextCursor! }, pool);
+    assert.notDeepEqual(ids(secondCancelled), ids(secondBefore), "annulation entre deux pages : l'ordre peut changer (documenté)");
+  } finally {
+    await resetBoostSettings();
+  }
+});
+
+test("boost : réglages de la catégorie de la demande (part promue, seuil) et seuil exact de pertinence (>=)", async () => {
+  await resetCatalog();
+  const demand = await newDemand(buyer.userId, { budget: null });
+  const offers: OfferRecord[] = [];
+  for (let index = 0; index < 20; index++) {
+    const offer = await newOffer({ ownerId: await makeOwner({ verified: true, ageDays: 40 }), price: 100_000 + index * 977, confirmedHoursAgo: 1 });
+    offers.push(offer);
+    await insertEvaluation(offer, demand, { score: `${99 - index * 2}.000000` });
+  }
+  try {
+    await roomyBoostSettings();
+    const organic = await relevanceOrder(demand);
+    const organicIds = ids(organic);
+    const target = organic.items[5];
+    const byId = new Map(offers.map((offer) => [offer.id, offer]));
+    await boostOffer(byId.get(target.candidateId)!);
+
+    const placedAt = async () => {
+      const page = await relevanceOrder(demand);
+      return { position: ids(page).indexOf(target.candidateId), sponsored: page.items.find((item) => item.candidateId === target.candidateId)!.sponsored, page };
+    };
+    // Seuil exact : pertinence == min_relevance → promu (>=) ; pertinence + 0,01 → aucun avantage, place organique.
+    await roomyBoostSettings({ min_relevance: target.relevance });
+    const atThreshold = await placedAt();
+    assert.deepEqual({ position: atThreshold.position, sponsored: atThreshold.sponsored }, { position: 0, sponsored: true }, "seuil atteint exactement");
+    await roomyBoostSettings({ min_relevance: Math.round((target.relevance + 0.01) * 100) / 100 });
+    const aboveThreshold = await placedAt();
+    assert.deepEqual({ position: aboveThreshold.position, sponsored: aboveThreshold.sponsored }, { position: 5, sponsored: false }, "sous le seuil : aucun avantage");
+    assert.deepEqual(ids(aboveThreshold.page), organicIds, "ordre strictement organique");
+    await roomyBoostSettings({ min_relevance: 0 });
+    assert.equal((await placedAt()).sponsored, true, "seuil 0");
+    await roomyBoostSettings({ min_relevance: 100 });
+    assert.equal((await placedAt()).sponsored, false, "seuil 100 : plus personne");
+
+    // Part promue : N = 20. 0,15 → 3 promus possibles mais un seul boost → 1 ; la position suit la part (pas de 5 avec 0,2).
+    for (const offer of [organic.items[2], organic.items[3], organic.items[4]]) await boostOffer(byId.get(offer.candidateId)!);
+    await roomyBoostSettings({ min_relevance: 0, max_promoted_share: 0.2 });
+    const wide = await relevanceOrder(demand);
+    assert.deepEqual(wide.items.map((item, position) => (item.sponsored ? position : -1)).filter((position) => position >= 0), [0, 5, 10, 15], "part 0,2 : floor(0,2 × 20) = 4 promus, pas de 5");
+    await roomyBoostSettings({ min_relevance: 0, max_promoted_share: 0.1 });
+    const narrow = await relevanceOrder(demand);
+    assert.deepEqual(narrow.items.map((item, position) => (item.sponsored ? position : -1)).filter((position) => position >= 0), [0, 10], "part 0,1 : floor(0,1 × 20) = 2 promus, pas de 10");
+    // Surcharge par catégorie : la ligne « smartphones » l'emporte sur « default » pour une demande de cette catégorie.
+    await roomyBoostSettings({ min_relevance: 0, max_promoted_share: 0.2 });
+    await tuneBoostSettings({ slot_ratio: 0.5, min_slots: 40, max_slots: 40, max_active_per_seller: 5, max_seller_slot_share: 1, max_promoted_share: 0.05, min_relevance: 0 }, "smartphones");
+    const override = await relevanceOrder(demand);
+    assert.deepEqual(override.items.map((item, position) => (item.sponsored ? position : -1)).filter((position) => position >= 0), [0], "part 0,05 : floor(0,05 × 20) = 1 promu");
+  } finally {
+    await resetBoostSettings();
+  }
+});
+
+test("boost §15 : un boost sur une offre non confirmée, incompatible, inéligible ou périmée ne la fait JAMAIS apparaître ; les autres boosts restent corrects", async () => {
+  await resetCatalog();
+  const demand = await newDemand(buyer.userId, { budget: null });
+  const good: OfferRecord[] = [];
+  for (let index = 0; index < 14; index++) {
+    const offer = await newOffer({ ownerId: await makeOwner({ verified: true, ageDays: 40 }), price: 100_000 + index * 811, confirmedHoursAgo: 1 });
+    good.push(offer);
+    await insertEvaluation(offer, demand, { score: `${95 - index}.000000` });
+  }
+  const bad = new Map<string, OfferRecord>();
+  const addBad = async (label: string, options: EvalOptions): Promise<string> => {
+    const offer = await newOffer({ ownerId: await makeOwner({ verified: true, ageDays: 400 }), price: 100_000, confirmedHoursAgo: 0.1 });
+    const evaluationId = await insertEvaluation(offer, demand, options);
+    bad.set(label, offer);
+    return evaluationId;
+  };
+  await addBad("incompatible", { score: "100.000000", compatibility: "incompatible" });
+  await addBad("compatibilité inconnue", { score: "100.000000", compatibility: "unknown" });
+  await addBad("inéligible", { score: "100.000000", eligibility: "ineligible" });
+  await addBad("périmée (moteur remplacé)", { score: "100.000000", isStale: true });
+  const expired = await addBad("périmée (expires_at)", { score: "100.000000" });
+  await pool.query("UPDATE matching_evaluations SET expires_at = clock_timestamp() - interval '1 second' WHERE id = $1", [expired]);
+  // Offre sans évaluation du tout.
+  const unevaluated = await newOffer({ ownerId: await makeOwner({ verified: true, ageDays: 400 }), price: 100_000, confirmedHoursAgo: 0.1 });
+  // Offre boostée puis devenue inéligible (en pause, indisponible, vendeur suspendu).
+  const paused = await newOffer({ ownerId: await makeOwner({ verified: true, ageDays: 400 }), price: 100_000, confirmedHoursAgo: 0.1 });
+  const unavailable = await newOffer({ ownerId: await makeOwner({ verified: true, ageDays: 400 }), price: 100_000, confirmedHoursAgo: 0.1 });
+  const suspended = await newOffer({ ownerId: await makeOwner({ verified: true, ageDays: 400 }), price: 100_000, confirmedHoursAgo: 0.1 });
+  for (const offer of [paused, unavailable, suspended]) await insertEvaluation(offer, demand, { score: "100.000000" });
+  try {
+    await roomyBoostSettings({ min_relevance: 0 });
+    for (const offer of [...bad.values(), unevaluated, paused, unavailable, suspended]) await boostOffer(offer);
+    await pool.query("UPDATE offers SET status = 'paused' WHERE id = $1", [paused.id]);
+    await pool.query("UPDATE offers SET availability_status = 'unavailable' WHERE id = $1", [unavailable.id]);
+    await pool.query("UPDATE users SET status = 'suspended' WHERE id = $1", [suspended.ownerId]);
+    // Deux bonnes offres boostées pour que le mécanisme soit actif pendant la vérification.
+    await boostOffer(good[7]);
+    await boostOffer(good[9]);
+    const forbidden = new Set([...[...bad.values()].map((offer) => offer.id), unevaluated.id, paused.id, unavailable.id, suspended.id]);
+    for (const sort of ["relevance", "score"] as const) {
+      const page = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort, limit: 100 }, pool);
+      assert.deepEqual([...ids(page)].sort(), good.map((offer) => offer.id).sort(), `tri ${sort} : seules les 14 correspondances confirmées et fraîches`);
+      for (const item of page.items) assert.ok(!forbidden.has(item.candidateId));
+      if (sort === "relevance") {
+        const promoted = page.items.filter((item) => item.sponsored).map((item) => item.candidateId);
+        assert.deepEqual(promoted, [good[7].id, good[9].id], "N = 14 : floor(0,15 × 14) = 2 promus, tous deux issus des correspondances valides");
+        assert.deepEqual(page.items.map((item, position) => (item.sponsored ? position : -1)).filter((position) => position >= 0), [0, 7]);
+      } else {
+        assert.ok(page.items.every((item) => item.sponsored === false), "tri par score : jamais sponsorisé");
+      }
+    }
+  } finally {
+    await resetBoostSettings();
+  }
+});
+
+test("boost : expiré, annulé, futur ou d'un vendeur suspendu → aucun effet (ordre organique, personne de sponsorisé)", async () => {
+  await resetCatalog();
+  const demand = await newDemand(buyer.userId, { budget: null });
+  const offers: OfferRecord[] = [];
+  for (let index = 0; index < 14; index++) {
+    const offer = await newOffer({ ownerId: await makeOwner({ verified: true, ageDays: 40 }), price: 100_000 + index * 733, confirmedHoursAgo: 1 });
+    offers.push(offer);
+    await insertEvaluation(offer, demand, { score: `${95 - index}.000000` });
+  }
+  try {
+    await roomyBoostSettings({ min_relevance: 0 });
+    const organic = await relevanceOrder(demand);
+    const organicIds = ids(organic);
+    const byId = new Map(offers.map((offer) => [offer.id, offer]));
+    const grants = new Map<number, string>();
+    for (const index of [8, 9, 10, 11, 12]) grants.set(index, (await boostOffer(byId.get(organicIds[index])!)).boost.id);
+    // Expiré (échu, statut encore « active »), annulé, futur, vendeur suspendu, expiré marqué.
+    await pool.query("UPDATE offer_boosts SET starts_at = clock_timestamp() - interval '2 days', ends_at = clock_timestamp() - interval '1 second' WHERE id = $1", [grants.get(8)]);
+    await cancelOfferBoost({ pool, boostId: grants.get(9)!, ownerId: byId.get(organicIds[9])!.ownerId });
+    await pool.query("UPDATE offer_boosts SET starts_at = clock_timestamp() + interval '1 hour', ends_at = clock_timestamp() + interval '2 hours' WHERE id = $1", [grants.get(10)]);
+    await pool.query("UPDATE users SET status = 'suspended' WHERE id = $1", [byId.get(organicIds[11])!.ownerId]);
+    await pool.query("UPDATE offer_boosts SET status = 'expired' WHERE id = $1", [grants.get(12)]);
+
+    const page = await relevanceOrder(demand);
+    const expectedIds = organicIds.filter((id) => id !== organicIds[11]);   // le vendeur suspendu n'est plus candidat du tout
+    assert.deepEqual(ids(page), expectedIds, "ordre strictement organique");
+    assert.ok(page.items.every((item) => item.sponsored === false), "aucun boost effectif : personne de sponsorisé");
+
+    // Contrôle positif : un boost effectif sur la même offre qu'un boost échu fonctionne bien (le vendeur 11 reste suspendu : N = 13).
+    const active = await boostOffer(byId.get(organicIds[8])!);
+    assert.equal(active.boost.status, "active");
+    const after = await relevanceOrder(demand);
+    assert.equal(after.items.length, 13);
+    assert.equal(after.items[0].candidateId, organicIds[8]);
+    assert.equal(after.items[0].sponsored, true);
+    assert.equal(after.items.filter((item) => item.sponsored).length, 1);
+  } finally {
+    await resetBoostSettings();
+  }
+});
+
+test("boost : le tri par score et le sens offre sont strictement inchangés (sponsored toujours faux)", async () => {
+  await resetCatalog();
+  const demand = await newDemand(buyer.userId, { budget: null });
+  const offers: OfferRecord[] = [];
+  for (let index = 0; index < 14; index++) {
+    const offer = await newOffer({ ownerId: await makeOwner({ verified: index % 2 === 0, ageDays: 30 }), price: 100_000 + index * 521, confirmedHoursAgo: index % 3 === 0 ? 1 : null });
+    offers.push(offer);
+    await insertEvaluation(offer, demand, { score: `${95 - index}.000000` });
+  }
+  // Sens offre : l'offre du vendeur « seller » reçoit des demandes candidates.
+  const own = await newOffer({ ownerId: seller.userId, price: 120_000, confirmedHoursAgo: 1 });
+  for (let index = 0; index < 14; index++) {
+    await insertEvaluation(own, await newDemand(await makeOwner({ verified: index % 2 === 0, ageDays: 5 + index * 3 })), { score: `${90 - index}.000000` });
+  }
+  try {
+    await roomyBoostSettings({ min_relevance: 0 });
+    const byScoreBefore = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "score", limit: 100 }, pool);
+    const defaultBefore = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { limit: 100 }, pool);
+    const offerSenseBefore = { relevance: await listStoredDemandMatchesForOffer(seller.userId, own.id, { sort: "relevance", limit: 100 }, pool), score: await listStoredDemandMatchesForOffer(seller.userId, own.id, { sort: "score", limit: 100 }, pool) };
+    assert.ok(offerSenseBefore.relevance.items.length === 14 && byScoreBefore.items.length === 14);
+
+    // Tous les vendeurs sont boostés, y compris l'offre du vendeur « seller » elle-même.
+    for (const offer of [...offers.slice(0, 4), own]) await boostOffer(offer);
+    const relevanceSponsored = (await relevanceOrder(demand)).items.filter((item) => item.sponsored).length;
+    assert.equal(relevanceSponsored, 2, "le boost agit bien sur le tri par pertinence, sens demande");
+
+    const byScoreAfter = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "score", limit: 100 }, pool);
+    const defaultAfter = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { limit: 100 }, pool);
+    assert.deepEqual(byScoreAfter.items, byScoreBefore.items, "tri par score : identique, jusqu'aux indicateurs");
+    assert.deepEqual(defaultAfter.items, defaultBefore.items, "tri par défaut : identique");
+    assert.ok([...byScoreAfter.items, ...defaultAfter.items].every((item) => item.sponsored === false));
+    const score = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "score", limit: 5 }, pool);
+    assert.deepEqual(score.items, byScoreBefore.items.slice(0, 5), "pagination par score inchangée");
+    assert.ok(score.nextCursor);
+    const next = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "score", limit: 5, cursor: score.nextCursor! }, pool);
+    assert.deepEqual(next.items, byScoreBefore.items.slice(5, 10));
+
+    for (const sort of ["relevance", "score"] as const) {
+      const after = await listStoredDemandMatchesForOffer(seller.userId, own.id, { sort, limit: 100 }, pool);
+      assert.deepEqual(after.items, offerSenseBefore[sort].items, `sens offre (${sort}) : identique malgré le boost de l'offre source`);
+      assert.ok(after.items.every((item) => item.sponsored === false));
+    }
+  } finally {
+    await resetBoostSettings();
+  }
+});
+
+test("boost HTTP : forme exacte avec sponsored (booléen), aucune fuite (identifiant de boost, dates, vendeur) ; tri par score et sens offre : sponsored faux", async () => {
+  await resetCatalog();
+  const demand = await newDemand(buyer.userId, { budget: null });
+  const offers: OfferRecord[] = [];
+  for (let index = 0; index < 14; index++) {
+    const offer = await newOffer({ ownerId: await makeOwner({ verified: true, ageDays: 40 }), price: 100_000 + index * 311, confirmedHoursAgo: 1 });
+    offers.push(offer);
+    await insertEvaluation(offer, demand, { score: `${95 - index}.000000` });
+  }
+  try {
+    await roomyBoostSettings({ min_relevance: 0 });
+    const boostedOffers = [offers[3], offers[5]];
+    const boosts = [];
+    for (const offer of boostedOffers) boosts.push((await boostOffer(offer, "7d")).boost);
+    const call = async (query: string) => storedHandler("demand")(request(urlOf("demand", demand.id, "stored-matches", query), buyer.cookie), demand.id);
+
+    const response = await call("?sort=relevance&limit=100");
+    assert.equal(response.status, 200);
+    const text = await response.text();
+    const body = JSON.parse(text);
+    assert.equal(body.contractVersion, "matching-stored-http/v1");
+    assert.equal(body.items.length, 14);
+    for (const item of body.items) {
+      assert.deepEqual(Object.keys(item).sort(), ["candidate", "candidateContentVersion", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "evaluation", "indicators", "relevance", "score", "scoring", "sponsored"]);
+      assert.equal(typeof item.sponsored, "boolean");
+    }
+    const sponsored = body.items.map((item: { sponsored: boolean }, position: number) => (item.sponsored ? position : -1)).filter((position: number) => position >= 0);
+    assert.deepEqual(sponsored, [0, 7], "deux promus : 0 et 7");
+    assert.deepEqual(sponsored.map((position: number) => body.items[position].candidateId), boostedOffers.map((offer) => offer.id));
+
+    const sellers = boostedOffers.map((offer) => offer.ownerId);
+    const dates = boosts.flatMap((boost) => [boost.startsAt.toISOString(), boost.endsAt.toISOString(), boost.createdAt.toISOString(),
+      boost.startsAt.toISOString().replace("T", " "), boost.endsAt.toISOString().replace("T", " ")]);
+    const forbidden = [...boosts.map((boost) => boost.id), ...sellers, ...dates, "admin_grant", "offer_boosts", "boost", "durationCode", "duration_code", "seller", "scope_",
+      "startsAt", "endsAt", "cancelledAt", "RAW_SECRET_TEXT"];
+    for (const needle of forbidden) assert.ok(!text.includes(needle), `fuite : ${needle}`);
+
+    // Tri par score et tri par défaut : sponsored faux partout.
+    for (const query of ["?sort=score&limit=100", "?limit=100"]) {
+      const plain = JSON.parse(await (await call(query)).text());
+      assert.ok(plain.items.every((item: { sponsored: boolean }) => item.sponsored === false), query);
+      assert.deepEqual(plain.items.map((item: { candidateId: string }) => item.candidateId), offers.map((offer) => offer.id), `${query} : ordre du score`);
+    }
+    // Sens offre : sponsored faux.
+    const own = await newOffer({ ownerId: seller.userId, price: 120_000, confirmedHoursAgo: 1 });
+    await insertEvaluation(own, await newDemand(await makeOwner()), { score: "80.000000" });
+    await boostOffer(own);
+    for (const sort of ["score", "relevance"]) {
+      const sense = await storedHandler("offer")(request(urlOf("offer", own.id, "stored-matches", `?sort=${sort}`), seller.cookie), own.id);
+      const senseBody = JSON.parse(await sense.text());
+      assert.equal(senseBody.items.length, 1);
+      assert.equal(senseBody.items[0].sponsored, false);
+      assert.deepEqual(Object.keys(senseBody.items[0]).sort(), Object.keys(body.items[0]).sort());
+    }
+  } finally {
+    await resetBoostSettings();
+  }
 });

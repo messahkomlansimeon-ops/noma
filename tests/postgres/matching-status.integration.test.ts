@@ -19,7 +19,7 @@ before(async () => {
   admin = opened.pool;
   await admin.query(`CREATE SCHEMA ${quoted}`);
   pool = await openVerifiedIsolatedPool(opened.target, schema);
-  assert.equal((await runMigrations(pool)).applied.length, 10);
+  assert.equal((await runMigrations(pool)).applied.length, 11);
 });
 
 after(async () => {
@@ -99,7 +99,7 @@ test("base saine : code 0, aucun avertissement, compteurs exacts (sortie lisible
 
   const human = await statusScript();
   assert.equal(human.code, 0, human.output);
-  assert.match(human.output, /Schéma : prêt \(10 migration\(s\), dernière 0010_matching_job_leases\)/);
+  assert.match(human.output, /Schéma : prêt \(11 migration\(s\), dernière 0011_offer_boosts\)/);
   assert.match(human.output, /Événements pending : catalog\.bootstrap_sync=1/);
   assert.match(human.output, /Événements projected : catalog\.bootstrap_sync=1/);
   assert.match(human.output, /Avertissements : aucun/);
@@ -107,7 +107,7 @@ test("base saine : code 0, aucun avertissement, compteurs exacts (sortie lisible
   const { code, report } = await statusJson();
   assert.equal(code, 0);
   assert.equal(report.schemaReady, true);
-  assert.deepEqual(report.migrations, { count: 10, latest: "0010_matching_job_leases" });
+  assert.deepEqual(report.migrations, { count: 11, latest: "0011_offer_boosts" });
   assert.deepEqual(report.outbox.pendingByType, { "catalog.bootstrap_sync": 1 });
   assert.deepEqual(report.outbox.projectedByType, { "catalog.bootstrap_sync": 1 });
   assert.equal(report.outbox.oldestPending?.eventType, "catalog.bootstrap_sync");

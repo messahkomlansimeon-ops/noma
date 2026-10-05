@@ -94,6 +94,17 @@ une grille exhaustive). `reserved` (20) reste **strictement** sous l'inconnu (30
 pas une information cachée. La renormalisation, elle, ne subsiste que pour les composantes **non applicables** du sens
 offre (disponibilité et prix de sa propre offre).
 
+## Boost (lot 2I1)
+
+La pertinence ci-dessus est **organique** : le boost n'y entre jamais (ni la valeur `relevance`, ni le score, ni les
+indicateurs ne changent). Brief §15 : compatibles, puis pertinence, puis boost **à l'intérieur** du classement. Après le tri
+organique de la fenêtre, `sort=relevance` du **sens demande** place les éléments dont l'offre a un boost effectif à `at` et dont
+la pertinence atteint `min_relevance`, au plus `floor(max_promoted_share × N)`, aux positions 0, 7, 14, … (part 0,15). Les autres
+éléments gardent leur ordre organique relatif. Chaque item porte `sponsored` (vrai seulement pour un promu). Le tri par score, le
+tri par défaut et le sens offre ne changent pas. Réglages, places, plafond par vendeur, attribution et limites :
+`BOOST.md`. `at` sert aussi d'horloge d'effectivité des boosts : une attribution postérieure à `at` n'affecte pas un parcours en
+cours.
+
 ## Tri, fenêtre et pagination
 
 `sort=score` (défaut) : STRICTEMENT le comportement et les curseurs d'avant le lot (score DESC NULLS LAST, date, id).

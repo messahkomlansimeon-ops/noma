@@ -150,6 +150,7 @@ if (!configuredUrl?.trim()) {
         "0008_matching_jobs",
         "0009_matching_projection",
         "0010_matching_job_leases",
+        "0011_offer_boosts",
       ]);
     });
 
