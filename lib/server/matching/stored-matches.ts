@@ -8,6 +8,12 @@ import type { DemandRecord, OfferRecord } from "../catalog/types";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
 import { validateCandidateLimit } from "./candidates";
 import {
+  computeAvailabilityIndicator, computeConfidenceIndicator, computePriceIndicator, computeRelevance,
+  type AvailabilityIndicator, type ConfidenceIndicator, type PriceIndicator, type RelevanceSense,
+} from "./indicators";
+import { readMarketReferences, type MarketQuery } from "./market";
+import { RELEVANCE_CONFIG, RELEVANCE_WINDOW } from "./relevance-config";
+import {
   MATCHING_CURRENT_CLOCK_CTE,
   MATCHING_FRESHNESS_FROM,
   buildMatchingFreshnessPredicate,
@@ -30,9 +36,15 @@ import type { MatchingCompatibilityStatus } from "./types";
 
 export type StoredMatchSourceKind = "offer" | "demand";
 
+export type StoredMatchSort = "score" | "relevance";
+
 export interface StoredMatchesQueryOptions {
   limit?: number;
   cursor?: string;
+  /** `score` (défaut : ordre et curseur historiques) ou `relevance` (pertinence organique, voir MATCHING-RELEVANCE.md). */
+  sort?: StoredMatchSort;
+  /** Réservé aux tests (non exposé par HTTP) : fenêtre de lecture du tri par pertinence, 200 par défaut. */
+  relevanceWindow?: number;
   /** Valeurs courantes par défaut, comme getActiveMatchingEvaluation (non exposées par HTTP). */
   expectedEngineOfflineVersion?: string;
   expectedEngineScoringVersion?: string;
@@ -66,6 +78,18 @@ export interface StoredMatchPreferencesSummary {
   unknownCount: number;
 }
 
+/**
+ * Indicateurs séparés (brief §5), calculés à la lecture et jamais enregistrés. Sens demande (l'acheteur voit des
+ * offres) : les trois concernent l'offre candidate et son vendeur. Sens offre (le vendeur voit des demandes) :
+ * `availability` et `price` sont null (ils décriraient SA propre offre, identique pour tous les éléments) ;
+ * `confidence` concerne l'acheteur.
+ */
+export interface StoredMatchIndicators {
+  availability: AvailabilityIndicator | null;
+  price: PriceIndicator | null;
+  confidence: ConfidenceIndicator;
+}
+
 export interface StoredMatchItem<TCandidate extends OfferRecord | DemandRecord> {
   candidateId: string;
   candidateContentVersion: number;
@@ -78,6 +102,9 @@ export interface StoredMatchItem<TCandidate extends OfferRecord | DemandRecord> 
   evaluationSummary: StoredMatchEvaluationSummary;
   scoringSummary: StoredMatchScoringSummary;
   preferencesSummary: StoredMatchPreferencesSummary;
+  indicators: StoredMatchIndicators;
+  /** Pertinence organique 0..100 (2 décimales) ; jamais de boost. */
+  relevance: number;
 }
 
 export interface StoredMatchesPage<
@@ -89,13 +116,15 @@ export interface StoredMatchesPage<
   nextCursor: string | null;
   hasMore: boolean;
   limit: number;
+  /** Tri `relevance` seulement : plus de RELEVANCE_WINDOW correspondances existent, seules les meilleures par score sont triées. */
+  truncated: boolean;
   /**
    * true si la VERSION COURANTE de la source est en cours de traitement : événement outbox pending de son agrégat à
    * cette version, ou job evaluate_* du bon type sur (source, version) pending / running / failed. Un NOUVEAU
    * candidat est ajouté plus tard par SON PROPRE job : ce cas n'est pas reflété par `processing`.
    */
   processing: boolean;
-  /** clock_timestamp() de la base à la fin de la lecture. */
+  /** clock_timestamp() de la base au début de la lecture (c'est aussi le `now` des indicateurs, sauf pages suivantes du tri par pertinence). */
   readAt: Date;
 }
 
@@ -182,6 +211,62 @@ function decodeStoredMatchCursor(
   return { v: 1, sourceKind, sourceId: sourceId.toLowerCase(), score, evaluatedAt, id: id.toLowerCase() };
 }
 
+/**
+ * Curseur du tri par pertinence : pagination par DÉCALAGE sur la liste triée, avec l'horloge `at` figée à la première
+ * page (les indicateurs des pages suivantes sont recalculés avec now = at). Clés exactes, distinctes de celles du curseur
+ * de score : un curseur de l'un est refusé par l'autre.
+ */
+interface RelevanceCursorPayload {
+  v: 1;
+  sort: "relevance";
+  sourceKind: StoredMatchSourceKind;
+  sourceId: string;
+  offset: number;
+  /** ISO UTC à 6 décimales, `Z` final. */
+  at: string;
+}
+
+const RELEVANCE_CURSOR_KEYS = ["at", "offset", "sort", "sourceId", "sourceKind", "v"];
+
+const toIsoMicros = (date: Date): string => date.toISOString().replace(/Z$/, "000Z");
+
+function encodeRelevanceCursor(payload: RelevanceCursorPayload): string {
+  return Buffer.from(JSON.stringify({
+    v: payload.v, sort: payload.sort, sourceKind: payload.sourceKind, sourceId: payload.sourceId, offset: payload.offset, at: payload.at,
+  }), "utf8").toString("base64url");
+}
+
+function decodeRelevanceCursor(
+  cursor: unknown,
+  expected: { sourceKind: StoredMatchSourceKind; sourceId: string },
+): RelevanceCursorPayload | null {
+  if (cursor === undefined || cursor === null) return null;
+  if (typeof cursor !== "string") throw invalidCursor("chaîne attendue");
+  if (!BASE64URL_PATTERN.test(cursor) || cursor.length > MAX_CURSOR_LENGTH) throw invalidCursor("encodage non conforme");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+  } catch {
+    throw invalidCursor("contenu corrompu");
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw invalidCursor("structure");
+  const keys = Object.keys(parsed).sort();
+  if (keys.length !== RELEVANCE_CURSOR_KEYS.length || keys.some((key, index) => key !== RELEVANCE_CURSOR_KEYS[index])) {
+    throw invalidCursor("propriétés inattendues (curseur d'un autre tri ?)");
+  }
+  const { v, sort, sourceKind, sourceId, offset, at } = parsed as Record<string, unknown>;
+  if (v !== 1) throw invalidCursor("version");
+  if (sort !== "relevance") throw invalidCursor("tri");
+  if (sourceKind !== "offer" && sourceKind !== "demand") throw invalidCursor("sens");
+  if (typeof sourceId !== "string" || !UUID_REGEX.test(sourceId)) throw invalidCursor("source");
+  if (typeof offset !== "number" || !Number.isSafeInteger(offset) || offset < 0 || offset > RELEVANCE_CONFIG.relevance.maxOffset) throw invalidCursor("décalage");
+  if (typeof at !== "string" || !isCalendarIsoMicroseconds(at)) throw invalidCursor("date");
+  if (sourceKind !== expected.sourceKind || sourceId.toLowerCase() !== expected.sourceId) {
+    throw invalidCursor("curseur d'une autre source");
+  }
+  return { v: 1, sort: "relevance", sourceKind, sourceId: sourceId.toLowerCase(), offset, at };
+}
+
 // ───────────── lecture des colonnes JSON enregistrées ─────────────
 
 function asRecord(value: unknown, field: string): Record<string, unknown> {
@@ -244,6 +329,7 @@ function readPreferencesSummary(stored: unknown): StoredMatchPreferencesSummary 
 
 interface StoredEvaluationColumns {
   eval_id: string;
+  eval_confirmed: boolean;
   eval_score: string | null;
   eval_coverage: string | null;
   eval_compatibility_status: MatchingCompatibilityStatus;
@@ -255,7 +341,7 @@ interface StoredEvaluationColumns {
 }
 
 const EVALUATION_COLUMNS = `
-  e.id AS eval_id, e.score::text AS eval_score, e.coverage::text AS eval_coverage,
+  e.id AS eval_id, e.is_confirmed_match AS eval_confirmed, e.score::text AS eval_score, e.coverage::text AS eval_coverage,
   e.compatibility_status AS eval_compatibility_status, e.evaluated_at AS eval_evaluated_at,
   to_char(e.evaluated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS eval_evaluated_at_iso,
   e.evaluation_summary AS eval_evaluation_summary, e.scoring_summary AS eval_scoring_summary,
@@ -279,26 +365,22 @@ function keysetCondition(cursor: StoredMatchCursorPayload, values: unknown[]): s
 
 type CandidateRow<TRow> = TRow & StoredEvaluationColumns;
 
-async function listStoredMatches<
-  TCandidate extends OfferRecord | DemandRecord,
-  TRow extends OfferRow | DemandRow,
->(
-  client: SqlExecutor,
-  input: {
-    sourceKind: StoredMatchSourceKind;
-    sourceId: string;
-    limit: number;
-    cursor: StoredMatchCursorPayload | null;
-    freshness: ReturnType<typeof resolveMatchingFreshnessParams>;
-    candidateColumns: string;
-    mapCandidate: (row: TRow) => TCandidate;
-  },
-): Promise<{ items: StoredMatchItem<TCandidate>[]; nextCursor: string | null; hasMore: boolean }> {
+interface RowsInput {
+  sourceKind: StoredMatchSourceKind;
+  sourceId: string;
+  freshness: ReturnType<typeof resolveMatchingFreshnessParams>;
+  candidateColumns: string;
+  rowLimit: number;
+  cursor: StoredMatchCursorPayload | null;
+}
+
+/** Lignes confirmées et fraîches de la source, dans l'ordre du score, `rowLimit` lignes au plus. */
+async function fetchRows<TRow extends OfferRow | DemandRow>(client: SqlExecutor, input: RowsInput): Promise<Array<CandidateRow<TRow>>> {
   const sourceColumn = input.sourceKind === "offer" ? "e.offer_id" : "e.demand_id";
   const freshness = buildMatchingFreshnessPredicate(input.freshness, 2);
   const values: unknown[] = [input.sourceId, ...freshness.values];
   const cursorCondition = input.cursor ? keysetCondition(input.cursor, values) : "";
-  values.push(input.limit + 1);
+  values.push(input.rowLimit);
 
   const result = await client.query<CandidateRow<TRow>>(
     `WITH ${MATCHING_CURRENT_CLOCK_CTE}
@@ -312,32 +394,133 @@ async function listStoredMatches<
       LIMIT $${values.length}`,
     values,
   );
+  return result.rows;
+}
 
-  const hasMore = result.rows.length > input.limit;
-  const rows = hasMore ? result.rows.slice(0, input.limit) : result.rows;
-  const items = rows.map((row): StoredMatchItem<TCandidate> => {
-    const candidate = input.mapCandidate(row);
+/** Item enrichi + clés internes de tri (jamais exposées). */
+interface RankedItem<TCandidate extends OfferRecord | DemandRecord> {
+  item: StoredMatchItem<TCandidate>;
+  evaluationId: string;
+  evaluatedAtIso: string;
+}
+
+interface OwnerFacts {
+  createdAt: Date;
+  phoneVerified: boolean;
+}
+
+/** Vérification du téléphone et ancienneté des propriétaires des candidats : une requête pour toute la liste. */
+async function readOwnerFacts(client: SqlExecutor, ownerIds: readonly string[]): Promise<Map<string, OwnerFacts>> {
+  const facts = new Map<string, OwnerFacts>();
+  if (ownerIds.length === 0) return facts;
+  const result = await client.query<{ id: string; created_at: Date; phone_verified: boolean }>(
+    `SELECT u.id, u.created_at,
+            EXISTS (SELECT 1 FROM phone_identities p WHERE p.user_id = u.id AND p.verified_at IS NOT NULL) AS phone_verified
+       FROM users u WHERE u.id = ANY($1::uuid[])`,
+    [[...new Set(ownerIds)]],
+  );
+  for (const row of result.rows) facts.set(row.id, { createdAt: row.created_at, phoneVerified: row.phone_verified });
+  return facts;
+}
+
+/**
+ * Items + indicateurs + pertinence pour des lignes déjà lues. Faits relus dans le MÊME instantané : marché (une requête,
+ * sens demande seulement) et propriétaires (une requête). `now` est l'horloge des indicateurs.
+ */
+async function buildItems<TCandidate extends OfferRecord | DemandRecord, TRow extends OfferRow | DemandRow>(
+  client: SqlExecutor,
+  input: {
+    sourceKind: StoredMatchSourceKind;
+    source: OfferRecord | DemandRecord;
+    rows: Array<CandidateRow<TRow>>;
+    mapCandidate: (row: TRow) => TCandidate;
+    now: Date;
+  },
+): Promise<Array<RankedItem<TCandidate>>> {
+  const candidates = input.rows.map((row) => input.mapCandidate(row));
+  const owners = await readOwnerFacts(client, candidates.map((candidate) => candidate.ownerId));
+  // Sens demande : l'acheteur voit des OFFRES, dont le prix se situe par rapport au marché observé.
+  const senseIsDemandSource = input.sourceKind === "demand";
+  const markets = senseIsDemandSource
+    ? await readMarketReferences(client, (candidates as OfferRecord[]).map((offer): MarketQuery => ({
+      offerId: offer.id, category: offer.category, brand: offer.brand, model: offer.model, currency: offer.price?.currency ?? null,
+    })))
+    : new Map();
+  const sense: RelevanceSense = senseIsDemandSource ? "demand_source" : "offer_source";
+
+  return input.rows.map((row, index): RankedItem<TCandidate> => {
+    const candidate = candidates[index];
+    const owner = owners.get(candidate.ownerId) ?? { createdAt: input.now, phoneVerified: false };
+    let indicators: StoredMatchIndicators;
+    if (senseIsDemandSource) {
+      const offer = candidate as OfferRecord;
+      indicators = {
+        availability: computeAvailabilityIndicator({
+          status: offer.availabilityStatus ?? null,
+          confirmedAt: offer.availabilityConfirmedAt ?? null,
+          quantity: offer.quantity ?? null,
+          requestedQuantity: (input.source as DemandRecord).quantity ?? null,
+          now: input.now,
+        }),
+        price: computePriceIndicator({ price: offer.price?.amount ?? null, market: markets.get(offer.id) ?? null }),
+        confidence: computeConfidenceIndicator({
+          kind: "offer", phoneVerified: owner.phoneVerified, accountCreatedAt: owner.createdAt, now: input.now,
+          availabilityEverConfirmed: offer.availabilityConfirmedAt != null,
+          fields: {
+            category: offer.category, brand: offer.brand, model: offer.model, condition: offer.condition,
+            price: offer.price?.amount ?? null, location: offer.location,
+          },
+        }),
+      };
+    } else {
+      const demand = candidate as DemandRecord;
+      indicators = {
+        availability: null,
+        price: null,
+        confidence: computeConfidenceIndicator({
+          kind: "demand", phoneVerified: owner.phoneVerified, accountCreatedAt: owner.createdAt, now: input.now,
+          availabilityEverConfirmed: false,
+          fields: { category: demand.category, brand: demand.brand, model: demand.model, condition: demand.condition, location: demand.location },
+        }),
+      };
+    }
+    const score = row.eval_score === null ? null : Number(row.eval_score);
+    const relevance = computeRelevance({
+      confirmed: row.eval_confirmed === true,
+      sense,
+      compatibility: score,
+      availability: indicators.availability?.score ?? null,
+      price: indicators.price?.score ?? null,
+      confidence: indicators.confidence.score,
+    });
     return {
-      candidateId: candidate.id,
-      candidateContentVersion: candidate.contentVersion,
-      candidate,
-      compatibilityStatus: row.eval_compatibility_status,
-      score: row.eval_score === null ? null : Number(row.eval_score),
-      coverage: row.eval_coverage === null ? null : Number(row.eval_coverage),
-      evaluatedAt: row.eval_evaluated_at,
-      evaluationSummary: readEvaluationSummary(row.eval_evaluation_summary),
-      scoringSummary: readScoringSummary(row.eval_scoring_summary),
-      preferencesSummary: readPreferencesSummary(row.eval_preferences_summary),
+      evaluationId: row.eval_id,
+      evaluatedAtIso: row.eval_evaluated_at_iso,
+      item: {
+        candidateId: candidate.id,
+        candidateContentVersion: candidate.contentVersion,
+        candidate,
+        compatibilityStatus: row.eval_compatibility_status,
+        score,
+        coverage: row.eval_coverage === null ? null : Number(row.eval_coverage),
+        evaluatedAt: row.eval_evaluated_at,
+        evaluationSummary: readEvaluationSummary(row.eval_evaluation_summary),
+        scoringSummary: readScoringSummary(row.eval_scoring_summary),
+        preferencesSummary: readPreferencesSummary(row.eval_preferences_summary),
+        indicators,
+        relevance: relevance ?? 0,
+      },
     };
   });
-  const last = rows[rows.length - 1];
-  const nextCursor = hasMore && last
-    ? encodeStoredMatchCursor({
-      v: 1, sourceKind: input.sourceKind, sourceId: input.sourceId,
-      score: last.eval_score, evaluatedAt: last.eval_evaluated_at_iso, id: last.eval_id,
-    })
-    : null;
-  return { items, nextCursor, hasMore };
+}
+
+/** Ordre du tri par pertinence : relevance DESC, score DESC NULLS LAST, evaluated_at DESC, id d'évaluation DESC. */
+function compareByRelevance<T extends OfferRecord | DemandRecord>(a: RankedItem<T>, b: RankedItem<T>): number {
+  if (a.item.relevance !== b.item.relevance) return b.item.relevance - a.item.relevance;
+  if ((a.item.score === null) !== (b.item.score === null)) return a.item.score === null ? 1 : -1;
+  if (a.item.score !== null && b.item.score !== null && a.item.score !== b.item.score) return b.item.score - a.item.score;
+  if (a.evaluatedAtIso !== b.evaluatedAtIso) return a.evaluatedAtIso < b.evaluatedAtIso ? 1 : -1;
+  return a.evaluationId < b.evaluationId ? 1 : a.evaluationId > b.evaluationId ? -1 : 0;
 }
 
 /** processing + readAt, dans le même instantané que la lecture des lignes. */
@@ -363,9 +546,87 @@ async function readProcessing(
   return { processing: result.rows[0].processing === true, readAt: result.rows[0].read_at };
 }
 
+function validateSort(sort: unknown): StoredMatchSort {
+  if (sort === undefined) return "score";
+  if (sort === "score" || sort === "relevance") return sort;
+  throw new CatalogValidationError("sort doit valoir score ou relevance.");
+}
+
+function validateRelevanceWindow(window: unknown): number {
+  if (window === undefined) return RELEVANCE_WINDOW;
+  const max = RELEVANCE_CONFIG.relevance.maxWindowOption;
+  if (typeof window !== "number" || !Number.isSafeInteger(window) || window < 1 || window > max) {
+    throw new CatalogValidationError(`relevanceWindow doit être un entier entre 1 et ${max}.`);
+  }
+  return window;
+}
+
+interface StoredReadInput<TSource extends OfferRecord | DemandRecord, TCandidate extends OfferRecord | DemandRecord, TRow extends OfferRow | DemandRow> {
+  sourceKind: StoredMatchSourceKind;
+  ownerId: string;
+  sourceId: string;
+  limit: number;
+  sort: StoredMatchSort;
+  window: number;
+  scoreCursor: StoredMatchCursorPayload | null;
+  relevanceCursor: RelevanceCursorPayload | null;
+  freshness: ReturnType<typeof resolveMatchingFreshnessParams>;
+  pool: Pool;
+  loadSource: (ownerId: string, sourceId: string, client: SqlExecutor) => Promise<TSource>;
+  candidateColumns: string;
+  mapCandidate: (row: TRow) => TCandidate;
+}
+
+/** Cœur commun aux deux sens : un seul instantané de lecture, mêmes erreurs de source que les routes en direct. */
+async function readStored<TSource extends OfferRecord | DemandRecord, TCandidate extends OfferRecord | DemandRecord, TRow extends OfferRow | DemandRow>(
+  input: StoredReadInput<TSource, TCandidate, TRow>,
+): Promise<StoredMatchesPage<TSource, TCandidate>> {
+  return withReadSnapshot(input.pool, async (client) => {
+    const source = await input.loadSource(input.ownerId, input.sourceId, client);
+    // Lu AVANT les lignes : readAt est l'horloge (« now ») des indicateurs.
+    const { processing, readAt } = await readProcessing(client, input.sourceKind, input.sourceId, source.contentVersion);
+    const sourceView = { id: source.id, contentVersion: source.contentVersion, ownerId: source.ownerId, record: source };
+    const rowsInput = { sourceKind: input.sourceKind, sourceId: input.sourceId, freshness: input.freshness, candidateColumns: input.candidateColumns };
+
+    if (input.sort === "relevance") {
+      // Les pages suivantes recalculent avec now = at, figé à la première page.
+      const at = input.relevanceCursor ? new Date(input.relevanceCursor.at) : readAt;
+      const rows = await fetchRows<TRow>(client, { ...rowsInput, rowLimit: input.window + 1, cursor: null });
+      const truncated = rows.length > input.window;
+      const ranked = await buildItems<TCandidate, TRow>(client, {
+        sourceKind: input.sourceKind, source, rows: truncated ? rows.slice(0, input.window) : rows, mapCandidate: input.mapCandidate, now: at,
+      });
+      ranked.sort(compareByRelevance);
+      const offset = input.relevanceCursor?.offset ?? 0;
+      const items = ranked.slice(offset, offset + input.limit).map((entry) => entry.item);
+      const hasMore = offset + input.limit < ranked.length;
+      const nextCursor = hasMore
+        ? encodeRelevanceCursor({ v: 1, sort: "relevance", sourceKind: input.sourceKind, sourceId: input.sourceId, offset: offset + input.limit, at: toIsoMicros(at) })
+        : null;
+      return { source: sourceView, items, nextCursor, hasMore, limit: input.limit, truncated, processing, readAt };
+    }
+
+    const rows = await fetchRows<TRow>(client, { ...rowsInput, rowLimit: input.limit + 1, cursor: input.scoreCursor });
+    const hasMore = rows.length > input.limit;
+    const pageRows = hasMore ? rows.slice(0, input.limit) : rows;
+    const ranked = await buildItems<TCandidate, TRow>(client, {
+      sourceKind: input.sourceKind, source, rows: pageRows, mapCandidate: input.mapCandidate, now: readAt,
+    });
+    const last = pageRows[pageRows.length - 1];
+    const nextCursor = hasMore && last
+      ? encodeStoredMatchCursor({
+        v: 1, sourceKind: input.sourceKind, sourceId: input.sourceId,
+        score: last.eval_score, evaluatedAt: last.eval_evaluated_at_iso, id: last.eval_id,
+      })
+      : null;
+    return { source: sourceView, items: ranked.map((entry) => entry.item), nextCursor, hasMore, limit: input.limit, truncated: false, processing, readAt };
+  });
+}
+
 /**
  * Correspondances enregistrées d'une offre (demandes candidates). Mêmes validations et mêmes erreurs de source
- * que findEvaluatedDemandMatchesForOffer ; tout dans UN instantané de lecture.
+ * que findEvaluatedDemandMatchesForOffer ; tout dans UN instantané de lecture. Sens offre : indicateurs `availability`
+ * et `price` nuls, pertinence = compatibilité et confiance de l'acheteur.
  */
 export async function listStoredDemandMatchesForOffer(
   ownerIdValue: string,
@@ -376,31 +637,27 @@ export async function listStoredDemandMatchesForOffer(
   const ownerId = requireUuid(ownerIdValue, "ownerId").toLowerCase();
   const offerId = requireUuid(offerIdValue, "offerId").toLowerCase();
   const limit = validateCandidateLimit(options?.limit);
-  const cursor = decodeStoredMatchCursor(options?.cursor, { sourceKind: "offer", sourceId: offerId });
+  const sort = validateSort(options?.sort);
+  const window = validateRelevanceWindow(options?.relevanceWindow);
+  const expected = { sourceKind: "offer" as const, sourceId: offerId };
+  const scoreCursor = sort === "score" ? decodeStoredMatchCursor(options?.cursor, expected) : null;
+  const relevanceCursor = sort === "relevance" ? decodeRelevanceCursor(options?.cursor, expected) : null;
   const freshness = resolveMatchingFreshnessParams({
     engineOfflineVersion: options?.expectedEngineOfflineVersion,
     engineScoringVersion: options?.expectedEngineScoringVersion,
     scoringConfigHash: options?.expectedScoringConfigHash,
   });
   const targetPool = requireTransactionPool(pool);
-
-  return withReadSnapshot(targetPool, async (client) => {
-    const sourceOffer = await loadSourceOffer(ownerId, offerId, client);
-    const page = await listStoredMatches<DemandRecord, DemandRow>(client, {
-      sourceKind: "offer", sourceId: offerId, limit, cursor, freshness,
-      candidateColumns: SOURCE_DEMAND_COLUMNS, mapCandidate: mapDemand,
-    });
-    const { processing, readAt } = await readProcessing(client, "offer", offerId, sourceOffer.contentVersion);
-    return {
-      source: { id: sourceOffer.id, contentVersion: sourceOffer.contentVersion, ownerId: sourceOffer.ownerId, record: sourceOffer },
-      ...page, limit, processing, readAt,
-    };
+  return readStored<OfferRecord, DemandRecord, DemandRow>({
+    sourceKind: "offer", ownerId, sourceId: offerId, limit, sort, window, scoreCursor, relevanceCursor, freshness, pool: targetPool,
+    loadSource: loadSourceOffer, candidateColumns: SOURCE_DEMAND_COLUMNS, mapCandidate: mapDemand,
   });
 }
 
 /**
  * Correspondances enregistrées d'une demande (offres candidates). Mêmes validations et mêmes erreurs de source
- * que findEvaluatedOfferMatchesForDemand ; tout dans UN instantané de lecture.
+ * que findEvaluatedOfferMatchesForDemand ; tout dans UN instantané de lecture. Sens demande : trois indicateurs sur
+ * l'offre candidate, pertinence sur les quatre composantes.
  */
 export async function listStoredOfferMatchesForDemand(
   ownerIdValue: string,
@@ -411,24 +668,19 @@ export async function listStoredOfferMatchesForDemand(
   const ownerId = requireUuid(ownerIdValue, "ownerId").toLowerCase();
   const demandId = requireUuid(demandIdValue, "demandId").toLowerCase();
   const limit = validateCandidateLimit(options?.limit);
-  const cursor = decodeStoredMatchCursor(options?.cursor, { sourceKind: "demand", sourceId: demandId });
+  const sort = validateSort(options?.sort);
+  const window = validateRelevanceWindow(options?.relevanceWindow);
+  const expected = { sourceKind: "demand" as const, sourceId: demandId };
+  const scoreCursor = sort === "score" ? decodeStoredMatchCursor(options?.cursor, expected) : null;
+  const relevanceCursor = sort === "relevance" ? decodeRelevanceCursor(options?.cursor, expected) : null;
   const freshness = resolveMatchingFreshnessParams({
     engineOfflineVersion: options?.expectedEngineOfflineVersion,
     engineScoringVersion: options?.expectedEngineScoringVersion,
     scoringConfigHash: options?.expectedScoringConfigHash,
   });
   const targetPool = requireTransactionPool(pool);
-
-  return withReadSnapshot(targetPool, async (client) => {
-    const sourceDemand = await loadSourceDemand(ownerId, demandId, client);
-    const page = await listStoredMatches<OfferRecord, OfferRow>(client, {
-      sourceKind: "demand", sourceId: demandId, limit, cursor, freshness,
-      candidateColumns: SOURCE_OFFER_COLUMNS, mapCandidate: mapOffer,
-    });
-    const { processing, readAt } = await readProcessing(client, "demand", demandId, sourceDemand.contentVersion);
-    return {
-      source: { id: sourceDemand.id, contentVersion: sourceDemand.contentVersion, ownerId: sourceDemand.ownerId, record: sourceDemand },
-      ...page, limit, processing, readAt,
-    };
+  return readStored<DemandRecord, OfferRecord, OfferRow>({
+    sourceKind: "demand", ownerId, sourceId: demandId, limit, sort, window, scoreCursor, relevanceCursor, freshness, pool: targetPool,
+    loadSource: loadSourceDemand, candidateColumns: SOURCE_OFFER_COLUMNS, mapCandidate: mapOffer,
   });
 }

@@ -21,9 +21,10 @@ Authentification, paramètres (`limit` 1 à 100, défaut 20 ; `cursor` ; tout au
 inéligible), dans UN instantané `REPEATABLE READ READ ONLY`.
 
 Réponse (`contractVersion: "matching-stored-http/v1"`) : `source` (fiche produit épurée), `items`, `processing`,
-`readAt`, `nextCursor`, `hasMore`, `limit`. Chaque item a la forme de l'item en direct (`candidateId`,
+`readAt`, `nextCursor`, `hasMore`, `limit`, `truncated` (lot 2H1). Chaque item a la forme de l'item en direct (`candidateId`,
 `candidateContentVersion`, `candidate`, `compatibilityStatus`, `score`, `coverage`, `evaluation`, `scoring`) plus
-`evaluatedAt`. Les résumés sont relus depuis les colonnes `evaluation_summary` (`criteriaSummary`),
+`evaluatedAt`, `indicators` (`availability`, `price`, `confidence`) et `relevance` (lot 2H1 : champs ajoutés, même
+`contractVersion`, voir `MATCHING-RELEVANCE.md`). Les résumés sont relus depuis les colonnes `evaluation_summary` (`criteriaSummary`),
 `scoring_summary` et `preferences_summary` ; `score` et `coverage` viennent de colonnes `NUMERIC(9,6)` : **arrondis
 à 6 décimales**. Liste blanche stricte, champ par champ : jamais d'identifiant de propriétaire, de texte brut,
 d'`evaluation_details`, de `scoring_config`, de clé d'idempotence ni de hash de tentative (ces colonnes ne sont
@@ -41,7 +42,11 @@ de l'évaluation, grâce au prédicat.
 
 ## Tri et pagination
 
-Tri : `score DESC NULLS LAST, evaluated_at DESC, id DESC`, pagination keyset, `LIMIT limit + 1`. Les index partiels
+Paramètre `sort` (lot 2H1) : `score` (défaut) ou `relevance` ; toute autre valeur ou un `sort` dupliqué → 400. Le tri par
+pertinence (fenêtre de 200, décalage, `at` figé, `truncated`) est décrit dans `MATCHING-RELEVANCE.md` ; le tri par
+score ci-dessous est inchangé.
+
+Tri par score : `score DESC NULLS LAST, evaluated_at DESC, id DESC`, pagination keyset, `LIMIT limit + 1`. Les index partiels
 `idx_matching_eval_offer_confirmed` / `idx_matching_eval_demand_confirmed` (0006) couvrent `(source, score DESC
 NULLS LAST, evaluated_at DESC)` ; `id` n'est qu'un départage des égalités : aucun index supplémentaire, aucune
 migration.
@@ -59,7 +64,7 @@ Booléen, vrai si, pour la **version COURANTE** de la source : un événement ou
 à cette version, OU un job `evaluate_*` du bon type existe sur `(source, content_version)` en `pending`,
 `running` ou `failed`. Il passe à faux quand le job est terminé (`completed`, `superseded`, `dead_letter`).
 Un job d'une version ancienne ou d'un autre type n'est pas pris en compte. `readAt` est le `clock_timestamp()` de
-la base à la fin de la lecture.
+la base lu au début de la lecture (c'est le `now` des indicateurs).
 
 **Un NOUVEAU candidat est ajouté plus tard par SON PROPRE job** (celui de la ressource nouvellement créée ou
 modifiée) : ce cas n'est pas reflété par `processing`, qui ne parle que de la source. Les événements d'autres

@@ -2,6 +2,7 @@ import "server-only";
 
 import type { AvailabilityStatus, DemandRecord, Money, OfferRecord } from "../catalog/types";
 import type { EvaluatedMatchItem, EvaluatedMatchPage } from "./service-types";
+import type { AvailabilityLevel, ConfidenceLevel, PricePosition, AccountAgeBand } from "./indicators";
 import type { StoredMatchItem, StoredMatchesPage } from "./stored-matches";
 import type { MatchingCompatibilityStatus } from "./types";
 
@@ -81,9 +82,21 @@ export interface EvaluatedMatchesResponseDto {
   limit: number;
 }
 
-/** Élément de correspondance ENREGISTRÉE : la forme de l'élément en direct, plus la date de l'évaluation. */
+/** Indicateurs séparés (brief §5), calculés à la lecture. `availability` et `price` sont null dans le sens offre. */
+export interface StoredMatchIndicatorsDto {
+  availability: { level: AvailabilityLevel; score: number | null; confirmedAgeHours: number | null; factors: string[] } | null;
+  /** Position par rapport au marché observé : jamais le prix de marché brut ni les offres d'autrui. */
+  price: { position: PricePosition; score: number | null; deltaPercent: number | null; sampleSize: number } | null;
+  /** Ancienneté du compte par tranche seulement ; jamais de téléphone ni de date de création. */
+  confidence: { level: ConfidenceLevel; score: number; accountAgeBand: AccountAgeBand; factors: string[] };
+}
+
+/** Élément de correspondance ENREGISTRÉE : la forme de l'élément en direct, plus la date de l'évaluation, les indicateurs et la pertinence. */
 export interface StoredMatchItemDto extends EvaluatedMatchItemDto {
   evaluatedAt: string;
+  indicators: StoredMatchIndicatorsDto;
+  /** Pertinence organique 0..100 (sans boost). */
+  relevance: number;
 }
 
 export interface StoredMatchesResponseDto {
@@ -96,6 +109,8 @@ export interface StoredMatchesResponseDto {
   nextCursor: string | null;
   hasMore: boolean;
   limit: number;
+  /** Tri par pertinence : plus de 200 correspondances existent, seules les meilleures par score ont été triées. */
+  truncated: boolean;
 }
 
 /**
@@ -245,6 +260,27 @@ function mapStoredMatchItem<TCandidate extends OfferRecord | DemandRecord>(
       },
     },
     evaluatedAt: item.evaluatedAt.toISOString(),
+    indicators: {
+      availability: item.indicators.availability === null ? null : {
+        level: item.indicators.availability.level,
+        score: item.indicators.availability.score,
+        confirmedAgeHours: item.indicators.availability.confirmedAgeHours,
+        factors: [...item.indicators.availability.factors],
+      },
+      price: item.indicators.price === null ? null : {
+        position: item.indicators.price.position,
+        score: item.indicators.price.score,
+        deltaPercent: item.indicators.price.deltaPercent,
+        sampleSize: item.indicators.price.sampleSize,
+      },
+      confidence: {
+        level: item.indicators.confidence.level,
+        score: item.indicators.confidence.score,
+        accountAgeBand: item.indicators.confidence.accountAgeBand,
+        factors: [...item.indicators.confidence.factors],
+      },
+    },
+    relevance: item.relevance,
   };
 }
 
@@ -262,5 +298,6 @@ export function mapStoredMatchesPageToDto<
     nextCursor: page.nextCursor,
     hasMore: page.hasMore,
     limit: page.limit,
+    truncated: page.truncated,
   };
 }

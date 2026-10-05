@@ -29,6 +29,7 @@
     "test:matching-http": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-http.integration.test.ts",
     "test:matching-persistence": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-persistence.integration.test.ts",
     "test:scoring": "NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/server/matching-scoring.test.ts",
+    "test:matching-indicators": "NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/server/matching-indicators.test.ts",
     "test:contracts": "node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/contracts.test.ts",
     "test:server": "node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/server/guard.test.ts",
     "test:stream": "NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/server/stream.test.ts",
@@ -46,6 +47,7 @@
     "test:matching-temporal": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-temporal.integration.test.ts",
     "test:matching-dev-full": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-dev-full.integration.test.ts",
     "test:matching-status": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-status.integration.test.ts",
+    "test:matching-relevance": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-relevance.integration.test.ts",
     "test:matching-stored": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-stored.integration.test.ts",
     "test:matching-bootstrap": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-bootstrap.integration.test.ts",
     "test:cleanup-schemas": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs scripts/cleanup-test-schemas.ts"

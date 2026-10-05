@@ -75,14 +75,18 @@ function mapMatchingError(error: unknown): Response {
 
 /**
  * Valide strictement les paramètres de requête HTTP.
- * Autorise uniquement 'limit' et 'cursor'.
+ * Autorise uniquement 'limit' et 'cursor' ; les routes `stored-matches` autorisent en plus 'sort' (`allowSort`,
+ * faux par défaut : les routes en direct refusent `sort`).
  * Rejette tout paramètre inconnu, répété ou mal formé.
  */
-function parseQueryParams(request: Request): { limit?: number; cursor?: string } {
+function parseQueryParams(
+  request: Request,
+  allowSort = false,
+): { limit?: number; cursor?: string; sort?: "score" | "relevance" } {
   const url = new URL(request.url);
   const keys = [...url.searchParams.keys()];
   for (const key of keys) {
-    if (key !== "limit" && key !== "cursor") {
+    if (key !== "limit" && key !== "cursor" && !(allowSort && key === "sort")) {
       throw new CatalogValidationError(`Paramètre non autorisé : ${key}`);
     }
   }
@@ -91,6 +95,9 @@ function parseQueryParams(request: Request): { limit?: number; cursor?: string }
   }
   if (url.searchParams.getAll("cursor").length > 1) {
     throw new CatalogValidationError("Paramètre 'cursor' dupliqué.");
+  }
+  if (url.searchParams.getAll("sort").length > 1) {
+    throw new CatalogValidationError("Paramètre 'sort' dupliqué.");
   }
 
   let limit: number | undefined;
@@ -113,7 +120,16 @@ function parseQueryParams(request: Request): { limit?: number; cursor?: string }
     }
   }
 
-  return { limit, cursor };
+  let sort: "score" | "relevance" | undefined;
+  if (url.searchParams.has("sort")) {
+    const rawSort = url.searchParams.get("sort");
+    if (rawSort !== "score" && rawSort !== "relevance") {
+      throw new CatalogValidationError("sort doit valoir score ou relevance.");
+    }
+    sort = rawSort;
+  }
+
+  return { limit, cursor, ...(allowSort ? { sort } : {}) };
 }
 
 export function createMatchingHttpHandlers(
@@ -166,11 +182,11 @@ export function createMatchingHttpHandlers(
         if (!UUID.test(id)) return invalidRequest();
 
         try {
-          const { limit, cursor } = parseQueryParams(request);
+          const { limit, cursor, sort } = parseQueryParams(request, true);
           const page = await listStoredOfferMatchesForDemand(
             auth.ownerId,
             id,
-            { limit, cursor },
+            { limit, cursor, sort },
             dependencies.pool,
           );
           return noStoreJsonResponse(200, mapStoredMatchesPageToDto(page));
@@ -207,11 +223,11 @@ export function createMatchingHttpHandlers(
         if (!UUID.test(id)) return invalidRequest();
 
         try {
-          const { limit, cursor } = parseQueryParams(request);
+          const { limit, cursor, sort } = parseQueryParams(request, true);
           const page = await listStoredDemandMatchesForOffer(
             auth.ownerId,
             id,
-            { limit, cursor },
+            { limit, cursor, sort },
             dependencies.pool,
           );
           return noStoreJsonResponse(200, mapStoredMatchesPageToDto(page));

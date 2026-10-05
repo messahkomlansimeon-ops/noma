@@ -563,8 +563,8 @@ for (const direction of DIRECTIONS) {
 
 // ═════════════ 6. HTTP ═════════════
 
-const ITEM_KEYS = ["candidate", "candidateContentVersion", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "evaluation", "score", "scoring"];
-const TOP_KEYS = ["contractVersion", "hasMore", "items", "limit", "nextCursor", "processing", "readAt", "source"];
+const ITEM_KEYS = ["candidate", "candidateContentVersion", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "evaluation", "indicators", "relevance", "score", "scoring"];
+const TOP_KEYS = ["contractVersion", "hasMore", "items", "limit", "nextCursor", "processing", "readAt", "source", "truncated"];
 
 test("HTTP : 401, 400, 200 avec la forme exacte, no-store et aucune fuite", async () => {
   for (const direction of DIRECTIONS) {
@@ -583,7 +583,7 @@ test("HTTP : 401, 400, 200 avec la forme exacte, no-store et aucune fuite", asyn
 
     assert.equal((await call("", null)).status, 401);
     assert.equal((await call("", "noma_auth=invalide")).status, 401);
-    for (const query of ["?foo=1", "?limit=0", "?limit=101", "?limit=abc", "?limit=1&limit=2", "?cursor=", "?cursor=zzz$", "?cursor=a&cursor=b", "?limit=5&sort=score"]) {
+    for (const query of ["?foo=1", "?limit=0", "?limit=101", "?limit=abc", "?limit=1&limit=2", "?cursor=", "?cursor=zzz$", "?cursor=a&cursor=b", "?limit=5&order=score"]) {
       const response = await call(query);
       assert.equal(response.status, 400, query);
       assert.deepEqual(await response.json(), { error: { code: "invalid_request", message: "Requête invalide." } });

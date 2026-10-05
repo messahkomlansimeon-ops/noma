@@ -110,3 +110,12 @@ diffèrent par : le DTO (`contractVersion: "matching-stored-http/v1"`, `evaluate
 `readAt`), le curseur (opaque, lié à la source et au sens, distinct de celui des routes en direct : un curseur
 d'une route n'est pas valide sur l'autre), le tri (score décroissant) et la limite par défaut (20, comme la
 recherche). Les routes `/matches` en direct restent strictement inchangées. Contrat complet : `MATCHING-STORED-READ.md`.
+
+**Paramètre `sort` (lot 2H1)** : les routes `stored-matches` acceptent `sort` (`score`, défaut, ou `relevance`) en plus de
+`limit` et `cursor` ; toute autre valeur, une valeur vide ou un `sort` dupliqué → `400 invalid_request`. Les routes
+`/matches` en direct **refusent toujours `sort`** (et tout paramètre autre que `limit` et `cursor`) : `sort` y est un
+paramètre inconnu → `400`. Les réponses `stored-matches` ajoutent, sans changer `contractVersion`
+(`matching-stored-http/v1`), `truncated` au niveau de la réponse et, par item, `indicators` (`availability`, `price`,
+`confidence`) et `relevance`, en liste blanche : jamais de numéro de téléphone, de date de création exacte,
+d'identifiant de propriétaire ni de prix de marché brut (le marché n'est exposé que par `position`, `deltaPercent` et
+`sampleSize`). Voir `MATCHING-RELEVANCE.md`.
