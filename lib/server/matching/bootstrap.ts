@@ -11,13 +11,13 @@ import {
   nextScanPosition,
   type ScanKind,
 } from "./resource-scan";
+import { MATCHING_REQUIRED_MIGRATION, isMatchingSchemaReady } from "./schema-ready";
 import { readSealedConfig } from "./worker";
 
 const DEFAULT_BATCH_SIZE = 100;
 const MAX_BATCH_SIZE = 500;
 /** Clé fixe du verrou consultatif de session (une seule exécution du bootstrap à la fois par base). */
 const BOOTSTRAP_ADVISORY_LOCK_KEY = "7204003001";
-const REQUIRED_MIGRATION = "0010_matching_job_leases";
 
 export class MatchingBootstrapError extends Error {
   constructor(message: string) {
@@ -81,14 +81,9 @@ function requireOptions(options: RunCatalogBootstrapOptions): { pool: Pool; batc
 
 /** N'applique JAMAIS de migration : refuse si 0010 n'est pas enregistrée dans noma_schema_migrations. */
 async function assertSchemaReady(client: PoolClient): Promise<void> {
-  const notReady = new MatchingBootstrapError(
-    `Schéma non prêt : la migration ${REQUIRED_MIGRATION} n'est pas enregistrée (appliquez les migrations 0001 à 0010 avant le bootstrap).`);
-  try {
-    const result = await client.query("SELECT 1 FROM noma_schema_migrations WHERE version = $1", [REQUIRED_MIGRATION]);
-    if (result.rowCount !== 1) throw notReady;
-  } catch (error) {
-    if ((error as { code?: string }).code === "42P01") throw notReady;
-    throw error;
+  if (!(await isMatchingSchemaReady(client))) {
+    throw new MatchingBootstrapError(
+      `Schéma non prêt : la migration ${MATCHING_REQUIRED_MIGRATION} n'est pas enregistrée (appliquez les migrations 0001 à 0010 avant le bootstrap).`);
   }
 }
 

@@ -73,9 +73,15 @@ n'est pas vide (0 sinon). Le mode boucle n'est pas modifié.
 `react-server` que `db:migrate`, **n'applique aucune migration** (la base doit déjà être migrée) et n'est jamais
 lancé par Next.js. Ne le lancez pas sur `noma_dev` sans l'avoir décidé.
 
+## Lancement conjoint avec l'application et état de santé (lot 2G1)
+
+`npm run dev:full` lance `next dev` et ce worker ensemble (le worker seulement si `DATABASE_URL` est défini et le
+schéma prêt) ; `npm run matching:status` lit l'état de santé en lecture seule (code 0 sain, 2 avertissements,
+1 erreur). `npm run dev` reste inchangé. Détail et signification des avertissements : `MATCHING-OPERATIONS.md`.
+
 ## Au déploiement (non fourni dans ce lot)
 
-Aucun fichier systemd n'est livré. Il faudra : une instance **séparée** du serveur Next.js, le **même
+Aucun fichier systemd n'est livré (ni pm2). Il faudra : une instance **séparée** du serveur Next.js, le **même
 `EnvironmentFile`** (`DATABASE_URL`), `Restart=on-failure`, et un arrêt par SIGTERM (le job en cours se termine
 avant la sortie ; prévoir un `TimeoutStopSec` supérieur à la durée d'un job). Plusieurs instances peuvent
 tourner : réservations `SKIP LOCKED` et baux garantissent qu'un job n'est exécuté que par un worker à la fois.

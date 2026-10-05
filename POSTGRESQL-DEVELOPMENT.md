@@ -52,7 +52,20 @@ docker exec "$CONTAINER" psql -U noma_local -d postgres -c 'DROP DATABASE noma_d
 docker exec -i "$CONTAINER" psql -U noma_local -d noma_dev -v ON_ERROR_STOP=1 < /tmp/noma-dev-backup-AAAA-MM-JJ.sql
 ```
 
-Cette commande de restauration est documentée, mais elle n'a pas été exécutée lors de l'activation.
+**Vérifiée le 2026-10-05**, sur une base jetable `noma_restore_test_<horodatage>` (jamais sur `noma_dev` ni `noma_test`) :
+`createdb`, les deux commandes ci-dessus avec ce nom de base, puis lecture : `noma_schema_migrations` contenait 0001 et
+0002, les 8 tables attendues étaient présentes (`auth_sessions`, `demands`, `noma_schema_migrations`, `offers`,
+`otp_challenges`, `otp_rate_limit_counters`, `phone_identities`, `users`), `users`, `offers` et `demands` valaient 0
+ligne ; `psql` a terminé avec le code 0 et aucune sortie d'erreur ; `dropdb` a supprimé la base. **Piège constaté** :
+`DROP DATABASE` / `CREATE DATABASE` ne sont pas guillemetés, donc PostgreSQL replie le nom en minuscules, alors que
+`createdb` conserve la casse : utilisez des noms de base **en minuscules**, comme `noma_dev`. Pour vérifier une
+sauvegarde sans risque, refaites cette procédure sur une base jetable aux noms en minuscules, puis supprimez-la avec
+`docker exec "$CONTAINER" dropdb -U noma_local <base>`.
+
+## Lancer l'application et le worker ensemble
+
+`npm run dev` (inchangé) ne lance que Next. `npm run dev:full` lance `next dev` ET le worker du matching ; voir
+`MATCHING-OPERATIONS.md`. `npm run matching:status` affiche l'état de santé du matching en lecture seule.
 
 ## Tests d'intégration
 
@@ -71,8 +84,8 @@ export TEST_DATABASE_URL='postgresql://noma_local:noma_local_only@127.0.0.1:5543
 npm run test:postgres
 ```
 
-Les tests des scripts (`matching:worker --once`, `matching:bootstrap`) lancent le vrai script sur un schéma
-temporaire de la base de test (`PGOPTIONS="-c search_path=<schéma>"`), jamais sur `noma_dev`.
+Les tests des scripts (`matching:worker --once`, `matching:bootstrap`, `matching:status`, `dev:full` avec un faux `next`) lancent
+le vrai script sur un schéma temporaire de la base de test (`PGOPTIONS="-c search_path=<schéma>"`), jamais sur `noma_dev`.
 
 `npm run test:cleanup-schemas` liste (simulation par défaut) puis, avec `-- --apply`, supprime les schémas
 `noma_test_<pid>_<32 hex>` laissés par des tests interrompus dont le processus n'existe plus ; il refuse
