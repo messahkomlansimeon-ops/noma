@@ -277,7 +277,8 @@ interface ExistingJobRow extends QueryResultRow {
   source_event_id: string | null;
 }
 
-async function insertJob(client: PoolClient, job: PlannedMatchingJob): Promise<boolean> {
+/** Insertion idempotente d'un job (ON CONFLICT DO NOTHING) avec contrôle d'intégrité de l'existant. true = inséré. */
+export async function insertJob(client: PoolClient, job: PlannedMatchingJob): Promise<boolean> {
   const inserted = await client.query(
     `INSERT INTO matching_jobs (
        job_identity, job_type, resource_id, resource_version,

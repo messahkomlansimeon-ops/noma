@@ -22,6 +22,14 @@ sont terminaux et seuls porteurs de `completed_at`. Hors `running`, aucun champ 
   jobs. Chaque réservation, reprise comprise, génère un `claim_token` neuf, incrémente
   `attempts` et fixe `lock_expires_at = clock_timestamp() + leaseSeconds` (15 à 600, 90
   par défaut).
+- `claimMatchingJobs` accepte l'option facultative `jobTypes` (tableau non vide, sans doublon, valeurs de la liste
+  CHECK de 0008, validé avant SQL) : seuls ces types sont réservables. Sans elle, tous les types le sont.
+  Le worker d'évaluation (2E4B) l'utilise pour ne jamais réserver un type qu'il ne sait pas traiter, ce qui
+  consommerait des tentatives jusqu'au `dead_letter`. La boucle d'exécution (2E4C1, `runner.ts`) réserve UN
+  job à la fois (`limit: 1`, jamais de lot : une réservation en lot laisse expirer les baux des jobs en
+  attente) parmi les deux types d'évaluation et `user_reactivation_sweep` ; `reevaluate_pair_temporal` et
+  `scoring_config_sweep` ne sont jamais réservés (2E4C2).
+- `requireWorkerId` est exportée (validation partagée avec la boucle d'exécution).
 - `heartbeatMatchingJob` : prolonge le bail.
 - `failMatchingJob` : `failed`, ou `dead_letter` avec `completed_at` si
   `attempts >= max_attempts`, sous bail valide.
@@ -57,10 +65,10 @@ via `source_event_id` (clé étrangère `ON DELETE SET NULL`).
 
 ## Exclus et limites
 
-Progression des lots de candidats, manifeste CAS, complétion (`completed`), boucle de
-worker, planificateur, cron, route HTTP, UI et purge sont hors lot. `last_error` posé par la
-maintenance est un texte fixe du plan, pas un code. La maintenance doit être appelée par un
-processus périodique encore inexistant. Un worker dont le traitement dépasse son bail sans
+Planificateur, cron, route HTTP, UI et purge sont hors lot (la progression des chunks est dans
+`MATCHING-CHUNKS.md`, le worker dans `MATCHING-WORKER.md`, la boucle dans `MATCHING-RUNNER.md`).
+`last_error` posé par la maintenance est un texte fixe du plan, pas un code. La maintenance est appelée à
+chaque cycle de `runMatchingCycle` (2E4C1) ; elle ne l'est par aucun autre processus. Un worker dont le traitement dépasse son bail sans
 heartbeat perd son bail ; les effets déjà écrits par ailleurs (2D) restent à rendre
 idempotents par 2E4. La migration 0010 échouerait sur une base déjà peuplée de jobs
 incohérents ; `noma_dev` n'a pas été migrée.

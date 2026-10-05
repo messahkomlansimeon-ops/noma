@@ -139,7 +139,7 @@ function cursor(value: unknown, label: string): string | null {
  * createdAtIso a un format fixe garanti par decodeCandidateCursor (UTC, 6 décimales, Z) : la comparaison
  * lexicographique est donc exacte. L'id est comparé en minuscules (le décodage accepte les deux casses).
  */
-function isCursorStrictlyAfter(out: string, from: string): boolean {
+export function isCursorStrictlyAfter(out: string, from: string): boolean {
   const next = decodeCandidateCursor(out)!;
   const previous = decodeCandidateCursor(from)!;
   if (next.createdAtIso !== previous.createdAtIso) return next.createdAtIso < previous.createdAtIso;

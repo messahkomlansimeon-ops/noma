@@ -7,6 +7,15 @@ const WORKER_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 const ERROR_CODE = /^[a-z0-9_.:-]{1,120}$/;
 
 export const DEFAULT_JOB_LEASE_SECONDS = 90;
+
+/** Liste du CHECK job_type de 0008. */
+export const MATCHING_JOB_TYPES = [
+  "evaluate_offer_candidates",
+  "evaluate_demand_candidates",
+  "reevaluate_pair_temporal",
+  "scoring_config_sweep",
+  "user_reactivation_sweep",
+] as const;
 const MIN_LEASE_SECONDS = 15;
 const MAX_LEASE_SECONDS = 600;
 const MAX_CLAIM_LIMIT = 50;
@@ -90,7 +99,7 @@ function requireBoundedInteger(value: unknown, field: string, min: number, max: 
   return value;
 }
 
-function requireWorkerId(value: unknown): string {
+export function requireWorkerId(value: unknown): string {
   if (typeof value !== "string" || !WORKER_ID.test(value)) {
     throw new MatchingJobValidationError("workerId doit contenir 1 à 128 caractères parmi A-Z a-z 0-9 . _ : -.");
   }
@@ -142,6 +151,24 @@ export interface ClaimMatchingJobsOptions {
   workerId: string;
   limit: number;
   leaseSeconds?: number;
+  /** Types réservables (non vide, sans doublon). Absent : tous les types, comportement historique. */
+  jobTypes?: readonly string[];
+}
+
+function requireJobTypes(value: unknown): readonly string[] | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new MatchingJobValidationError("jobTypes doit être un tableau non vide.");
+  }
+  const seen = new Set<string>();
+  for (const entry of value) {
+    if (typeof entry !== "string" || !(MATCHING_JOB_TYPES as readonly string[]).includes(entry)) {
+      throw new MatchingJobValidationError("jobTypes contient un type de job inconnu.");
+    }
+    if (seen.has(entry)) throw new MatchingJobValidationError("jobTypes contient un doublon.");
+    seen.add(entry);
+  }
+  return [...value];
 }
 
 /** Réserve jusqu'à `limit` jobs avec un jeton de bail neuf, y compris pour une reprise après expiration. */
@@ -150,6 +177,7 @@ export async function claimMatchingJobs(options: ClaimMatchingJobsOptions): Prom
   const workerId = requireWorkerId(options.workerId);
   const limit = requireBoundedInteger(options.limit, "limit", 1, MAX_CLAIM_LIMIT);
   const leaseSeconds = requireLeaseSeconds(options.leaseSeconds);
+  const jobTypes = requireJobTypes(options.jobTypes);
   const result = await pool.query<JobRow>(
     `WITH claimable AS (
        SELECT id
@@ -160,6 +188,7 @@ export async function claimMatchingJobs(options: ClaimMatchingJobsOptions): Prom
               )
           AND attempts < max_attempts
           AND scheduled_at <= clock_timestamp()
+          AND ($4::text[] IS NULL OR job_type = ANY($4::text[]))
         ORDER BY scheduled_at ASC, id ASC
         LIMIT $1
           FOR UPDATE SKIP LOCKED
@@ -177,7 +206,7 @@ export async function claimMatchingJobs(options: ClaimMatchingJobsOptions): Prom
         RETURNING j.*
      )
      SELECT * FROM claimed ORDER BY scheduled_at ASC, id ASC`,
-    [limit, workerId, leaseSeconds],
+    [limit, workerId, leaseSeconds, jobTypes],
   );
   return result.rows.map(mapLease);
 }

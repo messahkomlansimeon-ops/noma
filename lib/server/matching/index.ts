@@ -15,3 +15,6 @@ export * from "./projection";
 export * from "./jobs";
 export * from "./chunk-manifest";
 export * from "./chunks";
+export * from "./worker";
+export * from "./sweeps";
+export * from "./runner";

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { before, after, test } from "node:test";
 import { Pool } from "pg";
-import { createUser, createOffer } from "../../lib/server/catalog";
+import { createUser, createOffer, updateUser } from "../../lib/server/catalog";
 import {
   MatchingJobValidationError, claimMatchingJobs, failMatchingJob, heartbeatMatchingJob,
   runMatchingJobMaintenance, supersedeMatchingJob, type JobLease,
@@ -472,4 +472,40 @@ test("rejeu de la projection : le job dead_letter n'est ni recréé ni modifié"
   );
   assert.equal((await pool.query("SELECT count(*) AS n FROM matching_jobs")).rows[0].n, "1");
   assert.deepEqual(await snapshot(id), before);
+});
+
+test("filtre jobTypes : un type non demandé n'est jamais réservé", async () => {
+  await clean();
+  const user = await createUser({}, pool);
+  await createOffer({ ownerId: user.id, rawText: "iPhone 12", status: "published" }, pool);
+  const suspended = await updateUser({ id: user.id, expectedVersion: user.version, status: "suspended" }, pool);
+  await updateUser({ id: user.id, expectedVersion: suspended.version, status: "active" }, pool);
+  assert.equal((await projectOutboxBatch({ pool })).jobsInserted, 2);
+  const types = async () => (await pool.query("SELECT job_type, status, attempts FROM matching_jobs ORDER BY job_type")).rows;
+  assert.deepEqual((await types()).map((row) => row.job_type), ["evaluate_offer_candidates", "user_reactivation_sweep"]);
+
+  const evaluation = ["evaluate_offer_candidates", "evaluate_demand_candidates"];
+  const leases = await claimMatchingJobs({ pool, workerId: "w1", limit: 10, jobTypes: evaluation });
+  assert.deepEqual(leases.map((lease) => lease.jobType), ["evaluate_offer_candidates"]);
+  assert.deepEqual(await claimMatchingJobs({ pool, workerId: "w2", limit: 10, jobTypes: evaluation }), []);
+  const sweep = (await types()).find((row) => row.job_type === "user_reactivation_sweep");
+  assert.equal(sweep?.status, "pending");
+  assert.equal(sweep?.attempts, 0);
+  assert.deepEqual(await claimMatchingJobs({ pool, workerId: "w2", limit: 10, jobTypes: ["scoring_config_sweep"] }), []);
+  // Sans filtre : comportement historique, tous les types.
+  const rest = await claimMatchingJobs({ pool, workerId: "w3", limit: 10 });
+  assert.deepEqual(rest.map((lease) => lease.jobType), ["user_reactivation_sweep"]);
+});
+
+test("filtre jobTypes : vide, inconnu, doublon ou mal typé refusés avant SQL", async () => {
+  const { spy, count } = spyPool();
+  for (const jobTypes of [[], ["inconnu"], ["evaluate_offer_candidates", "evaluate_offer_candidates"], "evaluate_offer_candidates", [1], [null], null]) {
+    await assert.rejects(
+      claimMatchingJobs({ pool: spy, workerId: "w", limit: 1, jobTypes: jobTypes as never }),
+      MatchingJobValidationError,
+    );
+  }
+  assert.equal(count(), 0);
+  await claimMatchingJobs({ pool: spy, workerId: "w", limit: 1, jobTypes: ["evaluate_offer_candidates", "evaluate_demand_candidates"] });
+  assert.ok(count() > 0);
 });
