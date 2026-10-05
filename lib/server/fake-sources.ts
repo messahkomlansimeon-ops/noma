@@ -23,6 +23,21 @@ const result = (
   errors: [],
 });
 
+/** Délai par défaut de la source lente : inchangé (parcours UI, Playwright). */
+export const FAKE_SLOW_DEFAULT_MS = 1_500;
+
+/**
+ * Délai de la source lente, lu à CHAQUE appel de `run` (jamais mis en cache). Seule NOMA_FAKE_SLOW_MS, réservée aux tests
+ * d'intégration de la route, le remplace : entier de 1 à 3 600 000 ms, toute autre valeur retombe sur le défaut. Ce module
+ * n'est atteint que sous `fakeSources` (NOMA_FAKE_SOURCES=1 ET Turnstile désactivé pour les tests) : aucun effet en production.
+ */
+const slowDelayMs = (): number => {
+  const raw = process.env.NOMA_FAKE_SLOW_MS;
+  if (raw === undefined || !/^[0-9]+$/.test(raw)) return FAKE_SLOW_DEFAULT_MS;
+  const value = Number(raw);
+  return value >= 1 && value <= 3_600_000 ? value : FAKE_SLOW_DEFAULT_MS;
+};
+
 /** Annonces simulées alignées sur le besoin (mots-clés du texte) pour que la
  *  classification les accepte ; une « coque » et une offre hors budget
  *  exercent les rejets. */
@@ -59,6 +74,7 @@ export const fakeRunners = (needText = "téléphone"): Runner[] => {
       browser: false,
       run: (signal) =>
         new Promise<SourceResult>((resolve) => {
+          const delay = slowDelayMs();
           const t = setTimeout(
             () =>
               resolve(
@@ -67,7 +83,7 @@ export const fakeRunners = (needText = "téléphone"): Runner[] => {
                   listing("demo-lente", 5, { title: "Coque téléphone", price: 2_500 }), // rejet attendu
                 ]),
               ),
-            1_500,
+            delay,
           );
           t.unref?.();
           signal?.addEventListener(

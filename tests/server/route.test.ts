@@ -19,9 +19,10 @@ Object.assign(process.env, {
   NOMA_IP_SECRET: "ip-secret-tests",
 });
 
-import { test, describe, before } from "node:test";
+import { test, describe, before, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
+import { basename, dirname } from "node:path";
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import type { AddressInfo } from "node:net";
@@ -34,7 +35,13 @@ import { createContinuationToken } from "../../lib/server/continuation";
 import { pseudonymizeIp } from "../../lib/server/ip";
 
 const DB_PATH = process.env.NOMA_DB_PATH!;
-before(() => mkdirSync(DB_PATH.replace("/guard.sqlite", ""), { recursive: true }));
+const DB_DIR = dirname(DB_PATH);
+before(() => mkdirSync(DB_DIR, { recursive: true }));
+// Hygiène : ce fichier supprime à la fin SON dossier /tmp/noma-route-<pid> (et lui seul : le nom est revérifié avant tout rm).
+after(() => {
+  if (basename(DB_DIR) !== `noma-route-${process.pid}` || basename(DB_PATH) !== "guard.sqlite") return;
+  rmSync(DB_DIR, { recursive: true, force: true });
+});
 
 let db: ReturnType<typeof openGuardDb>["db"];
 before(() => {
@@ -55,20 +62,33 @@ const nextRequestInit = (init: {
   method: string;
   headers: Record<string, string>;
   body?: BodyInit;
+  signal?: AbortSignal;
 }): NextRequestInit =>
   ({
     method: init.method,
     headers: init.headers,
     ...(init.body !== undefined ? { body: init.body, duplex: "half" } : {}),
+    ...(init.signal ? { signal: init.signal } : {}),
   }) as unknown as NextRequestInit;
 
-const post = (body: BodyInit | undefined, headers: Record<string, string>): Promise<Response> =>
-  POST(
-    new NextRequest(
-      "http://localhost:3000/api/search",
-      nextRequestInit({ method: "POST", headers: { "content-type": "application/json", ...headers }, body }),
-    ),
+/**
+ * Requêtes ouvertes, retenues jusqu'à la fin du fichier. Un `signal` fourni à `new NextRequest(...)` est relayé par une référence
+ * FAIBLE (undici), et `AbortSignal.any` (route.ts) ne retient lui aussi ses sources que faiblement : si le ramasse-miettes
+ * collecte la requête pendant qu'une recherche est tenue, abandonner le signal n'atteint plus le moteur (mesuré : composite
+ * aborted = false après un GC forcé). Sous Next, la connexion retient la requête ; ici, c'est le test qui le fait.
+ */
+const retainedRequests = new Set<NextRequest>();
+after(() => retainedRequests.clear());
+
+/** `signal` (optionnel) joue le rôle de la déconnexion client : l'abandonner arrête le moteur, comme request.signal sous Next. */
+const post = (body: BodyInit | undefined, headers: Record<string, string>, signal?: AbortSignal): Promise<Response> => {
+  const request = new NextRequest(
+    "http://localhost:3000/api/search",
+    nextRequestInit({ method: "POST", headers: { "content-type": "application/json", ...headers }, body, signal }),
   );
+  retainedRequests.add(request);
+  return POST(request);
+};
 
 const collectEvents = async (res: Response): Promise<SearchEvent[]> => {
   const events: SearchEvent[] = [];
@@ -117,6 +137,17 @@ const waitUntil = async (condition: () => boolean, timeoutMs = 10_000): Promise<
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Le compteur anti-marteau est par FENÊTRE DE MINUTE d'horloge (`minuteWindow`, 2 démarrages/minute par session). Un test qui
+ * attend « même minute » entre son 1er et son 3e essai échoue si la frontière de minute tombe entre les deux (le compteur repart
+ * de zéro et le 3e essai est admis). On démarre donc à au moins `minRemainingMs` de la fin de la minute courante : sinon on
+ * attend la minute suivante. Ce n'est pas un délai ajouté : l'attente ne se produit que dans les dernières secondes d'une minute.
+ */
+const alignToFreshMinute = async (minRemainingMs = 5_000): Promise<void> => {
+  const remaining = 60_000 - (Date.now() % 60_000);
+  if (remaining < minRemainingMs) await sleep(remaining + 50);
+};
+
 // ── Serveur HTTP local isolé — vrai socket TCP, coupure client réelle ────────
 
 type SearchServer = { url: string; close: () => Promise<void> };
@@ -140,6 +171,7 @@ const startSearchServer = (): Promise<SearchServer> =>
         duplex: "half",
         signal: disconnect.signal,
       } as unknown as ConstructorParameters<typeof NextRequest>[1]);
+      retainedRequests.add(request); // la coupure client (disconnect.signal) ne doit pas dépendre du ramasse-miettes
       const response = await POST(request);
       response.headers.forEach((value, key) => res.setHeader(key, value));
       res.writeHead(response.status);
@@ -325,59 +357,124 @@ describe("parcours nominal — sources simulées, IA désactivée (aucune dépen
 });
 
 describe("concurrence et déconnexion client (HTTP réel)", () => {
-  test("1 recherche active par session : 2e POST → 429 search_in_progress", async () => {
-    const first = await post(
-      JSON.stringify({ text: "canapé 3 places", mode: "achat" }),
-      headersFor("203.0.113.8", { cookie: "noma_sid=sess-concurrence" }),
-    );
-    assert.equal(first.status, 200);
-    // la source lente (1,5 s) maintient la recherche active : lecture partielle
-    const reader = first.body!.getReader();
-    const firstChunk = await reader.read();
-    assert.equal(parseSearchEvent(new TextDecoder().decode(firstChunk.value!))?.type, "started");
-    // déterminisme : attendre l'occupation RÉELLE de la place (SQLite) avant
-    // le 2e POST — la lecture du 1er événement ne prouve pas l'admission
-    await waitUntil(() => activeSearchesCount() === 1, 5_000);
-
-    const second = await post(
-      JSON.stringify({ text: "second besoin", mode: "achat" }),
-      headersFor("203.0.113.9", { cookie: "noma_sid=sess-concurrence" }),
-    );
-    assert.equal(second.status, 429);
-    const payload = (await second.json()) as { error: { code: string } };
-    assert.equal(payload.error.code, "search_in_progress");
-
-    // fin de la première recherche : la place est libérée
-    // (reader.cancel() — le flux est verrouillé par ce lecteur ; une erreur
-    // ici doit faire échouer le test, jamais être masquée)
-    await reader.cancel();
+  // La source lente est tenue très longtemps : une recherche reste ACTIVE jusqu'à ce que le test l'annule (signal de la requête),
+  // quelle que soit la charge de la machine. Variable lue à chaque appel par fake-sources.ts (sous fakeSources uniquement).
+  const HELD_MS = 120_000;
+  let previousSlowDelay: string | undefined;
+  before(() => {
+    previousSlowDelay = process.env.NOMA_FAKE_SLOW_MS;
+    process.env.NOMA_FAKE_SLOW_MS = String(HELD_MS);
+  });
+  after(() => {
+    if (previousSlowDelay === undefined) delete process.env.NOMA_FAKE_SLOW_MS;
+    else process.env.NOMA_FAKE_SLOW_MS = previousSlowDelay;
+  });
+  // Aucune fuite d'un test vers le suivant : chaque test démarre sans recherche active.
+  beforeEach(async () => {
     await waitUntil(() => activeSearchesCount() === 0);
+  });
 
-    // même session, même minute : le compteur anti-marteau compte AUSSI les
-    // refus (3 essais en 1 minute) → 429 rate_limited + Retry-After
-    const retrySameSession = await post(
-      JSON.stringify({ text: "troisième besoin", mode: "achat" }),
-      headersFor("203.0.113.9", { cookie: "noma_sid=sess-concurrence" }),
-    );
-    assert.equal(retrySameSession.status, 429);
-    assert.equal(((await retrySameSession.json()) as { error: { code: string } }).error.code, "rate_limited");
-    assert.ok(retrySameSession.headers.get("retry-after"), "Retry-After présent");
+  test("1 recherche active par session : 2e POST → 429 search_in_progress", async () => {
+    await alignToFreshMinute();
+    const holdFirst = new AbortController();
+    const releaseOther = new AbortController();
+    let firstReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    let otherReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    try {
+      const first = await post(
+        JSON.stringify({ text: "canapé 3 places", mode: "achat" }),
+        headersFor("203.0.113.8", { cookie: "noma_sid=sess-concurrence" }),
+        holdFirst.signal,
+      );
+      assert.equal(first.status, 200);
+      // la source lente (tenue 120 s) maintient la recherche active jusqu'à l'annulation : lecture partielle
+      firstReader = first.body!.getReader();
+      const firstChunk = await firstReader.read();
+      assert.equal(parseSearchEvent(new TextDecoder().decode(firstChunk.value!))?.type, "started");
+      // déterminisme : attendre l'occupation RÉELLE de la place (SQLite) avant
+      // le 2e POST — la lecture du 1er événement ne prouve pas l'admission
+      await waitUntil(() => activeSearchesCount() === 1, 5_000);
 
-    // une AUTRE session est admise : la place globale est bien libérée
-    const other = await post(
-      JSON.stringify({ text: "autre acheteur", mode: "achat" }),
-      headersFor("203.0.113.10", { cookie: "noma_sid=sess-autre" }),
-    );
-    assert.equal(other.status, 200);
-    await collectEvents(other);
+      const second = await post(
+        JSON.stringify({ text: "second besoin", mode: "achat" }),
+        headersFor("203.0.113.9", { cookie: "noma_sid=sess-concurrence" }),
+      );
+      assert.equal(second.status, 429);
+      const payload = (await second.json()) as { error: { code: string } };
+      assert.equal(payload.error.code, "search_in_progress");
+
+      // fin de la première recherche : la place est libérée par l'annulation de SA requête (signal) puis du flux
+      // (reader.cancel() — le flux est verrouillé par ce lecteur ; une erreur
+      // ici doit faire échouer le test, jamais être masquée)
+      holdFirst.abort();
+      await firstReader.cancel();
+      await waitUntil(() => activeSearchesCount() === 0);
+
+      // même session, même minute (garanti par alignToFreshMinute) : le compteur
+      // anti-marteau compte AUSSI les refus (3 essais en 1 minute) → 429 rate_limited + Retry-After
+      const retrySameSession = await post(
+        JSON.stringify({ text: "troisième besoin", mode: "achat" }),
+        headersFor("203.0.113.9", { cookie: "noma_sid=sess-concurrence" }),
+      );
+      assert.equal(retrySameSession.status, 429);
+      assert.equal(((await retrySameSession.json()) as { error: { code: string } }).error.code, "rate_limited");
+      assert.ok(retrySameSession.headers.get("retry-after"), "Retry-After présent");
+
+      // une AUTRE session est admise : la place globale est bien libérée
+      const other = await post(
+        JSON.stringify({ text: "autre acheteur", mode: "achat" }),
+        headersFor("203.0.113.10", { cookie: "noma_sid=sess-autre" }),
+        releaseOther.signal,
+      );
+      assert.equal(other.status, 200);
+      otherReader = other.body!.getReader();
+      const otherChunk = await otherReader.read();
+      assert.equal(parseSearchEvent(new TextDecoder().decode(otherChunk.value!))?.type, "started");
+    } finally {
+      // chaque réponse ouverte est annulée, même si une assertion a échoué : rien ne reste actif pour le test suivant
+      holdFirst.abort();
+      releaseOther.abort();
+      await firstReader?.cancel().catch(() => {});
+      await otherReader?.cancel().catch(() => {});
+      await waitUntil(() => activeSearchesCount() === 0);
+    }
+  });
+
+  test("source lente TENUE : la recherche reste active au-delà du délai par défaut (1,5 s) tant que le test ne l'annule pas", async () => {
+    const hold = new AbortController();
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    try {
+      const res = await post(
+        JSON.stringify({ text: "armoire 2 portes", mode: "achat" }),
+        headersFor("203.0.113.11", { cookie: "noma_sid=sess-tenue" }),
+        hold.signal,
+      );
+      assert.equal(res.status, 200);
+      reader = res.body!.getReader();
+      const firstChunk = await reader.read();
+      assert.equal(parseSearchEvent(new TextDecoder().decode(firstChunk.value!))?.type, "started");
+      await waitUntil(() => activeSearchesCount() === 1, 5_000);
+      // 1 800 ms > 1 500 ms (délai par défaut de la source lente) : la place occupée n'est libérée par AUCUNE fin naturelle. Attendre
+      // plus longtemps (machine chargée) ne peut que confirmer cette assertion : elle ne dépend d'aucune fenêtre de temps.
+      await sleep(1_800);
+      assert.equal(activeSearchesCount(), 1, "la recherche tenue est toujours active après 1,8 s");
+      hold.abort();
+      await reader.cancel();
+      await waitUntil(() => activeSearchesCount() === 0);
+    } finally {
+      hold.abort();
+      await reader?.cancel().catch(() => {});
+      await waitUntil(() => activeSearchesCount() === 0);
+    }
   });
 
   test("VRAIE coupure client (socket TCP) : annulation jusqu'à la source, place libérée AVANT la fin normale, aucune publication tardive", async () => {
     const server = await startSearchServer();
+    const clientAbort = new AbortController();
+    let res: Response | undefined;
     try {
       const t0 = Date.now();
-      const clientAbort = new AbortController();
-      const res = await fetch(server.url, {
+      res = await fetch(server.url, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -391,7 +488,7 @@ describe("concurrence et déconnexion client (HTTP réel)", () => {
       assert.equal(activeSearchesCount(), 1, "la recherche est active côté serveur");
 
       // lecture NDJSON réelle ; coupure du socket dès le premier événement —
-      // bien avant la fin naturelle de la source lente (1,5 s)
+      // bien avant la fin naturelle de la source lente (120 s ici)
       const received: SearchEvent[] = [];
       let endedByAbort = false;
       try {
@@ -421,7 +518,7 @@ describe("concurrence et déconnexion client (HTTP réel)", () => {
       assert.ok(!received.some((e) => e.type === "completed"), "completed jamais reçu après coupure");
 
       // l'annulation a atteint le moteur : la place est libérée AVANT la fin
-      // normale (~1,5 s de source lente) ; sinon ce délai serait dépassé
+      // normale (120 s de source lente tenue) ; sinon ce délai serait dépassé
       const deadline = t0 + 10_000;
       while (activeSearchesCount() > 0) {
         if (Date.now() > deadline) throw new Error("place jamais libérée après déconnexion");
@@ -430,13 +527,16 @@ describe("concurrence et déconnexion client (HTTP réel)", () => {
       const freedIn = Date.now() - t0;
       assert.ok(
         freedIn < 1_300,
-        `place libérée en ${freedIn} ms — au-delà de 1,3 s l'annulation n'aurait pas atteint la source lente (1,5 s)`,
+        `place libérée en ${freedIn} ms — au-delà de 1,3 s l'annulation n'aurait pas atteint la source lente (tenue ${HELD_MS} ms)`,
       );
       // IA désactivée dans ce test : aucune réserve, aucune dépense comptée
       assert.equal(countRows("reservations"), 0);
       assert.equal(countRows("ledger"), 0);
     } finally {
+      clientAbort.abort();
+      await res?.body?.cancel().catch(() => {});
       await server.close();
+      await waitUntil(() => activeSearchesCount() === 0);
     }
   });
 });
