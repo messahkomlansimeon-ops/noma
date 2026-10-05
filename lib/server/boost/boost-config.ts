@@ -30,3 +30,9 @@ export const BOOST_SCOPE_LOCK_NAMESPACE = 1_314_664_948;
 
 /** Attente maximale d'un verrou ou d'une ligne verrouillée pendant une attribution. */
 export const BOOST_LOCK_TIMEOUT_MS = 5_000;
+
+/** Espace du verrou consultatif par OFFRE pour les cotations (distinct de BOOST_SCOPE_LOCK_NAMESPACE et des espaces de matching). */
+export const BOOST_QUOTE_LOCK_NAMESPACE = 1_314_664_949;
+
+/** Validité d'une cotation INDISPONIBLE (secondes) : courte, pour que l'indisponibilité ne soit pas figée. */
+export const BOOST_UNAVAILABLE_QUOTE_SECONDS = 60;

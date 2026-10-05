@@ -12,7 +12,8 @@ d'administration (`npm run boost:grant`). Le boost ne s'applique qu'au tri `sort
 Code : `lib/server/boost/boosts.ts` (réglages, places, attribution, annulation, lecture des boosts effectifs),
 `lib/server/boost/boost-config.ts` (durées, source, espace du verrou), `lib/server/boost/placement.ts` (placement pur),
 `lib/server/matching/stored-matches.ts` (application), `database/migrations/0011_offer_boosts.sql`,
-`scripts/boost-grant.ts`. Tests : `npm run test:boost` (pur + base) et `npm run test:matching-relevance` (invariants sur une
+`scripts/boost-grant.ts`. **Prix dynamique et cotations vendeur (lot 2I2) : `BOOST-PRICING.md`** (migration 0012, `pricing.ts`, `quotes.ts`,
+`npm run boost:quote`). Tests : `npm run test:boost` (pur + base) et `npm run test:matching-relevance` (invariants sur une
 fenêtre réelle).
 
 ## Modèle
@@ -189,7 +190,8 @@ et le classement organique est servi (voir « Panne du boost »). Appliquer la m
 
 ## Limites
 
-- **Aucun paiement, crédit, prix dynamique ni devis** (lot 2I2), **aucune métrique d'efficacité**, **aucune interface** :
+- **Aucun paiement, crédit, solde, achat ni réservation de place**, **aucune métrique d'efficacité**, **aucune interface** (le prix dynamique et
+  les cotations vendeur existent depuis le lot 2I2, voir `BOOST-PRICING.md` ; une cotation n'est ni un achat ni une réservation) :
   l'attribution n'est possible que par l'administration (`boost:grant`) ; les réglages se modifient en SQL.
 - **Localisation et variante exclues** du périmètre : « iPhone 13 128 Go à Cocody » et « 256 Go à Plateau » partagent les mêmes
   places.

@@ -19,7 +19,7 @@ before(async () => {
   admin = opened.pool;
   await admin.query(`CREATE SCHEMA ${quoted}`);
   pool = await openVerifiedIsolatedPool(opened.target, schema);
-  assert.equal((await runMigrations(pool)).applied.length, 11);
+  assert.equal((await runMigrations(pool)).applied.length, 12);
 });
 
 after(async () => {
@@ -99,7 +99,7 @@ test("base saine : code 0, aucun avertissement, compteurs exacts (sortie lisible
 
   const human = await statusScript();
   assert.equal(human.code, 0, human.output);
-  assert.match(human.output, /Schéma : prêt \(11 migration\(s\), dernière 0011_offer_boosts\)/);
+  assert.match(human.output, /Schéma : prêt \(12 migration\(s\), dernière 0012_boost_pricing\)/);
   assert.match(human.output, /Événements pending : catalog\.bootstrap_sync=1/);
   assert.match(human.output, /Événements projected : catalog\.bootstrap_sync=1/);
   assert.match(human.output, /Avertissements : aucun/);
@@ -107,7 +107,7 @@ test("base saine : code 0, aucun avertissement, compteurs exacts (sortie lisible
   const { code, report } = await statusJson();
   assert.equal(code, 0);
   assert.equal(report.schemaReady, true);
-  assert.deepEqual(report.migrations, { count: 11, latest: "0011_offer_boosts" });
+  assert.deepEqual(report.migrations, { count: 12, latest: "0012_boost_pricing" });
   assert.deepEqual(report.outbox.pendingByType, { "catalog.bootstrap_sync": 1 });
   assert.deepEqual(report.outbox.projectedByType, { "catalog.bootstrap_sync": 1 });
   assert.equal(report.outbox.oldestPending?.eventType, "catalog.bootstrap_sync");
@@ -264,7 +264,7 @@ test("boost_settings_missing : sans ligne « default » → code 2 et message fi
       const bare = await statusJson();
       assert.equal(bare.code, 0);
       assert.deepEqual(bare.report.warnings, []);
-      assert.deepEqual(bare.report.migrations, { count: 10, latest: "0010_matching_job_leases" });
+      assert.deepEqual(bare.report.migrations, { count: 11, latest: "0012_boost_pricing" });
     } finally {
       await pool.query("INSERT INTO noma_schema_migrations (version, checksum) VALUES ($1, $2)", [migration.version, migration.checksum]);
     }
@@ -273,6 +273,53 @@ test("boost_settings_missing : sans ligne « default » → code 2 et message fi
       `INSERT INTO boost_settings (key, slot_ratio, min_slots, max_slots, max_active_per_seller, max_seller_slot_share, max_promoted_share, min_relevance, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
       [defaults.key, defaults.slot_ratio, defaults.min_slots, defaults.max_slots, defaults.max_active_per_seller, defaults.max_seller_slot_share, defaults.max_promoted_share, defaults.min_relevance, defaults.updated_at]);
+  }
+  const healthy = await statusJson();
+  assert.equal(healthy.code, 0);
+  assert.deepEqual(healthy.report.warnings, []);
+});
+
+test("boost_pricing_missing : sans ligne « default » tarifaire → code 2 et message fixe ; ligne rétablie → 0 ; migration 0012 non enregistrée → pas d'avertissement", async () => {
+  await reset();
+  const defaults = (await pool.query("SELECT * FROM boost_pricing_settings WHERE key = 'default' AND version = 1")).rows[0];
+  assert.ok(defaults);
+  assert.deepEqual(warningCodes((await statusJson()).report), [], "base saine");
+  await pool.query("DELETE FROM boost_pricing_settings WHERE key = 'default'");
+  try {
+    const { code, report } = await statusJson();
+    assert.equal(code, 2);
+    assert.deepEqual(warningCodes(report), ["boost_pricing_missing"]);
+    assert.match(report.warnings[0].message, /^Aucune ligne « default » dans boost_pricing_settings : les cotations de boost sont impossibles/);
+    const human = await statusScript();
+    assert.equal(human.code, 2);
+    assert.match(human.output, /boost_pricing_missing : Aucune ligne « default » dans boost_pricing_settings/);
+    // Une ligne de catégorie ne remplace pas la ligne « default ».
+    await pool.query(
+      `INSERT INTO boost_pricing_settings (key, version, currency, base_amount, grid_amount, min_amount, max_amount, competition_step_milli, competition_max_milli,
+         demand_step_milli, demand_max_milli, scarcity_max_milli, duration_24h_milli, duration_3d_milli, duration_7d_milli, quote_validity_seconds)
+       VALUES ('smartphones', 1, 'XOF', 500, 100, 500, 50000, 20, 1500, 100, 3000, 2000, 1000, 2500, 5000, 900)`);
+    assert.deepEqual(warningCodes((await statusJson()).report), ["boost_pricing_missing"]);
+    await pool.query("DELETE FROM boost_pricing_settings WHERE key = 'smartphones'");
+
+    // Migration 0012 non enregistrée : la table n'est pas lue, aucun avertissement tarifaire.
+    const migration = (await pool.query("SELECT * FROM noma_schema_migrations WHERE version = '0012_boost_pricing'")).rows[0];
+    await pool.query("DELETE FROM noma_schema_migrations WHERE version = '0012_boost_pricing'");
+    try {
+      const bare = await statusJson();
+      assert.equal(bare.code, 0);
+      assert.deepEqual(bare.report.warnings, []);
+      assert.deepEqual(bare.report.migrations, { count: 11, latest: "0011_offer_boosts" });
+    } finally {
+      await pool.query("INSERT INTO noma_schema_migrations (version, checksum) VALUES ($1, $2)", [migration.version, migration.checksum]);
+    }
+  } finally {
+    await pool.query(
+      `INSERT INTO boost_pricing_settings (key, version, currency, base_amount, grid_amount, min_amount, max_amount, competition_step_milli, competition_max_milli,
+         demand_step_milli, demand_max_milli, scarcity_max_milli, duration_24h_milli, duration_3d_milli, duration_7d_milli, quote_validity_seconds, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+      [defaults.key, defaults.version, defaults.currency, defaults.base_amount, defaults.grid_amount, defaults.min_amount, defaults.max_amount,
+        defaults.competition_step_milli, defaults.competition_max_milli, defaults.demand_step_milli, defaults.demand_max_milli, defaults.scarcity_max_milli,
+        defaults.duration_24h_milli, defaults.duration_3d_milli, defaults.duration_7d_milli, defaults.quote_validity_seconds, defaults.created_at]);
   }
   const healthy = await statusJson();
   assert.equal(healthy.code, 0);

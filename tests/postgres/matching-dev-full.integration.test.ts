@@ -23,7 +23,7 @@ before(async () => {
   await admin.query(`CREATE SCHEMA ${quoteTemporarySchema(schema)}`);
   await admin.query(`CREATE SCHEMA ${quoteTemporarySchema(emptySchema)}`);
   pool = await openVerifiedIsolatedPool(opened.target, schema);
-  assert.equal((await runMigrations(pool)).applied.length, 11);
+  assert.equal((await runMigrations(pool)).applied.length, 12);
 });
 
 after(async () => {

@@ -17,7 +17,8 @@ export type MatchingStatusWarningCode =
   | "oldest_pending_too_old"
   | "job_lease_expired"
   | "active_evaluation_expired"
-  | "boost_settings_missing";
+  | "boost_settings_missing"
+  | "boost_pricing_missing";
 
 /** Textes fixes : jamais de donnée de la base. */
 export const MATCHING_STATUS_WARNING_MESSAGES: Record<MatchingStatusWarningCode, string> = {
@@ -28,6 +29,7 @@ export const MATCHING_STATUS_WARNING_MESSAGES: Record<MatchingStatusWarningCode,
   job_lease_expired: "Des jobs running ont un bail expiré (worker mort ou bloqué).",
   active_evaluation_expired: "Des évaluations actives sont expirées : le balayeur temporel ne tourne pas.",
   boost_settings_missing: "Aucune ligne « default » dans boost_settings : le boost est inactif (le classement organique est servi) ; réinsérez les réglages par défaut.",
+  boost_pricing_missing: "Aucune ligne « default » dans boost_pricing_settings : les cotations de boost sont impossibles (boost_pricing_missing) ; insérez une version de la configuration tarifaire par défaut.",
 };
 
 export interface MatchingStatusWarning {
@@ -157,6 +159,12 @@ async function collect(client: PoolClient): Promise<MatchingStatusReport> {
   if (boostMigration.rowCount === 1) {
     const defaults = await client.query<{ n: number }>("SELECT count(*)::int AS n FROM boost_settings WHERE key = 'default'");
     flag("boost_settings_missing", defaults.rows[0].n === 0);
+  }
+  // Configuration tarifaire du boost : seulement si la migration 0012 est enregistrée.
+  const pricingMigration = await client.query("SELECT 1 FROM noma_schema_migrations WHERE version = '0012_boost_pricing'");
+  if (pricingMigration.rowCount === 1) {
+    const pricingDefaults = await client.query<{ n: number }>("SELECT count(*)::int AS n FROM boost_pricing_settings WHERE key = 'default'");
+    flag("boost_pricing_missing", pricingDefaults.rows[0].n === 0);
   }
   return report;
 }

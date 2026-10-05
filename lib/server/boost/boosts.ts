@@ -28,7 +28,8 @@ export type BoostErrorCode =
   | "seller_boost_limit_reached"
   | "boost_not_found"
   | "boost_not_owned"
-  | "boost_settings_missing";
+  | "boost_settings_missing"
+  | "boost_pricing_missing";
 
 /** Textes fixes : jamais de donnée de la base (ni identifiant, ni texte métier). */
 export const BOOST_ERROR_MESSAGES: Readonly<Record<BoostErrorCode, string>> = Object.freeze({
@@ -42,6 +43,7 @@ export const BOOST_ERROR_MESSAGES: Readonly<Record<BoostErrorCode, string>> = Ob
   boost_not_found: "Boost introuvable.",
   boost_not_owned: "Ce boost n'appartient pas à ce vendeur.",
   boost_settings_missing: "Réglages de boost absents (ligne « default »).",
+  boost_pricing_missing: "Réglages tarifaires du boost absents (ni ligne de la catégorie, ni ligne « default »).",
 });
 
 export class BoostError extends Error {
@@ -191,7 +193,20 @@ export async function readBoostSettings(executor: SqlExecutor, category: string 
   };
 }
 
-interface OfferBoostFacts {
+/**
+ * Fragments SQL PARTAGÉS (lots 2I1 et 2I2) : une seule définition de l'éligibilité d'une offre et d'un boost effectif, pour que
+ * l'attribution, les places et les cotations ne divergent jamais. `o` = offers, `u` = users du propriétaire.
+ */
+export const BOOST_ELIGIBLE_OFFER_SQL = `o.status = 'published' AND o.archived_at IS NULL
+        AND o.availability_status IS DISTINCT FROM 'unavailable'
+        AND u.status = 'active' AND u.archived_at IS NULL`;
+
+/** Boost effectif (status active, starts_at <= now < ends_at) ; `prefix` = alias de offer_boosts avec son point, ou vide. */
+export function boostEffectiveSql(prefix: string): string {
+  return `${prefix}status = 'active' AND ${prefix}starts_at <= clock_timestamp() AND clock_timestamp() < ${prefix}ends_at`;
+}
+
+export interface OfferBoostFacts {
   owner_id: string;
   published: boolean;
   eligible: boolean;
@@ -201,12 +216,11 @@ interface OfferBoostFacts {
 }
 
 /** Offre + éligibilité (mêmes règles que la recherche de candidats : publiée, non archivée, non indisponible, propriétaire actif) + clé produit normalisée par PostgreSQL. */
-async function loadOfferFacts(client: SqlExecutor, offerId: string, lockRow: boolean): Promise<OfferBoostFacts | null> {
+export async function loadOfferFacts(client: SqlExecutor, offerId: string, lockRow: boolean): Promise<OfferBoostFacts | null> {
   const result = await client.query<OfferBoostFacts>(
     `SELECT o.owner_id,
             (o.status = 'published') AS published,
-            (o.status = 'published' AND o.archived_at IS NULL AND o.availability_status IS DISTINCT FROM 'unavailable'
-              AND u.status = 'active' AND u.archived_at IS NULL) AS eligible,
+            (${BOOST_ELIGIBLE_OFFER_SQL}) AS eligible,
             NULLIF(lower(btrim(o.category)), '') AS scope_category,
             NULLIF(lower(btrim(o.brand)), '') AS scope_brand,
             NULLIF(lower(btrim(o.model)), '') AS scope_model
@@ -218,7 +232,7 @@ async function loadOfferFacts(client: SqlExecutor, offerId: string, lockRow: boo
   return result.rows[0] ?? null;
 }
 
-function completeScope(facts: OfferBoostFacts): BoostScope {
+export function completeScope(facts: OfferBoostFacts): BoostScope {
   if (!facts.scope_category || !facts.scope_brand || !facts.scope_model) throw new BoostError("offer_not_boostable");
   return { category: facts.scope_category, brand: facts.scope_brand, model: facts.scope_model };
 }
@@ -229,9 +243,7 @@ async function countOffersInScope(client: SqlExecutor, scope: BoostScope): Promi
     `SELECT count(*)::int AS n
        FROM offers o JOIN users u ON u.id = o.owner_id
       WHERE lower(btrim(o.category)) = $1 AND lower(btrim(o.brand)) = $2 AND lower(btrim(o.model)) = $3
-        AND o.status = 'published' AND o.archived_at IS NULL
-        AND o.availability_status IS DISTINCT FROM 'unavailable'
-        AND u.status = 'active' AND u.archived_at IS NULL`,
+        AND ${BOOST_ELIGIBLE_OFFER_SQL}`,
     [scope.category, scope.brand, scope.model],
   );
   return result.rows[0].n;
@@ -243,7 +255,7 @@ async function countEffectiveBoosts(client: SqlExecutor, scope: BoostScope, sell
     `SELECT count(*)::int AS n
        FROM offer_boosts
       WHERE scope_category = $1 AND scope_brand = $2 AND scope_model = $3
-        AND status = 'active' AND starts_at <= clock_timestamp() AND clock_timestamp() < ends_at
+        AND ${boostEffectiveSql("")}
         AND ($4::uuid IS NULL OR seller_id = $4::uuid)`,
     [scope.category, scope.brand, scope.model, sellerId],
   );
@@ -256,7 +268,7 @@ async function readSlots(client: SqlExecutor, scope: BoostScope, settings: Boost
   return { scope, total, used, available: Math.max(0, total - used) };
 }
 
-async function withReadOnlySnapshot<T>(pool: Pool, operation: (client: PoolClient) => Promise<T>): Promise<T> {
+export async function withReadOnlySnapshot<T>(pool: Pool, operation: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
