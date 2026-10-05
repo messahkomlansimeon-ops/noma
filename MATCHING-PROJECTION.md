@@ -20,7 +20,8 @@ Commande : `npm run test:matching-projection` (base `TEST_DATABASE_URL` dédiée
 | `offer.paused`, `unavailable`, `archived`, `demand.satisfied`, `archived`, `user.suspended`, `archived` | `ignored`, raison `non_search_event` |
 | payload scellé invalide | `ignored` avec `error_message` = code stable |
 | `temporal.deadline_passed` (agrégat `temporal`) | job `reevaluate_pair_temporal` (`resource_id` = offre, `resource_version` = `generation` = `aggregate_version`, `target_resource_id` = demande) |
-| `scoring_config.updated`, `catalog.bootstrap_sync` | non sélectionnés, restent `pending` (lot suivant) |
+| `scoring_config.updated` | non sélectionné, reste `pending` (lot suivant) |
+| `catalog.bootstrap_sync` | non sélectionné : il est traité par le bootstrap (`MATCHING-BOOTSTRAP.md`), pas par le projecteur ; il reste `pending` jusqu'à la fin du bootstrap qui le passe à `projected` |
 
 **`temporal.deadline_passed` (2E4C2).** Émis par le balayeur temporel (`MATCHING-TEMPORAL.md`) avec
 `aggregate_type = 'temporal'`, `aggregate_id` = offre, `aggregate_version` = version de l'offre,

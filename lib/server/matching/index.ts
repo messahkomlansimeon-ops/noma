@@ -19,3 +19,4 @@ export * from "./worker";
 export * from "./sweeps";
 export * from "./runner";
 export * from "./temporal";
+export * from "./bootstrap";

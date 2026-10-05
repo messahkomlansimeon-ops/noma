@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Pool, PoolClient } from "pg";
+import type { Pool } from "pg";
 import {
   LEASE_FENCE,
   MatchingJobValidationError,
@@ -11,12 +11,14 @@ import {
   supersedeMatchingJob,
   type JobLease,
 } from "./jobs";
+import { MatchingProjectionIntegrityError, insertJob } from "./projection";
 import {
-  computeJobIdentity,
-  insertJob,
-  MatchingProjectionIntegrityError,
-  type PlannedMatchingJob,
-} from "./projection";
+  INITIAL_SCAN_POSITION,
+  buildEvaluationChildJob,
+  listEligibleResources,
+  nextScanPosition,
+  type ScanPosition,
+} from "./resource-scan";
 import { classifyFailure, readSealedConfig } from "./worker";
 
 const DEFAULT_BATCH_SIZE = 100;
@@ -68,20 +70,6 @@ interface Context {
   leaseSeconds: number;
   hooks: UserReactivationSweepHooks;
   summary: { childJobsInserted: number; childJobsAlreadyPresent: number };
-}
-
-type ResourceKind = "offer" | "demand";
-
-interface Position {
-  kind: ResourceKind;
-  /** created_at en texte PostgreSQL (précision microseconde conservée) et id de la dernière ressource lue. */
-  after: { createdAt: string; id: string } | null;
-}
-
-interface ResourceRow {
-  id: string;
-  content_version: number;
-  created_at_text: string;
 }
 
 function requireBatchSize(value: unknown): number {
@@ -139,60 +127,11 @@ async function checkSealedConfig(ctx: Context): Promise<void> {
 }
 
 /**
- * Éligibilité EXACTEMENT celle de loadSourceOffer / loadSourceDemand (service.ts) :
- * offre published, non archivée, disponibilité ≠ unavailable (NULL accepté) ; demande active, non archivée.
- * Le propriétaire est actif (contrôlé par checkAccount).
- */
-async function listResources(client: PoolClient, ctx: Context, position: Position): Promise<ResourceRow[]> {
-  const eligibility = position.kind === "offer"
-    ? "status = 'published' AND archived_at IS NULL AND availability_status IS DISTINCT FROM 'unavailable'"
-    : "status = 'active' AND archived_at IS NULL";
-  const table = position.kind === "offer" ? "offers" : "demands";
-  const keyset = position.after ? "AND (created_at, id) > ($3::timestamptz, $4::uuid)" : "";
-  const params: unknown[] = [ctx.lease.resourceId, ctx.batchSize];
-  if (position.after) params.push(position.after.createdAt, position.after.id);
-  const result = await client.query<ResourceRow>(
-    `SELECT id, content_version, created_at::text AS created_at_text
-       FROM ${table}
-      WHERE owner_id = $1::uuid AND ${eligibility} ${keyset}
-      ORDER BY created_at ASC, id ASC
-      LIMIT $2`,
-    params,
-  );
-  return result.rows;
-}
-
-function childJob(ctx: Context, kind: ResourceKind, row: ResourceRow): PlannedMatchingJob {
-  const { lease } = ctx;
-  const jobType = kind === "offer" ? "evaluate_offer_candidates" : "evaluate_demand_candidates";
-  const scoringConfigHash = lease.scoringConfigHash as string;
-  const sourceEventId = lease.sourceEventId as string;
-  return {
-    jobIdentity: computeJobIdentity({
-      generation: lease.resourceVersion,
-      jobType,
-      resourceId: row.id,
-      resourceVersion: row.content_version,
-      scoringConfigHash,
-      sourceEventId,
-      targetResourceId: null,
-    }),
-    jobType,
-    resourceId: row.id,
-    resourceVersion: row.content_version,
-    targetResourceId: null,
-    scoringConfigHash,
-    sourceEventId,
-    generation: lease.resourceVersion,
-  };
-}
-
-/**
  * Un lot dans SA transaction : verrou du sweep sous LEASE_FENCE, lecture du lot, insertion des enfants,
  * extension du bail sous le même fence, COMMIT. Bail perdu à n'importe quel point → ROLLBACK.
  * Renvoie la position suivante, ou null en fin de parcours.
  */
-async function runBatch(ctx: Context, position: Position): Promise<Position | null> {
+async function runBatch(ctx: Context, position: ScanPosition): Promise<ScanPosition | null> {
   const client = await ctx.pool.connect();
   let rollbackFailed = false;
   try {
@@ -208,11 +147,18 @@ async function runBatch(ctx: Context, position: Position): Promise<Position | nu
     );
     if (locked.rowCount !== 1) throw new StopSignal("lease_lost");
 
-    const rows = await listResources(client, ctx, position);
+    const rows = await listEligibleResources(client, { kind: "account", ownerId: ctx.lease.resourceId }, position, ctx.batchSize);
     let inserted = 0;
     let present = 0;
     for (const row of rows) {
-      if (await insertJob(client, childJob(ctx, position.kind, row))) inserted++;
+      const child = buildEvaluationChildJob({
+        kind: position.kind,
+        row,
+        generation: ctx.lease.resourceVersion,
+        scoringConfigHash: ctx.lease.scoringConfigHash as string,
+        sourceEventId: ctx.lease.sourceEventId as string,
+      });
+      if (await insertJob(client, child)) inserted++;
       else present++;
     }
 
@@ -228,11 +174,7 @@ async function runBatch(ctx: Context, position: Position): Promise<Position | nu
     ctx.summary.childJobsInserted += inserted;
     ctx.summary.childJobsAlreadyPresent += present;
 
-    if (rows.length === ctx.batchSize) {
-      const last = rows[rows.length - 1];
-      return { kind: position.kind, after: { createdAt: last.created_at_text, id: last.id } };
-    }
-    return position.kind === "offer" ? { kind: "demand", after: null } : null;
+    return nextScanPosition(position, rows, ctx.batchSize);
   } catch (error) {
     try {
       await client.query("ROLLBACK");
@@ -268,7 +210,7 @@ async function execute(ctx: Context): Promise<UserReactivationSweepOutcome> {
 
   // Aucune progression persistée : une reprise refait tout le parcours, les identités déterministes
   // rendent ce rejeu sans effet.
-  let position: Position | null = { kind: "offer", after: null };
+  let position: ScanPosition | null = INITIAL_SCAN_POSITION;
   for (let batchIndex = 0; position; batchIndex++) {
     await runHook(ctx.hooks.beforeBatch?.(batchIndex));
     await checkAccount(ctx);

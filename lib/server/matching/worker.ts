@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
+import type { SqlExecutor } from "../postgres/client";
 import { CatalogNotFoundError, CatalogValidationError } from "../catalog/errors";
 import type { DemandRecord, OfferRecord } from "../catalog/types";
 import {
@@ -206,7 +207,7 @@ export type SealedConfigResult =
  * au hash du job, puis versions de moteur. Aucune écriture ; l'appelant choisit comment échouer.
  */
 export async function readSealedConfig(
-  pool: Pool,
+  pool: SqlExecutor,
   sealed: { sourceEventId: string | null; scoringConfigHash: string | null },
 ): Promise<SealedConfigResult> {
   const unavailable = { ok: false, errorCode: "sealed_config_unavailable" } as const;

@@ -19,9 +19,13 @@ async function main(): Promise<void> {
   if (once) {
     const result = await runMatchingCycle({ pool, workerId });
     console.log(
-      `Matching worker : un cycle, ${result.projected.selected} événement(s) lu(s), ` +
+      `Matching worker : un cycle, ${result.temporal.expired} évaluation(s) périmée(s), ` +
+      `${result.projected.selected} événement(s) lu(s), ` +
       `${result.maintenance.deadLettered} job(s) en dead_letter, ${result.jobs.length} job(s) exécuté(s).`,
     );
+    // Un code stable par ligne (jamais de message brut) ; une étape en échec donne le code de sortie 1.
+    for (const code of result.errors) console.error(`Matching worker : ${code}`);
+    if (result.errors.length > 0) process.exitCode = 1;
     return;
   }
 

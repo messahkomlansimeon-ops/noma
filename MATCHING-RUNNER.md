@@ -59,9 +59,14 @@ pour les tests.
 ## Lancement local
 
 ```bash
-DATABASE_URL=... npm run matching:worker -- --once   # un seul cycle puis sortie
+DATABASE_URL=... npm run matching:worker -- --once   # un seul cycle puis sortie (code 1 si une étape a échoué)
 DATABASE_URL=... npm run matching:worker             # boucle ; SIGTERM / SIGINT = arrêt propre
 ```
+
+Mode `--once` : le résumé affiche les évaluations périmées (`temporal.expired`), les événements lus, les jobs
+mis en `dead_letter` et les jobs exécutés. Chaque code de `errors` est affiché sur sa propre ligne
+(`Matching worker : projection_error_p0001`, jamais de message brut) et le **code de sortie vaut 1** si `errors`
+n'est pas vide (0 sinon). Le mode boucle n'est pas modifié.
 
 `DATABASE_URL` est obligatoire. L'identité du worker est `MATCHING_WORKER_ID` ou, par défaut, `<hôte>-<pid>`
 (validée : 1 à 128 caractères `A-Z a-z 0-9 . _ : -`). Le script utilise le même chargeur tsx et la même condition

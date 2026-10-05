@@ -41,6 +41,9 @@ export TEST_DATABASE_URL='postgresql://noma_local:noma_local_only@127.0.0.1:5543
 npm run test:postgres
 ```
 
+Les tests des scripts (`matching:worker --once`, `matching:bootstrap`) lancent le vrai script sur un schéma
+temporaire de la base de test (`PGOPTIONS="-c search_path=<schéma>"`), jamais sur `noma_dev`.
+
 `npm run test:cleanup-schemas` liste (simulation par défaut) puis, avec `-- --apply`, supprime les schémas
 `noma_test_<pid>_<32 hex>` laissés par des tests interrompus dont le processus n'existe plus ; il refuse
 toute base non dédiée et toute session concurrente sur la base de test.

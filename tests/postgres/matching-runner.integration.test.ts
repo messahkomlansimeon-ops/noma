@@ -10,6 +10,7 @@ import {
   MATCHING_RUNNER_JOB_TYPES, runMatchingCycle, runMatchingWorkerLoop, type MatchingCycleResult,
 } from "../../lib/server/matching/runner";
 import { runMigrations } from "../../lib/server/postgres/migrations";
+import { runScript } from "./run-script";
 import {
   openVerifiedTestDatabase, openVerifiedIsolatedPool, createTemporarySchemaName, quoteTemporarySchema,
 } from "./test-database";
@@ -508,4 +509,30 @@ test("validation avant SQL : cycle et boucle refusent les paramètres invalides 
     await assert.rejects(() => runMatchingWorkerLoop(options as never), MatchingJobValidationError, `boucle : ${name}`);
   }
   assert.equal(count(), 0);
+});
+
+// ───────────── 18. script --once (2E4C3) ─────────────
+
+test("script matching-worker --once sur un schéma temporaire : code 0 au cas nominal, code 1 et code stable si une étape échoue", async () => {
+  await simpleWorld(1, 1);
+  const nominal = await runScript("scripts/matching-worker.ts", ["--once"], schema);
+  assert.equal(nominal.code, 0, nominal.output);
+  assert.match(nominal.output, /un cycle, 0 évaluation\(s\) périmée\(s\), 2 événement\(s\) lu\(s\), 0 job\(s\) en dead_letter, 2 job\(s\) exécuté\(s\)\./);
+  assert.ok(!nominal.output.includes("Matching worker : projection_error"));
+  assert.equal((await jobs()).filter((job) => job.status === "completed").length, 2, "le vrai script a exécuté les jobs");
+
+  await createOffer(offerInput((await createUser({}, pool)).id, { rawText: "iPhone 13 supplémentaire" }), pool);
+  await pool.query("CREATE OR REPLACE FUNCTION reject_script_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'script audit failure'; END $$");
+  await pool.query("CREATE TRIGGER reject_script_ack BEFORE UPDATE ON matching_outbox_events FOR EACH ROW EXECUTE FUNCTION reject_script_audit()");
+  try {
+    const failing = await runScript("scripts/matching-worker.ts", ["--once"], schema);
+    assert.equal(failing.code, 1, failing.output);
+    assert.match(failing.output, /^Matching worker : projection_error_p0001$/m);
+    assert.ok(!/script audit failure|audit/.test(failing.output), "aucun message brut");
+    assert.match(failing.output, /un cycle, 0 évaluation\(s\) périmée\(s\), 0 événement\(s\) lu\(s\)/);
+  } finally {
+    await pool.query("DROP TRIGGER IF EXISTS reject_script_ack ON matching_outbox_events");
+  }
+  const recovered = await runScript("scripts/matching-worker.ts", ["--once"], schema);
+  assert.equal(recovered.code, 0, recovered.output);
 });
