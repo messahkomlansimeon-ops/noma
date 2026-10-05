@@ -18,6 +18,7 @@ const SHA256_HEX = /^[0-9a-f]{64}$/;
 export type MatchingProjectedJobType =
   | "evaluate_offer_candidates"
   | "evaluate_demand_candidates"
+  | "reevaluate_pair_temporal"
   | "user_reactivation_sweep";
 
 const JOB_TYPES = new Set<string>([
@@ -116,6 +117,10 @@ export type OutboxProjectionInvalidCode =
   | "invalid_eligibility_flag"
   | "eligibility_status_mismatch"
   | "invalid_user_status"
+  | "missing_target"
+  | "invalid_target"
+  | "invalid_expired_evaluation_id"
+  | "target_payload_mismatch"
   | "invalid_scoring_config"
   | "invalid_scoring_config_hash"
   | "scoring_config_hash_mismatch"
@@ -128,7 +133,7 @@ export type OutboxProjectionDecision =
   | { kind: "invalid"; code: OutboxProjectionInvalidCode };
 
 interface SearchRoute {
-  aggregateType: "offer" | "demand" | "user";
+  aggregateType: "offer" | "demand" | "user" | "temporal";
   jobType: MatchingProjectedJobType;
 }
 
@@ -141,6 +146,8 @@ const SEARCH_ROUTES: Partial<Record<OutboxEventType, SearchRoute>> = {
   "demand.activated": { aggregateType: "demand", jobType: "evaluate_demand_candidates" },
   "demand.updated": { aggregateType: "demand", jobType: "evaluate_demand_candidates" },
   "user.reactivated": { aggregateType: "user", jobType: "user_reactivation_sweep" },
+  // Agrégat 'temporal' : aggregate_id = offre, aggregate_version = version de l'offre, target = demande (2E4C2).
+  "temporal.deadline_passed": { aggregateType: "temporal", jobType: "reevaluate_pair_temporal" },
 };
 
 const NON_SEARCH_EVENTS = new Set<OutboxEventType>([
@@ -153,7 +160,7 @@ const NON_SEARCH_EVENTS = new Set<OutboxEventType>([
   "user.archived",
 ]);
 
-/** Types lus par le projecteur. Les événements temporal, scoring_config et bootstrap restent pending (lot 2E4). */
+/** Types lus par le projecteur. Les événements scoring_config et bootstrap restent pending (lots suivants). */
 export const PROJECTABLE_EVENT_TYPES: readonly OutboxEventType[] = [
   ...Object.keys(SEARCH_ROUTES) as OutboxEventType[],
   ...NON_SEARCH_EVENTS,
@@ -176,7 +183,17 @@ export function planOutboxProjection(event: OutboxEventRecord): OutboxProjection
   if (!route) return invalid("unsupported_event_type");
 
   if (event.aggregateType !== route.aggregateType) return invalid("aggregate_mismatch");
-  if (event.targetAggregateId !== null) return invalid("unexpected_target");
+  const temporal = route.aggregateType === "temporal";
+  if (temporal) {
+    if (event.targetAggregateId === null || event.targetAggregateId === undefined) return invalid("missing_target");
+    try {
+      requireProjectionUuid(event.targetAggregateId, "targetAggregateId");
+    } catch {
+      return invalid("invalid_target");
+    }
+  } else if (event.targetAggregateId !== null) {
+    return invalid("unexpected_target");
+  }
   const version = event.aggregateVersion;
   if (typeof version !== "number" || !Number.isSafeInteger(version) || version < 1 || version > MAX_INTEGER) {
     return invalid("invalid_aggregate_version");
@@ -185,23 +202,26 @@ export function planOutboxProjection(event: OutboxEventRecord): OutboxProjection
   if (!isPlainObject(payload)) return invalid("invalid_payload_status");
   if (payload.generation !== version) return invalid("generation_mismatch");
 
-  if (typeof payload.status !== "string") return invalid("invalid_payload_status");
-  if (route.aggregateType === "user") {
-    if (payload.status !== "active") return invalid("invalid_user_status");
-  } else {
-    if (typeof payload.eligible !== "boolean") return invalid("invalid_eligibility_flag");
-    let expected: boolean;
-    if (route.aggregateType === "offer") {
-      const availability = payload.availability_status;
-      if (availability !== undefined && availability !== null && typeof availability !== "string") {
-        return invalid("invalid_availability_status");
-      }
-      expected = payload.status === "published" && availability !== "unavailable";
+  // L'événement temporel n'a ni statut ni éligibilité : la paire est relue par le worker.
+  if (!temporal) {
+    if (typeof payload.status !== "string") return invalid("invalid_payload_status");
+    if (route.aggregateType === "user") {
+      if (payload.status !== "active") return invalid("invalid_user_status");
     } else {
-      expected = payload.status === "active";
+      if (typeof payload.eligible !== "boolean") return invalid("invalid_eligibility_flag");
+      let expected: boolean;
+      if (route.aggregateType === "offer") {
+        const availability = payload.availability_status;
+        if (availability !== undefined && availability !== null && typeof availability !== "string") {
+          return invalid("invalid_availability_status");
+        }
+        expected = payload.status === "published" && availability !== "unavailable";
+      } else {
+        expected = payload.status === "active";
+      }
+      if (payload.eligible !== expected) return invalid("eligibility_status_mismatch");
+      if (!payload.eligible) return { kind: "ignored", reason: "resource_not_eligible" };
     }
-    if (payload.eligible !== expected) return invalid("eligibility_status_mismatch");
-    if (!payload.eligible) return { kind: "ignored", reason: "resource_not_eligible" };
   }
 
   const config = payload.scoring_config;
@@ -214,6 +234,15 @@ export function planOutboxProjection(event: OutboxEventRecord): OutboxProjection
     if (typeof value !== "string" || value.length === 0) return invalid("invalid_engine_version");
   }
 
+  if (temporal) {
+    try {
+      requireProjectionUuid(payload.expiredEvaluationId, "expiredEvaluationId");
+    } catch {
+      return invalid("invalid_expired_evaluation_id");
+    }
+    if (payload.demandId !== event.targetAggregateId) return invalid("target_payload_mismatch");
+  }
+
   let jobIdentity: string;
   try {
     jobIdentity = computeJobIdentity({
@@ -223,7 +252,7 @@ export function planOutboxProjection(event: OutboxEventRecord): OutboxProjection
       resourceVersion: version,
       scoringConfigHash: hash,
       sourceEventId: event.id,
-      targetResourceId: null,
+      targetResourceId: temporal ? event.targetAggregateId : null,
     });
   } catch {
     return invalid("invalid_job_identity_input");
@@ -235,7 +264,7 @@ export function planOutboxProjection(event: OutboxEventRecord): OutboxProjection
       jobType: route.jobType,
       resourceId: event.aggregateId,
       resourceVersion: version,
-      targetResourceId: null,
+      targetResourceId: temporal ? event.targetAggregateId : null,
       scoringConfigHash: hash,
       sourceEventId: event.id,
       generation: version,

@@ -10,12 +10,13 @@ import {
   runMatchingJobMaintenance,
 } from "./jobs";
 import { projectOutboxBatch, type ProjectOutboxBatchResult } from "./projection";
+import { runTemporalExpirySweep } from "./temporal";
 import { runUserReactivationSweep, type UserReactivationSweepResult } from "./sweeps";
 import { MATCHING_EVALUATION_JOB_TYPES, requirePageSize, runMatchingJob, type MatchingJobRunResult } from "./worker";
 
 /**
- * Types exécutés par la boucle. reevaluate_pair_temporal et scoring_config_sweep n'y figurent JAMAIS
- * (lot 2E4C2) : ils restent pending.
+ * Types exécutés par la boucle : les types d'évaluation (dont reevaluate_pair_temporal depuis 2E4C2) et le sweep de
+ * réactivation. scoring_config_sweep n'y figure JAMAIS : il reste pending.
  */
 export const MATCHING_RUNNER_JOB_TYPES = [...MATCHING_EVALUATION_JOB_TYPES, "user_reactivation_sweep"] as const;
 
@@ -23,6 +24,8 @@ const DEFAULT_MAX_JOBS = 5;
 const MAX_MAX_JOBS = 50;
 const DEFAULT_PROJECTION_LIMIT = 50;
 const MAX_PROJECTION_LIMIT = 100;
+const DEFAULT_TEMPORAL_LIMIT = 100;
+const MAX_TEMPORAL_LIMIT = 500;
 const DEFAULT_IDLE_DELAY_MS = 1_000;
 const DEFAULT_MAX_IDLE_DELAY_MS = 30_000;
 const MAX_DELAY_MS = 3_600_000;
@@ -32,12 +35,14 @@ export type MatchingCycleJobSummary =
   | ({ jobId: string; jobType: "user_reactivation_sweep" } & UserReactivationSweepResult);
 
 export interface MatchingCycleResult {
+  /** Évaluations périmées par le balayeur temporel (étape exécutée AVANT la projection). */
+  temporal: { expired: number };
   projected: ProjectOutboxBatchResult;
   maintenance: { deadLettered: number };
   jobs: MatchingCycleJobSummary[];
-  /** Aucun progrès : rien lu par la projection, rien en maintenance, aucun job exécuté (erreurs ou non). */
+  /** Aucun progrès : rien périmé, rien lu par la projection, rien en maintenance, aucun job exécuté (erreurs ou non). */
   idle: boolean;
-  /** Codes stables des étapes en échec (`projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`). */
+  /** Codes stables des étapes en échec (`temporal_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`). */
   errors: string[];
 }
 
@@ -47,6 +52,8 @@ export interface RunMatchingCycleOptions {
   maxJobs?: number;
   pageSize?: number;
   projectionLimit?: number;
+  /** Nombre maximal d'évaluations périmées par le balayeur temporel en un cycle (1 à 500, 100 par défaut). */
+  temporalLimit?: number;
   leaseSeconds?: number;
   /** Quand il est déclenché, plus aucun job n'est réservé ; le job en cours se termine. */
   signal?: AbortSignal;
@@ -67,8 +74,8 @@ function requireSignal(value: unknown): AbortSignal {
 }
 
 /**
- * Un cycle : projection de l'outbox, maintenance, puis au plus maxJobs jobs réservés UN PAR UN
- * (une réservation en lot laisserait expirer les baux des jobs en attente). Les trois étapes sont cloisonnées :
+ * Un cycle : balayage temporel, projection de l'outbox, maintenance, puis au plus maxJobs jobs réservés UN PAR UN
+ * (une réservation en lot laisserait expirer les baux des jobs en attente). Les quatre étapes sont cloisonnées :
  * un échec est rapporté dans `errors` (codes stables) sans empêcher les suivantes.
  */
 export async function runMatchingCycle(options: RunMatchingCycleOptions): Promise<MatchingCycleResult> {
@@ -77,12 +84,20 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
   const maxJobs = requireBoundedInteger(options.maxJobs === undefined ? DEFAULT_MAX_JOBS : options.maxJobs, "maxJobs", 1, MAX_MAX_JOBS);
   const projectionLimit = requireBoundedInteger(
     options.projectionLimit === undefined ? DEFAULT_PROJECTION_LIMIT : options.projectionLimit, "projectionLimit", 1, MAX_PROJECTION_LIMIT);
+  const temporalLimit = requireBoundedInteger(
+    options.temporalLimit === undefined ? DEFAULT_TEMPORAL_LIMIT : options.temporalLimit, "temporalLimit", 1, MAX_TEMPORAL_LIMIT);
   const pageSize = options.pageSize === undefined ? undefined : requirePageSize(options.pageSize);
   const signal = options.signal === undefined ? undefined : requireSignal(options.signal);
   const leaseSeconds = options.leaseSeconds === undefined ? undefined : requireLeaseSeconds(options.leaseSeconds);
 
   // Étapes cloisonnées : l'échec de l'une n'empêche pas les suivantes. Seuls des codes stables sont conservés.
   const errors: string[] = [];
+  let temporal = { expired: 0 };
+  try {
+    temporal = await runTemporalExpirySweep({ pool, limit: temporalLimit });
+  } catch (error) {
+    errors.push(`temporal_error_${errorCodeOf(error)}`);
+  }
   let projected: ProjectOutboxBatchResult = { selected: 0, projected: 0, jobsInserted: 0, jobsAlreadyPresent: 0, ignored: 0, invalid: 0 };
   try {
     projected = await projectOutboxBatch({ pool, limit: projectionLimit });
@@ -114,10 +129,11 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
     errors.push(`job_error_${errorCodeOf(error)}`);
   }
   return {
+    temporal,
     projected,
     maintenance,
     jobs,
-    idle: projected.selected === 0 && maintenance.deadLettered === 0 && jobs.length === 0,
+    idle: temporal.expired === 0 && projected.selected === 0 && maintenance.deadLettered === 0 && jobs.length === 0,
     errors,
   };
 }

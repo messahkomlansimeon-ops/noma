@@ -21,6 +21,7 @@ import {
   decodeCandidateCursor,
   findDemandCandidatesForOffer,
   findOfferCandidatesForDemand,
+  resolveInternalCandidateId,
   validateCandidateLimit,
 } from "./candidates";
 import { evaluateOfflineMatching } from "./offline";
@@ -30,6 +31,7 @@ import {
   type EvaluatedMatchesQueryOptions,
   type EvaluatedMatchItem,
   type EvaluatedMatchPage,
+  type InternalEvaluatedDemandMatchesQueryOptions,
 } from "./service-types";
 
 /**
@@ -247,17 +249,19 @@ export async function findEvaluatedOfferMatchesForDemand(
  * 4. Le calcul du score explicable et de la couverture (Lot 2B).
  *
  * Préserve l'ordre chronologique décroissant de la page de candidats sans tri par score.
+ * Option INTERNE `candidateId` (worker temporel) : restreint la sélection à un seul candidat, même éligibilité.
  */
 export async function findEvaluatedDemandMatchesForOffer(
   ownerIdValue: string,
   offerIdValue: string,
-  options?: EvaluatedMatchesQueryOptions,
+  options?: InternalEvaluatedDemandMatchesQueryOptions,
   pool?: Pool,
 ): Promise<EvaluatedMatchPage<OfferRecord, DemandRecord>> {
   const ownerId = requireUuid(ownerIdValue, "ownerId").toLowerCase();
   const offerId = requireUuid(offerIdValue, "offerId").toLowerCase();
   validateCandidateLimit(options?.limit);
   decodeCandidateCursor(options?.cursor);
+  resolveInternalCandidateId(options);
   const targetPool = requireTransactionPool(pool);
   const now = options?.now ?? new Date();
 

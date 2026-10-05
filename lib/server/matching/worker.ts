@@ -52,10 +52,15 @@ import {
 import { computeMatchingScore } from "./scoring";
 import { MATCHING_SCORING_CONTRACT_VERSION, type MatchingScoringOptions, type MatchingScoringResult } from "./scoring-types";
 import { findEvaluatedDemandMatchesForOffer, findEvaluatedOfferMatchesForDemand } from "./service";
-import type { EvaluatedMatchPage } from "./service-types";
+import type { EvaluatedMatchPage, InternalEvaluatedDemandMatchesQueryOptions } from "./service-types";
 import { MATCHING_OFFLINE_CONTRACT_VERSION, type MatchingEvaluationResult } from "./types";
 
-export const MATCHING_EVALUATION_JOB_TYPES = ["evaluate_offer_candidates", "evaluate_demand_candidates"] as const;
+export const MATCHING_EVALUATION_JOB_TYPES = [
+  "evaluate_offer_candidates", "evaluate_demand_candidates", "reevaluate_pair_temporal",
+] as const;
+
+/** Job de paire (2E4C2) : pivot = offre, un seul candidat = la demande ciblée, un seul chunk EOF. */
+const PAIR_JOB_TYPE = "reevaluate_pair_temporal";
 
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
@@ -289,7 +294,12 @@ async function loadPage(
   await runHook(ctx.hooks.beforeFetchPage?.());
   const ownerId = await checkPivot(ctx);
   const now = await chooseNow();
-  const options = { cursor, limit, now, scoringOptions: ctx.scoringOptions };
+  // Job de paire : TOUTE lecture (ouverture, reprise après crash) passe par la restriction interne à la demande
+  // ciblée ; jamais de relecture de la liste des demandes de l'offre.
+  const pairTarget = ctx.lease.jobType === PAIR_JOB_TYPE ? ctx.lease.targetResourceId : null;
+  const options: InternalEvaluatedDemandMatchesQueryOptions = pairTarget
+    ? { cursor: null, limit: 1, now, scoringOptions: ctx.scoringOptions, candidateId: pairTarget }
+    : { cursor, limit, now, scoringOptions: ctx.scoringOptions };
   let page: EvaluatedMatchPage<PivotRecord, CandidateRecord>;
   try {
     page = (ctx.kind === "offer"
@@ -605,6 +615,7 @@ async function execute(ctx: Context): Promise<MatchingJobOutcome> {
   if (!(MATCHING_EVALUATION_JOB_TYPES as readonly string[]).includes(ctx.lease.jobType)) {
     return failWith(ctx, "unsupported_job_type");
   }
+  if (ctx.lease.jobType === PAIR_JOB_TYPE && !ctx.lease.targetResourceId) return failWith(ctx, "missing_target");
   ctx.scoringOptions = await loadSealedConfig(ctx);
   for (;;) {
     const state = await readState(ctx);

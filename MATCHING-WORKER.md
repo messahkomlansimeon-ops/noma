@@ -57,8 +57,22 @@ sentinelle EOF, aucun recomptage. Les évaluations sont persistées, jamais clas
 
 ## `runMatchingWorkerOnce`
 
-Réserve `limit` jobs (1 à 10) avec `jobTypes` = les deux types d'évaluation (un `user_reactivation_sweep` n'est
-jamais réservé), les exécute séquentiellement, retourne les résumés. Aucune boucle ni planificateur.
+Réserve `limit` jobs (1 à 10) avec `jobTypes` = `MATCHING_EVALUATION_JOB_TYPES` (les deux types d'évaluation et
+`reevaluate_pair_temporal` ; un `user_reactivation_sweep` n'est jamais réservé), les exécute séquentiellement, retourne les résumés. Aucune boucle ni planificateur.
+
+## Job de paire `reevaluate_pair_temporal` (lot 2E4C2)
+
+Le pivot est l'offre (`kind` « offer »). Le job réévalue UNE paire dont l'évaluation vient d'être périmée par le
+balayeur temporel (`MATCHING-TEMPORAL.md`). Le chargement de page utilise l'option interne `candidateId =
+target_resource_id`, `cursor` nul et `limit` 1 : un seul chunk EOF avec 0 ou 1 candidat. **Toute** lecture, y
+compris la reprise après un crash (`loadResumeRecords`), passe par `candidateId` : la liste des demandes de l'offre
+n'est jamais relue. Cible absente → échec `missing_target` (défensif, avant toute lecture). Si la demande n'est plus
+candidate (archivée, satisfaite, propriétaire suspendu, etc.), le chunk n'a aucun candidat et le job est
+`completed` sans évaluation : la recherche normale ne la sélectionnerait pas non plus. Le reste du protocole est
+celui de 2E4B (pivot obsolète → `superseded`, `StalePreconditions` → `skipped_stale`, nouvelle tentative durable
+sur expiration pendant l'attente de verrou, erreur transitoire → `failed`, reprise sur manifeste sans doublon).
+La nouvelle évaluation est calculée à `T_eval` PostgreSQL : si l'échéance de la demande est dépassée, elle est
+`incompatible` (`DEMAND_EXPIRED`) et n'a plus d'`expires_at`.
 
 ## Sweep de réactivation (lot 2E4C1)
 
@@ -99,8 +113,7 @@ certains enfants rend ces enfants `superseded` (propriétaire inactif). Le sweep
 
 ## Exclus et limites
 
-Exclus : `reevaluate_pair_temporal`, `scoring_config_sweep`, balayeur temporel,
-émetteurs temporal/scoring/bootstrap, cron, HTTP, UI, notifications, boosts.
+Exclus : `scoring_config_sweep`, émetteurs scoring/bootstrap, cron, HTTP, UI, notifications, boosts.
 Limites : `created_evaluations_count` compte les candidats `persisted` du manifeste ; une évaluation écrite
 avant un crash puis rejouée est comptée `replayed` (sous-comptage possible). Une évaluation 2D en vol peut
 survivre à la perte du bail. Si deux jobs évaluent la même paire (sens offre et sens demande), le plus récent
@@ -110,7 +123,7 @@ multiples (`limit` > 1) démarrent tous leurs baux à la réservation : un job d
 est abandonné (`lease_lost`) puis repris plus tard ; la boucle d'exécution (2E4C1) réserve donc un seul job à la
 fois.
 
-## Reste pour 2E4C2
+## Reste à faire
 
-Types `reevaluate_pair_temporal` et `scoring_config_sweep`, émetteurs temporal / scoring / bootstrap,
-balayeur temporel, planification et supervision. La boucle d'exécution est décrite dans `MATCHING-RUNNER.md`.
+Type `scoring_config_sweep`, émetteurs scoring / bootstrap (lot 2E4C3), planification et supervision. La boucle
+d'exécution est décrite dans `MATCHING-RUNNER.md`, le balayeur temporel dans `MATCHING-TEMPORAL.md`.

@@ -25,3 +25,13 @@ export interface CandidatePage<T extends OfferRecord | DemandRecord> {
   hasMore: boolean;
   limit: number;
 }
+
+/**
+ * Options INTERNES (worker temporel, lot 2E4C2) : restreignent la sélection des demandes candidates d'une offre à
+ * UN seul candidat, avec exactement la même éligibilité que la recherche normale. Jamais exposées par une route :
+ * `parseQueryParams` (http.ts) ne transmet que `limit` et `cursor`.
+ */
+export interface InternalDemandCandidateQueryOptions extends CandidateQueryOptions {
+  /** UUID du seul candidat à considérer. Incompatible avec un `cursor` non nul. */
+  candidateId?: string;
+}

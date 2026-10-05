@@ -75,10 +75,15 @@ Un manifeste décrit un job précis ; `initializeChunk` le vérifie en SQL (et n
 
 - `scoring_config_hash` du manifeste = `matching_jobs.scoring_config_hash` ; un job dont le hash est
   NULL est refusé (`NULL = x` n'est jamais vrai) → `config_mismatch` ;
-- `job_type` ∈ `evaluate_offer_candidates`, `evaluate_demand_candidates` ; les autres types
-  (`user_reactivation_sweep`, etc.) sont définis en 2E4C → `unsupported_job_type` ;
+- `job_type` ∈ `evaluate_offer_candidates`, `evaluate_demand_candidates`, `reevaluate_pair_temporal` (2E4C2) ; les
+  autres types (`user_reactivation_sweep`, `scoring_config_sweep`) → `unsupported_job_type` ;
 - chaque candidat porte `pair_resource_id = resource_id` et `pair_resource_version = resource_version`
   du job → `pair_resource_mismatch` ;
+- **`reevaluate_pair_temporal` (2E4C2), règles supplémentaires**, en SQL et en TypeScript : un seul chunk EOF
+  (`chunk_index` 0, `cursor_in` nul, `is_eof` vrai), au plus UN candidat et, s'il existe,
+  `candidate_id` = `target_resource_id` du job (un job sans cible n'accepte aucun candidat). Violation de la cible
+  ou plusieurs candidats → `target_mismatch` (nouvelle raison) ; chunk d'index > 0, curseur d'entrée ou chunk non
+  EOF → `invalid_next_manifest`. Les règles et raisons des autres types sont inchangées ;
 - chunk 0 : `cursor_in` nul ET `cursor_position` nul ; chunk N > 0 : `cursor_in` = `cursor_out` du
   prédécesseur validé ET = `cursor_position`, sans COALESCE → `cursor_discontinuity`.
 
@@ -91,7 +96,7 @@ autres opérations ne les modifient pas (append-only).
 
 Ordre du diagnostic d'initialisation après rowCount = 0 : bail perdu → manifeste en base invalide →
 déjà appliqué (même `chunk_id` et mêmes champs structurants) → type de job → configuration → pivot →
-curseur → raisons d'état existantes (`predecessor_missing`, `eof_reached`, `predecessor_not_validated`,
+règles du job de paire (`target_mismatch`, `invalid_next_manifest`) → curseur → raisons d'état existantes (`predecessor_missing`, `eof_reached`, `predecessor_not_validated`,
 `predecessor_mismatch`). Le rejeu identique d'une initialisation réussie reste `already_applied`.
 
 ## Append-only et curseur
@@ -104,8 +109,8 @@ rembobine ni ne recompte rien.
 
 ## Exclus et limites
 
-Exclus : 2C1/2A/2B/2D, clés d'idempotence, détection d'obsolescence, boucle de worker, balayeur
-temporel, HTTP, UI, migration. Limites : l'ancienne tentative d'un candidat relancé reste `pending`
+Exclus : 2C1/2A/2B/2D, clés d'idempotence, détection d'obsolescence, boucle de worker, HTTP, UI, migration
+(le balayeur temporel est décrit dans `MATCHING-TEMPORAL.md`). Limites : l'ancienne tentative d'un candidat relancé reste `pending`
 (seule la courante s'acquitte, par conception append-only) ; l'ajout d'une tentative est refusé sur un
 candidat déjà résolu ; une opération de type « record » peut, au niveau SQL, résoudre aussi une autre
 tentative `pending` (reste additif) ; un manifeste corrompu en base est classé, jamais réparé.

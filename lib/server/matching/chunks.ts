@@ -32,6 +32,7 @@ export type ChunkRejectedReason =
   | "unsupported_job_type"
   | "config_mismatch"
   | "pair_resource_mismatch"
+  | "target_mismatch"
   | "cursor_discontinuity"
   | "invalid_next_manifest";
 
@@ -124,16 +125,23 @@ interface JobStateRow extends QueryResultRow {
   scoring_config_hash: string | null;
   resource_id: string;
   resource_version: number;
+  target_resource_id: string | null;
 }
 
-/** Types de job dont le parcours de candidats est défini dans ce lot (les autres : 2E4C). */
-const CHUNKED_JOB_TYPES: readonly string[] = ["evaluate_offer_candidates", "evaluate_demand_candidates"];
+/**
+ * Types de job chunkés. `reevaluate_pair_temporal` (2E4C2) est un cas dégénéré : un seul chunk EOF, au plus un
+ * candidat (la demande ciblée), avec des règles de liaison supplémentaires.
+ */
+const CHUNKED_JOB_TYPES: readonly string[] = [
+  "evaluate_offer_candidates", "evaluate_demand_candidates", "reevaluate_pair_temporal",
+];
 
 async function readJobState(pool: Pool, jobId: string): Promise<JobStateRow | null> {
   const result = await pool.query<JobStateRow>(
     `SELECT status, claim_token,
             (lock_expires_at IS NOT NULL AND lock_expires_at >= clock_timestamp()) AS lease_valid,
-            cursor_position, chunk_manifest, job_type, scoring_config_hash, resource_id, resource_version
+            cursor_position, chunk_manifest, job_type, scoring_config_hash, resource_id, resource_version,
+            target_resource_id
        FROM matching_jobs WHERE id = $1`,
     [jobId],
   );
@@ -212,11 +220,25 @@ export async function initializeChunk(options: InitializeChunkOptions): Promise<
         -- Liaison au job : configuration scellée (un hash NULL en base ne vaut jamais l'égalité),
         -- type de job supporté, ressource pivot et version de chaque candidat.
         AND ($4::jsonb->>'scoring_config_hash') = scoring_config_hash
-        AND job_type IN ('evaluate_offer_candidates', 'evaluate_demand_candidates')
+        AND job_type IN ('evaluate_offer_candidates', 'evaluate_demand_candidates', 'reevaluate_pair_temporal')
         AND NOT EXISTS (
           SELECT 1 FROM jsonb_array_elements($4::jsonb->'candidates') AS c
            WHERE c->>'pair_resource_id' IS DISTINCT FROM resource_id::text
               OR (c->>'pair_resource_version')::int IS DISTINCT FROM resource_version
+        )
+        -- reevaluate_pair_temporal : un seul chunk EOF, au plus un candidat, et c'est la demande ciblée.
+        AND (
+          job_type <> 'reevaluate_pair_temporal'
+          OR (
+            ($4::jsonb->>'chunk_index')::int = 0
+            AND ($4::jsonb->>'cursor_in') IS NULL
+            AND ($4::jsonb->>'is_eof')::boolean = true
+            AND jsonb_array_length($4::jsonb->'candidates') <= 1
+            AND NOT EXISTS (
+              SELECT 1 FROM jsonb_array_elements($4::jsonb->'candidates') AS c
+               WHERE c->>'candidate_id' IS DISTINCT FROM target_resource_id::text
+            )
+          )
         )
         AND (
               (
@@ -265,6 +287,14 @@ export async function initializeChunk(options: InitializeChunkOptions): Promise<
   if (manifest.candidates.some((candidate) =>
     candidate.pair_resource_id !== job.resource_id || candidate.pair_resource_version !== job.resource_version)) {
     return { kind: "rejected", reason: "pair_resource_mismatch" };
+  }
+  if (job.job_type === "reevaluate_pair_temporal") {
+    if (manifest.candidates.length > 1 || manifest.candidates.some((candidate) => candidate.candidate_id !== job.target_resource_id)) {
+      return { kind: "rejected", reason: "target_mismatch" };
+    }
+    if (manifest.chunk_index !== 0 || manifest.cursor_in !== null || !manifest.is_eof) {
+      return { kind: "rejected", reason: "invalid_next_manifest" };
+    }
   }
   if (!stored) {
     if (manifest.chunk_index > 0) return { kind: "rejected", reason: "predecessor_missing" };

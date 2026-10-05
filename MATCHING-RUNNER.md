@@ -10,24 +10,27 @@ Code : `lib/server/matching/runner.ts` (`runMatchingCycle`, `runMatchingWorkerLo
 
 ## Un cycle (`runMatchingCycle`)
 
+0. `runTemporalExpirySweep` (`temporalLimit`, 100 par défaut, 1 à 500) : évaluations dont l'échéance est dépassée
+   → périmées + événements `temporal.deadline_passed` (exécuté AVANT la projection pour que l'événement soit
+   projeté et son job exécuté dans le même cycle). Résultat `temporal: { expired }`.
 1. `projectOutboxBatch` (`projectionLimit`, 50 par défaut, 1 à 100) : événements → jobs.
 2. `runMatchingJobMaintenance` : jobs épuisés → `dead_letter`.
 3. Jusqu'à `maxJobs` fois (5 par défaut, 1 à 50) : `claimMatchingJobs({ limit: 1, jobTypes })` avec
-   `evaluate_offer_candidates`, `evaluate_demand_candidates` et `user_reactivation_sweep`, puis l'exécuteur du
-   type (`runMatchingJob` ou `runUserReactivationSweep`). Arrêt dès qu'aucun job n'est réservé. **Un seul job à
+   `evaluate_offer_candidates`, `evaluate_demand_candidates`, `reevaluate_pair_temporal` et
+   `user_reactivation_sweep`, puis l'exécuteur du type (`runMatchingJob` ou `runUserReactivationSweep`). Arrêt dès qu'aucun job n'est réservé. **Un seul job à
    la fois** : une réservation en lot laisserait expirer les baux des jobs en attente.
 
-`idle` = rien lu par la projection, rien en maintenance, aucun job exécuté. `reevaluate_pair_temporal` et
-`scoring_config_sweep` ne sont jamais réservés : ils restent `pending` (2E4C2). L'option `signal` (non prévue
+`idle` = rien périmé (`temporal.expired` = 0), rien lu par la projection, rien en maintenance, aucun job exécuté
+(erreurs ou non). `scoring_config_sweep` n'est jamais réservé : il reste `pending`. L'option `signal` (non prévue
 par le plan, nécessaire à l'arrêt propre) empêche toute nouvelle réservation une fois déclenchée.
 
 Toutes les entrées sont validées avant la moindre requête (`MatchingJobValidationError`).
 
 ## Cloisonnement des étapes
 
-Projection, maintenance et exécution des jobs sont isolées : l'échec de l'une n'empêche pas les
+Balayage temporel, projection, maintenance et exécution des jobs sont isolés : l'échec de l'une n'empêche pas les
 suivantes (un événement empoisonné ne doit pas empêcher d'exécuter les jobs sains). Le résultat
-porte `errors: string[]` : codes stables `projection_error_<code>`, `maintenance_error_<code>`,
+porte `errors: string[]` : codes stables `temporal_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`,
 `job_error_<code>` (`<code>` : SQLSTATE ou code d'erreur en minuscules, `validation` ou `unknown` ;
 jamais de message, de requête ni d'identifiant). Si l'exécution d'un job lève une exception
 (base indisponible pendant l'enregistrement d'un échec…), `job_error_…` est enregistré, **aucun
@@ -72,10 +75,10 @@ Aucun fichier systemd n'est livré. Il faudra : une instance **séparée** du se
 avant la sortie ; prévoir un `TimeoutStopSec` supérieur à la durée d'un job). Plusieurs instances peuvent
 tourner : réservations `SKIP LOCKED` et baux garantissent qu'un job n'est exécuté que par un worker à la fois.
 
-## Exclus (2E4C2)
+## Exclus
 
-`reevaluate_pair_temporal`, `scoring_config_sweep`, émetteurs temporal / scoring / bootstrap, balayeur
-temporel, planification, supervision, service systemd, HTTP, UI.
+`scoring_config_sweep`, émetteurs scoring / bootstrap (2E4C3), planification, supervision, service systemd,
+HTTP, UI.
 
 ## Limites
 

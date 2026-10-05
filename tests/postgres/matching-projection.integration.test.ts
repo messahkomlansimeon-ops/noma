@@ -326,10 +326,10 @@ test("planOutboxProjection : un type de prototype est un type non supporté, jam
   assert.equal(planOutboxProjection(event).kind, "job");
 });
 
-test("événements temporal, scoring et bootstrap : non sélectionnés, restent pending", async () => {
+test("événements scoring et bootstrap : non sélectionnés, restent pending (temporal est projetable depuis 2E4C2)", async () => {
   await clean();
   const unsupported: [string, string][] = [
-    ["temporal.deadline_passed", "temporal"], ["scoring_config.updated", "system"], ["catalog.bootstrap_sync", "system"],
+    ["scoring_config.updated", "system"], ["catalog.bootstrap_sync", "system"],
   ];
   const ids: string[] = [];
   for (const [eventType, aggregateType] of unsupported) {
@@ -350,7 +350,7 @@ test("événements temporal, scoring et bootstrap : non sélectionnés, restent 
     assert.equal(event.errorMessage, null);
     assert.equal((await jobsFor(id)).length, 0);
   }
-  assert.equal(await pendingCount(), 3);
+  assert.equal(await pendingCount(), 2);
   assert.equal((await projectOutboxBatch({ pool })).selected, 0);
 });
 

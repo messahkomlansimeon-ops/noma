@@ -907,6 +907,16 @@ Pour éviter toute condition de course entre le balayeur temporel et une rééva
        )
    );
    ```
+> **Corrigé en 2E4C2.** L'`INSERT` SQL brut ci-dessus avec `aggregate_type = 'offer'` est **interdit** : l'index
+> unique de 0009 sur `(aggregate_type, aggregate_id, aggregate_version)` (types `offer`, `demand`, `user`) ferait
+> collisionner deux expirations de la même offre v1 avec deux demandes différentes, et `recordOutboxEvent` impose
+> que le préfixe `temporal.` porte l'agrégat `temporal`. Le balayeur (`temporal.ts`) enregistre donc l'événement par
+> `recordOutboxEvent` avec `aggregateType: 'temporal'`, `aggregateId` = offre, `aggregateVersion` =
+> `offer_content_version`, `targetAggregateId` = demande, payload `{ demandId, demandContentVersion,
+> expiredEvaluationId }` (la configuration scellée et `generation` sont ajoutées par `recordOutboxEvent`).
+> La sélection ajoute `ORDER BY expires_at, id` et la péremption se fait ligne par ligne (`WHERE id = …`). Voir
+> `MATCHING-TEMPORAL.md`.
+
 3. **Protection contre l'Écrasement d'une Nouvelle Évaluation** :
    Grâce à la clause `WHERE me.id = ee.id`, le balayeur n'invalide **que la ligne exacte dont le délai a expiré**. Si un worker a déjà calculé et persisté une nouvelle évaluation fraîche pour cette paire (avec un nouvel `id`), cette nouvelle évaluation n'est absolument pas affectée.
 

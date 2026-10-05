@@ -18,6 +18,7 @@ import type {
   CandidateCursorPayload,
   CandidatePage,
   CandidateQueryOptions,
+  InternalDemandCandidateQueryOptions,
 } from "./candidates-types";
 
 export const DEFAULT_CANDIDATE_LIMIT = 20;
@@ -136,6 +137,20 @@ export function decodeCandidateCursor(cursor?: unknown): CandidateCursorPayload 
     createdAtIso,
     id,
   };
+}
+
+/**
+ * Valide la restriction interne `candidateId` avant tout SQL : UUID (renvoyé en minuscules) ou null.
+ * Combinée à un curseur non nul, elle est refusée (une restriction à un candidat n'a pas de page suivante).
+ */
+export function resolveInternalCandidateId(options?: InternalDemandCandidateQueryOptions): string | null {
+  const raw = options?.candidateId;
+  if (raw === undefined) return null;
+  const candidateId = requireUuid(raw, "candidateId").toLowerCase();
+  if (options?.cursor !== undefined && options.cursor !== null) {
+    throw new CatalogValidationError("candidateId ne peut pas être combiné à un curseur.");
+  }
+  return candidateId;
 }
 
 interface CandidateOfferRowWithSourceStatus extends Partial<OfferRow>, QueryResultRow {
@@ -296,20 +311,27 @@ export async function findOfferCandidatesForDemand(
  * 4. Propriétaire du candidat actif et non archivé (users.status = 'active' AND users.archived_at IS NULL).
  * 5. Statut de la demande candidate = 'active' et non archivée.
  * 6. Pagination par curseur stable (created_at DESC, id DESC) préservant l'UTC et les microsecondes.
+ * Option INTERNE `candidateId` : une seule condition `d.id = $n` ajoutée à la même requête (même éligibilité).
  */
 export async function findDemandCandidatesForOffer(
   ownerIdValue: string,
   offerIdValue: string,
-  options?: CandidateQueryOptions,
+  options?: InternalDemandCandidateQueryOptions,
   db: SqlExecutor = getPostgresPool(),
 ): Promise<CandidatePage<DemandRecord>> {
   const ownerId = requireUuid(ownerIdValue, "ownerId").toLowerCase();
   const offerId = requireUuid(offerIdValue, "offerId").toLowerCase();
   const limit = validateCandidateLimit(options?.limit);
   const cursorPayload = decodeCandidateCursor(options?.cursor);
+  const candidateId = resolveInternalCandidateId(options);
 
   const values: unknown[] = [offerId, ownerId, limit + 1];
   let cursorCondition = "";
+  let candidateCondition = "";
+  if (candidateId) {
+    values.push(candidateId);
+    candidateCondition = `AND d.id = $${values.length}::uuid`;
+  }
 
   if (cursorPayload) {
     values.push(cursorPayload.createdAtIso, cursorPayload.id.toLowerCase());
@@ -349,6 +371,7 @@ export async function findDemandCandidatesForOffer(
          AND d.archived_at IS NULL
          AND u.status = 'active'
          AND u.archived_at IS NULL
+         ${candidateCondition}
          ${cursorCondition}
        ORDER BY d.created_at DESC, d.id DESC
        LIMIT $3

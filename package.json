@@ -40,6 +40,7 @@
     "test:matching-worker": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-worker.integration.test.ts",
     "test:matching-sweeps": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-sweeps.integration.test.ts",
     "test:matching-runner": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-runner.integration.test.ts",
+    "test:matching-temporal": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-temporal.integration.test.ts",
     "test:cleanup-schemas": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs scripts/cleanup-test-schemas.ts"
   },
   "dependencies": {

@@ -1,5 +1,5 @@
 import type { DemandRecord, OfferRecord } from "../catalog/types";
-import type { CandidateQueryOptions } from "./candidates-types";
+import type { CandidateQueryOptions, InternalDemandCandidateQueryOptions } from "./candidates-types";
 import type { MatchingCompatibilityStatus, MatchingEvaluationResult } from "./types";
 import type { MatchingScoringOptions, MatchingScoringResult } from "./scoring-types";
 
@@ -17,6 +17,10 @@ export interface EvaluatedMatchesQueryOptions extends CandidateQueryOptions {
    */
   scoringOptions?: MatchingScoringOptions;
 }
+
+/** Options INTERNES du sens offre → demandes (worker temporel) : ajoute la restriction à un candidat. */
+export interface InternalEvaluatedDemandMatchesQueryOptions
+  extends EvaluatedMatchesQueryOptions, InternalDemandCandidateQueryOptions {}
 
 export interface EvaluatedMatchItem<TCandidate extends OfferRecord | DemandRecord> {
   candidateId: string;

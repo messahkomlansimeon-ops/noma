@@ -160,18 +160,16 @@ test("les cycles réservent un seul job à la fois : claim limit 1, avec les tro
 
 // ───────────── 10. types exclus ─────────────
 
-test("reevaluate_pair_temporal et scoring_config_sweep restent pending, jamais réservés", async () => {
+test("scoring_config_sweep reste pending, jamais réservé (reevaluate_pair_temporal est exécuté depuis 2E4C2)", async () => {
   await simpleWorld(1, 1);
-  const insert = (type: string) => pool.query(
-    `INSERT INTO matching_jobs (job_identity, job_type, resource_id, resource_version, target_resource_id)
-     VALUES ($1, $2, $3, 1, $4)`,
-    [randomUUID().replaceAll("-", "") + randomUUID().replaceAll("-", ""), type, randomUUID(), type === "reevaluate_pair_temporal" ? randomUUID() : null]);
-  await insert("reevaluate_pair_temporal");
-  await insert("scoring_config_sweep");
+  await pool.query(
+    `INSERT INTO matching_jobs (job_identity, job_type, resource_id, resource_version)
+     VALUES ($1, 'scoring_config_sweep', $2, 1)`,
+    [randomUUID().replaceAll("-", "") + randomUUID().replaceAll("-", ""), randomUUID()]);
   const results = await cyclesUntilIdle();
   assert.ok(results.flatMap((result) => result.jobs).length >= 2, "les jobs d'évaluation sont exécutés");
-  const rows = (await jobs()).filter((job) => job.job_type === "reevaluate_pair_temporal" || job.job_type === "scoring_config_sweep");
-  assert.equal(rows.length, 2);
+  const rows = (await jobs()).filter((job) => job.job_type === "scoring_config_sweep");
+  assert.equal(rows.length, 1);
   for (const row of rows) {
     assert.equal(row.status, "pending");
     assert.equal(row.attempts, 0);
@@ -284,7 +282,12 @@ test("délai d'inactivité croissant (×2, borné) puis remis au minimum après 
 
 test("erreur de cycle (base indisponible) : journalisée par code stable, la boucle continue", async () => {
   await simpleWorld(1, 1);
-  const failures = [Object.assign(new Error("connect ECONNREFUSED 10.0.0.1 secret-owner-id"), { code: "57P01" }), new Error("texte brut du propriétaire")];
+  // Depuis 2E4C2 chaque cycle ouvre d'abord une connexion pour le balayage temporel, puis une pour la projection :
+  // deux pannes par cycle en erreur.
+  const failures = [
+    Object.assign(new Error("connect ECONNREFUSED 10.0.0.1 secret-owner-id"), { code: "57P01" }), new Error("texte brut du propriétaire"),
+    Object.assign(new Error("connect ECONNREFUSED 10.0.0.1 secret-owner-id"), { code: "57P01" }), new Error("texte brut du propriétaire"),
+  ];
   const { spy } = observedPool(pool, { failConnect: () => failures.shift() ?? null });
   const logs: string[] = [];
   const delays: number[] = [];
@@ -295,7 +298,10 @@ test("erreur de cycle (base indisponible) : journalisée par code stable, la bou
     sleep: async (ms) => { delays.push(ms); },
     onCycle: (cycle) => { if (cycle.jobs.length > 0) controller.abort(); },
   });
-  assert.deepEqual(logs, ["matching_worker projection_error_57p01", "matching_worker projection_error_unknown"]);
+  assert.deepEqual(logs, [
+    "matching_worker temporal_error_57p01", "matching_worker projection_error_unknown",
+    "matching_worker temporal_error_57p01", "matching_worker projection_error_unknown",
+  ]);
   assert.ok(logs.every((line) => !/secret|ECONNREFUSED|propriétaire/.test(line)), "ni message d'erreur ni identifiant dans le journal");
   assert.deepEqual(delays, [50, 100], "une attente (croissante) suit chaque erreur");
   assert.ok(result.jobsRun >= 1, "la boucle a survécu et travaillé");

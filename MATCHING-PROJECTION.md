@@ -19,7 +19,19 @@ Commande : `npm run test:matching-projection` (base `TEST_DATABASE_URL` dédiée
 | mêmes types offre/demande avec `eligible=false` | `ignored`, raison `resource_not_eligible` |
 | `offer.paused`, `unavailable`, `archived`, `demand.satisfied`, `archived`, `user.suspended`, `archived` | `ignored`, raison `non_search_event` |
 | payload scellé invalide | `ignored` avec `error_message` = code stable |
-| `temporal.deadline_passed`, `scoring_config.updated`, `catalog.bootstrap_sync` | non sélectionnés, restent `pending` (2E4) |
+| `temporal.deadline_passed` (agrégat `temporal`) | job `reevaluate_pair_temporal` (`resource_id` = offre, `resource_version` = `generation` = `aggregate_version`, `target_resource_id` = demande) |
+| `scoring_config.updated`, `catalog.bootstrap_sync` | non sélectionnés, restent `pending` (lot suivant) |
+
+**`temporal.deadline_passed` (2E4C2).** Émis par le balayeur temporel (`MATCHING-TEMPORAL.md`) avec
+`aggregate_type = 'temporal'`, `aggregate_id` = offre, `aggregate_version` = version de l'offre,
+`target_aggregate_id` = demande, payload `{ demandId, demandContentVersion, expiredEvaluationId }` plus la
+configuration scellée et `generation` ajoutées par `recordOutboxEvent`. Contrairement aux autres routes, la cible
+est **obligatoire** et il n'y a ni `status` ni `eligible` (la paire est relue par le worker). Invalide, avec code
+stable et sans jamais bloquer la file : `aggregate_mismatch`, `missing_target`, `invalid_target`,
+`invalid_aggregate_version`, `generation_mismatch`, `invalid_scoring_config*`, `scoring_config_hash_mismatch`,
+`invalid_engine_version`, `invalid_expired_evaluation_id` (UUID), `target_payload_mismatch`
+(`payload.demandId` ≠ cible). L'identité du job inclut la cible : deux expirations sur la même offre v1 avec deux
+demandes donnent deux jobs distincts (plan §9.1).
 
 Seul le payload scellé fait foi : aucune configuration courante n'est relue. Le
 payload est validé pour les types chercheurs (agrégat cohérent, cible nulle, version
