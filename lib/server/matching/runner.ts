@@ -35,7 +35,10 @@ export interface MatchingCycleResult {
   projected: ProjectOutboxBatchResult;
   maintenance: { deadLettered: number };
   jobs: MatchingCycleJobSummary[];
+  /** Aucun progrès : rien lu par la projection, rien en maintenance, aucun job exécuté (erreurs ou non). */
   idle: boolean;
+  /** Codes stables des étapes en échec (`projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`). */
+  errors: string[];
 }
 
 export interface RunMatchingCycleOptions {
@@ -65,7 +68,8 @@ function requireSignal(value: unknown): AbortSignal {
 
 /**
  * Un cycle : projection de l'outbox, maintenance, puis au plus maxJobs jobs réservés UN PAR UN
- * (une réservation en lot laisserait expirer les baux des jobs en attente).
+ * (une réservation en lot laisserait expirer les baux des jobs en attente). Les trois étapes sont cloisonnées :
+ * un échec est rapporté dans `errors` (codes stables) sans empêcher les suivantes.
  */
 export async function runMatchingCycle(options: RunMatchingCycleOptions): Promise<MatchingCycleResult> {
   const pool = requirePool(options.pool);
@@ -77,26 +81,44 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
   const signal = options.signal === undefined ? undefined : requireSignal(options.signal);
   const leaseSeconds = options.leaseSeconds === undefined ? undefined : requireLeaseSeconds(options.leaseSeconds);
 
-  const projected = await projectOutboxBatch({ pool, limit: projectionLimit });
-  const maintenance = await runMatchingJobMaintenance({ pool });
+  // Étapes cloisonnées : l'échec de l'une n'empêche pas les suivantes. Seuls des codes stables sont conservés.
+  const errors: string[] = [];
+  let projected: ProjectOutboxBatchResult = { selected: 0, projected: 0, jobsInserted: 0, jobsAlreadyPresent: 0, ignored: 0, invalid: 0 };
+  try {
+    projected = await projectOutboxBatch({ pool, limit: projectionLimit });
+  } catch (error) {
+    errors.push(`projection_error_${errorCodeOf(error)}`);
+  }
+  let maintenance = { deadLettered: 0 };
+  try {
+    maintenance = await runMatchingJobMaintenance({ pool });
+  } catch (error) {
+    errors.push(`maintenance_error_${errorCodeOf(error)}`);
+  }
   const jobs: MatchingCycleJobSummary[] = [];
-  for (let index = 0; index < maxJobs; index++) {
-    if (signal?.aborted) break;
-    const [lease] = await claimMatchingJobs({ pool, workerId, limit: 1, leaseSeconds, jobTypes: MATCHING_RUNNER_JOB_TYPES });
-    if (!lease) break;
-    if (lease.jobType === "user_reactivation_sweep") {
-      const result = await runUserReactivationSweep({ pool, lease, leaseSeconds });
-      jobs.push({ jobId: lease.jobId, jobType: "user_reactivation_sweep", ...result });
-    } else {
-      const result = await runMatchingJob({ pool, lease, pageSize, leaseSeconds });
-      jobs.push({ jobId: lease.jobId, jobType: lease.jobType as (typeof MATCHING_EVALUATION_JOB_TYPES)[number], ...result });
+  try {
+    for (let index = 0; index < maxJobs; index++) {
+      if (signal?.aborted) break;
+      const [lease] = await claimMatchingJobs({ pool, workerId, limit: 1, leaseSeconds, jobTypes: MATCHING_RUNNER_JOB_TYPES });
+      if (!lease) break;
+      if (lease.jobType === "user_reactivation_sweep") {
+        const result = await runUserReactivationSweep({ pool, lease, leaseSeconds });
+        jobs.push({ jobId: lease.jobId, jobType: "user_reactivation_sweep", ...result });
+      } else {
+        const result = await runMatchingJob({ pool, lease, pageSize, leaseSeconds });
+        jobs.push({ jobId: lease.jobId, jobType: lease.jobType as (typeof MATCHING_EVALUATION_JOB_TYPES)[number], ...result });
+      }
     }
+  } catch (error) {
+    // La base est probablement malade : plus aucun job dans ce cycle. Le bail du job en cours expirera.
+    errors.push(`job_error_${errorCodeOf(error)}`);
   }
   return {
     projected,
     maintenance,
     jobs,
     idle: projected.selected === 0 && maintenance.deadLettered === 0 && jobs.length === 0,
+    errors,
   };
 }
 
@@ -133,12 +155,17 @@ function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+/** Suffixe stable d'une erreur : jamais le message (il peut contenir hôte, requête ou identifiant). */
+function errorCodeOf(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code === "string" && /^[A-Za-z0-9_]{1,40}$/.test(code)) return code.toLowerCase();
+  if (error instanceof MatchingJobValidationError) return "validation";
+  return "unknown";
+}
+
 /** Code stable d'une erreur de cycle : jamais le message (il peut contenir hôte, requête ou identifiant). */
 export function describeCycleError(error: unknown): string {
-  const code = (error as { code?: unknown } | null)?.code;
-  if (typeof code === "string" && /^[A-Za-z0-9_]{1,40}$/.test(code)) return `cycle_error_${code.toLowerCase()}`;
-  if (error instanceof MatchingJobValidationError) return "cycle_error_validation";
-  return "cycle_error_unknown";
+  return `cycle_error_${errorCodeOf(error)}`;
 }
 
 /**
@@ -171,6 +198,7 @@ export async function runMatchingWorkerLoop(options: RunMatchingWorkerLoopOption
       const result = await runMatchingCycle({ pool, workerId, maxJobs: maxJobsPerCycle, signal });
       cycles++;
       jobsRun += result.jobs.length;
+      for (const code of result.errors) log(`matching_worker ${code}`);
       options.onCycle?.(result);
       wait = result.idle;
     } catch (error) {

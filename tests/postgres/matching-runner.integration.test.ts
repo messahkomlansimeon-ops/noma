@@ -4,7 +4,8 @@ import { before, after, test } from "node:test";
 import { Pool } from "pg";
 import { createDemand, createOffer, createUser, publishOffer, updateOffer, updateUser } from "../../lib/server/catalog";
 import { MatchingJobValidationError } from "../../lib/server/matching/jobs";
-import { PROJECTABLE_EVENT_TYPES } from "../../lib/server/matching/projection";
+import { OUTBOX_COLUMNS, mapOutboxRow, type OutboxRow } from "../../lib/server/matching/outbox";
+import { PROJECTABLE_EVENT_TYPES, planOutboxProjection, projectOutboxBatch } from "../../lib/server/matching/projection";
 import {
   MATCHING_RUNNER_JOB_TYPES, runMatchingCycle, runMatchingWorkerLoop, type MatchingCycleResult,
 } from "../../lib/server/matching/runner";
@@ -77,12 +78,14 @@ async function cyclesUntilIdle(db: Pool = pool, workerId = "runner-a", maxJobs?:
 }
 
 /** Pool dont `query` et `connect` sont observables ; `onQuery` peut déclencher un effet ou une panne. */
-function observedPool(base: Pool, hooks: { onQuery?: (text: string, params: unknown[] | undefined) => void; failConnect?: () => Error | null } = {}) {
+function observedPool(base: Pool, hooks: { onQuery?: (text: string, params: unknown[] | undefined) => void; failConnect?: () => Error | null; failQuery?: (text: string) => Error | null } = {}) {
   let queries = 0;
   const spy = Object.create(base) as Pool;
   spy.query = ((...args: unknown[]) => {
     queries++;
     hooks.onQuery?.(typeof args[0] === "string" ? args[0] : "", Array.isArray(args[1]) ? args[1] : undefined);
+    const queryFailure = hooks.failQuery?.(typeof args[0] === "string" ? args[0] : "");
+    if (queryFailure) return Promise.reject(queryFailure);
     return (base.query as (...a: unknown[]) => unknown)(...args);
   }) as never;
   spy.connect = ((...args: unknown[]) => {
@@ -292,7 +295,7 @@ test("erreur de cycle (base indisponible) : journalisée par code stable, la bou
     sleep: async (ms) => { delays.push(ms); },
     onCycle: (cycle) => { if (cycle.jobs.length > 0) controller.abort(); },
   });
-  assert.deepEqual(logs, ["matching_worker cycle_error_57p01", "matching_worker cycle_error_unknown"]);
+  assert.deepEqual(logs, ["matching_worker projection_error_57p01", "matching_worker projection_error_unknown"]);
   assert.ok(logs.every((line) => !/secret|ECONNREFUSED|propriétaire/.test(line)), "ni message d'erreur ni identifiant dans le journal");
   assert.deepEqual(delays, [50, 100], "une attente (croissante) suit chaque erreur");
   assert.ok(result.jobsRun >= 1, "la boucle a survécu et travaillé");
@@ -320,6 +323,143 @@ test("deux boucles concurrentes (deux pools) : chaque job exécuté une seule fo
   assert.deepEqual(await duplicateActivePairs(), []);
   const active = Number((await pool.query("SELECT count(*) AS n FROM matching_evaluations WHERE is_latest")).rows[0].n);
   assert.equal(active, 16, "4 offres × 4 demandes, une évaluation active par paire");
+});
+
+// ───────────── 17. cloisonnement des étapes (2E4C1-bis) ─────────────
+
+const failingFunction = () => pool.query(
+  "CREATE OR REPLACE FUNCTION reject_runner_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'runner audit failure'; END $$");
+const withTrigger = async (ddl: string, name: string, table: string, run: () => Promise<void>) => {
+  await failingFunction();
+  await pool.query(ddl);
+  try { await run(); } finally { await pool.query(`DROP TRIGGER IF EXISTS ${name} ON ${table}`); }
+};
+const insertPending = async (kind: "offer" | "demand") => {
+  const owner = await createUser({}, pool);
+  return kind === "offer" ? createOffer(offerInput(owner.id, { rawText: "iPhone 13 supplémentaire" }), pool) : createDemand(demandInput(owner.id), pool);
+};
+
+test("événement empoisonné plus ancien : quarantaine, 2 jobs sains exécutés, job divergent intact, second cycle idle", async () => {
+  await simpleWorld(1, 1);
+  assert.equal((await projectOutboxBatch({ pool })).jobsInserted, 2, "deux jobs sains pending");
+  const extra = await insertPending("offer");
+  const row = (await pool.query<OutboxRow>(`SELECT ${OUTBOX_COLUMNS} FROM matching_outbox_events WHERE aggregate_id = $1`, [extra.id])).rows[0];
+  const decision = planOutboxProjection(mapOutboxRow(row));
+  assert.equal(decision.kind, "job");
+  if (decision.kind !== "job") return;
+  await pool.query(
+    `INSERT INTO matching_jobs(job_identity, job_type, resource_id, resource_version, scoring_config_hash, source_event_id, status, completed_at)
+     VALUES ($1, $2, $3, $4, $5, $6, 'completed', clock_timestamp())`,
+    [decision.job.jobIdentity, decision.job.jobType, decision.job.resourceId, decision.job.resourceVersion + 1, decision.job.scoringConfigHash, decision.job.sourceEventId]);
+  await pool.query("UPDATE matching_outbox_events SET occurred_at = occurred_at - interval '1 hour' WHERE id = $1", [row.id]);
+  const divergent = async () => (await pool.query("SELECT * FROM matching_jobs WHERE job_identity = $1", [decision.job.jobIdentity])).rows;
+  const before = await divergent();
+
+  const first = await runMatchingCycle({ pool, workerId: "runner-a" });
+  assert.deepEqual(first.errors, []);
+  assert.equal(first.projected.quarantined, 1);
+  assert.equal(first.jobs.length, 2, "les deux jobs sains sont exécutés");
+  assert.ok(first.jobs.every((job) => job.outcome === "completed"));
+  assert.equal(first.idle, false);
+
+  const event = (await pool.query("SELECT dispatch_status, error_message FROM matching_outbox_events WHERE id = $1", [row.id])).rows[0];
+  assert.deepEqual(event, { dispatch_status: "ignored", error_message: "job_integrity_conflict" });
+  assert.deepEqual(await divergent(), before, "le job divergent est inchangé");
+  const healthy = (await jobs()).filter((job) => job.job_identity !== decision.job.jobIdentity);
+  assert.equal(healthy.length, 2);
+  assert.ok(healthy.every((job) => job.status === "completed"));
+
+  const second = await runMatchingCycle({ pool, workerId: "runner-a" });
+  assert.equal(second.idle, true);
+  assert.deepEqual(second.errors, []);
+});
+
+test("projection en échec à chaque cycle (sans conflit d'intégrité) : jobs exécutés, projection_error rapportée, événement conservé puis projeté", async () => {
+  await simpleWorld(1, 1);
+  assert.equal((await projectOutboxBatch({ pool })).jobsInserted, 2);
+  const extra = await insertPending("offer");
+  await withTrigger(
+    "CREATE TRIGGER reject_runner_ack BEFORE UPDATE ON matching_outbox_events FOR EACH ROW EXECUTE FUNCTION reject_runner_audit()",
+    "reject_runner_ack", "matching_outbox_events", async () => {
+      const first = await runMatchingCycle({ pool, workerId: "runner-a" });
+      assert.deepEqual(first.errors, ["projection_error_p0001"]);
+      assert.equal(first.jobs.length, 2, "les jobs pending sont exécutés malgré l'échec de la projection");
+      assert.ok(first.jobs.every((job) => job.outcome === "completed"));
+      assert.equal(first.idle, false);
+
+      const second = await runMatchingCycle({ pool, workerId: "runner-a" });
+      assert.deepEqual(second.errors, ["projection_error_p0001"], "la projection échoue encore");
+      assert.equal(second.idle, true, "idle = aucun progrès, même avec des erreurs");
+      const event = (await pool.query("SELECT dispatch_status, error_message FROM matching_outbox_events WHERE aggregate_id = $1", [extra.id])).rows[0];
+      assert.deepEqual(event, { dispatch_status: "pending", error_message: null }, "l'événement reste pending");
+    });
+
+  const third = await runMatchingCycle({ pool, workerId: "runner-a" });
+  assert.deepEqual(third.errors, []);
+  assert.equal(third.projected.selected, 1);
+  assert.equal(third.jobs.length, 1, "l'événement est projeté puis son job exécuté");
+  assert.equal((await pool.query("SELECT dispatch_status FROM matching_outbox_events WHERE aggregate_id = $1", [extra.id])).rows[0].dispatch_status, "projected");
+});
+
+test("maintenance en échec : les jobs sont exécutés, maintenance_error rapportée", async () => {
+  await simpleWorld(1, 1);
+  await pool.query(
+    `INSERT INTO matching_jobs (job_identity, job_type, resource_id, resource_version, status, attempts, max_attempts, scheduled_at)
+     VALUES ($1, 'evaluate_offer_candidates', $2, 1, 'failed', 5, 5, clock_timestamp() - interval '1 hour')`,
+    ["c".repeat(64), randomUUID()]);
+  await withTrigger(
+    "CREATE TRIGGER reject_runner_dead BEFORE UPDATE ON matching_jobs FOR EACH ROW WHEN (NEW.status = 'dead_letter') EXECUTE FUNCTION reject_runner_audit()",
+    "reject_runner_dead", "matching_jobs", async () => {
+      const result = await runMatchingCycle({ pool, workerId: "runner-a" });
+      assert.deepEqual(result.errors, ["maintenance_error_p0001"]);
+      assert.equal(result.projected.selected, 2, "la projection a eu lieu");
+      assert.equal(result.jobs.length, 2);
+      assert.ok(result.jobs.every((job) => job.outcome === "completed"));
+      assert.equal((await jobs()).find((job) => job.job_identity === "c".repeat(64)).status, "failed", "le job épuisé n'a pas été modifié");
+    });
+  const after = await runMatchingCycle({ pool, workerId: "runner-a" });
+  assert.deepEqual(after.errors, []);
+  assert.equal(after.maintenance.deadLettered, 1);
+});
+
+test("exception pendant l'exécution d'un job : job_error rapportée, plus aucun job dans ce cycle", async () => {
+  await simpleWorld(1, 1);
+  let sealedReads = 0;
+  const { spy } = observedPool(pool, {
+    failQuery: (text) => {
+      // Lecture de la configuration scellée du premier job, puis son enregistrement d'échec : la base « tombe ».
+      if (text.includes("SELECT payload FROM matching_outbox_events") && ++sealedReads === 1) return Object.assign(new Error("hôte secret"), { code: "57P01" });
+      if (text.includes("SET status = CASE WHEN attempts") && sealedReads === 1) return Object.assign(new Error("hôte secret"), { code: "57P01" });
+      return null;
+    },
+  });
+  const result = await runMatchingCycle({ pool: spy, workerId: "runner-a" });
+  assert.deepEqual(result.errors, ["job_error_57p01"]);
+  assert.equal(result.jobs.length, 0);
+  assert.ok(!JSON.stringify(result).includes("secret"));
+  const rows = await jobs();
+  assert.equal(rows.filter((job) => job.status === "running").length, 1, "le bail du job en cours expirera normalement");
+  assert.equal(rows.filter((job) => job.status === "pending" && job.attempts === 0).length, 1, "aucun autre job n'a été réservé");
+});
+
+test("boucle : projection toujours en échec et aucun job → délai croissant, jamais de boucle sans attente", async () => {
+  await simpleWorld(1, 1);
+  await withTrigger(
+    "CREATE TRIGGER reject_runner_ack BEFORE UPDATE ON matching_outbox_events FOR EACH ROW EXECUTE FUNCTION reject_runner_audit()",
+    "reject_runner_ack", "matching_outbox_events", async () => {
+      const controller = new AbortController();
+      const delays: number[] = [];
+      const logs: string[] = [];
+      const result = await runMatchingWorkerLoop({
+        pool, workerId: "runner-a", signal: controller.signal, idleDelayMs: 100, maxIdleDelayMs: 300,
+        log: (line) => logs.push(line),
+        sleep: async (ms) => { delays.push(ms); if (delays.length === 4) controller.abort(); },
+      });
+      assert.deepEqual(delays, [100, 200, 300, 300]);
+      assert.equal(result.cycles, delays.length, "chaque cycle sans progrès est suivi d'une attente");
+      assert.equal(result.jobsRun, 0);
+      assert.deepEqual(logs, Array(4).fill("matching_worker projection_error_p0001"));
+    });
 });
 
 // ───────────── 16. validation avant SQL ─────────────

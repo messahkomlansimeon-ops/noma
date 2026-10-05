@@ -11,7 +11,7 @@ import {
   type OutboxEventRecord, type OutboxRow,
 } from "../../lib/server/matching/outbox";
 import {
-  MatchingProjectionError, MatchingProjectionIntegrityError, PROJECTABLE_EVENT_TYPES,
+  MatchingProjectionError, PROJECTABLE_EVENT_TYPES,
   computeJobIdentity, planOutboxProjection, projectOutboxBatch,
 } from "../../lib/server/matching/projection";
 import { computeScoringConfigHash, normalizeScoringConfig } from "../../lib/server/matching/persistence";
@@ -400,9 +400,46 @@ test("atomicité : échec d'insertion de job ou erreur après un premier job ann
   assert.equal((await projectOutboxBatch({ pool })).jobsInserted, 3);
 });
 
-test("divergence d'un job existant : erreur d'intégrité, tout le lot annulé", async () => {
+test("divergence d'un job existant : l'événement fautif est mis en quarantaine, le job est intact, le reste du lot est projeté", async () => {
   await clean();
-  await seedPublishedOffers(2);
+  await seedPublishedOffers(3);
+  const events = await allEvents();
+  const poisoned = events[1];
+  const decision = planOutboxProjection(poisoned);
+  assert.equal(decision.kind, "job");
+  if (decision.kind !== "job") return;
+  await pool.query(
+    "INSERT INTO matching_jobs(job_identity,job_type,resource_id,resource_version,scoring_config_hash,source_event_id) VALUES($1,$2,$3,$4,$5,$6)",
+    [decision.job.jobIdentity, decision.job.jobType, decision.job.resourceId, decision.job.resourceVersion + 1, decision.job.scoringConfigHash, decision.job.sourceEventId],
+  );
+  const divergent = async () => (await pool.query("SELECT * FROM matching_jobs WHERE job_identity = $1", [decision.job.jobIdentity])).rows;
+  const before = await divergent();
+  assert.equal(before.length, 1);
+
+  const result = await projectOutboxBatch({ pool });
+  assert.deepEqual(result, { selected: 3, projected: 2, jobsInserted: 2, jobsAlreadyPresent: 0, ignored: 0, invalid: 0, quarantined: 1 });
+
+  const quarantined = await eventById(poisoned.id);
+  assert.equal(quarantined.dispatchStatus, "ignored");
+  assert.equal(quarantined.errorMessage, "job_integrity_conflict");
+  assert.notEqual(quarantined.dispatchedAt, null);
+  assert.deepEqual(await divergent(), before, "le job divergent n'est jamais modifié");
+
+  for (const event of [events[0], events[2]]) {
+    const projected = await eventById(event.id);
+    assert.equal(projected.dispatchStatus, "projected");
+    assert.equal(projected.errorMessage, null);
+    assert.equal((await jobsFor(event.id)).length, 1);
+  }
+  assert.equal(await jobCount(), 3, "le job divergent et deux jobs projetés");
+  assert.equal(await pendingCount(), 0);
+  // Plus rien à rejouer : la quarantaine est un acquittement, pas une relance.
+  assert.deepEqual(await projectOutboxBatch({ pool }), { selected: 0, projected: 0, jobsInserted: 0, jobsAlreadyPresent: 0, ignored: 0, invalid: 0 });
+});
+
+test("erreur SQL sans lien avec l'intégrité : le lot entier est annulé, aucune quarantaine, même avec un événement empoisonné", async () => {
+  await clean();
+  await seedPublishedOffers(3);
   const events = await allEvents();
   const decision = planOutboxProjection(events[1]);
   assert.equal(decision.kind, "job");
@@ -411,9 +448,23 @@ test("divergence d'un job existant : erreur d'intégrité, tout le lot annulé",
     "INSERT INTO matching_jobs(job_identity,job_type,resource_id,resource_version,scoring_config_hash,source_event_id) VALUES($1,$2,$3,$4,$5,$6)",
     [decision.job.jobIdentity, decision.job.jobType, decision.job.resourceId, decision.job.resourceVersion + 1, decision.job.scoringConfigHash, decision.job.sourceEventId],
   );
-  await assert.rejects(projectOutboxBatch({ pool }), MatchingProjectionIntegrityError);
-  assert.equal(await jobCount(), 1);
-  assert.equal(await pendingCount(), 2);
+  const noQuarantine = async () => {
+    assert.equal(await jobCount(), 1, "aucun job créé");
+    assert.equal(await pendingCount(), 3, "aucun événement acquitté");
+    assert.equal((await pool.query("SELECT 1 FROM matching_outbox_events WHERE error_message IS NOT NULL OR dispatched_at IS NOT NULL")).rowCount, 0);
+  };
+
+  // Erreur à l'INSERT d'un job (le trigger se déclenche aussi avant la détection du conflit).
+  await pool.query("CREATE TRIGGER reject_audit_job BEFORE INSERT ON matching_jobs FOR EACH ROW EXECUTE FUNCTION reject_audit_job()");
+  try { await assert.rejects(projectOutboxBatch({ pool }), /audit job failure/); }
+  finally { await pool.query("DROP TRIGGER reject_audit_job ON matching_jobs"); }
+  await noQuarantine();
+
+  // Erreur à l'acquittement d'un événement.
+  await pool.query("CREATE TRIGGER reject_audit_ack BEFORE UPDATE ON matching_outbox_events FOR EACH ROW EXECUTE FUNCTION reject_audit_job()");
+  try { await assert.rejects(projectOutboxBatch({ pool }), /audit job failure/); }
+  finally { await pool.query("DROP TRIGGER reject_audit_ack ON matching_outbox_events"); }
+  await noQuarantine();
 });
 
 test("validation avant SQL : limit, pool, client et exécuteur arbitraire refusés sans requête", async () => {

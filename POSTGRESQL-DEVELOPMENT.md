@@ -41,6 +41,10 @@ export TEST_DATABASE_URL='postgresql://noma_local:noma_local_only@127.0.0.1:5543
 npm run test:postgres
 ```
 
+`npm run test:cleanup-schemas` liste (simulation par défaut) puis, avec `-- --apply`, supprime les schémas
+`noma_test_<pid>_<32 hex>` laissés par des tests interrompus dont le processus n'existe plus ; il refuse
+toute base non dédiée et toute session concurrente sur la base de test.
+
 Sans `TEST_DATABASE_URL`, la commande échoue explicitement. Elle ne se replie pas
 sur `DATABASE_URL`, ne simule pas un succès et ne nettoie aucune base applicative.
 Le nettoyage supprime uniquement le schéma temporaire dont le nom est généré et

@@ -23,6 +23,24 @@ par le plan, nécessaire à l'arrêt propre) empêche toute nouvelle réservatio
 
 Toutes les entrées sont validées avant la moindre requête (`MatchingJobValidationError`).
 
+## Cloisonnement des étapes
+
+Projection, maintenance et exécution des jobs sont isolées : l'échec de l'une n'empêche pas les
+suivantes (un événement empoisonné ne doit pas empêcher d'exécuter les jobs sains). Le résultat
+porte `errors: string[]` : codes stables `projection_error_<code>`, `maintenance_error_<code>`,
+`job_error_<code>` (`<code>` : SQLSTATE ou code d'erreur en minuscules, `validation` ou `unknown` ;
+jamais de message, de requête ni d'identifiant). Si l'exécution d'un job lève une exception
+(base indisponible pendant l'enregistrement d'un échec…), `job_error_…` est enregistré, **aucun
+autre job** n'est exécuté dans ce cycle (la base est probablement malade) et son bail expirera
+normalement. `idle` reste « aucun progrès » (rien lu par la projection, rien en maintenance, aucun
+job exécuté), erreurs ou non : une projection qui échoue à chaque cycle n'entraîne donc pas de
+boucle sans attente. La validation des paramètres lève toujours avant tout SQL. La boucle
+journalise chaque code de `errors` (`matching_worker projection_error_p0001`, …) ; une exception
+qui s'échapperait quand même du cycle reste journalisée `cycle_error_<code>`.
+
+Les conflits d'intégrité de job sont traités à la source (quarantaine par événement, voir
+`MATCHING-PROJECTION.md`) : ils ne produisent plus d'erreur de projection.
+
 ## La boucle (`runMatchingWorkerLoop`)
 
 Enchaîne des cycles jusqu'au déclenchement de `signal`. Inactif, le délai double (`idleDelayMs` 1000 ms →

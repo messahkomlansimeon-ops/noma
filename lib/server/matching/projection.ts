@@ -263,7 +263,15 @@ export interface ProjectOutboxBatchResult {
   jobsAlreadyPresent: number;
   ignored: number;
   invalid: number;
+  /**
+   * Événements dont le job existant diverge (même identité, champs différents) : acquittés `ignored` avec
+   * `job_integrity_conflict`, sans toucher au job. Présent seulement s'il est > 0.
+   */
+  quarantined?: number;
 }
+
+/** Code stable posé en `error_message` d'un événement mis en quarantaine (autorisé par 0009 : statut ignored). */
+export const JOB_INTEGRITY_CONFLICT_CODE = "job_integrity_conflict";
 
 const DEFAULT_PROJECTION_LIMIT = 50;
 const MAX_PROJECTION_LIMIT = 100;
@@ -318,6 +326,7 @@ export async function insertJob(client: PoolClient, job: PlannedMatchingJob): Pr
 
 /**
  * Projette un lot d'événements outbox en jobs, puis les acquitte, dans une seule transaction.
+ * Un job existant divergent met seulement CET événement en quarantaine (savepoint) ; toute autre erreur annule le lot.
  * Aucun job n'est réservé ni exécuté ici (lots 2E3B et 2E4).
  */
 export async function projectOutboxBatch(
@@ -356,15 +365,24 @@ export async function projectOutboxBatch(
     await hooks?.afterSelect?.(events);
 
     for (const event of events) {
+      // Point de reprise par événement : seul un conflit d'intégrité de job (déterministe, il se reproduirait
+      // à chaque essai) met l'événement en quarantaine. Toute autre erreur annule le lot entier.
+      await client.query("SAVEPOINT projection_event");
       const decision = planOutboxProjection(event);
+      let outcome: "projected" | "ignored" | "invalid" | "quarantined" | "present" = "ignored";
+      let errorMessage: string | null = null;
       if (decision.kind === "job") {
-        if (await insertJob(client, decision.job)) result.jobsInserted++;
-        else result.jobsAlreadyPresent++;
-        result.projected++;
-      } else if (decision.kind === "ignored") {
-        result.ignored++;
-      } else {
-        result.invalid++;
+        try {
+          outcome = (await insertJob(client, decision.job)) ? "projected" : "present";
+        } catch (error) {
+          if (!(error instanceof MatchingProjectionIntegrityError)) throw error;
+          await client.query("ROLLBACK TO SAVEPOINT projection_event");
+          outcome = "quarantined";
+          errorMessage = JOB_INTEGRITY_CONFLICT_CODE;
+        }
+      } else if (decision.kind === "invalid") {
+        outcome = "invalid";
+        errorMessage = decision.code;
       }
       await hooks?.beforeAcknowledge?.(event, decision);
 
@@ -372,15 +390,18 @@ export async function projectOutboxBatch(
         `UPDATE matching_outbox_events
             SET dispatch_status = $2, dispatched_at = clock_timestamp(), error_message = $3
           WHERE id = $1 AND dispatch_status = 'pending'`,
-        [
-          event.id,
-          decision.kind === "job" ? "projected" : "ignored",
-          decision.kind === "invalid" ? decision.code : null,
-        ],
+        [event.id, outcome === "projected" || outcome === "present" ? "projected" : "ignored", errorMessage],
       );
       if (acknowledged.rowCount !== 1) {
         throw new MatchingProjectionIntegrityError("Acquittement d'événement outbox impossible : lot annulé.");
       }
+      await client.query("RELEASE SAVEPOINT projection_event");
+
+      if (outcome === "projected") { result.jobsInserted++; result.projected++; }
+      else if (outcome === "present") { result.jobsAlreadyPresent++; result.projected++; }
+      else if (outcome === "invalid") result.invalid++;
+      else if (outcome === "quarantined") result.quarantined = (result.quarantined ?? 0) + 1;
+      else result.ignored++;
     }
     await client.query("COMMIT");
     return result;

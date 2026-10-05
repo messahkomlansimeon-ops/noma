@@ -36,7 +36,7 @@ resource_version, scoring_config_hash, source_event_id, target_resource_id})` (c
 snake_case, `target_resource_id` nul explicite). Rejouer un événement redonne la même
 identité : `ON CONFLICT (job_identity) DO NOTHING` reste idempotent même si le job est
 déjà `completed`. Un job déjà présent est relu et comparé champ à champ ; toute
-divergence lève `MatchingProjectionIntegrityError` et annule le lot.
+divergence lève `MatchingProjectionIntegrityError` (voir « Quarantaine »).
 
 ## Acquittement
 
@@ -44,13 +44,32 @@ Une seule transaction `READ COMMITTED` (`lock_timeout` 3 s, `statement_timeout` 
 sélection `ORDER BY occurred_at, id LIMIT n FOR UPDATE SKIP LOCKED` (`n` entre 1 et 100,
 50 par défaut). Chaque événement est acquitté par `UPDATE … WHERE dispatch_status =
 'pending'` : `projected` (job), `ignored` (non chercheur, inéligible) ou `ignored` avec
-code (invalide). Un acquittement qui ne touche pas exactement une ligne, ou toute erreur
-SQL, annule tout le lot (aucun job, aucun acquittement). Un événement invalide ne bloque
-jamais la file. Deux projecteurs concurrents traitent des événements disjoints.
+code (invalide ou mis en quarantaine). Un acquittement qui ne touche pas exactement une
+ligne, ou toute erreur SQL, annule tout le lot (aucun job, aucun acquittement). Un événement
+invalide ou en quarantaine ne bloque jamais la file. Deux projecteurs concurrents traitent des événements disjoints.
 
 La migration 0009 impose : `pending` ⇔ `dispatched_at` nul, `error_message` réservé à
 `ignored`, version obligatoire pour un événement de compte, un seul événement par version
 d'agrégat versionné, `job_identity` en 64 caractères hexadécimaux minuscules.
+
+## Quarantaine
+
+Un job existant qui porte la même `job_identity` avec des champs différents est un conflit
+**déterministe** : il se reproduirait à chaque essai, et annuler le lot le ferait échouer
+indéfiniment (un seul événement bloquerait la projection de tous les utilisateurs). Chaque
+événement est donc traité sous `SAVEPOINT projection_event`. Si `insertJob` lève
+`MatchingProjectionIntegrityError`, on fait `ROLLBACK TO SAVEPOINT`, l'événement est acquitté
+`ignored` avec `error_message = 'job_integrity_conflict'` (code stable ; 0009 réserve
+`error_message` au statut `ignored`), et le lot continue. L'acquittement reste conditionnel
+(`dispatch_status = 'pending'`, exactement une ligne). Le job divergent n'est **jamais
+modifié**. Le résultat porte `quarantined` (nombre d'événements concernés ; propriété présente
+seulement si > 0, pour ne pas changer la forme des résultats existants).
+
+Toute **autre** erreur (SQL, transitoire, hook, acquittement qui ne touche pas une ligne,
+y compris la `MatchingProjectionIntegrityError` d'un acquittement) conserve le comportement
+précédent : `ROLLBACK` du lot entier, aucun job créé, aucun événement acquitté. Un événement en
+quarantaine n'est pas rejoué ; il reste visible (`ignored` + `job_integrity_conflict`) pour
+un diagnostic humain, et rien ne le corrige automatiquement.
 
 ## Exclusions et limites
 
