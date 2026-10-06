@@ -144,6 +144,27 @@ export function grantBoostByAdministration(offerId: string, duration: "24h" | "3
 }
 
 /**
+ * COMMANDE D'ADMINISTRATION `boost:refund-purchase` sur la base noma_e2e : rembourse INTÉGRALEMENT un achat de boost (le boost actif est annulé, le crédit est
+ * rendu). Renvoie la ligne affichée ; lève une erreur si la commande refuse.
+ */
+export function refundPurchaseByAdministration(purchaseId: string, reasonCode: string): Promise<string> {
+  const databaseUrl = e2eDatabaseUrl();
+  return new Promise((resolve, reject) => {
+    const env: NodeJS.ProcessEnv = { ...process.env, DATABASE_URL: databaseUrl, NODE_OPTIONS: "--conditions=react-server" };
+    const child = spawn(
+      process.execPath,
+      ["--import", "./poc/node_modules/tsx/dist/loader.mjs", "scripts/boost-refund-purchase.ts", "--purchase", purchaseId, "--reason", reasonCode],
+      { cwd: process.cwd(), env, stdio: ["ignore", "pipe", "pipe"] },
+    );
+    let out = "";
+    child.stdout.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
+    child.stderr.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
+    child.on("error", () => reject(new Error("boost:refund-purchase : lancement impossible")));
+    child.on("exit", (code) => (code === 0 ? resolve(out.trim()) : reject(new Error(`boost:refund-purchase a refusé (code ${code}) : ${out.trim().slice(0, 200)}`))));
+  });
+}
+
+/**
  * COMMANDE `dev:seed` (annonces concurrentes d'exemple, vendeurs fictifs +225 07 99 99 99 xx) sur la base noma_e2e. NODE_ENV vaut « development »
  * pour l'enfant (la commande refuse tout autre NODE_ENV). Renvoie la sortie ; lève une erreur si refus.
  */

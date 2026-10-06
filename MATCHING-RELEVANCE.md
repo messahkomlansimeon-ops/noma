@@ -42,6 +42,12 @@ pas donné de prix, prioritaire) ou **`insufficient_market`** (prix présent, ma
 du vendeur). `deltaPercent` = arrondi entier de (prix − médiane) / médiane × 100. Le marché brut (percentiles, prix
 d'autres offres) n'est jamais exposé : seuls position, `deltaPercent`, `sampleSize` et `factors` le sont.
 
+**Calcul du marché (lot P3)** : `readMarketReferences` (`market.ts`) lit les offres de chaque marché UNE fois (clé `lower(btrim(...))` calculée par PostgreSQL) et calcule, par
+offre, le marché HORS cette offre en O(n) sur des prix triés (`percentileContSorted` : position `p × (n − 1)`, interpolation `bas + fraction × (haut − bas)` en double précision, la
+formule de `percentile_cont`) au lieu de la jointure carrée précédente (23 ms et 39 800 lignes triées pour 200 offres d'un même produit). Résultats **identiques** (mêmes doubles) :
+test différentiel contre l'ancienne requête recopiée dans `tests/postgres/matching-relevance.integration.test.ts` (tailles 0 à 40, doublons, prix jusqu'à 2^53 − 1, exclusions, plusieurs produits
+et devises, casse et espaces).
+
 ### Confiance (`confidence`)
 Points : téléphone vérifié 40 ; ancienneté du compte ≥ 30 jours 20 (≥ 7 jours 10) ; complétude des champs structurés
 applicables au prorata sur 30 (offre : category, brand, model, condition, price, location ; demande : category, brand,

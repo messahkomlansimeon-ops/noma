@@ -14,6 +14,7 @@ import {
   TOPUP_PRESETS,
   checkoutHref,
   createTopupKeys,
+  createTopupWithFreshKey,
   formatFcfa,
   mergeTransactionPages,
   parseTopupAmount,
@@ -57,7 +58,13 @@ function RechargePanel({ next }: { next: string }) {
     let navigating = false;
     try {
       const scope = String(result.amountXof);
-      const { topup } = await api.wallet.createTopup({ amountXof: result.amountXof, idempotencyKey: keys.current.keyFor(scope) });
+      // Une intention réutilisée déjà TERMINÉE (payée dans un autre onglet qui partageait la clé) : clé neuve, recréée une seule fois.
+      const { topup } = await createTopupWithFreshKey({
+        create: (request) => api.wallet.createTopup(request),
+        keys: keys.current,
+        scope,
+        amountXof: result.amountXof,
+      });
       const href = checkoutHref(topup.checkoutPath, next);
       if (href === null) {
         setError("La page de paiement n'a pas pu être ouverte. Réessayez dans un instant.");

@@ -23,7 +23,7 @@ import * as purchasesRoute from "../../app/api/offers/[id]/boost-purchases/route
 import {
   createTemporarySchemaName, openVerifiedIsolatedPool, openVerifiedTestDatabase, quoteTemporarySchema, type DedicatedTestDatabase,
 } from "./test-database";
-import { EVALUATION_SUMMARY_JSON, PREFERENCES_SUMMARY_JSON, REACHABLE_LIST_SIZE, SCORING_SUMMARY_JSON } from "./boost-fixtures";
+import { EVALUATION_SUMMARY_JSON, PREFERENCES_SUMMARY_JSON, REACHABLE_LIST_SIZE, SCORING_SUMMARY_JSON, addReachableBuyer, slowReachPool } from "./boost-fixtures";
 
 // ───────────── infrastructure ─────────────
 
@@ -202,8 +202,15 @@ function bounded<T>(promise: Promise<T>, ms: number, label: string): Promise<T> 
   return Promise.race([promise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${label} : aucune réponse après ${ms} ms (lock_timeout absent ?)`)), ms))]);
 }
 
-async function insertQuote(offer: OfferRecord, options: { amount?: number; status?: "available" | "unavailable"; expiresInSeconds?: number; sellerId?: string; durationCode?: "24h" | "3d" | "7d" } = {}): Promise<string> {
+/** L'achat REVÉRIFIE la portée du boost (lot P3) : chaque offre dont on insère une cotation a un acheteur dont la liste la ferait monter (une fois par offre). */
+const reachableOffers = new Set<string>();
+
+async function insertQuote(offer: OfferRecord, options: { amount?: number; status?: "available" | "unavailable"; expiresInSeconds?: number; sellerId?: string; durationCode?: "24h" | "3d" | "7d"; reachable?: boolean } = {}): Promise<string> {
   const id = randomUUID();
+  if (options.reachable !== false && !reachableOffers.has(offer.id)) {
+    reachableOffers.add(offer.id);
+    await addReachableBuyer(pool, offer);
+  }
   const available = (options.status ?? "available") === "available";
   await pool.query(
     `INSERT INTO boost_quotes (
@@ -621,6 +628,41 @@ test("409 : chaque refus de règle a son code et son message fixes (quote_expire
 
   // Aucun message de refus ne contient d'identifiant ni de montant.
   for (const text of Object.values({ a: "Cette cotation a expiré", b: "Solde insuffisant." })) assert.ok(!/[0-9]/.test(text));
+});
+
+test("409 no_visible_effect (lot P3) : plus aucun acheteur atteignable au moment de l'achat → 409 au texte fixe, rien d'écrit ; la portée revenue, le MÊME devis s'achète ; le message ne révèle ni acheteur, ni identifiant, ni montant", async () => {
+  const w = await world();
+  const buyerDemands = "id IN (SELECT demand_id FROM matching_evaluations WHERE offer_id = $1)";
+  await pool.query(`UPDATE demands SET status = 'satisfied' WHERE ${buyerDemands}`, [w.offer.id]);
+  const before = await snapshot();
+  const refused = await post(w.offer.id, { body: bodyFor(w) });
+  assert.equal(refused.status, 409);
+  assert.deepEqual(errorOf(refused), { code: "no_visible_effect", message: "Ce boost ne ferait monter votre annonce chez aucun acheteur : rien n'a été acheté." });
+  assert.deepEqual(await snapshot(), before, "ni débit, ni boost, ni achat");
+  assert.ok(!/[0-9a-f]{8}-[0-9a-f]{4}/.test(refused.text) && !/[0-9]/.test(errorOf(refused).message), "aucun identifiant ni montant");
+  await pool.query(`UPDATE demands SET status = 'active' WHERE ${buyerDemands}`, [w.offer.id]);
+  assert.equal((await post(w.offer.id, { body: bodyFor(w) })).status, 201, "la portée revenue, le même devis s'achète");
+});
+
+test("503 reach_check_unavailable (lot P3-bis, N3) : vérification de la portée non terminée à temps → 503 au texte fixe, Retry-After court, rien d'écrit (ni débit, ni boost, ni achat), journal d'un code ; la MÊME clé d'idempotence réessayée aboutit (201, un seul débit) ; ce n'est jamais un 409 no_visible_effect", async () => {
+  const w = await world();
+  const slowHandlers = createBoostPurchaseHttpHandlers({ pool: slowReachPool(pool), now: clock.now, env, log });
+  const body = bodyFor(w);
+  const before = await snapshot();
+  logs.length = 0;
+  const slow = await post(w.offer.id, { handlers: slowHandlers, body });
+  assert.equal(slow.status, 503);
+  assert.deepEqual(slow.json, { error: { code: "reach_check_unavailable", message: "Vérification impossible pour le moment, réessayez dans un instant." } });
+  assert.equal(slow.headers.find(([name]) => name === "retry-after")?.[1], "2", "Retry-After court");
+  assert.deepEqual(logs, ["reach_check_unavailable"]);
+  assert.deepEqual(await snapshot(), before, "ni débit, ni boost, ni achat");
+  assert.ok(!/[0-9a-f]{8}-[0-9a-f]{4}/.test(slow.text) && !/[0-9]/.test(errorOf(slow).message), "aucun identifiant ni montant dans le message");
+  // Même clé, vérification qui aboutit : l'achat passe, une seule fois.
+  const retried = await post(w.offer.id, { body });
+  assert.equal(retried.status, 201);
+  assert.equal(asObject(asObject(retried.json).purchase).reused, false);
+  assert.equal((await post(w.offer.id, { body })).status, 200, "rejeu de la même clé : aucun second débit");
+  assert.equal(await scalar("SELECT count(*)::text AS n FROM boost_purchases WHERE seller_id = $1", [seller.userId]).then(Number) >= 1, true);
 });
 
 // ═════════════ 6 bis. Une cotation achetée n'est jamais renvoyée (parcours complet par HTTP) ═════════════

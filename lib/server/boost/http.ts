@@ -8,7 +8,7 @@ import { CATALOG_HTTP_BODY_MAX_BYTES } from "../catalog/http";
 import { CatalogValidationError } from "../catalog/errors";
 import { checkPostOrigin, noStoreJsonResponse, readJsonBodyCapped, readSingleCookie } from "../http/protection";
 import { getPostgresPool } from "../postgres/client";
-import { BOOST_DURATION_CODES, type BoostDurationCode } from "./boost-config";
+import { BOOST_DURATION_CODES, BOOST_QUOTE_RATE_WINDOW_SECONDS, BOOST_REACH_RETRY_AFTER_SECONDS, type BoostDurationCode } from "./boost-config";
 import { BoostError } from "./boosts";
 import { listOfferBoostQuotes, quoteOfferBoost, type BoostQuote, type BoostQuoteHistoryItem } from "./quotes";
 
@@ -68,6 +68,19 @@ const resourceNotFound = () => boostError(404, "resource_not_found", "Ressource 
 const offerNotEligible = () => boostError(409, "offer_not_eligible", "Cette offre n'est pas éligible au boost.");
 const offerNotBoostable = () => boostError(409, "offer_not_boostable", "Cette offre n'est pas boostable : catégorie, marque et modèle requis.");
 const boostUnavailable = () => boostError(503, "boost_unavailable", "Le service de boost est temporairement indisponible.");
+/** Limite de débit des devis (lot P3) : 429, texte fixe, `Retry-After` en secondes. */
+const rateLimited = () => noStoreJsonResponse(
+  429,
+  { error: { code: "rate_limited", message: "Trop de devis demandés en peu de temps : réessayez dans une minute." } },
+  { "retry-after": String(BOOST_QUOTE_RATE_WINDOW_SECONDS) },
+);
+
+/** Vérification de la portée non terminée à temps (lot P3-bis) : 503 retriable, texte fixe, `Retry-After` court ; aucun devis n'a été écrit. */
+const reachCheckUnavailable = () => noStoreJsonResponse(
+  503,
+  { error: { code: "reach_check_unavailable", message: "Vérification impossible pour le moment, réessayez dans un instant." } },
+  { "retry-after": String(BOOST_REACH_RETRY_AFTER_SECONDS) },
+);
 
 // ───────────── DTO (liste blanche explicite : aucun champ n'est copié par défaut) ─────────────
 
@@ -79,7 +92,9 @@ interface BoostQuoteDto {
   amount: number | null;
   unavailableReason: BoostQuote["unavailableReason"];
   factors: { competitionMilli: number; demandMilli: number; scarcityMilli: number; durationMilli: number } | null;
-  inputs: { competingSellers: number; compatibleBuyers: number; reachableBuyers: number | null; slotsTotal: number; slotsUsed: number };
+  inputs: {
+    competingSellers: number; compatibleBuyers: number; reachableBuyers: number | null; reachTruncated: boolean; slotsTotal: number; slotsUsed: number;
+  };
   computedAt: string;
   expiresAt: string;
 }
@@ -103,6 +118,7 @@ function quoteDto(quote: BoostQuote | BoostQuoteHistoryItem): BoostQuoteDto {
       competingSellers: quote.inputs.competingSellers,
       compatibleBuyers: quote.inputs.compatibleBuyers,
       reachableBuyers: quote.inputs.reachableBuyers,
+      reachTruncated: quote.inputs.reachTruncated,
       slotsTotal: quote.inputs.slotsTotal,
       slotsUsed: quote.inputs.slotsUsed,
     },
@@ -180,6 +196,11 @@ export function createBoostHttpHandlers(dependencies: BoostHttpDependencies = {}
       if (error.code === "offer_not_found" || error.code === "offer_not_owned") return resourceNotFound();
       if (error.code === "offer_not_eligible") return offerNotEligible();
       if (error.code === "offer_not_boostable") return offerNotBoostable();
+      if (error.code === "rate_limited") return rateLimited();
+      if (error.code === "reach_check_unavailable") {
+        journal(error.code);
+        return reachCheckUnavailable();
+      }
     }
     return unavailable(logCodeOf(error));
   }

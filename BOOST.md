@@ -12,6 +12,9 @@ INCHANGÉES et partagées (une seule fonction, `placeOfferBoostInTransaction`) ;
 pertinente (§15 : le boost n'agit que sur des éléments déjà présents et confirmés du classement, au-dessus de `min_relevance`).** Le boost ne s'applique qu'au tri `sort=relevance` du **sens demande**
 (l'acheteur voit des offres). Le tri par score, le tri par défaut et le sens offre ne changent pas.
 
+**Depuis le lot P3 (priorité d'ancienneté, portée sans éviction), quand plusieurs boosts sont promouvables dans une même liste et que le
+quota ne suffit pas, la promotion va aux boosts les plus ANCIENS (jamais à celui qui est le mieux classé) : voir « Priorité d'ancienneté ».**
+
 Code : `lib/server/boost/boosts.ts` (réglages, places, attribution, annulation, lecture des boosts effectifs),
 `lib/server/boost/boost-config.ts` (durées, source, espace du verrou), `lib/server/boost/placement.ts` (placement pur),
 `lib/server/matching/stored-matches.ts` (application), `database/migrations/0011_offer_boosts.sql`,
@@ -123,17 +126,46 @@ la mention « Boost (administration) ». Aucun paiement, aucun crédit.
 Dans `stored-matches`, `sort=relevance`, **sens demande uniquement**, après le classement organique de la fenêtre (règles de
 2H1 et 2H1-bis inchangées, indicateurs et pertinence inchangés) :
 
-1. **promouvables** = éléments dont l'offre a un boost **effectif à `at`** (vendeur toujours propriétaire et actif, offre
-   toujours éligible, clé produit actuelle de l'offre égale au périmètre du boost) **et** dont la pertinence est `>=`
-   `min_relevance` des réglages de la catégorie de la demande ;
+1. **promouvables** = éléments dont l'offre a un boost **effectif à `at`** (vendeur toujours propriétaire et actif, offre toujours
+   éligible, clé produit actuelle de l'offre égale au périmètre du boost) **et** dont la pertinence est `>=`
+   `min_relevance` des réglages de la catégorie de la demande ; chacun a un **rang d'ancienneté** (voir plus bas : 0 = le boost le plus
+   ancien) ;
 2. `maxPromus = floor(max_promoted_share × N)`, `N` = nombre d'éléments de la fenêtre (au plus 200) ;
-3. **placement avec plancher** : on parcourt les positions finales p = 0 … N−1 avec la file des éléments non encore placés
-   (ordre organique). À une **position de promotion** (p multiple de `ceil(1 / max_promoted_share)` : 0, 7, 14, … avec 0,15)
-   tant que `maxPromus` n'est pas atteint, soit `h` la tête de la file et `x` le premier élément promouvable de la file :
-   - si `x` existe **et x ≠ h** : `x` est placé en p et **promu** (il monte strictement, le quota est consommé) ;
-   - sinon `h` est placé, **non promu** : aucun avantage, aucun quota consommé ;
+3. **placement avec plancher et priorité d'ancienneté** : on parcourt les positions finales p = 0 … N−1 avec la file des éléments non
+   encore placés (ordre organique). À une **position de promotion** (p multiple de `ceil(1 / max_promoted_share)` : 0, 7, 14, … avec
+   0,15) tant que `maxPromus` n'est pas atteint, soit `x` le promouvable de la file dont le **boost est le plus ancien** (rang le plus
+   petit ; jamais l'ordre organique) :
+   - si `x` existe **et monte strictement** (sa position organique est supérieure à p) : `x` est placé en p et **promu** (le quota est
+     consommé) ;
+   - sinon la tête de file est placée, **non promue** : aucun avantage, aucun quota consommé (`x` est déjà à sa place, ou aucun élément
+     n'est promouvable) ;
    à toute autre position, on place la tête, non promue ;
 4. aucun élément n'est ajouté, retiré ni dupliqué ; les non-promus gardent leur ordre organique relatif.
+
+### Priorité d'ancienneté (lot P3)
+
+Avant le lot P3, à quota insuffisant, la promotion allait au PREMIER promouvable dans l'ordre organique : une offre mieux classée qui
+achetait après une autre prenait la seule place. Constat prouvé : liste de 8 offres (quota 1), périmètre à 2 places ; D achète (atteignable),
+puis A (mieux classée) achète avec un devis calculé avant l'achat de D et prend la place : D a payé et n'est plus « sponsorisée ».
+
+Règle actuelle, **une seule fonction** (`placeBoostedItems`, `placement.ts`, appelée par la lecture des résultats, le journal d'exposition et la
+portée d'un boost) : le rang d'un boost est son ordre par **`starts_at` croissant (à la microseconde, texte ISO UTC de largeur fixe), puis
+identifiant du boost** (`compareBoostAge`, `rankBoostsByAge` ; `rankEffectiveBoosts` dans `boosts.ts`). Conséquences, **testées exhaustivement**
+(listes de 0 à 9 éléments, six parts, tous les ensembles de promouvables et tous les ordres d'ancienneté jusqu'à 4 boosts, plus de 20 000 cas) :
+- invariants conservés : un promu **monte strictement** et ne descend jamais, `sponsored ⇔ position finale < position organique`, au plus
+  `floor(part × N)` promus, à des positions multiples du pas, les non-promus gardent leur ordre relatif ;
+- les promus se suivent du boost le plus **ancien** au plus récent ;
+- **aucune éviction** : AJOUTER un boost promouvable plus récent que tous les autres ne change la décision (promu ou non) d'AUCUN autre
+  élément. Un boost plus récent ne prend donc jamais une position de promotion tant qu'un boost plus ancien est encore promouvable dans la
+  file, **même quand celui-ci n'a rien à gagner** (il est alors déjà à sa place : la position reste organique et le quota intact) ; il attend
+  la position de promotion suivante ;
+- avec un rang égal à l'indice organique, on retrouve EXACTEMENT l'ancien placement (modèle de référence indépendant).
+
+**Exemple chiffré** (N = 30, part 0,15 → `maxPromus` = 4, pas = 7 ; classement organique 0, 1, 2, …, 29 ; promouvables 3, 5 et 8) :
+- si l'ordre d'ancienneté suit l'ordre organique (3, 5, 8) : p0 → **3 passe en 0** ; 5 atteint sa place organique avant p7 (aucun avantage) ;
+  p7 → **8 passe en 7** ; résultat 3, 0, 1, 2, 4, 5, 6, **8**, 7, 9, … ; sponsorisés : 3 et 8 (c'est l'ancien placement, inchangé) ;
+- si l'ordre d'ancienneté est **8, 3, 5** (8 est le boost le plus ancien) : p0 → **8 passe en 0** ; 3 et 5 sont placés à leur tour (positions
+  4 et 6, descendus d'un cran par le promu) ; p7 : plus aucun promouvable ; résultat 8, 0, 1, 2, 3, 4, 5, 6, 7, 9, … ; sponsorisé : 8 seul.
 
 **Le boost ne peut qu'améliorer la position d'une offre promue.** Un promu ne descend jamais ; « sponsorisé » signifie « a
 gagné des places grâce au boost » (`sponsored` ⇔ position finale < position organique). Un élément boosté qui atteint sa
@@ -219,9 +251,24 @@ et le classement organique est servi (voir « Panne du boost »). Appliquer la m
   places.
 - **Boost uniquement dans `stored-matches`, tri `relevance`, sens demande** : aucun boost dans `/api/search` ni dans les routes
   `/matches` en direct, ni dans le sens offre.
-- **Placement avec plancher** : un boost n'améliore la position d'une offre que s'il la fait monter ; une offre déjà bien
+- **Placement avec plancher et priorité d'ancienneté** : un boost n'améliore la position d'une offre que s'il la fait monter ; une offre déjà bien
   classée (ou qui atteint sa place avant la position de promotion suivante) n'est ni déplacée ni sponsorisée, et le quota
-  n'est pas consommé. Le nombre d'offres sponsorisées peut donc être inférieur à `floor(max_promoted_share × N)`.
+  n'est pas consommé. Le nombre d'offres sponsorisées peut donc être inférieur à `floor(max_promoted_share × N)`. Un boost récent peut
+  n'avoir aucune place tant que des boosts plus anciens occupent les promotions de la liste (la portée du devis le dit : `no_visible_effect`).
+  L'ancienneté se compare dans la liste concernée seulement (les boosts d'autres périmètres n'y figurent pas).
+- **Quota parfois non épuisé : choix assumé (lot P3-bis, N5).** La priorité d'ancienneté ne change PAS l'algorithme au lot P3-bis : la place promue
+  va toujours au boost le plus ancien, même quand un boost plus récent aurait pu monter à sa place. Conséquence mesurée (50 000 tirages d'audit) : le
+  nombre de promus peut être inférieur à celui de l'ancien placement (par ordre organique), soit ≈ 7,7 % de quota laissé vide. Exemple exact
+  (`placeBoostedItems`, liste de n = 23 offres, part promue 0,2 : quota floor(0,2 × 23) = 4, une position de promotion toutes les 5 places : 0, 5, 10,
+  15, 20) avec des boosts aux rangs organiques 17 (le plus ancien), 22, 14, 2 puis 11 (le plus récent, en comptant les rangs organiques à partir de 0) :
+  position 0 → l'offre du rang organique 17 monte ; position 5 → celle du rang 22 ; position 10 → celle du rang 14 ; aux positions 15 et 20, les deux
+  boosts restants (rangs organiques 2 et 11) sont DÉJÀ mieux placés que la position visée : ils ne montent pas, le quota n'est pas consommé. Résultat :
+  **3 promus sur un quota de 4**. L'ancien placement (ordre organique) en promouvait 4 (2, 11, 14 et 17) : il servait la place à celui qui avait le moins
+  à gagner. Le choix est voulu : **priorité au premier payeur** (un boost plus récent n'évince ni ne devance jamais un boost plus ancien) et cohérence
+  avec la portée (`reach.ts` applique la même fonction, d'où le théorème testé « ajouter un boost plus récent ne change la décision d'aucun autre »).
+  Ce qui reste garanti : la portée vérifiée À L'ACHAT (`BOOST-PURCHASE.md`, lot P3) assure qu'un boost acheté a un effet visible AU MOMENT de l'achat
+  (au moins un acheteur chez qui l'offre monte) ; elle ne promet pas qu'il le gardera si un boost plus ancien est acheté ensuite pour la même liste (il
+  ne l'évince pas, mais il peut ne plus y trouver de place).
 - Un boost échu garde le statut `active` en base jusqu'au prochain cycle du worker (qui le marque `expired`), ou, sans worker,
   jusqu'à la prochaine attribution ou annulation sur la même offre ; il n'a aucun effet ni ne compte dans l'intervalle.
 - Pas d'index fonctionnel sur `lower(btrim(...))` : le comptage des offres d'un périmètre est proportionnel à la taille du

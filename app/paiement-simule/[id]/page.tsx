@@ -51,6 +51,8 @@ function Paiement({ topupId }: { topupId: string }) {
   const [busy, setBusy] = useState<Action | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // Cette page a VU la recharge en attente : c'est elle qu'on vient de payer (sinon, « déjà terminée avant cette visite », jamais « crédité »).
+  const [sawPending, setSawPending] = useState(false);
   // Verrou synchrone : deux appuis rapprochés ne lancent jamais deux événements.
   const busyRef = useRef(false);
 
@@ -61,6 +63,7 @@ function Paiement({ topupId }: { topupId: string }) {
       if (result.ok) {
         setTopup(result.topup);
         setFailure(null);
+        if (result.topup.status === "pending") setSawPending(true);
         return;
       }
       if (redirectIfUnauthorized(result.error)) return;
@@ -90,6 +93,7 @@ function Paiement({ topupId }: { topupId: string }) {
     if (result.ok) {
       setTopup(result.topup);
       setFailure(null);
+      if (result.topup.status === "pending") setSawPending(true);
     } else if (!redirectIfUnauthorized(result.error)) {
       setFailure(failureOf(result.error));
     }
@@ -103,7 +107,7 @@ function Paiement({ topupId }: { topupId: string }) {
     if (finishedAmount !== null) createTopupKeys().forget(String(finishedAmount));
   }, [finishedAmount]);
 
-  const view = checkoutView({ topup, failure });
+  const view = checkoutView({ topup, failure, paidHere: sawPending });
   const retryHref = walletHref({ next: safeNextPath(rawNext, ""), recharge: true });
 
   return (

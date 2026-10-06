@@ -96,3 +96,20 @@ sur `DATABASE_URL`, ne simule pas un succès et ne nettoie aucune base applicati
 Le nettoyage supprime uniquement le schéma temporaire dont le nom est généré et
 validé par le harnais ; le schéma `public` est contrôlé mais jamais nettoyé. Les
 données fictives de `lib/data.ts` ne sont jamais importées.
+
+## Pool applicatif et mesures de coût (lot P3)
+
+Le pool de l'application (`getPostgresPool`, `lib/server/postgres/client.ts`) a une taille maximale **explicite** (20 connexions par processus) et un
+**délai d'attente d'une connexion de 5 s** (`connectionTimeoutMillis`) : quand toutes les connexions sont prises, l'appel échoue en
+`timeout exceeded when trying to connect` et les routes répondent un 503 propre (avant : attente sans fin, constaté 63,9 s pour un `GET /api/wallet`
+pendant douze devis de boost simultanés). Le worker a son propre pool. Les tests ouvrent leurs propres pools (`max: 1` en général).
+
+Mesurer le coût du boost (base JETABLE, jamais `noma_dev` ni `noma_test` : le nom doit commencer par `noma_perf_`, sinon refus avant toute connexion) :
+
+```shell
+docker exec deploy-postgres-1 createdb -U noma_local noma_perf_p3
+export DATABASE_URL='postgresql://noma_local:noma_local_only@127.0.0.1:55432/noma_perf_p3'
+npm run perf:boost -- setup     # 200 offres d'un périmètre, 1 000 besoins compatibles, 200 000 évaluations, 3 boosts (≈ 30 s)
+npm run perf:boost -- measure results quote-reachable quote-unreachable purchase concurrent
+docker exec deploy-postgres-1 dropdb -U noma_local noma_perf_p3
+```

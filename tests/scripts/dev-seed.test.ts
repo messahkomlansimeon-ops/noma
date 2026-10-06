@@ -84,18 +84,77 @@ describe("arguments", () => {
     assert.throws(() => parseSeedArguments(["--category", "phones", "--brand", "a", "--model", "x".repeat(61)]), /--model doit être un texte/);
     assert.throws(() => parseSeedArguments(["phones"]), /valeur manquante/);
   });
+  test("lot P3 : --brand et --model refusent les caractères de contrôle et de direction de texte (bidi) ; les accents, espaces et symboles courants restent permis", () => {
+    const bidi = [0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069, 0x200e, 0x200f, 0x061c];
+    const control = [0x00, 0x01, 0x08, 0x09, 0x0a, 0x0d, 0x1b, 0x1f, 0x7f, 0x80, 0x85, 0x9f, 0x2028, 0x2029];
+    for (const code of [...bidi, ...control]) {
+      const character = String.fromCodePoint(code);
+      for (const flag of ["--brand", "--model"] as const) {
+        const args = ["--category", "phones", "--brand", "apple", "--model", "iphone 12"];
+        args[args.indexOf(flag) + 1] = `abc${character}def`;
+        assert.throws(() => parseSeedArguments(args), SeedUsageError, `${flag} U+${code.toString(16)}`);
+        const alone = ["--category", "phones", "--brand", "apple", "--model", "iphone 12"];
+        alone[alone.indexOf(flag) + 1] = character;
+        assert.throws(() => parseSeedArguments(alone), SeedUsageError, `${flag} seul U+${code.toString(16)}`);
+      }
+    }
+    assert.throws(() => parseSeedArguments(["--category", "phones", "--brand", "apple", "--model", "gpt\u202Efdp.exe"]), /sans caractère de contrôle ni de direction de texte/);
+    for (const fine of ["Galaxy S21 Ultra 5G", "iPhone 12 — 128 Go", "Écouteurs Électro", "TV 55\" (4K)", "a", "x".repeat(60), "日本語", "😀 phone"]) {
+      assert.equal(parseSeedArguments(["--category", "phones", "--brand", "apple", "--model", fine]).model, fine, fine);
+    }
+  });
+});
+
+describe("lot P3-bis (N6) : caractères invisibles et de format refusés", () => {
+  const invisible = [0x200b, 0x200c, 0x200d, 0x2060, 0xfeff, 0x00ad, 0x2061, 0x2064, 0x180e, 0x206a, 0xe0020];
+  const base = () => ["--category", "phones", "--brand", "apple", "--model", "iphone 12"];
+  test("U+200B à U+200D, U+2060, U+FEFF (et tout format Cf) refusés dans --category, --brand et --model : au milieu, au bord, seul", () => {
+    for (const code of invisible) {
+      const character = String.fromCodePoint(code);
+      for (const flag of ["--category", "--brand", "--model"] as const) {
+        for (const value of [`ab${character}cd`, `${character}abc`, `abc${character}`, character]) {
+          const args = base();
+          args[args.indexOf(flag) + 1] = flag === "--category" ? `phones${value}` : value;
+          if (flag === "--category" && value === character) args[args.indexOf(flag) + 1] = character;
+          assert.throws(() => parseSeedArguments(args), SeedUsageError, `${flag} U+${code.toString(16)} « ${value.length} »`);
+        }
+      }
+    }
+  });
+  test("le message cite le champ fautif et ne reprend jamais la valeur saisie (--category compris)", () => {
+    const args = base();
+    args[1] = "pho\u200Bnes";
+    assert.throws(() => parseSeedArguments(args), (error: unknown) => error instanceof SeedUsageError && /^--category doit être un texte de 1 à 60 caractères/.test(error.message) && !error.message.includes("\u200b"));
+    const model = base();
+    model[5] = "iphone\u200B 12";
+    assert.throws(() => parseSeedArguments(model), /--model doit être un texte de 1 à 60 caractères sans caractère de contrôle ni de direction de texte, ni caractère invisible/);
+    // Bord de valeur : trim() retire U+FEFF sans le dire ; la valeur BRUTE est contrôlée.
+    const edge = base();
+    edge[3] = "\uFEFFapple";
+    assert.throws(() => parseSeedArguments(edge), /--brand doit être/);
+  });
+  test("les accents, espaces, symboles et emoji sans jonction restent permis ; espaces de bord toujours rognés", () => {
+    for (const fine of ["Galaxy S21 Ultra 5G", "Écouteurs Électro", "日本語", "😀 phone", "iPhone 12 — 128 Go"]) {
+      assert.equal(parseSeedArguments(["--category", "phones", "--brand", "apple", "--model", fine]).model, fine, fine);
+    }
+    assert.equal(parseSeedArguments(["--category", "phones", "--brand", "  apple ", "--model", " iphone 12 "]).brand, "apple");
+  });
 });
 
 describe("garde-fous de l'environnement", () => {
   const env = (extra: Record<string, string | undefined> = {}) => ({ DATABASE_URL: GOOD_URL, ...extra });
 
-  test("acceptée : NODE_ENV absent, vide ou « development », base locale noma_essai / noma_e2e / noma_test", () => {
+  test("acceptée : NODE_ENV absent, vide ou « development », base locale de la liste blanche (noma_essai, noma_e2e, noma_essai_*)", () => {
     assert.deepEqual(checkSeedEnvironment(env()), { ok: true, databaseName: "noma_essai" });
     assert.equal(checkSeedEnvironment(env({ NODE_ENV: "" })).ok, true);
     assert.equal(checkSeedEnvironment(env({ NODE_ENV: "development" })).ok, true);
     assert.equal(checkSeedEnvironment(env({ NODE_ENV: " development " })).ok, true);
     assert.deepEqual(checkSeedEnvironment({ DATABASE_URL: "postgres://u:p@localhost:5432/noma_e2e" }), { ok: true, databaseName: "noma_e2e" });
-    assert.deepEqual(checkSeedEnvironment({ DATABASE_URL: "postgres://u:p@[::1]/noma_test?sslmode=disable" }), { ok: true, databaseName: "noma_test" });
+    assert.deepEqual(checkSeedEnvironment({ DATABASE_URL: "postgres://u:p@[::1]/noma_essai?sslmode=disable" }), { ok: true, databaseName: "noma_essai" });
+    // Bases jetables noma_essai_* (minuscules, chiffres, tiret bas) : acceptées.
+    for (const name of ["noma_essai_x", "noma_essai_ab12", "noma_essai_20261006_tmp", "noma_essai_" + "a".repeat(40)]) {
+      assert.deepEqual(checkSeedEnvironment({ DATABASE_URL: `postgres://u:p@localhost/${name}` }), { ok: true, databaseName: name }, name);
+    }
   });
   test("refus : NODE_ENV défini et différent de development (production, test, staging…)", () => {
     for (const value of ["production", "Production", "test", "staging", "prod", "dev"]) {
@@ -129,19 +188,22 @@ describe("garde-fous de l'environnement", () => {
       }
     }
   });
-  test("refus : nom de base qui ne commence pas par noma_ ; refus de noma_dev (toutes graphies)", () => {
-    for (const name of ["postgres", "autre", "essai_noma", "NOMA_essai", "noma", ""]) {
-      const result = checkSeedEnvironment({ DATABASE_URL: `postgres://u:p@localhost/${name}` });
-      assert.equal(result.ok, false, name);
-      if (!result.ok) assert.match(result.reason, /doit commencer par « noma_ »/);
-    }
-    for (const name of ["noma_dev", "noma_DEV", "noma_Dev", "noma%5Fdev"]) {
+  test("refus : tout nom hors de la liste blanche (lot P3) — noma_test, noma_prod, noma_dev (toutes graphies), noma_* quelconque, casse, suffixes", () => {
+    const refused = [
+      "postgres", "autre", "essai_noma", "NOMA_essai", "noma", "",
+      "noma_test", "noma_prod", "noma_production", "noma_staging", "noma_perf_p3", "noma_restore_test_1",
+      "noma_dev", "noma_DEV", "noma_Dev", "noma%5Fdev", "noma_dev2", "noma_dev_essai",
+      "noma_essai2", "noma_essai-x", "noma_essai_", "noma_essai_X", "noma_Essai", "noma_E2E", "noma_e2e2", "noma_e2e_x", "noma_essai_" + "a".repeat(41),
+      "noma_essai_a b", "noma_essai_é",
+    ];
+    for (const name of refused) {
       const result = checkSeedEnvironment({ DATABASE_URL: `postgres://u:p@127.0.0.1:5432/${name}` });
       assert.equal(result.ok, false, name);
-      if (!result.ok) assert.match(result.reason, /refuse la base noma_dev/);
+      if (!result.ok) {
+        assert.match(result.reason, /dev:seed ne peuple que les bases d'essai noma_essai, noma_e2e et noma_essai_\*/, name);
+        assert.ok(!result.reason.includes("u:p@"), "le motif ne contient jamais l'adresse");
+      }
     }
-    // noma_dev2 n'est pas noma_dev : acceptée (base d'essai distincte).
-    assert.equal(checkSeedEnvironment({ DATABASE_URL: "postgres://u:p@127.0.0.1/noma_dev2" }).ok, true);
   });
   test("databaseNameOf lit le nom comme pg le lit", () => {
     assert.equal(databaseNameOf("postgres://u:p@localhost:5432/noma_essai?sslmode=disable"), "noma_essai");
@@ -247,8 +309,10 @@ describe("refus en processus enfant (rien n'est écrit, aucune connexion)", () =
     const cases: Array<[Record<string, string>, RegExp]> = [
       [{}, /DATABASE_URL est obligatoire/],
       [{ DATABASE_URL: "postgresql://u:p@db.example.com:5432/noma_essai" }, /base de CE poste/],
-      [{ DATABASE_URL: CLOSED_PORT_URL("noma_dev") }, /refuse la base noma_dev/],
-      [{ DATABASE_URL: CLOSED_PORT_URL("autre") }, /doit commencer par « noma_ »/],
+      [{ DATABASE_URL: CLOSED_PORT_URL("noma_dev") }, /ne peuple que les bases d'essai noma_essai, noma_e2e et noma_essai_\*/],
+      [{ DATABASE_URL: CLOSED_PORT_URL("noma_test") }, /ne peuple que les bases d'essai/],
+      [{ DATABASE_URL: CLOSED_PORT_URL("noma_prod") }, /ne peuple que les bases d'essai/],
+      [{ DATABASE_URL: CLOSED_PORT_URL("autre") }, /ne peuple que les bases d'essai/],
     ];
     for (const [env, pattern] of cases) {
       const result = await runSeed(PRODUCT, { NODE_ENV: "development", ...env });

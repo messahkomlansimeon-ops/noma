@@ -57,7 +57,15 @@ Une transaction, dans cet ordre ; tout échec à n'importe quelle étape annule 
    existante, à ce vendeur, éligible, clé produit complète (`offer_not_found`, `offer_not_owned`, `offer_not_eligible`,
    `offer_not_boostable`) ; verrou du périmètre ; **la cotation est relue sous le verrou** (échéance à CET instant, achat concurrent,
    périmètre de l'offre inchangé — sinon `quote_expired`/`quote_already_used`) ; boosts échus de l'offre marqués `expired` ; puis
-   `offer_already_boosted`, `no_slot_available`, `seller_boost_limit_reached` (mêmes règles, mêmes codes, mêmes priorités que l'attribution).
+   `offer_already_boosted`, `no_slot_available`, `seller_boost_limit_reached` (mêmes règles, mêmes codes, mêmes priorités que l'attribution) ;
+   **puis (lot P3) la PORTÉE est REVÉRIFIÉE sous le verrou du périmètre** (`computeBoostReach`, mode « premier » : arrêt au PREMIER acheteur
+   atteignable ; budget de 1,5 s, `statement_timeout` de 2 s) : le devis date de jusqu'à 15 minutes, les listes des acheteurs et les autres boosts ont pu
+   changer, et un boost plus ancien a pu prendre la place. L'offre achetée est comptée comme le boost le plus RÉCENT (priorité d'ancienneté, `BOOST.md`) :
+   elle n'évince jamais un boost existant. Aucun acheteur atteignable, DÉMONTRÉ (tous les besoins examinés dans les bornes) → **`no_visible_effect`** (409). **Lot P3-bis (N3) :
+   budget (1,5 s) ou `statement_timeout` épuisé SANS acheteur trouvé** (verrou tenu sur les évaluations, base chargée) → **`reach_check_unavailable`** (**503**,
+   `Retry-After: 2`, « Vérification impossible pour le moment, réessayez dans un instant. »), retriable avec la **MÊME clé d'idempotence** : une lenteur
+   n'est plus un refus définitif (constaté avant le lot : verrou de 3 s → 409 « ne ferait plus monter votre annonce » en 2 s, le même devis accepté 78 ms
+   après). Dans les deux cas RIEN n'est écrit (ni débit, ni boost, ni achat) et le devis reste utilisable ; jamais un achat sur un effet non démontré.
 5. **Prix et durée** : EXACTEMENT le montant et la durée de la cotation (jamais recalculés : un changement de tarif ou de marché entre
    la cotation et l'achat ne change pas le débit). Le boost commence à `clock_timestamp()`.
 6. **Débit** : transaction `boost_purchase` (vendeur −montant, `boost_revenue` +montant) par `postWalletTransaction`, **après** tous les
@@ -65,15 +73,18 @@ Une transaction, dans cet ordre ; tout échec à n'importe quelle étape annule 
 7. Boost (source `purchase`), puis ligne `boost_purchases`. Renvoie l'achat, le boost et le solde après l'opération.
 
 **Priorité des refus** : validation, idempotence, cotation (introuvable, indisponible, échue, déjà achetée), offre (inexistante,
-éligibilité, clé produit), cotation relue sous le verrou, offre déjà boostée, place, plafond vendeur, solde.
+éligibilité, clé produit), cotation relue sous le verrou, offre déjà boostée, place, plafond vendeur, **portée (`no_visible_effect`, lot P3)**, solde.
+Un REJEU d'une clé déjà utilisée renvoie l'achat existant avant tout autre contrôle (aucune revérification de portée, aucun débit).
 
 ### Ordre global des verrous (documenté dans `purchase.ts`)
 
 Toute transaction du système prend ses verrous dans cet ordre, jamais à l'envers (pas d'interblocage ; testé par une charge mixte de 24
-opérations simultanées) : 1. idempotence (vendeur, clé) — achat ; 2. cotation par offre — cotations ; 3. ligne de l'offre `FOR SHARE` ;
+opérations simultanées) : 1. idempotence (vendeur, clé) — achat ; 2. cotation par offre — cotations ; 2b. vendeur (limite de débit des devis, lot P3) — cotations, juste après 2 ; 3. ligne de l'offre `FOR SHARE` ;
 4. périmètre (clé produit) — attribution et achat ; 5. ligne de l'achat `FOR UPDATE` — remboursement ; 6. lignes de boost de l'offre ;
 7. comptes du grand livre par identifiant croissant ; 8. ligne d'achat. Espaces consultatifs : 1_314_664_948 (périmètre), 949 (cotation),
-950 (recharge), **951 (idempotence d'un achat)**. `boost_revenue` est touché par chaque achat : point chaud, pris tard dans la transaction.
+950 (recharge), **951 (idempotence d'un achat)**, **952 (vendeur, limite de débit des devis, lot P3 : pris APRÈS le verrou de cotation de l'offre, tenu le temps du
+comptage et de l'écriture)**, **953 (`dev:seed`, verrou de session, jamais pris par le serveur)**. La revérification de la portée de l'achat s'exécute SOUS
+les verrous 1 et 4 (périmètre) et jamais sous le verrou de cotation (2) : le calcul d'un devis, lui, ne tient aucun verrou pendant la portée. `boost_revenue` est touché par chaque achat : point chaud, pris tard dans la transaction.
 
 ## Remboursement (administration seulement, aucune route HTTP)
 
@@ -108,8 +119,10 @@ résolution de session ni requête SQL pour une origine refusée).
 | 409 | `quote_unavailable` / `quote_already_used` | cotation sans prix / déjà achetée (même remboursée) |
 | 409 | `offer_not_eligible` | offre en pause, archivée, indisponible, propriétaire inactif, **ou clé produit effacée** (`offer_not_boostable` du domaine) |
 | 409 | `offer_already_boosted` / `no_slot_available` / `seller_boost_limit_reached` | mêmes règles que l'attribution |
+| 409 | `no_visible_effect` | (lot P3) la portée revérifiée sous le verrou du périmètre ne trouve plus aucun acheteur chez qui le boost ferait monter l'offre (DÉMONTRÉ, tous les besoins examinés dans les bornes) : rien n'a été acheté, ni débité |
 | 409 | `insufficient_balance` | solde inférieur au prix |
 | 409 | `idempotency_conflict` | même clé, autre cotation ou autre offre |
+| 503 | `reach_check_unavailable` | (lot P3-bis) la revérification de la portée n'a pas pu se terminer dans son budget (1,5 s ; `statement_timeout`) sans acheteur trouvé : rien n'est écrit, `Retry-After: 2`, **réessayer avec la même clé d'idempotence** ; journal : `reach_check_unavailable` |
 | 503 | `boost_purchase_unavailable` | `NOMA_AUTH_ORIGIN` non configurée, migration 0015 absente, verrou (`55P03`, après 5 s), base indisponible, session impossible à résoudre, toute autre erreur |
 
 Journal serveur : **un seul code** par 503 (`[boost-purchase-http] <code>` : code du domaine, SQLSTATE ou `unexpected_error`), jamais de
@@ -148,13 +161,12 @@ recharge, à justifier. Le rapport ne contient aucune donnée personnelle.
   `offer_already_boosted` pendant 60 s (comme toute cotation indisponible) tant que le boost est actif ; après remboursement ou
   annulation et dès que cette indisponibilité de 60 s a expiré, une cotation normale. Contrepartie : la **migration 0015** est requise
   aussi pour demander une cotation.
-- **La portée visible n'est pas recalculée à l'achat** (lot P2-bis, `BOOST-PRICING.md`) : un devis `available` garantit qu'au moment de son
-  calcul au moins un acheteur voyait l'offre monter ; l'achat revérifie places, plafond vendeur et validité du devis (au plus 900 s) mais pas
-  les listes des acheteurs. Si elles changent entre-temps, le boost est acheté au prix du devis sans promesse de position (l'écran le dit :
-  « Ce n'est pas une garantie de position ni de vente »). La migration **0016** est requise pour demander un devis (colonne
-  `reachable_buyers`).
-- **Aucune limite de débit propre à la route** : chaque POST ouvre une transaction et prend des verrous ; une limite de débit en
-  amont reste à prévoir avant toute exposition publique.
+- **La portée est revérifiée à l'achat (lot P3)**, sous le verrou du périmètre : un devis `available` a été calculé sur une ESTIMATION datée (20 besoins
+  comptés, 50 examinés, 3 s) ; à l'achat, l'achat ne passe que si au moins un acheteur verrait encore l'offre monter (budget de 1,5 s ; `no_visible_effect` si démontré inatteignable, `reach_check_unavailable` — 503 à réessayer — si la vérification n'a pas pu aboutir). La
+  revérification examine au plus 50 besoins : un acheteur au-delà de ce nombre n'est pas vu (documenté : prudence, jamais l'inverse). Un achat tient le verrou du
+  périmètre au plus ≈ 1,5 s de plus qu'avant le lot (mesuré : ≈ 0,1 à 0,8 s). La migration **0017** est requise pour demander un devis.
+- **Limite de débit** : la demande de DEVIS est limitée (20 par vendeur et par minute, `BOOST-PRICING.md`) ; la route d'achat n'a pas de limite propre (chaque
+  POST ouvre une transaction et prend des verrous ; une limite de débit en amont reste à prévoir avant toute exposition publique).
 - Un corps JSON précédé d'un BOM UTF-8 est lu comme les autres routes de corps utilisateur (le décodeur partagé retire le BOM) ; seuls
   les corps du webhook fictif sont refusés dans ce cas.
 - `boost_revenue` est un point chaud d'écriture (chaque achat et remboursement le touche, brièvement, en fin de transaction).

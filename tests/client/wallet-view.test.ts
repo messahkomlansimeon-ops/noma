@@ -7,6 +7,7 @@ import {
   BOOST_SUCCESS_NOTE,
   BUY_LABELS,
   PURCHASE_NOT_RECORDED_TEXT,
+  PURCHASE_RECHECK_DELAYS_MS,
   SERVER_DATE_RESOLUTION_MS,
   TOPUP_KEY_PREFIX,
   UNRESOLVED_PURCHASE_TEXT,
@@ -31,10 +32,12 @@ import {
   buyState,
   canBuy,
   checkoutHref,
+  checkoutAlreadyCreditedMessage,
   checkoutView,
   confirmButtonState,
   createIdempotencyKeys,
   createTopupKeys,
+  createTopupWithFreshKey,
   formatDateFr,
   formatDateTimeFr,
   formatFcfa,
@@ -52,6 +55,7 @@ import {
   reanchorQuote,
   returnLinkLabel,
   returnTarget,
+  schedulePurchaseRechecks,
   transactionLabel,
   walletHref,
   walletRow,
@@ -83,7 +87,7 @@ function quote(overrides: Partial<BoostQuote> = {}): BoostQuote {
     amount: 1_300,
     unavailableReason: null,
     factors: { competitionMilli: 1020, demandMilli: 1000, scarcityMilli: 1000, durationMilli: 2500 },
-    inputs: { competingSellers: 1, compatibleBuyers: 1, reachableBuyers: 1, slotsTotal: 2, slotsUsed: 0 },
+    inputs: { competingSellers: 1, compatibleBuyers: 1, reachableBuyers: 1, reachTruncated: false, slotsTotal: 2, slotsUsed: 0 },
     computedAt: "2031-01-01T10:00:00.000Z",
     expiresAt: "2031-01-01T10:15:00.000Z",
     reused: false,
@@ -383,6 +387,32 @@ describe("page de paiement simulé : états", () => {
     for (const text of [CHECKOUT_MESSAGES.failed, CHECKOUT_MESSAGES.expired]) assert.match(text, /pas été crédité/);
   });
 
+  test("recharge déjà terminée avant la visite (paidHere faux) : réussie → « déjà été créditée… une seule fois » (jamais « a été crédité de », réservé au paiement fait sur cette page) ; échouée ou expirée → « terminée sans paiement » (lots P3 et P3-bis)", () => {
+    const done = topup({ status: "succeeded", amountXof: 5_000 });
+    const alreadyDone = checkoutView({ topup: done, failure: null, paidHere: false });
+    assert.equal(alreadyDone.kind, "succeeded");
+    const credited = (alreadyDone as { message: string }).message;
+    assert.equal(credited, checkoutAlreadyCreditedMessage(formatFcfa(5_000)));
+    assert.match(credited, /^Cette recharge a déjà été créditée sur votre porte-monnaie \(5\s000 FCFA, une seule fois\)\.$/);
+    assert.equal(credited.includes("a été crédité de"), false, "jamais la phrase du paiement immédiat");
+    assert.equal(credited.includes("n'a rien ajouté"), false, "plus de message alarmant (lot P3-bis)");
+    assert.equal(credited.includes("avant cette visite"), false);
+    assert.match((checkoutView({ topup: done, failure: null, paidHere: true }) as { message: string }).message, /^Votre porte-monnaie a été crédité de 5\s000 FCFA\.$/);
+    assert.match((checkoutView({ topup: done, failure: null }) as { message: string }).message, /a été crédité de/);
+    // Échouée ou expirée déjà terminée : « terminée sans paiement », même type d'écran ; vue de la page qui l'a payée (ou absente) : messages d'origine.
+    for (const status of ["failed", "expired"] as const) {
+      const view = checkoutView({ topup: topup({ status }), failure: null, paidHere: false }) as { kind: string; message: string };
+      assert.equal(view.kind, status);
+      assert.equal(view.message, "Cette recharge est terminée sans paiement : aucun montant n'a été crédité.");
+      assert.equal(view.message, CHECKOUT_MESSAGES.alreadyEndedUnpaid);
+      const here = checkoutView({ topup: topup({ status }), failure: null, paidHere: true }) as { message: string };
+      assert.equal(here.message, status === "failed" ? CHECKOUT_MESSAGES.failed : CHECKOUT_MESSAGES.expired);
+      assert.deepEqual(checkoutView({ topup: topup({ status }), failure: null }), checkoutView({ topup: topup({ status }), failure: null, paidHere: true }));
+    }
+    // En attente : inchangé quel que soit paidHere.
+    assert.deepEqual(checkoutView({ topup: topup(), failure: null, paidHere: false }), checkoutView({ topup: topup(), failure: null, paidHere: true }));
+  });
+
   test("lecture en échec : 404 introuvable, 503 indisponible (fictif inactif), le reste = erreur à réessayer", () => {
     assert.deepEqual(checkoutView({ topup: null, failure: { status: 404, code: "resource_not_found" } }), { kind: "not_found", message: CHECKOUT_MESSAGES.notFound });
     assert.deepEqual(checkoutView({ topup: null, failure: { status: 503, code: "payment_unavailable" } }), { kind: "unavailable", message: CHECKOUT_MESSAGES.unavailable });
@@ -581,6 +611,7 @@ describe("confirmation et suites d'un refus", () => {
     for (const failure of [
       { status: 0, code: "network_error" },
       { status: 503, code: "boost_purchase_unavailable" },
+      { status: 503, code: "reach_check_unavailable" },
       { status: 200, code: "invalid_response" },
       { status: 400, code: "invalid_request" },
       { status: 409, code: "code_inconnu" },
@@ -700,9 +731,16 @@ describe("achat : suites d'un échec dont le résultat est inconnu, bouton penda
       { status: 429, code: "rate_limited" },
       { status: 0, code: "aborted" },
       { status: 0, code: "invalid_argument" },
+      // Lot P3-bis : vérification de la portée non terminée = réponse EXPLICITE du serveur (transaction annulée, rien de débité) : ce n'est pas un résultat inconnu.
+      { status: 503, code: "reach_check_unavailable" },
     ]) assert.equal(isPurchaseOutcomeUnknown(failure), false, JSON.stringify(failure));
+    // Mais ce même code derrière un autre statut (proxy, 502) ne prouve rien : inconnu.
+    assert.equal(isPurchaseOutcomeUnknown({ status: 502, code: "reach_check_unavailable" }), true);
     assert.match(UNRESOLVED_PURCHASE_TEXT, /Vérifier \/ réessayer/);
-    assert.match(PURCHASE_NOT_RECORDED_TEXT, /Aucun achat n'est enregistré/);
+    // Lot P3 : la relecture n'a pas trouvé l'achat, mais il peut encore aboutir : jamais « aucun débit » (faux : le débit peut arriver ensuite).
+    assert.match(PURCHASE_NOT_RECORDED_TEXT, /Pas encore enregistré : l'achat peut encore aboutir\./);
+    assert.equal(PURCHASE_NOT_RECORDED_TEXT.includes("aucun débit"), false);
+    assert.equal(UNRESOLVED_PURCHASE_TEXT.includes("aucun débit"), false);
     assert.equal(BUY_LABELS.verify, "Vérifier / réessayer");
     assert.equal(BUY_LABELS.refreshBalance, "Relire mon solde");
   });
@@ -805,5 +843,89 @@ describe("achat : suites d'un échec dont le résultat est inconnu, bouton penda
     assert.equal(row.label, "Opération");
     assert.match(row.amountText, /^−750 FCFA$/);
     assert.equal(row.tone, "debit");
+  });
+});
+
+describe("relectures automatiques d'un achat au résultat inconnu (lot P3)", () => {
+  test("délais exacts : 2 s, 5 s, 10 s depuis l'incident", () => {
+    assert.deepEqual([...PURCHASE_RECHECK_DELAYS_MS], [2_000, 5_000, 10_000]);
+    assert.ok(Object.isFrozen(PURCHASE_RECHECK_DELAYS_MS));
+  });
+
+  test("schedulePurchaseRechecks : trois minuteries aux bons délais, rang 0, 1, 2 ; l'annulation les efface toutes", () => {
+    const timers: Array<{ id: number; ms: number; callback: () => void; cleared: boolean }> = [];
+    const fake = {
+      set: (callback: () => void, ms: number) => { const entry = { id: timers.length, ms, callback, cleared: false }; timers.push(entry); return entry.id; },
+      clear: (handle: unknown) => { timers[handle as number].cleared = true; },
+    };
+    const ticks: number[] = [];
+    const cancel = schedulePurchaseRechecks((attempt) => ticks.push(attempt), fake);
+    assert.deepEqual(timers.map((timer) => timer.ms), [2_000, 5_000, 10_000]);
+    timers[0].callback();
+    timers[2].callback();
+    assert.deepEqual(ticks, [0, 2]);
+    cancel();
+    assert.deepEqual(timers.map((timer) => timer.cleared), [true, true, true]);
+  });
+
+  test("avec les vraies minuteries : annulée avant le premier délai, aucune relecture ne part", async () => {
+    const ticks: number[] = [];
+    const cancel = schedulePurchaseRechecks((attempt) => ticks.push(attempt));
+    cancel();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.deepEqual(ticks, []);
+  });
+});
+
+describe("recharge : clé d'idempotence d'une intention déjà terminée (lot P3)", () => {
+  const memoryKeys = () => {
+    let counter = 0;
+    return createIdempotencyKeys(() => `00000000-0000-4000-8000-${String(++counter).padStart(12, "0")}`);
+  };
+  const reply = (status: "pending" | "succeeded" | "failed" | "expired", reused: boolean) => ({ topup: { status, checkoutPath: "/paiement-simule/x" }, reused });
+
+  test("intention réutilisée déjà TERMINÉE (réussie, échouée, expirée) : clé oubliée, clé neuve, recréée UNE seule fois", async () => {
+    for (const status of ["succeeded", "failed", "expired"] as const) {
+      const keys = memoryKeys();
+      const sent: string[] = [];
+      const result = await createTopupWithFreshKey({
+        keys, scope: "5000", amountXof: 5_000,
+        create: async (request) => {
+          sent.push(request.idempotencyKey);
+          return sent.length === 1 ? reply(status, true) : reply("pending", false);
+        },
+      });
+      assert.equal(sent.length, 2, `${status} : deux envois exactement`);
+      assert.notEqual(sent[0], sent[1], `${status} : clé neuve`);
+      assert.equal(result.topup.status, "pending");
+      assert.equal(keys.keyFor("5000"), sent[1], "la clé neuve est celle qui reste pour ce montant");
+    }
+  });
+
+  test("intention en attente réutilisée, ou créée : un seul envoi, la clé reste", async () => {
+    for (const [status, reused] of [["pending", true], ["pending", false], ["succeeded", false]] as const) {
+      const keys = memoryKeys();
+      let sends = 0;
+      const first = keys.keyFor("2000");
+      const result = await createTopupWithFreshKey({ keys, scope: "2000", amountXof: 2_000, create: async () => { sends += 1; return reply(status, reused); } });
+      assert.equal(sends, 1, `${status}/${reused}`);
+      assert.equal(result.topup.status, status);
+      assert.equal(keys.keyFor("2000"), first);
+    }
+  });
+
+  test("si la seconde création est elle aussi terminée, elle est rendue telle quelle : jamais plus de deux envois (pas de boucle)", async () => {
+    const keys = memoryKeys();
+    let sends = 0;
+    const result = await createTopupWithFreshKey({ keys, scope: "1000", amountXof: 1_000, create: async () => { sends += 1; return reply("succeeded", true); } });
+    assert.equal(sends, 2);
+    assert.equal(result.topup.status, "succeeded");
+  });
+
+  test("une erreur du premier envoi est relancée (pas de seconde tentative cachée)", async () => {
+    const keys = memoryKeys();
+    let sends = 0;
+    await assert.rejects(createTopupWithFreshKey({ keys, scope: "1000", amountXof: 1_000, create: async () => { sends += 1; throw new Error("réseau"); } }), /réseau/);
+    assert.equal(sends, 1);
   });
 });

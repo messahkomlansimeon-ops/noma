@@ -9,6 +9,7 @@ import { postWalletTransaction } from "../wallet/ledger";
 import {
   BOOST_LOCK_TIMEOUT_MS, BOOST_PURCHASE_LOCK_NAMESPACE, type BoostDurationCode,
 } from "./boost-config";
+import { BOOST_PURCHASE_REACH_BUDGET_MS, computeBoostReach, isReachUndetermined } from "./reach";
 import {
   BOOST_COLUMNS, BoostError, cancelOfferBoostInTransaction, mapBoost, placeOfferBoostInTransaction, withReadOnlySnapshot,
   type BoostRow, type BoostScope, type OfferBoostRecord,
@@ -25,12 +26,14 @@ import {
  * ORDRE GLOBAL DES VERROUS (toute transaction du système les prend dans cet ordre, jamais à l'envers : pas d'interblocage) :
  *   1. verrou consultatif d'IDEMPOTENCE (vendeur, clé) — achat seulement ;
  *   2. verrou consultatif de COTATION par offre — cotations seulement (quotes.ts) ;
+ *   2b. (lot P3) verrou consultatif du VENDEUR (limite de débit des devis) — cotations seulement, pris juste après le précédent ;
  *   3. ligne de l'offre, FOR SHARE ;
  *   4. verrou consultatif de PÉRIMÈTRE (clé produit) — attribution et achat ;
  *   5. ligne de l'achat, FOR UPDATE — remboursement seulement ;
  *   6. lignes de boost de l'offre (échéance, annulation) ;
  *   7. comptes du grand livre, par identifiant croissant (écritures insérées dans cet ordre : voir ledger.ts) ;
  *   8. insertion de la ligne d'achat (ou mise à jour, au remboursement).
+ * La revérification de la portée de l'achat (lot P3) est une LECTURE faite sous 1 et 4, avant 7 : elle ne prend aucun verrou de plus.
  * Une attente de verrou est bornée par `lock_timeout` (BOOST_LOCK_TIMEOUT_MS).
  */
 
@@ -86,6 +89,11 @@ export interface BoostPurchaseTestHooks {
   beforeDebit?: () => void | Promise<void>;
   /** Réservé aux tests : appelé juste après le débit, avant la création du boost. */
   afterDebit?: () => void | Promise<void>;
+  /** Réservé aux tests : appelé pendant la revérification de la portée (verrou du périmètre tenu), avant l'examen de chaque besoin. */
+  beforeReachDemand?: (index: number) => void | Promise<void>;
+  /** Réservé aux tests : horloge et budget (ms) de la revérification de la portée. */
+  reachClock?: () => number;
+  reachBudgetMs?: number;
 }
 
 export interface BoostRefundTestHooks {
@@ -219,7 +227,8 @@ async function assertQuotePurchasable(
  *     `quote_unavailable`, `quote_expired`, `quote_already_used` ;
  *  4. placement : offre admissible (`offer_not_found`, `offer_not_owned`, `offer_not_eligible`, `offer_not_boostable`), verrou de
  *     périmètre, cotation relue sous le verrou, `offer_already_boosted`, `no_slot_available`, `seller_boost_limit_reached` : les
- *     MÊMES règles et codes que `grantOfferBoost` (`placeOfferBoostInTransaction`) ;
+ *     MÊMES règles et codes que `grantOfferBoost` (`placeOfferBoostInTransaction`) ; puis PORTÉE revérifiée sous le verrou du périmètre
+ *     (lot P3, `no_visible_effect` : aucun acheteur ne verrait l'offre monter, démontré ; lot P3-bis, `reach_check_unavailable` : vérification non terminée dans le budget, rien démontré ; avant le débit) ;
  *  5. le prix est EXACTEMENT le montant de la cotation et la durée celle de la cotation ; le boost commence à clock_timestamp() ;
  *  6. débit : transaction `boost_purchase` (vendeur −montant, `boost_revenue` +montant) ; solde insuffisant → WalletError
  *     `insufficient_balance` et RIEN n'est écrit ;
@@ -273,6 +282,17 @@ export async function purchaseOfferBoost(input: {
         await assertQuotePurchasable(client, { quoteId, sellerId, offerId, scope });
       },
       beforeInsert: async () => {
+        // Portée REVÉRIFIÉE sous le verrou du périmètre (lot P3), après les contrôles de places et AVANT le débit : le devis date de jusqu'à 15 minutes,
+        // les listes des acheteurs et les autres boosts ont pu changer (un boost plus ancien peut avoir pris la place). Arrêt au premier acheteur
+        // atteignable ; aucun DÉMONTRÉ (tous les besoins examinés dans les bornes) → `no_visible_effect` ; budget ou délai épuisé sans en trouver (lot
+        // P3-bis : verrou lent, base chargée) → `reach_check_unavailable` (503, à réessayer avec la MÊME clé), jamais un refus définitif. RIEN n'est écrit
+        // dans les deux cas (ni débit, ni boost, ni achat).
+        const reach = await computeBoostReach(client, {
+          offerId, mode: "first", budgetMs: input.hooks?.reachBudgetMs ?? BOOST_PURCHASE_REACH_BUDGET_MS,
+          clock: input.hooks?.reachClock, beforeDemand: input.hooks?.beforeReachDemand,
+        });
+        if (isReachUndetermined(reach)) throw new BoostError("reach_check_unavailable");
+        if (reach.reachableBuyers === 0) throw new BoostError("no_visible_effect");
         if (input.hooks?.beforeDebit) await input.hooks.beforeDebit();
         const amount = price.amount;
         const posted = await postWalletTransaction(client, {

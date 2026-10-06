@@ -11,7 +11,7 @@ import { WALLET_MAX_SAFE_AMOUNT } from "../wallet/config";
 import { WalletError } from "../wallet/errors";
 import { readStrictJsonBody } from "../wallet/http";
 import { BoostError, type BoostErrorCode } from "./boosts";
-import type { BoostDurationCode } from "./boost-config";
+import { BOOST_REACH_RETRY_AFTER_SECONDS, type BoostDurationCode } from "./boost-config";
 import { listOfferBoostPurchases, purchaseOfferBoost, type BoostPurchaseHistoryItem, type BoostPurchaseResult } from "./purchase";
 
 /**
@@ -69,6 +69,13 @@ const invalidRequest = () => purchaseError(400, "invalid_request", "Requête inv
 const resourceNotFound = () => purchaseError(404, "resource_not_found", "Ressource introuvable.");
 const purchaseUnavailable = () => purchaseError(503, "boost_purchase_unavailable", "L'achat de boost est temporairement indisponible.");
 
+/** Vérification de la portée non terminée à temps (lot P3-bis) : 503 retriable (même clé d'idempotence), texte fixe, `Retry-After` court ; rien n'est écrit. */
+const reachCheckUnavailable = () => noStoreJsonResponse(
+  503,
+  { error: { code: "reach_check_unavailable", message: "Vérification impossible pour le moment, réessayez dans un instant." } },
+  { "retry-after": String(BOOST_REACH_RETRY_AFTER_SECONDS) },
+);
+
 /** Refus de règle métier : 409, code et message fixes. */
 const CONFLICTS: Readonly<Record<string, string>> = Object.freeze({
   quote_expired: "Cette cotation a expiré : demandez-en une nouvelle.",
@@ -78,6 +85,7 @@ const CONFLICTS: Readonly<Record<string, string>> = Object.freeze({
   offer_already_boosted: "Cette offre a déjà un boost actif.",
   no_slot_available: "Aucune place de boost disponible dans ce périmètre.",
   seller_boost_limit_reached: "Le plafond de boosts de ce vendeur dans ce périmètre est atteint.",
+  no_visible_effect: "Ce boost ne ferait monter votre annonce chez aucun acheteur : rien n'a été acheté.",
   insufficient_balance: "Solde insuffisant.",
   idempotency_conflict: "Cette clé d'idempotence a déjà servi pour un autre achat.",
 });
@@ -172,7 +180,7 @@ function logCodeOf(error: unknown): string {
 const NOT_FOUND_CODES: ReadonlySet<BoostErrorCode> = new Set(["offer_not_found", "offer_not_owned", "quote_not_found"]);
 const CONFLICT_CODES: ReadonlySet<BoostErrorCode> = new Set([
   "quote_expired", "quote_unavailable", "quote_already_used", "offer_not_eligible", "offer_already_boosted", "no_slot_available",
-  "seller_boost_limit_reached", "idempotency_conflict",
+  "seller_boost_limit_reached", "idempotency_conflict", "no_visible_effect",
 ]);
 
 export function createBoostPurchaseHttpHandlers(dependencies: BoostPurchaseHttpDependencies = {}): BoostPurchaseHttpHandlers {
@@ -201,6 +209,10 @@ export function createBoostPurchaseHttpHandlers(dependencies: BoostPurchaseHttpD
       // Une offre qui a perdu sa clé produit n'est plus éligible au boost.
       if (error.code === "offer_not_boostable") return conflict("offer_not_eligible");
       if (CONFLICT_CODES.has(error.code)) return conflict(error.code);
+      if (error.code === "reach_check_unavailable") {
+        journal(error.code);
+        return reachCheckUnavailable();
+      }
     }
     if (error instanceof WalletError && error.code === "insufficient_balance") return conflict("insufficient_balance");
     return unavailable(logCodeOf(error));

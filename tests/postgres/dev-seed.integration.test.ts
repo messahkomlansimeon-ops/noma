@@ -1,43 +1,60 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import { randomBytes } from "node:crypto";
 import { Pool } from "pg";
 import { createOffer, createUser, publishOffer } from "../../lib/server/catalog";
 import { runMigrations } from "../../lib/server/postgres/migrations";
-import { FAKE_PHONE_PREFIX, SEED_MARKER, fakeSellerId, fakeSellerPhone, isFakeSellerPhone } from "../../scripts/dev-seed-plan";
+import { FAKE_PHONE_PREFIX, SEED_LOCK_NAMESPACE, SEED_MARKER, fakeSellerId, fakeSellerPhone, isFakeSellerPhone, parseSeedArguments } from "../../scripts/dev-seed-plan";
 import { runScript } from "./run-script";
-import {
-  createTemporarySchemaName, openVerifiedIsolatedPool, openVerifiedTestDatabase, quoteTemporarySchema,
-} from "./test-database";
+import { seedExampleOffers } from "../../scripts/dev-seed";
+import { openVerifiedTestDatabase } from "./test-database";
 
 /**
- * `npm run dev:seed` sur un schéma temporaire de la base de test (TEST_DATABASE_URL, jamais noma_dev) : vrais services du catalogue (outbox),
- * vendeurs fictifs du bloc réservé, rejouable sans doublon, refus sans écriture. Le script est lancé en processus enfant avec NODE_ENV=development
- * (le script refuse tout autre NODE_ENV) ; DATABASE_URL = TEST_DATABASE_URL (nom « noma_test » : accepté par la règle « noma_… sauf noma_dev »).
+ * `npm run dev:seed` sur une base jetable `noma_essai_*` créée à côté de la base de test (TEST_DATABASE_URL, jamais noma_dev) : vrais services du
+ * catalogue (outbox), vendeurs fictifs du bloc réservé, rejouable sans doublon, refus sans écriture. Le script est lancé en processus enfant avec
+ * NODE_ENV=development (le script refuse tout autre NODE_ENV).
  */
 
-const schema = createTemporarySchemaName();
-const emptySchema = createTemporarySchemaName();
-let admin: Pool, pool: Pool;
+/**
+ * Lot P3 : `dev:seed` ne peuple plus que `noma_essai`, `noma_e2e` et les bases jetables `noma_essai_*` (liste blanche) ; ce fichier n'utilise donc PLUS
+ * un schéma de `noma_test` pour le script : il crée une base JETABLE `noma_essai_<hex>` (puis une seconde, vide, et une troisième pour les lancements
+ * simultanés) avec la connexion de test, et la supprime à la fin. Aucune autre base n'est touchée.
+ */
+const suffix = `${process.pid}_${randomBytes(4).toString("hex")}`;
+const mainDb = `noma_essai_${suffix}`;
+const emptyDb = `noma_essai_${suffix}_vide`;
+const raceDb = `noma_essai_${suffix}_course`;
+let admin: Pool, pool: Pool, emptyPool: Pool, racePool: Pool;
+let baseUrl: string;
+const urlFor = (database: string): string => {
+  const url = new URL(baseUrl);
+  url.pathname = `/${database}`;
+  return url.toString();
+};
 
 before(async () => {
   const opened = await openVerifiedTestDatabase(process.env.TEST_DATABASE_URL);
   admin = opened.pool;
-  await admin.query(`CREATE SCHEMA ${quoteTemporarySchema(schema)}`);
-  await admin.query(`CREATE SCHEMA ${quoteTemporarySchema(emptySchema)}`);
-  pool = await openVerifiedIsolatedPool(opened.target, schema);
-  assert.equal((await runMigrations(pool)).applied.length, 16);
+  baseUrl = opened.target.connectionString;
+  for (const name of [mainDb, emptyDb, raceDb]) await admin.query(`CREATE DATABASE "${name}"`);
+  pool = new Pool({ connectionString: urlFor(mainDb), max: 4 });
+  emptyPool = new Pool({ connectionString: urlFor(emptyDb), max: 1 });
+  racePool = new Pool({ connectionString: urlFor(raceDb), max: 6 });
+  assert.equal((await runMigrations(pool)).applied.length, 17);
+  assert.equal((await runMigrations(racePool)).applied.length, 17);
 });
 
 after(async () => {
-  if (pool) await pool.end();
+  for (const each of [pool, emptyPool, racePool]) if (each) await each.end().catch(() => {});
   if (admin) {
-    for (const name of [schema, emptySchema]) await admin.query(`DROP SCHEMA IF EXISTS ${quoteTemporarySchema(name)} CASCADE`);
+    for (const name of [mainDb, emptyDb, raceDb]) await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`).catch(() => {});
     await admin.end();
   }
 });
 
-const seed = (args: string[], env: Record<string, string> = {}, targetSchema = schema) =>
-  runScript("scripts/dev-seed.ts", args, targetSchema, { NODE_ENV: "development", ...env });
+/** Le script réel, en processus enfant, sur une base jetable `noma_essai_*` (jamais noma_test : refusée par la liste blanche). */
+const seed = (args: string[], env: Record<string, string> = {}, database = mainDb) =>
+  runScript("scripts/dev-seed.ts", args, "public", { NODE_ENV: "development", DATABASE_URL: urlFor(database), ...env });
 
 const PHONE = ["--category", "phones", "--brand", "apple", "--model", "iphone 12"];
 
@@ -74,7 +91,7 @@ test("premier passage : 8 vendeurs fictifs du bloc réservé, 8 annonces publié
   assert.deepEqual(before, { users: 0, identities: 0, offers: 0, outbox: 0 });
   const result = await seed(PHONE);
   assert.equal(result.code, 0, result.output);
-  assert.match(result.output, /base « noma_test », produit « Téléphones · apple iphone 12 » : 8 annonce\(s\) d'exemple publiée\(s\), 0 déjà présente\(s\) ; 8 vendeur\(s\) fictif\(s\) créé\(s\), 0 déjà présent\(s\)/);
+  assert.match(result.output, new RegExp(`base « ${mainDb} », produit « Téléphones · apple iphone 12 » : 8 annonce\\(s\\) d'exemple publiée\\(s\\), 0 déjà présente\\(s\\) ; 8 vendeur\\(s\\) fictif\\(s\\) créé\\(s\\), 0 déjà présent\\(s\\)`));
   assert.match(result.output, /Publiez ensuite VOTRE annonce et créez VOTRE besoin/);
 
   const offers = await seededOffers();
@@ -197,11 +214,98 @@ test("refus : NODE_ENV=test (ou production), aucune écriture d'aucune sorte", a
 });
 
 test("base non migrée : code 1, message clair, aucune table créée ni ligne écrite", async () => {
-  const result = await seed(PHONE, {}, emptySchema);
+  const result = await seed(PHONE, {}, emptyDb);
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /la base d'essai n'est pas migrée \(lancez d'abord `npm run db:migrate` avec cette DATABASE_URL\)/);
-  const tables = await admin.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = $1", [emptySchema]);
-  assert.equal(tables.rows[0].n, 0, "le schéma vide n'a reçu aucune table");
+  const tables = await emptyPool.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public'");
+  assert.equal(tables.rows[0].n, 0, "la base vide n'a reçu aucune table");
+});
+
+test("lot P3 : liste blanche des bases — noma_test (et toute autre base noma_*) est refusée AVANT toute écriture, par le script réel", async () => {
+  const before = await counts();
+  for (const database of ["noma_test", "noma_prod", "noma_dev2"]) {
+    const refused = await runScript("scripts/dev-seed.ts", PHONE, "public", { NODE_ENV: "development", DATABASE_URL: urlFor(database) });
+    assert.equal(refused.code, 1, `${database} : ${refused.output}`);
+    assert.match(refused.output, /dev:seed : refus — dev:seed ne peuple que les bases d'essai noma_essai, noma_e2e et noma_essai_\*/, database);
+    assert.ok(!/ECONNREFUSED|n'est pas migrée|erreur/i.test(refused.output), `aucune connexion tentée pour ${database} : ${refused.output}`);
+  }
+  assert.deepEqual(await counts(), before, "rien n'a été écrit");
+});
+
+test("lot P3 : --brand et --model avec un caractère de direction de texte (U+202E) ou de contrôle → refus avant toute connexion, rien d'écrit", async () => {
+  const before = await counts();
+  for (const model of ["iphone\u202E 12", "iphone\u2066 12", "iphone\u200F", "iphone\u0007"]) {
+    const refused = await seed(["--category", "phones", "--brand", "apple", "--model", model]);
+    assert.equal(refused.code, 1, refused.output);
+    assert.match(refused.output, /--model doit être un texte de 1 à 60 caractères sans caractère de contrôle ni de direction de texte/);
+  }
+  const brand = await seed(["--category", "phones", "--brand", "ap\u202Eple", "--model", "iphone 12"]);
+  assert.equal(brand.code, 1, brand.output);
+  assert.match(brand.output, /--brand doit être un texte/);
+  assert.deepEqual(await counts(), before);
+  assert.throws(() => parseSeedArguments(["--category", "phones", "--brand", "apple", "--model", "x\u202Ey"]));
+});
+
+test("lot P3-bis (N6) : --category, --brand et --model avec un caractère invisible (U+200B, U+200C, U+200D, U+2060, U+FEFF) → refus par le script réel, avant toute connexion, rien d'écrit", async () => {
+  const before = await counts();
+  for (const invisible of ["\u200B", "\u200C", "\u200D", "\u2060", "\uFEFF"]) {
+    const model = await seed(["--category", "phones", "--brand", "apple", "--model", `iphone${invisible}12`]);
+    assert.equal(model.code, 1, model.output);
+    assert.match(model.output, /--model doit être un texte de 1 à 60 caractères sans caractère de contrôle ni de direction de texte, ni caractère invisible/);
+    const brand = await seed(["--category", "phones", "--brand", `ap${invisible}ple`, "--model", "iphone 12"]);
+    assert.equal(brand.code, 1, brand.output);
+    assert.match(brand.output, /--brand doit être un texte/);
+    const category = await seed(["--category", `pho${invisible}nes`, "--brand", "apple", "--model", "iphone 12"]);
+    assert.equal(category.code, 1, category.output);
+    assert.match(category.output, /--category doit être un texte/);
+    assert.equal(category.output.includes(invisible), false, "la valeur saisie n'est jamais reprise dans le message");
+  }
+  assert.deepEqual(await counts(), before, "rien n'a été écrit");
+});
+
+test("lot P3 : verrou de seed — tant qu'un verrou consultatif du seed est tenu, un second seed ATTEND sans rien écrire ; libéré, il s'exécute (sérialisation de deux dev:seed)", async () => {
+  const options = parseSeedArguments(["--category", "phones", "--brand", "lock", "--model", "attente", "--offers", "3"]);
+  const holder = await pool.connect();
+  let pending: Promise<unknown> | null = null;
+  let finished = false;
+  try {
+    await holder.query("SELECT pg_advisory_lock($1::int, 1)", [SEED_LOCK_NAMESPACE]);
+    const before = await counts();
+    pending = seedExampleOffers(pool, options).then((report) => { finished = true; return report; });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    assert.equal(finished, false, "le seed attend le verrou");
+    assert.deepEqual(await counts(), before, "aucune écriture pendant l'attente");
+    const waiting = await admin.query("SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted AND classid = $1::oid", [SEED_LOCK_NAMESPACE]);
+    assert.equal(waiting.rows[0].n, 1, "une session attend le verrou du seed");
+  } finally {
+    await holder.query("SELECT pg_advisory_unlock($1::int, 1)", [SEED_LOCK_NAMESPACE]);
+    holder.release();
+  }
+  const report = (await pending) as { offersCreated: number };
+  assert.equal(report.offersCreated, 3);
+  const held = await admin.query("SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND classid = $1::oid", [SEED_LOCK_NAMESPACE]);
+  assert.equal(held.rows[0].n, 0, "le verrou est libéré à la fin");
+});
+
+test("lot P3 : trois dev:seed LANCÉS EN MÊME TEMPS sur une base neuve → tous réussissent (code 0, jamais « erreur inattendue »), 8 annonces, 8 vendeurs, aucun doublon", async () => {
+  const results = await Promise.all([seed(PHONE, {}, raceDb), seed(PHONE, {}, raceDb), seed(PHONE, {}, raceDb)]);
+  for (const result of results) {
+    assert.equal(result.code, 0, result.output);
+    assert.ok(!/erreur inattendue|erreur 23505/.test(result.output), result.output);
+  }
+  const created = results.map((result) => Number(/: (\d+) annonce\(s\) d'exemple publiée\(s\)/.exec(result.output)![1]));
+  assert.equal(created.reduce((sum, value) => sum + value, 0), 8, `annonces créées par les trois lancements : ${created.join(", ")}`);
+  const read = async (table: string) => Number((await racePool.query<{ n: string }>(`SELECT count(*)::text AS n FROM ${table}`)).rows[0].n);
+  assert.deepEqual([await read("users"), await read("phone_identities"), await read("offers")], [8, 8, 8]);
+  // Même chose au niveau de la fonction : deux appels simultanés sur des pools distincts (la seconde base est déjà peuplée : rien de plus).
+  const other = new Pool({ connectionString: urlFor(raceDb), max: 4 });
+  try {
+    const [first, second] = await Promise.all([seedExampleOffers(racePool, parseSeedArguments(["--category", "phones", "--brand", "apple", "--model", "iphone 13"])), seedExampleOffers(other, parseSeedArguments(["--category", "phones", "--brand", "apple", "--model", "iphone 13"]))]);
+    assert.equal(first.offersCreated + second.offersCreated, 8, "deux appels simultanés : 8 annonces au total, jamais 16");
+    assert.equal(await read("users"), 8, "les mêmes vendeurs fictifs servent les deux produits");
+  } finally {
+    await other.end();
+  }
 });
 
 test("refus d'arguments : code 1, usage affiché, aucune écriture", async () => {

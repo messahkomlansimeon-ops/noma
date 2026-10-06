@@ -11,12 +11,13 @@ import { createMatchingHttpHandlers, type MatchingHttpHandlers } from "../../lib
 import {
   computeAvailabilityIndicator, computeConfidenceIndicator, computePriceIndicator, computeRelevance, type MarketReference,
 } from "../../lib/server/matching/indicators";
-import { readMarketReferences } from "../../lib/server/matching/market";
+import { percentileContSorted, readMarketReferences, type MarketQuery } from "../../lib/server/matching/market";
 import { runMatchingCycle } from "../../lib/server/matching/runner";
 import { computeScoringConfigHash, normalizeScoringConfig } from "../../lib/server/matching/persistence";
 import { RELEVANCE_CONFIG } from "../../lib/server/matching/relevance-config";
 import {
-  listStoredDemandMatchesForOffer, listStoredOfferMatchesForDemand, type StoredMatchesPage, type StoredMatchesQueryOptions,
+  countDemandOrganicLists, createOrganicReadCache, listStoredDemandMatchesForOffer, listStoredOfferMatchesForDemand, readDemandOrganicRanking,
+  type StoredMatchesPage, type StoredMatchesQueryOptions,
 } from "../../lib/server/matching/stored-matches";
 import { MATCHING_SCORING_CONTRACT_VERSION } from "../../lib/server/matching/scoring-types";
 import { MATCHING_OFFLINE_CONTRACT_VERSION } from "../../lib/server/matching/types";
@@ -59,7 +60,7 @@ before(async () => {
   admin = opened.pool;
   await admin.query(`CREATE SCHEMA ${quoted}`);
   pool = await openVerifiedIsolatedPool(opened.target, schema);
-  assert.equal((await runMigrations(pool)).applied.length, 16);
+  assert.equal((await runMigrations(pool)).applied.length, 17);
   handlers = createMatchingHttpHandlers({ pool, now: () => clock.now() });
   buyer = await login();
   seller = await login();
@@ -874,8 +875,13 @@ const boostOffer = (offer: OfferRecord, durationCode: "24h" | "3d" | "7d" = "24h
 const relevanceOrder = (demand: DemandRecord, extra: StoredMatchesQueryOptions = {}) =>
   listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 100, ...extra }, pool);
 
-/** Modèle de référence INDÉPENDANT de placeBoostedItems (règle du plancher) : file d'ids, flottants avec tolérance. */
-function referencePlacement(organic: string[], relevances: Map<string, number>, boosted: Set<string>, minRelevance: number, share: number) {
+/**
+ * Modèle de référence INDÉPENDANT de placeBoostedItems (règle du plancher et priorité d'ANCIENNETÉ, lot P3) : file d'ids, flottants avec tolérance. L'ordre
+ * d'itération de `boosted` est l'ordre d'ancienneté des boosts (le plus ANCIEN d'abord) : à chaque position de promotion, le promouvable restant au boost le
+ * plus ancien est promu s'il MONTE (sa position organique dépasse la position finale), jamais selon l'ordre organique.
+ */
+function referencePlacement(organic: string[], relevances: Map<string, number>, boosted: Iterable<string>, minRelevance: number, share: number) {
+  const age = new Map([...boosted].map((id, rank) => [id, rank]));
   const n = organic.length;
   const step = Math.ceil(1 / share - 1e-9);
   const maxPromoted = Math.floor(n * share + 1e-9);
@@ -885,8 +891,9 @@ function referencePlacement(organic: string[], relevances: Map<string, number>, 
   for (let position = 0; position < n; position++) {
     let pick = queue[0];
     if (position % step === 0 && promoted.length < maxPromoted) {
-      const candidate = queue.find((id) => boosted.has(id) && relevances.get(id)! >= minRelevance);
-      if (candidate !== undefined && candidate !== queue[0]) { pick = candidate; promoted.push(candidate); }
+      const eligible = queue.filter((id) => age.has(id) && relevances.get(id)! >= minRelevance);
+      const candidate = eligible.length === 0 ? undefined : eligible.reduce((oldest, id) => (age.get(id)! < age.get(oldest)! ? id : oldest));
+      if (candidate !== undefined && organic.indexOf(candidate) > position) { pick = candidate; promoted.push(candidate); }
     }
     queue.splice(queue.indexOf(pick), 1);
     order.push(pick);
@@ -974,16 +981,28 @@ test("boost (vrai pipeline, 30 offres) : un promu ne descend jamais (sponsored �
     // Une attribution APRÈS `at` n'a aucun effet sur les pages suivantes du même parcours (starts_at > at)…
     const first = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7 }, pool);
     const secondBefore = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7, cursor: first.nextCursor! }, pool);
-    const latecomer = byId.get(organicIds[16])!;
+    // Le dernier boost attribué est le plus RÉCENT (priorité d'ancienneté, lot P3). L'offre classée 22 (pertinence = seuil) est promouvable et loin de la tête, mais la
+    // position de promotion 21 appartient au boost ANCIEN de l'offre classée 21 (la tête de file : rien à gagner) : le plus récent ne la lui prend PAS.
+    const latecomer = byId.get(organicIds[22])!;
     await boostOffer(latecomer);
     const secondAfter = await listStoredOfferMatchesForDemand(buyer.userId, demand.id, { sort: "relevance", limit: 7, cursor: first.nextCursor! }, pool);
     assert.deepEqual(ids(secondAfter), ids(secondBefore), "attribution postérieure à `at` : l'ordre du parcours en cours ne change pas");
-    // … mais une nouvelle première page en tient compte (modèle de référence avec le nouveau boost).
-    const withLatecomer = referencePlacement(organicIds, relevances, new Set([...boosted, organicIds[16]]), threshold, 0.15);
+    // … une nouvelle première page en tient compte (modèle de référence avec le nouveau boost, le plus récent) : ici, AUCUN changement, aucun boost ancien évincé.
+    const withLatecomer = referencePlacement(organicIds, relevances, [...boosted, organicIds[22]], threshold, 0.15);
     const fresh = await relevanceOrder(demand);
     assert.deepEqual(ids(fresh), withLatecomer.order);
-    assert.notDeepEqual(ids(fresh), ids(page));
-    assert.ok(fresh.items.find((item) => item.candidateId === latecomer.id)!.sponsored);
+    assert.deepEqual(ids(fresh), ids(page), "un boost plus récent n'évince aucun boost plus ancien : l'ordre servi est inchangé");
+    assert.deepEqual(fresh.items.map((item) => item.sponsored), page.items.map((item) => item.sponsored));
+    assert.equal(fresh.items.find((item) => item.candidateId === latecomer.id)!.sponsored, false, "le boost le plus récent n'a pas de place : le plus ancien la garde");
+    // Le boost ancien de l'offre classée 21 est annulé : la position de promotion 21 est libre, le boost le plus récent la prend.
+    const oldBoost = await pool.query<{ id: string }>("SELECT id FROM offer_boosts WHERE offer_id = $1", [organicIds[21]]);
+    await cancelOfferBoost({ pool, boostId: oldBoost.rows[0].id, ownerId: byId.get(organicIds[21])!.ownerId });
+    const freed = referencePlacement(organicIds, relevances, [...boosted].filter((id) => id !== organicIds[21]).concat(organicIds[22]), threshold, 0.15);
+    const afterFree = await relevanceOrder(demand);
+    assert.deepEqual(ids(afterFree), freed.order);
+    assert.notDeepEqual(ids(afterFree), ids(page));
+    assert.equal(afterFree.items[21].candidateId, latecomer.id);
+    assert.equal(afterFree.items[21].sponsored, true, "la place libérée est prise par le boost le plus récent (quota 4 : 15, 17, 19, 22)");
     // L'annulation entre deux pages, elle, modifie les pages suivantes (limite documentée : le statut est celui de la lecture).
     const cancelled = await pool.query<{ id: string }>("SELECT id FROM offer_boosts WHERE offer_id = $1", [organicIds[highIndexes[0]]]);
     await cancelOfferBoost({ pool, boostId: cancelled.rows[0].id, ownerId: byId.get(organicIds[highIndexes[0]])!.ownerId });
@@ -1375,4 +1394,241 @@ test("panne du boost : aucun boost effectif → aucune requête de réglages, au
   } finally {
     await resetBoostSettings();
   }
+});
+
+// ═════════════ Lot P3 : priorité d'ancienneté dans la lecture réelle des résultats ═════════════
+
+test("boost (vrai pipeline, lot P3) : à quota insuffisant, la promotion va au boost le plus ANCIEN, même moins bien classé ; l'ordre d'attribution fait foi (inverser les attributions inverse le promu) ; un boost plus récent n'évince jamais", async () => {
+  await resetCatalog();
+  const demand = await newDemand(buyer.userId, { budget: null });
+  const offers: OfferRecord[] = [];
+  for (let index = 0; index < 10; index++) {
+    const offer = await newOffer({ ownerId: await makeOwner({ verified: true, ageDays: 40 }), price: 100_000 + index * 977, confirmedHoursAgo: 1 });
+    offers.push(offer);
+    await insertEvaluation(offer, demand, { score: `${99 - index * 2}.000000` });
+  }
+  try {
+    await roomyBoostSettings({ min_relevance: 0 });
+    const organic = await relevanceOrder(demand);
+    const organicIds = ids(organic);
+    assert.equal(organicIds.length, 10, "liste de 10 offres : quota floor(0,15 × 10) = 1, une seule position de promotion (0)");
+    const byId = new Map(offers.map((offer) => [offer.id, offer]));
+    const [better, worse] = [organicIds[3], organicIds[6]];
+    // Le boost de l'offre classée 6 est le plus ANCIEN : c'est elle qui est promue en tête, pas l'offre classée 3 (mieux classée).
+    await boostOffer(byId.get(worse)!);
+    await boostOffer(byId.get(better)!);
+    const first = await relevanceOrder(demand);
+    assert.deepEqual(first.items.filter((item) => item.sponsored).map((item) => item.candidateId), [worse], "le boost le plus ancien est promu");
+    assert.equal(ids(first)[0], worse);
+    assert.equal(first.items.find((item) => item.candidateId === better)!.sponsored, false, "le boost plus récent, mieux classé, n'a pas de place");
+    // Attributions inversées (annulation puis nouvelles attributions : l'ordre d'ancienneté suit `starts_at`) : l'offre classée 3 devient la plus ancienne.
+    for (const id of [worse, better]) {
+      const row = await pool.query<{ id: string }>("SELECT id FROM offer_boosts WHERE offer_id = $1 AND status = 'active'", [id]);
+      await cancelOfferBoost({ pool, boostId: row.rows[0].id, ownerId: byId.get(id)!.ownerId });
+    }
+    await boostOffer(byId.get(better)!);
+    await boostOffer(byId.get(worse)!);
+    const second = await relevanceOrder(demand);
+    assert.deepEqual(second.items.filter((item) => item.sponsored).map((item) => item.candidateId), [better], "attributions inversées : le promu est l'autre");
+    assert.equal(ids(second)[0], better);
+    assert.deepEqual([...ids(second)].sort(), [...organicIds].sort(), "aucune offre ajoutée ni retirée");
+    // Aucune éviction : un TROISIÈME boost (le plus récent), même sur l'offre la mieux classée qui n'est pas en tête, ne change ni l'ordre ni les sponsorisés.
+    const third = organicIds[8];
+    await boostOffer(byId.get(third)!);
+    const third_page = await relevanceOrder(demand);
+    assert.deepEqual(ids(third_page), ids(second), "un boost plus récent n'évince personne");
+    assert.deepEqual(third_page.items.map((item) => item.sponsored), second.items.map((item) => item.sponsored));
+  } finally {
+    await resetBoostSettings();
+  }
+});
+
+// ═════════════ Lot P3 : lectures de la portée d'un boost — différentiels avant/après ═════════════
+
+/** L'ANCIENNE requête du marché observé (jointure carrée, `percentile_cont` de PostgreSQL), recopiée comme référence : le nouveau calcul doit rendre les mêmes doubles. */
+async function legacyMarketReferences(queries: readonly MarketQuery[]): Promise<Map<string, MarketReference>> {
+  const result = new Map<string, MarketReference>();
+  const usable = queries.filter((query) => query.category && query.brand && query.model && query.currency);
+  for (const query of queries) result.set(query.offerId, { sampleSize: 0, p25: null, median: null, p75: null });
+  if (usable.length === 0) return result;
+  const rows = await pool.query<{ offer_id: string; n: number; p25: number | null; median: number | null; p75: number | null }>(
+    `WITH req AS (
+       SELECT * FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::text[]) AS r(offer_id, category, brand, model, currency)
+     )
+     SELECT r.offer_id,
+            count(m.id)::int AS n,
+            percentile_cont(0.25) WITHIN GROUP (ORDER BY m.price_amount) AS p25,
+            percentile_cont(0.5)  WITHIN GROUP (ORDER BY m.price_amount) AS median,
+            percentile_cont(0.75) WITHIN GROUP (ORDER BY m.price_amount) AS p75
+       FROM req r
+       LEFT JOIN offers m
+         ON lower(btrim(m.category)) = lower(btrim(r.category))
+        AND lower(btrim(m.brand)) = lower(btrim(r.brand))
+        AND lower(btrim(m.model)) = lower(btrim(r.model))
+        AND m.price_currency = r.currency
+        AND m.id <> r.offer_id
+        AND m.status = 'published'
+        AND m.archived_at IS NULL
+        AND m.availability_status IS DISTINCT FROM 'unavailable'
+        AND m.price_amount IS NOT NULL
+        AND m.owner_id IN (SELECT id FROM users WHERE status = 'active' AND archived_at IS NULL)
+      GROUP BY r.offer_id`,
+    [usable.map((q) => q.offerId), usable.map((q) => q.category), usable.map((q) => q.brand), usable.map((q) => q.model), usable.map((q) => q.currency)],
+  );
+  for (const row of rows.rows) {
+    result.set(row.offer_id, {
+      sampleSize: row.n,
+      p25: row.p25 === null ? null : Number(row.p25),
+      median: row.median === null ? null : Number(row.median),
+      p75: row.p75 === null ? null : Number(row.p75),
+    });
+  }
+  return result;
+}
+
+test("marché (lot P3) : le calcul linéaire rend EXACTEMENT les mêmes doubles que l'ancienne jointure carrée sur des jeux variés (tailles 0 à 40, doublons, prix énormes, exclusions, plusieurs produits et devises, casse et espaces)", async () => {
+  await resetCatalog();
+  let seed = 1_006_2026;
+  const random = () => { seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0; return seed / 0x1_0000_0000; };
+  const pick = <T,>(items: readonly T[]): T => items[Math.floor(random() * items.length)];
+  const owners = { active: await makeOwner(), suspended: await makeOwner() };
+  await pool.query("UPDATE users SET status = 'suspended' WHERE id = $1", [owners.suspended]);
+  const products = [["smartphones", "Apple", "iPhone 13"], ["smartphones", "Samsung", "Galaxy S21"], ["laptops", "Dell", "XPS 13"]] as const;
+  const insertOffer = async (product: readonly string[], price: number | null, extra: { currency?: string; status?: string; availability?: string | null; owner?: string; archived?: boolean; spaced?: boolean }) => {
+    const id = randomUUID();
+    const [category, brand, model] = extra.spaced ? product.map((text, index) => (index === 0 ? ` ${text.toUpperCase()} ` : index === 1 ? text.toLowerCase() : ` ${text}`)) : product;
+    await pool.query(
+      `INSERT INTO offers (id, owner_id, status, raw_text, category, brand, model, price_amount, price_currency, availability_status, archived_at)
+       VALUES ($1, $2, $3, 'référence', $4, $5, $6, $7, $8, $9, CASE WHEN $10::boolean THEN clock_timestamp() END)`,
+      [id, extra.owner ?? owners.active, extra.archived ? "archived" : extra.status ?? "published", category, brand, model, price,
+        price === null ? null : extra.currency ?? "XOF", extra.availability === undefined ? "available" : extra.availability, extra.archived === true],
+    );
+    return id;
+  };
+  const sizes = [0, 1, 2, 3, 4, 5, 6, 7, 11, 17, 25, 40];
+  let compared = 0;
+  const bigPrices = [9_007_199_254_740_991, 9_007_199_254_740_990, 4_503_599_627_370_497, 1, 3];
+  for (const size of sizes) {
+    await pool.query("DELETE FROM offers");
+    const queries: MarketQuery[] = [];
+    for (const product of products) {
+      const count = product === products[0] ? size : Math.floor(size / 2);
+      for (let index = 0; index < count; index++) {
+        const roll = random();
+        const price = roll < 0.12 ? pick(bigPrices) : roll < 0.3 ? 100_000 + Math.floor(random() * 3) * 5_000 : 50_000 + Math.floor(random() * 900_000);
+        const id = await insertOffer(product, price, { spaced: random() < 0.25 });
+        if (random() < 0.5) queries.push({ offerId: id, category: product[0], brand: product[1], model: product[2], currency: "XOF" });
+      }
+      // Offres exclues du marché : pause, archivée, indisponible, propriétaire suspendu, prix absent, autre devise.
+      await insertOffer(product, 77_777, { status: "paused" });
+      await insertOffer(product, 66_666, { archived: true });
+      await insertOffer(product, 55_555, { availability: "unavailable" });
+      await insertOffer(product, 44_444, { owner: owners.suspended });
+      await insertOffer(product, null, {});
+      await insertOffer(product, 33_333, { currency: "EUR" });
+      await insertOffer(product, 22_222, { availability: null });
+    }
+    // Requêtes : offres du marché, offre HORS marché (pausée), produit sans offre, clé à casse et espaces différents, devise sans offre, clé inutilisable.
+    const outside = await insertOffer(products[0], 120_000, { status: "paused" });
+    queries.push({ offerId: outside, category: "SMARTPHONES ", brand: " apple", model: "iphone 13", currency: "XOF" });
+    queries.push({ offerId: randomUUID(), category: "inconnu", brand: "x", model: "y", currency: "XOF" });
+    queries.push({ offerId: randomUUID(), category: "smartphones", brand: "Apple", model: "iPhone 13", currency: "EUR" });
+    queries.push({ offerId: randomUUID(), category: "smartphones", brand: "Apple", model: "iPhone 13", currency: "USD" });
+    queries.push({ offerId: randomUUID(), category: null, brand: "Apple", model: "iPhone 13", currency: "XOF" });
+    queries.push({ offerId: randomUUID(), category: "smartphones", brand: "", model: "iPhone 13", currency: "XOF" });
+    const [expected, actual] = [await legacyMarketReferences(queries), await readMarketReferences(pool, queries)];
+    assert.deepEqual([...actual].sort(([a], [b]) => a.localeCompare(b)), [...expected].sort(([a], [b]) => a.localeCompare(b)), `taille ${size} : mêmes résultats, mêmes doubles`);
+    compared += queries.length;
+  }
+  assert.ok(compared > 100, `${compared} requêtes comparées`);
+  // Aucune requête : aucun accès ; liste de clés inutilisables seulement : aucune requête SQL.
+  assert.equal((await readMarketReferences(pool, [])).size, 0);
+  // percentileContSorted : interpolation de PostgreSQL à la main (n = 4, p25 : position 0,75 → 10 + 0,75 × (20 − 10)).
+  assert.equal(percentileContSorted([10, 20, 30, 40], 0.25), 17.5);
+  assert.equal(percentileContSorted([10, 20, 30, 40], 0.5), 25);
+  assert.equal(percentileContSorted([10, 20, 30, 40], 0.75), 32.5);
+  assert.equal(percentileContSorted([5], 0.5), 5);
+  assert.equal(percentileContSorted([], 0.5), null);
+  await resetCatalog();
+});
+
+test("lecture de la portée (lot P3) : countDemandOrganicLists — tailles identiques à la lecture des résultats pour chaque demande, plafond respecté, demande sans ligne = 0, UNE requête", async () => {
+  await resetCatalog();
+  const sizes = [0, 3, 7, 12, 30];
+  const demands: DemandRecord[] = [];
+  const pairs: Array<[OfferRecord, DemandRecord]> = [];
+  for (const [index, size] of sizes.entries()) {
+    const demand = await newDemand((await login()).userId, { budget: null });
+    demands.push(demand);
+    for (let offerIndex = 0; offerIndex < size; offerIndex++) {
+      const offer = await newOffer({ ownerId: await makeOwner(), price: 100_000 + index * 1_000 + offerIndex });
+      pairs.push([offer, demand]);
+      await insertEvaluation(offer, demand, { score: `${90 - (offerIndex % 20)}.000000` });
+    }
+  }
+  const ids = demands.map((demand) => demand.id);
+  const exact = await countDemandOrganicLists(pool, ids);
+  assert.deepEqual(ids.map((id) => exact.get(id)), sizes, "tailles exactes");
+  // Même nombre que celui de la lecture des résultats (limite 100 : tout tient sur une page).
+  for (const [index, demand] of demands.entries()) {
+    const page = await listStoredOfferMatchesForDemand(demand.ownerId, demand.id, { sort: "relevance", limit: 100 }, pool);
+    assert.equal(page.items.length, sizes[index], `lecture des résultats de la demande ${index}`);
+  }
+  // Plafond : min(taille, plafond), jamais au-delà ; plafond 7 = seuil du quota à 0,15.
+  const capped = await countDemandOrganicLists(pool, ids, 7);
+  assert.deepEqual(ids.map((id) => capped.get(id)), [0, 3, 7, 7, 7]);
+  assert.deepEqual([...(await countDemandOrganicLists(pool, ids, 1)).values()], [0, 1, 1, 1, 1]);
+  assert.deepEqual([...(await countDemandOrganicLists(pool, [randomUUID()])).values()], [0], "demande inconnue : 0");
+  assert.equal((await countDemandOrganicLists(pool, [])).size, 0);
+  // Une seule requête SQL pour toutes les demandes.
+  let queries = 0;
+  const spy = { query: (...args: unknown[]) => { queries += 1; return (pool.query as (...a: unknown[]) => unknown)(...args); } } as unknown as Pool;
+  await countDemandOrganicLists(spy, ids, 7);
+  assert.equal(queries, 1);
+  // Évaluation périmée ou demande non active : ne comptent pas (mêmes conditions de fraîcheur que la lecture).
+  const [pair] = pairs.filter(([, demand]) => demand.id === demands[2].id);
+  await pool.query("UPDATE matching_evaluations SET is_stale = TRUE, stale_reason = 'engine_superseded', staled_at = clock_timestamp() WHERE offer_id = $1 AND demand_id = $2", [pair[0].id, pair[1].id]);
+  assert.equal((await countDemandOrganicLists(pool, [demands[2].id])).get(demands[2].id), 6);
+  await pool.query("UPDATE demands SET status = 'satisfied' WHERE id = $1", [demands[3].id]);
+  assert.equal((await countDemandOrganicLists(pool, [demands[3].id])).get(demands[3].id), 0);
+});
+
+test("lecture de la portée (lot P3) : readDemandOrganicRanking avec le cache d'instantané rend EXACTEMENT les mêmes classements et pertinences que sans cache, et que l'ordre organique de la page de résultats ; le marché et les propriétaires ne sont lus qu'une fois", async () => {
+  await resetCatalog();
+  const buyerIds: string[] = [];
+  const demands: DemandRecord[] = [];
+  const patterns: Array<Partial<OfferOptions>> = [{ confirmedHoursAgo: 2 }, { confirmedHoursAgo: 100 }, { confirmedHoursAgo: null }, { availability: "reserved" }, { availability: null }];
+  const offers: OfferRecord[] = [];
+  for (let index = 0; index < 14; index++) {
+    offers.push(await newOffer({ ownerId: await makeOwner({ verified: index % 2 === 0, ageDays: index % 3 === 0 ? 40 : 3 }), price: 100_000 + index * 1_300, ...patterns[index % 5] }));
+  }
+  for (let d = 0; d < 4; d++) {
+    const login = await makeOwner();
+    buyerIds.push(login);
+    const demand = await newDemand(login, { budget: null });
+    demands.push(demand);
+    for (const [index, offer] of offers.entries()) {
+      if ((index + d) % 4 === 3) continue; // listes différentes d'une demande à l'autre
+      await insertEvaluation(offer, demand, { score: `${60 + ((index * 7 + d * 11) % 40)}.000000` });
+    }
+  }
+  const at = new Date();
+  const cache = createOrganicReadCache();
+  let queries: string[] = [];
+  const spy = { query: (...args: unknown[]) => { queries.push(String(typeof args[0] === "string" ? args[0] : "").replace(/\s+/g, " ").slice(0, 60)); return (pool.query as (...a: unknown[]) => unknown)(...args); } } as unknown as Pool;
+  for (const [index, demand] of demands.entries()) {
+    const plain = await readDemandOrganicRanking(pool, { demandId: demand.id, ownerId: buyerIds[index], at });
+    const cached = await readDemandOrganicRanking(spy, { demandId: demand.id, ownerId: buyerIds[index], at }, cache);
+    assert.deepEqual(cached, plain, `demande ${index} : avec cache = sans cache`);
+    const page = await listStoredOfferMatchesForDemand(buyerIds[index], demand.id, { sort: "relevance", limit: 100 }, pool);
+    assert.deepEqual(plain.map((entry) => entry.offerId), page.items.map((item) => item.candidateId), `demande ${index} : même ordre que la page de résultats`);
+  }
+  const marketReads = queries.filter((text) => text.startsWith("WITH req AS")).length;
+  const ownerReads = queries.filter((text) => text.startsWith("SELECT u.id, u.created_at")).length;
+  assert.ok(marketReads >= 1 && marketReads <= 2, `le marché est lu une fois par ensemble d'offres nouvelles (${marketReads} lectures pour 4 demandes)`);
+  assert.ok(ownerReads >= 1 && ownerReads <= 2, `les propriétaires aussi (${ownerReads})`);
+  // Sans cache : une lecture du marché PAR demande.
+  queries = [];
+  for (const [index, demand] of demands.entries()) await readDemandOrganicRanking(spy, { demandId: demand.id, ownerId: buyerIds[index], at });
+  assert.equal(queries.filter((text) => text.startsWith("WITH req AS")).length, 4);
 });

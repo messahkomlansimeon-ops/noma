@@ -77,7 +77,7 @@ les dates changent à chaque exécution).
     "amount": 2300,
     "unavailableReason": null,
     "factors": { "competitionMilli": 1060, "demandMilli": 1300, "scarcityMilli": 1333, "durationMilli": 2500 },
-    "inputs": { "competingSellers": 3, "compatibleBuyers": 4, "slotsTotal": 3, "slotsUsed": 1, "reachableBuyers": 2 },
+    "inputs": { "competingSellers": 3, "compatibleBuyers": 4, "slotsTotal": 3, "slotsUsed": 1, "reachableBuyers": 2, "reachTruncated": false },
     "computedAt": "2026-10-05T17:01:29.061Z",
     "expiresAt": "2026-10-05T17:16:29.061Z",
     "reused": false
@@ -85,7 +85,9 @@ les dates changent à chaque exécution).
 }
 ```
 
-**200 — même demande, cotation réutilisée** : le même corps, avec `"reused": true`.
+**200 — même demande, cotation réutilisée** : le même corps, avec `"reused": true`. Lot P3-bis : un devis `available` n'est réutilisé qu'après revérification
+de sa portée (« premier acheteur atteignable », 1 s) ; démontré inatteignable (la place a été prise par un boost acheté plus tôt, les listes ont changé), c'est un
+devis neuf INDISPONIBLE (`no_visible_effect`, 201) qui est renvoyé, jamais le même devis « disponible ».
 
 **201 — cotation indisponible** (offre sans acheteur compatible) : `status: "unavailable"`, `amount: null`, `factors: null`,
 `unavailableReason: "no_compatible_buyer"`, expiration 60 s après le calcul. Même forme avec `"no_visible_effect"` (lot P2-bis : des
@@ -100,7 +102,7 @@ comparables) : `inputs.reachableBuyers` vaut alors 0.
 `id`, `durationCode`, `currency` (`XOF`), `status` (`available` | `unavailable`), `amount` (entier XOF ou `null`),
 `unavailableReason` (`offer_already_boosted`, `no_slot_available`, `seller_boost_limit_reached`, `no_compatible_buyer`,
 `no_visible_effect`, ou `null`), `factors` (`competitionMilli`, `demandMilli`, `scarcityMilli`, `durationMilli`, ou `null`), `inputs`
-(`competingSellers`, `compatibleBuyers`, `slotsTotal`, `slotsUsed`, `reachableBuyers`), `computedAt` et `expiresAt` (ISO 8601 UTC),
+(`competingSellers`, `compatibleBuyers`, `slotsTotal`, `slotsUsed`, `reachableBuyers`, `reachTruncated`), `computedAt` et `expiresAt` (ISO 8601 UTC),
 `reused` (POST seulement) ou `expired` (GET seulement).
 
 `inputs.reachableBuyers` (lot P2-bis) : nombre d'acheteurs **distincts** chez qui le boost ferait monter l'offre dans leurs résultats
@@ -108,6 +110,14 @@ comparables) : `inputs.reachableBuyers` vaut alors 0.
 ce calcul). Une cotation `available` créée depuis le lot porte toujours un entier ≥ 1 (une cotation antérieure à la migration 0016 reste `null`). Le champ est une clé **obligatoire** de `inputs` : la liste blanche du
 DTO est figée par les tests, et l'ajout d'une clé à `inputs` est une évolution **additive** de `boost-quote/v1` (les clients qui ignorent
 les clés inconnues ne sont pas touchés ; le client du dépôt exige désormais la clé).
+
+`inputs.reachTruncated` (lot P3, booléen) : la portée est une estimation bornée (20 besoins comptés, 50 examinés, 3 s) ; **vrai** : des besoins compatibles n'ont pas été
+examinés, `reachableBuyers` est un MINIMUM (l'écran dit « au moins X acheteur(s) ») ; faux : compte exact, ou portée non évaluée. Un devis d'avant la migration 0017
+est servi avec `false`. Le client tolère l'absence de la clé (faux), refuse un type autre que booléen.
+
+**429 — limite de débit** (lot P3) : au plus 20 devis CALCULÉS par vendeur et par minute ; le 21e est refusé :
+`{ "error": { "code": "rate_limited", "message": "Trop de devis demandés en peu de temps : réessayez dans une minute." } }`, en-tête `Retry-After: 60`, rien d'écrit,
+aucun journal. Une cotation réutilisée (200), l'historique (GET) et les autres vendeurs ne sont pas concernés.
 
 Le DTO est construit champ par champ : un champ ajouté plus tard à `BoostQuote` ne sort **jamais** tant qu'on ne l'ajoute pas ici.
 **Jamais exposés** : le prix brut (`rawAmount`), la configuration tarifaire (`pricing` : clé, version), l'identifiant de l'offre ou
@@ -126,7 +136,9 @@ Corps `{ "error": { "code", "message" } }`, messages fixes (jamais un identifian
 | 404 | `resource_not_found` | offre inexistante **ou offre d'un autre vendeur** : réponse strictement identique (statut, en-têtes, corps) |
 | 409 | `offer_not_eligible` | offre à soi, mais non publiée, archivée, indisponible, ou propriétaire inactif |
 | 409 | `offer_not_boostable` | offre à soi et éligible, mais sans catégorie, marque ou modèle |
-| 503 | `boost_unavailable` | `NOMA_AUTH_ORIGIN` non configurée, réglages tarifaires ou de boost absents, verrou (`55P03`), base indisponible, migration 0012 non appliquée, session impossible à résoudre, toute autre erreur |
+| 429 | `rate_limited` | (lot P3) plus de 20 devis calculés pour ce vendeur sur la dernière minute ; `Retry-After: 60` |
+| 503 | `reach_check_unavailable` | (lot P3-bis) la portée du boost n'a pas pu être calculée dans le budget (3 s) ou la revérification d'un devis réutilisable n'a pas abouti (1 s) sans acheteur trouvé : « Vérification impossible pour le moment, réessayez dans un instant. », `Retry-After: 2`, AUCUN devis écrit (rien n'est réutilisé), journal `reach_check_unavailable` |
+| 503 | `boost_unavailable` | `NOMA_AUTH_ORIGIN` non configurée, réglages tarifaires ou de boost absents, verrou (`55P03`), base indisponible, **aucune connexion libre dans le pool après 5 s (lot P3 : échec propre, jamais une attente sans fin)**, **calcul de portée saturé (`quote_busy`, lot P3)**, migration 0012 non appliquée, session impossible à résoudre, toute autre erreur |
 
 Le propriétaire est vérifié **avant** l'éligibilité : on ne révèle jamais l'existence ni l'état de l'offre d'autrui (une offre
 d'autrui en pause répond 404, jamais 409).
@@ -149,7 +161,7 @@ requête ni un identifiant. Un journal qui lève est ignoré (la réponse ne cha
 - `NOMA_AUTH_ORIGIN` est obligatoire pour le POST (comme les routes du catalogue). Sans elle, tout POST répond 503.
 - La migration 0012 doit être appliquée : sans elle, le POST répond 503 (journal `42P01`). Depuis le lot P1b, la **migration 0015** l'est aussi
   (la réutilisation d'une cotation exclut celles déjà achetées : `boost_purchases`), et depuis le lot P2-bis la **migration 0016**
-  (colonne `reachable_buyers`, motif `no_visible_effect`). `MATCHING_REQUIRED_MIGRATION` reste 0010.
+  (colonne `reachable_buyers`, motif `no_visible_effect`), et, depuis le lot P3, la **migration 0017** (colonne `reach_truncated`, index de la limite de débit). `MATCHING_REQUIRED_MIGRATION` reste 0010.
 - Une cotation indisponible n'est pas une erreur : l'interface (lot suivant) devra lire `status` et `unavailableReason`.
 
 ## Limites

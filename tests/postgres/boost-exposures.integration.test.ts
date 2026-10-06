@@ -86,8 +86,13 @@ const relevanceOptions = (extra: StoredMatchesQueryOptions = {}): StoredMatchesQ
 const listFor = (demand: DemandRecord, options: StoredMatchesQueryOptions, db: Pool = pool) =>
   listStoredOfferMatchesForDemand(demand.ownerId, demand.id, options, db);
 
-/** Modèle de référence INDÉPENDANT de placeBoostedItems (règle du plancher), en flottants avec tolérance. */
-function referencePlacement(organic: string[], relevances: Map<string, number>, boosted: Set<string>, minRelevance: number, share: number) {
+/**
+ * Modèle de référence INDÉPENDANT de placeBoostedItems (règle du plancher et priorité d'ANCIENNETÉ, lot P3), en flottants avec tolérance. L'ordre d'itération de
+ * `boosted` est l'ordre d'ancienneté des boosts (le plus ANCIEN d'abord) : à chaque position de promotion, le promouvable restant au boost le plus ancien est
+ * promu s'il MONTE (sa position organique dépasse la position finale), jamais selon l'ordre organique.
+ */
+function referencePlacement(organic: string[], relevances: Map<string, number>, boosted: Iterable<string>, minRelevance: number, share: number) {
+  const age = new Map([...boosted].map((id, rank) => [id, rank]));
   const n = organic.length;
   const step = Math.ceil(1 / share - 1e-9);
   const maxPromoted = Math.floor(n * share + 1e-9);
@@ -97,8 +102,9 @@ function referencePlacement(organic: string[], relevances: Map<string, number>, 
   for (let position = 0; position < n; position++) {
     let pick = queue[0];
     if (position % step === 0 && promoted.size < maxPromoted) {
-      const candidate = queue.find((id) => boosted.has(id) && relevances.get(id)! >= minRelevance);
-      if (candidate !== undefined && candidate !== queue[0]) { pick = candidate; promoted.add(candidate); }
+      const eligible = queue.filter((id) => age.has(id) && relevances.get(id)! >= minRelevance);
+      const candidate = eligible.length === 0 ? undefined : eligible.reduce((oldest, id) => (age.get(id)! < age.get(oldest)! ? id : oldest));
+      if (candidate !== undefined && organic.indexOf(candidate) > position) { pick = candidate; promoted.add(candidate); }
     }
     queue.splice(queue.indexOf(pick), 1);
     order.push(pick);
@@ -212,11 +218,11 @@ const cursorFor = (demand: DemandRecord, offset = 7): string => Buffer.from(JSON
 // ═════════════ 1. Migration 0013 ═════════════
 
 test("migration 0013 : 13 appliquées, la relance n'en applique aucune, chaque CHECK, clé primaire, clés étrangères, index et cascades", async () => {
-  assert.equal(firstMigration.applied.length, 16);
-  assert.equal(firstMigration.applied.at(-1), "0016_boost_quote_reach");
+  assert.equal(firstMigration.applied.length, 17);
+  assert.equal(firstMigration.applied.at(-1), "0017_boost_quote_reach_truncated");
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 16);
+  assert.equal(rerun.skipped.length, 17);
 
   const seller = await makeUser(), viewer = await makeUser(), extraViewer = await makeUser();
   const offer = await newOffer({ ownerId: seller }), otherOffer = await newOffer({ ownerId: await makeUser() });

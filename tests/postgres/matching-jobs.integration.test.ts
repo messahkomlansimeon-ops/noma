@@ -26,11 +26,11 @@ before(async () => {
   second = await openVerifiedIsolatedPool(opened.target, schema);
   third = await openVerifiedIsolatedPool(opened.target, schema);
   const first = await runMigrations(pool);
-  assert.equal(first.applied.length, 16);
-  assert.equal(first.applied.at(-1), "0016_boost_quote_reach");
+  assert.equal(first.applied.length, 17);
+  assert.equal(first.applied.at(-1), "0017_boost_quote_reach_truncated");
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 16);
+  assert.equal(rerun.skipped.length, 17);
 });
 
 after(async () => {

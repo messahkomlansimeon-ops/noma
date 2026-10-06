@@ -3,7 +3,7 @@
 > **Mise à jour (lot P2)** : le porte-monnaie, la recharge simulée et l'**achat de boost** existent (voir `ECRANS-P2.md`). Le bouton
 > « Acheter » n'est plus toujours désactivé (il suit le devis et le solde) et le compte à rebours d'un devis n'utilise plus l'horloge
 > de l'appareil (horloge monotone ancrée à la réception). Lot P2-bis : un devis n'est « disponible » que si le boost ferait réellement monter
-> l'annonce chez au moins un acheteur (motif « Pas encore assez d'annonces comparables… », ligne « Mise en avant visible auprès de X acheteur(s) »,
+> l'annonce chez au moins un acheteur (motif « Pour le moment, un boost ne ferait monter votre annonce chez aucun acheteur… », ligne « Mise en avant visible auprès de X acheteur(s) »,
 > `npm run dev:seed` pour ajouter des annonces d'exemple : `ESSAYER.md`, `BOOST-PRICING.md`). Les paragraphes ci-dessous décrivent l'état du lot E1b.
 
 Ce lot rend l'application utilisable de bout en bout dans un vrai navigateur (relais de développement, commande unique

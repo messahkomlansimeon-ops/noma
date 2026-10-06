@@ -20,10 +20,10 @@ utilisé** (la recharge du porte-monnaie passe par une page de paiement SIMULÉ)
    `npm run dev:try`, voir ci-dessous). La commande ne lit aucun fichier `.env` pour la deviner, et elle refuse de démarrer
    si la base n'est pas sur **votre ordinateur** (`127.0.0.1`, `localhost` ou `::1`).
 
-   **La base d'essai doit être migrée jusqu'au bout : 16 migrations** (de `0001` à `0016`, dont le porte-monnaie `0014`,
-   l'achat de boost `0015` et la portée visible d'un devis de boost `0016`). Si votre base d'essai a été créée avant ces lots,
-   relancez simplement la deuxième commande ci-dessus (elle n'applique que ce qui manque). Contrôle : la commande suivante doit
-   afficher `16`.
+   **La base d'essai doit être migrée jusqu'au bout : 17 migrations** (de `0001` à `0017`, dont le porte-monnaie `0014`,
+   l'achat de boost `0015`, la portée visible d'un devis de boost `0016` et son estimation bornée `0017`). Si votre base d'essai a
+   été créée avant ces lots, relancez simplement la deuxième commande ci-dessus (elle n'applique que ce qui manque). Contrôle : la
+   commande suivante doit afficher `17`.
 
    ```
    docker exec deploy-postgres-1 psql -U noma_local -d noma_essai -tAc "select count(*) from noma_schema_migrations"
@@ -71,8 +71,7 @@ second compte (deux numéros différents, par exemple `07 00 00 00 42` et `07 00
    la page affiche les offres compatibles. Si elle affiche « Recherche en cours… », appuyez sur « Actualiser ».
 4. **Ajouter des annonces concurrentes d'exemple** (à faire AVANT d'essayer le boost). Un boost ne fait monter votre annonce que
    dans une liste d'au moins **7 offres** : la place mise en avant est limitée à 15 % de la liste (arrondie vers le bas), donc il
-   n'y en a aucune sous 7 offres. Avec votre seule annonce, le devis du boost vous dira honnêtement « Pas encore assez d'annonces
-   comparables : un boost ne changerait rien à l'ordre des résultats. » et l'achat restera éteint. Dans un autre terminal, depuis
+   n'y en a aucune sous 7 offres. Avec votre seule annonce, le devis du boost vous dira honnêtement « Pour le moment, un boost ne ferait monter votre annonce chez aucun acheteur : leurs listes sont trop courtes, ou la place mise en avant y est déjà occupée par un boost acheté plus tôt. » et l'achat restera éteint. Dans un autre terminal, depuis
    le dossier du projet, pendant que l'essai tourne :
 
    ```
@@ -84,13 +83,16 @@ second compte (deux numéros différents, par exemple `07 00 00 00 42` et `07 00
    ne leur est envoyé). Utilisez la **même catégorie, la même marque et le même modèle** que votre annonce et votre besoin.
    Vous pouvez la relancer sans crainte : elle ne recrée pas ce qui existe déjà (`--offers 10` n'ajoute que 2 annonces). Patientez
    quelques secondes que le worker les compare au besoin. Par prudence, elle refuse de s'exécuter si `NODE_ENV` est défini autrement
-   que `development`, si `DATABASE_URL` est absente ou n'est pas sur votre ordinateur, ou si la base ne s'appelle pas `noma_…` ou
-   s'appelle `noma_dev` : elle n'écrit alors rien.
+   que `development`, si `DATABASE_URL` est absente ou n'est pas sur votre ordinateur, ou si la base n'est pas l'une des bases
+   d'essai connues (**`noma_essai`, `noma_e2e` ou `noma_essai_…`** : tout autre nom, y compris `noma_dev`, `noma_test` et `noma_prod`,
+   est refusé) : elle n'écrit alors rien. Deux commandes lancées en même temps s'attendent l'une l'autre (jamais d'annonce en double).
+   Le nom du produit (`--category`, `--brand`, `--model`) ne peut contenir ni caractère de contrôle ni caractère de direction de texte.
 5. **Vendeur** : dans « Mes annonces », ouvrez l'annonce : elle montre combien de **besoins** d'acheteurs correspondent (sans jamais
    montrer qui sont les acheteurs : un même acheteur peut avoir plusieurs besoins, donc on ne compte pas des acheteurs ici) et, dans
    « Booster cette annonce », un devis de prix pour 24 heures, 3 jours ou 7 jours (avec le temps pendant lequel ce prix reste
    valable). Un devis n'est proposé que si le boost ferait réellement monter votre annonce chez au moins un acheteur : il indique
-   alors « Mise en avant visible auprès de X acheteur(s) » (sans jamais dire qui). Tant que votre porte-monnaie est vide, le bouton
+   alors « Mise en avant visible auprès de X acheteur(s) » (sans jamais dire qui ; « d'au moins X » quand l'estimation a été limitée à
+   quelques dizaines de besoins : c'est un minimum). Tant que votre porte-monnaie est vide, le bouton
    « Acheter » reste éteint et l'écran dit « Solde insuffisant (0 FCFA) », avec un bouton « Recharger ».
 6. **Vendeur** : **recharger son porte-monnaie** (paiement simulé). Appuyez sur « Recharger » (ou, depuis l'onglet « Compte » :
    « Mon porte-monnaie » puis « Recharger »), choisissez un montant (1 000, 2 000, 5 000 ou 10 000 FCFA, ou un autre montant de
@@ -102,8 +104,10 @@ second compte (deux numéros différents, par exemple `07 00 00 00 42` et `07 00
    est actif ; l'écran vous demande de confirmer (« Vous allez payer … FCFA pour un boost de … Solde après achat : … FCFA. »), puis
    « Confirmer l'achat ». Vous voyez « Boost actif jusqu'au … », votre solde diminue du prix, et « Mon porte-monnaie » garde
    l'historique (Recharge, Achat de boost). Un prix ne vaut que quelques minutes : s'il a expiré, l'écran le dit et vous en demandez un
-   nouveau. Si la connexion se coupe pendant l'achat, l'écran propose « Vérifier / réessayer » : il retrouve votre achat sans jamais
-   vous faire payer deux fois.
+   nouveau. Si la connexion se coupe pendant l'achat, l'écran dit « Pas encore enregistré : l'achat peut encore aboutir. », relit tout seul vos
+   achats (après 2, 5 puis 10 secondes) et propose « Vérifier / réessayer » : il retrouve votre achat sans jamais vous faire payer deux
+   fois. L'achat revérifie aussi, au dernier moment, qu'un acheteur verrait encore votre annonce monter : sinon rien n'est acheté
+   (« Ce boost ne ferait plus monter votre annonce chez aucun acheteur (place déjà occupée par un boost acheté plus tôt, ou liste trop courte). Aucun débit. Demandez un nouveau prix plus tard. »).
 8. **Acheteur** : sur la page de ses résultats, appuyez sur « Actualiser » : l'annonce boostée remonte avec le badge **« Sponsorisé »**
    (grâce aux annonces d'exemple de l'étape 4 : sans elles, la liste compte trop peu d'offres et aucune place n'est mise en avant).
    Un boost n'est ni une garantie de position, ni une garantie de vente.
@@ -137,8 +141,10 @@ Dans le terminal : **Ctrl+C**. Tout s'arrête (le serveur, le worker et le relai
 | Le code de connexion n'apparaît pas | Regardez bien le terminal de la commande `dev:try` (pas celui d'un autre programme). |
 | « Trop de demandes de code » | Patientez une minute avant de redemander un code pour le même numéro. |
 | « La recharge n'est pas disponible pour le moment. » | La recharge simulée n'est active que dans l'essai lancé par `dev:try` (la commande pose `NOMA_FAKE_PAYMENTS=1`) : relancez avec la commande de ce guide, sans l'avoir remplacée. |
-| « Pas encore assez d'annonces comparables : un boost ne changerait rien à l'ordre des résultats. » | Il y a trop peu d'annonces pour ce produit (7 offres au moins dans la liste de l'acheteur) : lancez `npm run dev:seed` (étape 4 du scénario), patientez quelques secondes, puis « Actualiser » le devis. |
-| « dev:seed : refus — … » | La commande d'exemple n'écrit que dans une base d'essai de votre ordinateur, hors production : lisez la raison affichée (NODE_ENV, DATABASE_URL absente ou distante, base `noma_dev` ou dont le nom ne commence pas par `noma_`). |
+| « Pour le moment, un boost ne ferait monter votre annonce chez aucun acheteur : leurs listes sont trop courtes, ou la place mise en avant y est déjà occupée par un boost acheté plus tôt. » | Il y a trop peu d'annonces pour ce produit (7 offres au moins dans la liste de l'acheteur), ou la place mise en avant y est déjà prise par un boost acheté plus tôt : lancez `npm run dev:seed` (étape 4 du scénario), patientez quelques secondes, puis « Actualiser » le devis. |
+| « dev:seed : refus — … » | La commande d'exemple n'écrit que dans une base d'essai de votre ordinateur, hors production : lisez la raison affichée (NODE_ENV, DATABASE_URL absente ou distante, base autre que `noma_essai`, `noma_e2e` ou `noma_essai_…`, ou un texte `--category`, `--brand` ou `--model` qui contient un caractère de contrôle, de direction de texte ou invisible comme U+200B : retapez-le sans copier-coller). |
+| « Vérification impossible pour le moment, réessayez dans un instant. » | La base était trop lente pour vérifier à temps qu'un acheteur verrait votre annonce monter (rien n'a été écrit ni débité) : réessayez dans quelques secondes (pour un achat, « Confirmer l'achat » réutilise la même clé : vous ne serez débité qu'une fois). |
+| « Trop de devis demandés en peu de temps » | Au plus 20 prix calculés par minute pour un même vendeur : patientez une minute. |
 | « Solde insuffisant » sous « Acheter » | Rechargez votre porte-monnaie (« Recharger »), puis revenez à l'annonce. |
 | « Ce devis a expiré » | Un prix ne vaut que quelques minutes : appuyez sur « Demander un nouveau devis ». |
 | « NODE_ENV vaut … : dev:try ne démarre jamais hors développement » | Une variable `NODE_ENV` est définie dans votre terminal : retirez-la (`unset NODE_ENV`) ou mettez `NODE_ENV=development`. |

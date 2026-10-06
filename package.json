@@ -63,7 +63,7 @@
     "test:matching-relevance": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-relevance.integration.test.ts",
     "test:matching-stored": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-stored.integration.test.ts",
     "test:matching-bootstrap": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/matching-bootstrap.integration.test.ts",
-    "test:boost": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/server/boost.test.ts tests/postgres/boost.integration.test.ts",
+    "test:boost": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/server/boost.test.ts tests/server/postgres-pool.test.ts tests/postgres/boost.integration.test.ts",
     "test:boost-pricing": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/server/boost-pricing.test.ts",
     "test:boost-quotes": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/boost-quotes.integration.test.ts",
     "test:boost-http": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/postgres/boost-http.integration.test.ts",
@@ -76,6 +76,7 @@
     "e2e:core": "node --import ./poc/node_modules/tsx/dist/loader.mjs scripts/e2e-core.ts",
     "e2e:search-release": "node --import ./poc/node_modules/tsx/dist/loader.mjs scripts/e2e-search-release.ts",
     "e2e:ui": "node --import ./poc/node_modules/tsx/dist/loader.mjs scripts/e2e-ui.ts",
+    "perf:boost": "NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs tests/perf/boost-perf.ts",
     "test:cleanup-schemas": "NODE_ENV=test NODE_OPTIONS=--conditions=react-server node --import ./poc/node_modules/tsx/dist/loader.mjs scripts/cleanup-test-schemas.ts"
   },
   "dependencies": {

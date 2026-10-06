@@ -496,9 +496,10 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
   const guide = readFileSync(fileURLToPath(new URL("../../ESSAYER.md", import.meta.url)), "utf8");
   const normalized = guide.replace(/\s+/g, " ");
 
-  test("le guide dit (lots P2 et P2-bis) : base à 16 migrations, recharge simulée, achat de boost, « aucun argent réel », « Sponsorisé »", () => {
+  test("le guide dit (lots P2, P2-bis et P3) : base à 17 migrations, recharge simulée, achat de boost, « aucun argent réel », « Sponsorisé »", () => {
     for (const expected of [
-      "16 migrations",
+      "17 migrations",
+      "0017",
       "0016",
       "0015",
       "noma_schema_migrations",
@@ -513,6 +514,8 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
       "Confirmer l'achat",
       "Boost actif jusqu'au",
       "Sponsorisé",
+      "Pas encore enregistré : l'achat peut encore aboutir.",
+      "`noma_essai`, `noma_e2e` ou `noma_essai_…`",
       "aucun argent réel n'est utilisé",
       "NOMA_FAKE_PAYMENTS=1",
       "NOMA_FAKE_PAYMENT_SECRET",
@@ -524,7 +527,7 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
     for (const expected of [
       "npm run dev:seed -- --category phones --brand apple --model \"iphone 12\" --offers 8",
       "au moins **7 offres**",
-      "Pas encore assez d'annonces comparables : un boost ne changerait rien à l'ordre des résultats.",
+      "Pour le moment, un boost ne ferait monter votre annonce chez aucun acheteur : leurs listes sont trop courtes, ou la place mise en avant y est déjà occupée par un boost acheté plus tôt.",
       "Mise en avant visible auprès de X acheteur(s)",
       "vendeurs fictifs",
       "+225 07 99 99 99 01",

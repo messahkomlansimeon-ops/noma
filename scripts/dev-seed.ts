@@ -5,6 +5,7 @@ import { createOffer, createUser, getUserById, publishOffer } from "../lib/serve
 import { isMatchingSchemaReady } from "../lib/server/matching/schema-ready";
 import { closePostgresPool, getPostgresPool } from "../lib/server/postgres/client";
 import {
+  SEED_LOCK_NAMESPACE,
   SEED_MARKER,
   SEED_USAGE,
   SeedUsageError,
@@ -20,12 +21,12 @@ import {
  * `npm run dev:seed -- --category phones --brand apple --model "iphone 12" --offers 8` : ajoute à une base d'ESSAI des annonces CONCURRENTES
  * d'exemple, par des vendeurs fictifs (numéros +225 07 99 99 99 01 à 50, un bloc qui n'appartient à personne). Pourquoi : un boost n'a d'effet
  * visible que si la liste d'un acheteur compte au moins 7 offres (quota de places mises en avant = 15 % de la liste, arrondi par défaut) ; avec une
- * seule annonce et un seul besoin, la cotation dit « pas assez d'annonces comparables » (ESSAYER.md).
+ * seule annonce et un seul besoin, la cotation dit « un boost ne ferait monter votre annonce chez aucun acheteur (listes trop courtes…) » (ESSAYER.md).
  *
  * Les annonces passent par les VRAIS services du catalogue (création puis publication : l'outbox reçoit ses événements, le worker du matching les
  * évalue comme celles de n'importe quel vendeur). Rejouable : une annonce d'exemple déjà présente (même vendeur fictif, même produit) n'est jamais
  * recréée. Refus clair, RIEN d'écrit : `NODE_ENV` défini autre que « development », `DATABASE_URL` absent de l'environnement de lancement ou
- * qui ne désigne pas une base de CE poste, nom de base qui ne commence pas par « noma_ » ou qui vaut « noma_dev » (voir dev-seed-plan.ts).
+ * qui ne désigne pas une base de CE poste, nom de base hors de la liste blanche (`noma_essai`, `noma_e2e`, `noma_essai_*` ; lot P3) (voir dev-seed-plan.ts).
  */
 
 export interface SeedReport {
@@ -59,7 +60,30 @@ async function ensureFakeSeller(pool: Pool, phone: string): Promise<{ userId: st
   return { userId: user.id, created: true };
 }
 
+/**
+ * Peuple la base d'essai, UN `dev:seed` À LA FOIS : un verrou consultatif de session, tenu sur une connexion dédiée du pool pendant toute l'exécution,
+ * sérialise deux commandes lancées en parallèle (sans lui : deux vendeurs fictifs créés en même temps, « erreur inattendue », ou annonces en double).
+ * Le pool doit donc offrir au moins DEUX connexions (celui du script en a 20). Attente bornée à 60 s.
+ */
 export async function seedExampleOffers(pool: Pool, options: SeedOptions): Promise<SeedReport> {
+  const lock = await pool.connect();
+  let reusable = true;
+  try {
+    await lock.query("SET lock_timeout = '60s'");
+    await lock.query("SELECT pg_advisory_lock($1::int, 1)", [SEED_LOCK_NAMESPACE]);
+    return await seedUnderLock(pool, options);
+  } finally {
+    try {
+      await lock.query("SELECT pg_advisory_unlock($1::int, 1)", [SEED_LOCK_NAMESPACE]);
+      await lock.query("RESET lock_timeout");
+    } catch {
+      reusable = false; // connexion douteuse : détruite (son verrou de session tombe avec elle)
+    }
+    lock.release(!reusable);
+  }
+}
+
+async function seedUnderLock(pool: Pool, options: SeedOptions): Promise<SeedReport> {
   const report: SeedReport = { sellersCreated: 0, sellersExisting: 0, offersCreated: 0, offersExisting: 0 };
   const brand = capitalizeFirst(options.brand);
   for (const planned of planSeedOffers(options)) {

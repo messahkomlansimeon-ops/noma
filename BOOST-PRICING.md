@@ -10,8 +10,9 @@ cotations par HTTP (`POST` et `GET /api/offers/{id}/boost-quotes`) : voir `BOOST
 exactement celui de la cotation, jamais recalculé ; une cotation ne s'achète qu'une fois ; la disponibilité est revérifiée à l'achat).
 
 Code : `lib/server/boost/pricing.ts` (fonctions pures), `lib/server/boost/quotes.ts` (comptages, cotation, historiques),
-`database/migrations/0012_boost_pricing.sql`, `scripts/boost-quote.ts`. Tests : `npm run test:boost-pricing` (pur),
-`npm run test:boost-quotes` (base `TEST_DATABASE_URL` dédiée).
+`lib/server/boost/reach.ts` (portée visible), `lib/server/boost/gate.ts` (créneaux de calcul),
+`database/migrations/0012_boost_pricing.sql` (puis 0016 et 0017), `scripts/boost-quote.ts`, `tests/perf/boost-perf.ts` (`npm run perf:boost`).
+Tests : `npm run test:boost-pricing` (pur), `npm run test:boost-quotes` (base `TEST_DATABASE_URL` dédiée).
 
 ## Formule
 
@@ -63,22 +64,39 @@ pas 0 à 1 000 ; plafonds de concurrence, de demande et de rareté 1 000 à 5 00
 ## Cotations (`boost_quotes`, immuables)
 
 `quoteOfferBoost({ pool, ownerId, offerId, durationCode })`. Validation **avant tout SQL** (zéro requête : pool exigé, UUID,
-durée). Puis une transaction READ COMMITTED dont les premières instructions sont `SET LOCAL lock_timeout` et un **verrou
-consultatif par offre** (espace distinct de celui des périmètres). Pas de REPEATABLE READ : un instantané pris avant le verrou
-masquerait une cotation concurrente et créerait un doublon.
+durée). **Depuis le lot P3, la cotation se fait en TROIS temps : le calcul de la portée ne tient plus aucun verrou** (constat prouvé avant le
+lot : 200 offres et 1 000 besoins compatibles, un devis prenait 11,9 s (200 besoins examinés) à 59,7 s (1 000, aucun atteignable) DANS la transaction qui
+tient le verrou consultatif de l'offre et la ligne de l'offre `FOR SHARE` : un devis concurrent échouait en 503 après 5 s, une mise en pause de
+l'offre attendait toute la durée du calcul, douze devis simultanés faisaient attendre 28 à 58 s un `GET /api/wallet` d'un AUTRE utilisateur) :
 
-1. contrôles de l'offre (ligne verrouillée en lecture partagée) : `offer_not_found`, `offer_not_owned`, `offer_not_eligible`,
-   `offer_not_boostable` (mêmes règles que l'attribution) ;
-2. **réutilisation** : une cotation de cette offre, de même durée, même vendeur et même périmètre, avec `expires_at > maintenant`,
-   est renvoyée telle quelle (`reused: true`, aucune écriture), **même si les comptages ou la version tarifaire ont changé** —
-   **sauf une cotation déjà ACHETÉE** (présente dans `boost_purchases`, lot P1b) : elle n'est jamais renvoyée, une cotation neuve est
-   calculée (indisponible `offer_already_boosted` tant que le boost acheté est actif, normale après remboursement ou annulation, une fois
-   l'éventuelle indisponibilité de 60 s écoulée) ;
-3. sinon : réglages tarifaires (`boost_pricing_missing` sans aucune ligne), puis les comptages en **une seule requête**, puis le
-   prix ou l'indisponibilité, puis `INSERT` (`computed_at = clock_timestamp()`).
+1. **lecture sans verrou** (instantané `REPEATABLE READ READ ONLY`) : contrôles de l'offre (`offer_not_found`, `offer_not_owned`,
+   `offer_not_eligible`, `offer_not_boostable`, mêmes règles que l'attribution), **réutilisation** (une cotation de cette offre, de même durée,
+   même vendeur et même périmètre, avec `expires_at > maintenant`, est renvoyée telle quelle : `reused: true`, aucune écriture, **même si les
+   comptages ou la version tarifaire ont changé** — **sauf une cotation déjà ACHETÉE** (présente dans `boost_purchases`, lot P1b) : elle n'est
+   jamais renvoyée ; **lot P3-bis (N1) : un devis `available` n'est renvoyé qu'après REVÉRIFICATION de sa portée** — mode « premier atteignable », hors
+   verrous, sous un créneau de calcul, budget `BOOST_REUSE_REACH_BUDGET_MS` = 1 s : atteignable → renvoyé tel quel ; DÉMONTRÉ inatteignable → il n'est
+   plus réutilisé, un devis neuf (indisponible `no_visible_effect`, 60 s) est calculé et écrit ; vérification non terminée dans le budget → `reach_check_unavailable`,
+   rien d'écrit ni modifié. Sans cela, « acheter → refus `no_visible_effect` → redemander un devis » rendait le MÊME devis « disponible » jusqu'à son échéance),
+   **limite de débit** (voir plus bas), puis réglages tarifaires (`boost_pricing_missing` sans aucune ligne), comptages en **une
+   seule requête** et motif d'indisponibilité antérieur à la portée ;
+2. **portée** (seulement si aucun motif antérieur ne s'applique : inutile de la payer quand la cotation est déjà refusée), dans un AUTRE
+   instantané en lecture seule, sous un **créneau de calcul** (au plus `BOOST_REACH_MAX_CONCURRENCY` = 4 simultanés par processus ; au-delà, attente
+   d'au plus `BOOST_REACH_QUEUE_WAIT_MS` = 5 s puis `quote_busy`, 503), un **budget de temps** de `BOOST_QUOTE_REACH_BUDGET_MS` = 3 s et un
+   `statement_timeout` local de `BOOST_REACH_STATEMENT_TIMEOUT_MS` = 2 s. Le créneau se prend AVANT d'ouvrir l'instantané : l'attente ne retient ni
+   connexion ni verrou. Une demande identique qui aboutit pendant l'attente fait renvoyer sa cotation (rien n'est recalculé). La portée est une
+   **ESTIMATION DATÉE** : l'achat la revérifie (`BOOST-PURCHASE.md`) ;
+3. **écriture, transaction courte** READ COMMITTED : `lock_timeout`, **verrou consultatif par offre**, puis **verrou consultatif du vendeur**
+   (espace 1_314_664_952 : comptage et écriture de la limite de débit, exacts même en parallèle), relecture COMPLÈTE de l'étape 1 sous les verrous (l'offre
+   a pu changer : pause, autre produit ; ligne de l'offre verrouillée en lecture partagée), prix ou indisponibilité, `INSERT`
+   (`computed_at = clock_timestamp()`). Pas de REPEATABLE READ pour cette étape : un instantané pris avant le verrou masquerait une cotation
+   concurrente et créerait un doublon. **Lot P3-bis (N3) : `no_visible_effect` n'est écrit que s'il est DÉMONTRÉ** (tous les besoins examinés dans les bornes, aucun atteignable). Si l'étape 2 n'a rien
+   démontré pour CE périmètre (l'offre a changé de produit, ou un motif antérieur a disparu entre les deux lectures), ou si son budget (3 s) ou son `statement_timeout`
+   s'est épuisé **sans acheteur trouvé** (verrou tenu, base chargée), la demande échoue en **`reach_check_unavailable`** (503, `Retry-After: 2`, « Vérification impossible pour
+   le moment, réessayez dans un instant. ») et **AUCUN devis n'est écrit** : un devis « indisponible » écrit sur une lenteur serait réutilisé 60 s et ferait d'une lenteur un
+   refus (constaté : verrou de 3 s sur `matching_evaluations` → « ne ferait plus monter votre annonce », même devis accepté 78 ms plus tard).
 
 Aucune erreur de domaine n'enregistre de ligne. **Aucune place n'est réservée** : une cotation n'est pas une promesse ; la
-disponibilité sera revérifiée à l'achat, au lot paiement (propriété, admissibilité, cotation, place, plafond vendeur).
+disponibilité est revérifiée à l'achat (propriété, admissibilité, cotation, place, plafond vendeur, **portée**).
 
 ### Comptages (une seule requête, un seul instantané)
 - **places** : total et utilisées EXACTEMENT comme `readBoostSlots` (mêmes fragments SQL `BOOST_ELIGIBLE_OFFER_SQL` et
@@ -95,7 +113,9 @@ Une cotation indisponible est enregistrée (`status = 'unavailable'`, montant et
 Ordre de priorité : `offer_already_boosted` (boost effectif ou futur sur l'offre) → `no_slot_available` (total = 0 ou used ≥ total ;
 jamais un prix infini) → `seller_boost_limit_reached` → `no_compatible_buyer` (D = 0 : pas de vente sans exposition possible) →
 **`no_visible_effect`** (lot P2-bis : des acheteurs compatibles existent, mais le boost ne ferait monter l'offre dans AUCUNE de leurs listes).
-Le calcul de la portée n'a lieu que si aucun motif antérieur ne s'applique (inutile de le payer quand la cotation est déjà refusée).
+Le calcul de la portée n'a lieu que si aucun motif antérieur ne s'applique (inutile de le payer quand la cotation est déjà refusée). Budget de
+temps épuisé, ou requête interrompue par le délai, **sans acheteur démontré** : plus un motif d'indisponibilité depuis le lot P3-bis (rien n'est démontré) mais
+l'erreur `reach_check_unavailable` (503, aucun devis écrit).
 
 ### Portée visible (lot P2-bis, `lib/server/boost/reach.ts`)
 Un devis n'est **disponible** que si au moins un acheteur verrait réellement l'offre monter. Constat qui a motivé la règle : avec une
@@ -104,33 +124,61 @@ places mises en avant, `floor(part promue × N)`, vaut 0 sous 7 offres (part de 
 
 `computeBoostReach` examine les besoins actifs compatibles de l'offre (mêmes évaluations que D), du plus récent au plus ancien, et pour
 chacun :
-1. **N** = taille de la liste que l'acheteur voit (`countDemandOrganicList`, plafonnée à la fenêtre de pertinence) ; si
-   `computeMaxPromoted(N, part promue)` vaut 0, le besoin est écarté sans autre calcul ;
+1. **N** = taille de la liste que l'acheteur voit, lue pour TOUS les besoins candidats en **UNE seule requête** (`countDemandOrganicLists`,
+   **plafonnée au seuil de quota** `ceil(1 / part promue)` = 7 avec 0,15 : le coût ne dépend plus de la taille des listes ; mesuré avant plafond : 600 ms
+   pour 50 listes de 200 offres) ; si `computeMaxPromoted(N, part promue)` vaut 0, le besoin est écarté sans relire son classement ;
 2. sinon le classement organique de ce besoin est relu avec LA fonction de la lecture des résultats (`readDemandOrganicRanking` :
-   pertinence incluse, `compareByRelevance`) ;
+   pertinence incluse, `compareByRelevance`) ; les propriétaires et le marché de chaque offre, qui ne dépendent pas de la demande, ne sont lus
+   **qu'une fois** pour toute la portée (`OrganicReadCache`, jamais partagé entre deux requêtes) ;
 3. le placement est simulé par `placeBoostedItems` via `isPromotedByBoost` (aucune copie de la logique) : sont promouvables les offres
-   déjà boostées PLUS celle-ci dont la pertinence atteint le seuil `min_relevance` des réglages de la catégorie du besoin ; l'offre est
-   « atteignable » si elle y est marquée promue (quota non épuisé par d'autres boosts, pertinence suffisante, **gain de place strict** :
-   une offre déjà à la place cible ne monte pas).
+   déjà boostées PLUS celle-ci dont la pertinence atteint le seuil `min_relevance` des réglages de la catégorie du besoin. **Priorité
+   d'ancienneté (lot P3)** : les boosts existants gardent leur rang (`starts_at`, puis identifiant du boost) et l'offre cotée est ajoutée comme le
+   boost le **plus RÉCENT** (rang le plus bas) ; elle est « atteignable » seulement si elle y est marquée promue (quota non épuisé par les
+   boosts existants, pertinence suffisante, **gain de place strict**) : **elle n'évince donc jamais un boost existant** (théorème du placement,
+   `BOOST.md`). Constat prouvé avant le lot : le placement donnait la place à l'offre la mieux classée, une offre qui achetait après une autre
+   pouvait lui prendre sa seule place.
 Un acheteur n'est compté qu'une fois (un seul besoin atteignable suffit). Chaque besoin est évalué sous un `SAVEPOINT` : une évaluation
 enregistrée illisible ou une erreur SQL sur UN besoin le fait tenir pour non atteignable (journal : le code seul), sans casser la cotation.
 
-Bornes : au plus **200** besoins évalués pour le COMPTAGE (`BOOST_REACH_COUNT_LIMIT`, les plus récents d'abord) ; au-delà, on ne continue
-que tant qu'aucun acheteur atteignable n'est trouvé et on s'arrête au premier, sans dépasser **1 000** besoins évalués au total
-(`BOOST_REACH_SEARCH_LIMIT`). Passé ce plafond sans acheteur atteignable, le résultat est 0 (`no_visible_effect`) : le compte est exact
-jusqu'à 200 besoins évalués, un minimum au-delà. Le résultat est borné par `compatibleBuyers`. **Le prix ne change pas** : `reachableBuyers`
-n'entre dans aucun facteur ; il décide seulement de la disponibilité et s'affiche (« Mise en avant visible auprès de X acheteur(s) »).
-Aucune identité d'acheteur ne sort : seul le nombre.
+**Bornes (lot P3)** : au plus **20** besoins examinés pour le COMPTAGE (`BOOST_REACH_COUNT_LIMIT`, les plus récents d'abord) ; au-delà, on ne
+continue que tant qu'aucun acheteur atteignable n'est trouvé et on s'arrête au premier, sans dépasser **50** besoins examinés au total
+(`BOOST_REACH_SEARCH_LIMIT`). Mode « premier » (revérification d'un achat) : arrêt au premier acheteur atteignable. **Budget** de temps total
+(3 s pour un devis, 1,5 s pour la revérification d'un achat) et `statement_timeout` de 2 s, ramené pour chaque besoin au budget restant :
+aucune requête ne dépasse le budget. Budget épuisé ou requête interrompue sans acheteur atteignable : le résultat est 0 ET `budgetExhausted` (INDÉTERMINÉ : `isReachUndetermined`, lot P3-bis ;
+`reach_check_unavailable` au devis comme à l'achat, jamais `no_visible_effect`) ; zéro acheteur SANS épuisement : DÉMONTRÉ (`no_visible_effect`) ; `statement_timeout`
+borné par le budget (plancher 250 ms) dès les premières lectures ;
+avec au moins un acheteur démontré : ce minimum. Le résultat est borné par `compatibleBuyers`. **`truncated`** : des besoins compatibles n'ont pas été
+examinés (bornes, budget, interruption) : `reachableBuyers` est alors un MINIMUM, et l'écran dit « au moins X ». Le prix ne change pas :
+`reachableBuyers` n'entre dans aucun facteur ; il décide seulement de la disponibilité et s'affiche (« Mise en avant visible auprès de X
+acheteur(s) » ou « d'au moins X acheteur(s) »). Aucune identité d'acheteur ne sort : seul le nombre.
 
 Migration **0016** : colonne `boost_quotes.reachable_buyers` (entier, NULL si non évalué : ancien devis ou motif antérieur) et CHECK
 `chk_boost_quotes_reason` étendu à `no_visible_effect` ; contraintes : 0 ≤ `reachable_buyers` ≤ `compatible_buyers`, un devis `available`
-n'a jamais `reachable_buyers` = 0, et `no_visible_effect` impose `reachable_buyers` = 0.
+n'a jamais `reachable_buyers` = 0, et `no_visible_effect` impose `reachable_buyers` = 0. Migration **0017** (lot P3, additive) : colonne
+`boost_quotes.reach_truncated` (booléen, NULL si la portée n'a pas été évaluée ; renseignée seulement avec `reachable_buyers`, CHECK
+`chk_boost_quotes_reach_truncated`) et index `idx_boost_quotes_seller_computed (seller_id, computed_at DESC)` (limite de débit).
+
+### Limite de débit et créneaux de calcul (lot P3)
+
+Au plus **20 devis calculés par vendeur et par minute** (`BOOST_QUOTE_RATE_LIMIT`, fenêtre glissante de 60 s sur `computed_at`) : le 21e est refusé
+(`BoostError` `rate_limited`, **429** côté HTTP avec `Retry-After: 60`, rien d'écrit). Seuls les devis CALCULÉS comptent : une cotation réutilisée
+n'est pas limitée. Le compte est exact même en parallèle (30 demandes simultanées donnent exactement 20 devis). Au plus 4 calculs de portée
+simultanés par processus ; une demande qui n'a pas de créneau après 5 s reçoit `quote_busy` (503 `boost_unavailable`, rien d'écrit). Pool applicatif : 20 connexions
+au plus et 5 s d'attente d'une connexion (`lib/server/postgres/client.ts`), échec propre en 503 au-delà.
+
+### Mesures (jeu de 200 offres d'un même périmètre, 1 000 besoins compatibles, `npm run perf:boost`)
+
+Chiffres bruts du lot (machine partagée, PostgreSQL 16.13, base jetable) — avant → après : devis atteignable 11,9 – 12,0 s → 0,41 – 0,43 s ; devis où aucun acheteur n'est
+atteignable (50 besoins examinés au plus) 58,0 – 59,7 s → 0,89 – 0,90 s ; verrous de l'offre tenus par le devis 11,9 – 59,7 s → 17 – 24 ms ; achat 35 ms (sans aucune
+revérification : un boost sans effet s'achetait) → 73 ms, pire cas (offre inatteignable, 50 besoins examinés) 0,87 s avec verrou de périmètre tenu 0,86 s et refus
+`no_visible_effect` ; `GET /api/wallet` d'un autre utilisateur pendant douze devis simultanés 28 – 58 s → 15 ms ; mise en pause de l'offre pendant un devis 27,9 s → 11 ms ; page
+de résultats d'un acheteur (200 offres) 57 → 28 ms (médiane). Commande : `npm run perf:boost` (voir `POSTGRESQL-DEVELOPMENT.md`).
 
 ### Validité
 Cotation disponible : `quote_validity_seconds` (900 s par défaut). Cotation indisponible : **60 s**
 (`BOOST_UNAVAILABLE_QUOTE_SECONDS`), pour que l'indisponibilité ne soit pas figée. Résultat `BoostQuote` : `id`, `offerId`,
 `durationCode`, `currency`, `status`, `amount`, `rawAmount` (chaîne), `unavailableReason`, `factors` (millièmes) ou null, `inputs`
-(`competingSellers`, `compatibleBuyers`, `slotsTotal`, `slotsUsed`, `reachableBuyers`), `pricing` (`key`, `version`), `computedAt`, `expiresAt`, `reused`.
+(`competingSellers`, `compatibleBuyers`, `slotsTotal`, `slotsUsed`, `reachableBuyers`, `reachTruncated`), `pricing` (`key`, `version`), `computedAt`, `expiresAt`, `reused`.
 
 ## Historiques
 
@@ -153,7 +201,7 @@ Cotation disponible : `quote_validity_seconds` (900 s par défaut). Cotation ind
 - Changer un tarif : insérer une nouvelle ligne `(key, version + 1)`. Les cotations en cours gardent leur prix jusqu'à leur
   expiration ; l'historique garde la version qui les a produites.
 - La migration 0012 doit être appliquée avant d'utiliser `quoteOfferBoost` (et, depuis le lot P1b, la **migration 0015** : la réutilisation
-  exclut les cotations achetées ; depuis le lot P2-bis, la **migration 0016** : colonne `reachable_buyers` et motif `no_visible_effect`) ; `MATCHING_REQUIRED_MIGRATION` reste 0010 (le worker
+  exclut les cotations achetées ; depuis le lot P2-bis, la **migration 0016** : colonne `reachable_buyers` et motif `no_visible_effect` ; depuis le lot P3, la **migration 0017** : colonne `reach_truncated` et index de la limite de débit) ; `MATCHING_REQUIRED_MIGRATION` reste 0010 (le worker
   n'utilise pas les cotations).
 
 ## Limites
@@ -167,10 +215,11 @@ Cotation disponible : `quote_validity_seconds` (900 s par défaut). Cotation ind
   (le brief demande d'exclure l'activité suspecte).
 - **Localisation et variante exclues** du périmètre (comme 2I1) : le marché de la cotation est la clé produit.
 - Un acheteur compatible ne garantit pas d'exposition : `min_relevance` et la part promue maximale s'appliquent encore au
-  classement (voir `BOOST.md`). Depuis le lot P2-bis, la cotation ne se déclare « disponible » que si le boost fait monter l'offre chez au
-  moins un acheteur **au moment du calcul** ; l'état des listes peut changer ensuite (autres offres, autres boosts, autres besoins) :
-  une cotation ne promet toujours aucune impression, aucune position et aucune vente, et la portée n'est PAS recalculée à l'achat
-  (l'achat revérifie places, plafond vendeur et validité, `BOOST-PURCHASE.md`).
+  classement (voir `BOOST.md`). La cotation ne se déclare « disponible » que si le boost fait monter l'offre chez au moins un acheteur **au
+  moment de l'estimation** ; l'état des listes peut changer ensuite (autres offres, autres boosts, autres besoins) : une cotation ne promet toujours
+  aucune impression, aucune position et aucune vente. **Depuis le lot P3, la portée est revérifiée à l'achat** sous le verrou du périmètre
+  (`BOOST-PURCHASE.md`) : `no_visible_effect` si plus aucun acheteur n'est atteignable, rien n'est écrit. La portée est une ESTIMATION bornée (20
+  besoins comptés, 50 examinés, 3 s) : un compte tronqué est un minimum.
 - Les durées longues ont un facteur configurable mais la **capacité sur toute la période** n'est pas vérifiée ici (aucune
   réservation) ; elle le sera à l'achat.
 - Pas d'index fonctionnel sur `lower(btrim(...))` : le comptage des offres d'un périmètre est proportionnel à la taille du

@@ -190,6 +190,8 @@ export interface BoostQuote {
     compatibleBuyers: number;
     /** Acheteurs pour lesquels le boost ferait réellement monter l'annonce ; `null` : non évalué (devis ancien ou indisponible plus tôt). */
     reachableBuyers: number | null;
+    /** Lot P3 : la portée est une estimation bornée ; vrai = des acheteurs n'ont pas été examinés, `reachableBuyers` est un MINIMUM (« au moins X »). */
+    reachTruncated: boolean;
     slotsTotal: number;
     slotsUsed: number;
   };
@@ -657,6 +659,7 @@ function parseBoostQuote(status: number, value: unknown, flag: "reused" | "expir
     typeof inputs.competingSellers !== "number" ||
     typeof inputs.compatibleBuyers !== "number" ||
     !(inputs.reachableBuyers === null || (typeof inputs.reachableBuyers === "number" && Number.isSafeInteger(inputs.reachableBuyers) && inputs.reachableBuyers >= 0)) ||
+    !(inputs.reachTruncated === undefined || typeof inputs.reachTruncated === "boolean") ||
     typeof inputs.slotsTotal !== "number" ||
     typeof inputs.slotsUsed !== "number"
   ) {
@@ -693,6 +696,7 @@ function parseBoostQuote(status: number, value: unknown, flag: "reused" | "expir
       competingSellers: inputs.competingSellers,
       compatibleBuyers: inputs.compatibleBuyers,
       reachableBuyers: inputs.reachableBuyers as number | null,
+      reachTruncated: inputs.reachTruncated === true,
       slotsTotal: inputs.slotsTotal,
       slotsUsed: inputs.slotsUsed,
     },
@@ -1298,6 +1302,8 @@ export const api: ApiClient = createApiClient();
 export type ApiErrorContext = "otp-request" | "otp-verify" | "catalog" | "matches" | "boost" | "wallet" | "purchase" | "default";
 
 export const GENERIC_ERROR_MESSAGE = "Une erreur est survenue. Réessayez dans un instant.";
+/** 429 d'une demande de devis (limite de débit par vendeur, lot P3). */
+export const BOOST_RATE_LIMITED_MESSAGE = "Trop de demandes de prix en peu de temps. Patientez une minute, puis réessayez.";
 /** 429 d'une recharge, d'une lecture du porte-monnaie ou d'un achat. */
 export const TOO_MANY_ATTEMPTS_MESSAGE = "Trop de tentatives, réessayez dans un instant.";
 
@@ -1313,6 +1319,9 @@ export const WALLET_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.fr
   wallet_unavailable: "Le porte-monnaie est temporairement indisponible. Réessayez dans un instant.",
 });
 
+/** 503 `reach_check_unavailable` (lot P3-bis) : la vérification de la portée n'a pas pu se terminer ; rien n'a été écrit ni débité, on peut réessayer. */
+export const REACH_CHECK_UNAVAILABLE_MESSAGE = "Vérification impossible pour le moment, réessayez dans un instant.";
+
 /** Messages fixes des refus d'un achat de boost (`purchase`), un par code de `boost-purchase/v1`. */
 export const PURCHASE_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   invalid_request: "Cette demande d'achat n'est pas valide. Actualisez la page, puis réessayez.",
@@ -1325,6 +1334,8 @@ export const PURCHASE_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.
   offer_already_boosted: "Cette annonce est déjà boostée.",
   no_slot_available: "Il n'y a plus de place de mise en avant disponible pour ce produit pour le moment.",
   seller_boost_limit_reached: "Vous avez atteint votre plafond de boosts pour ce produit.",
+  no_visible_effect: "Ce boost ne ferait plus monter votre annonce chez aucun acheteur (place déjà occupée par un boost acheté plus tôt, ou liste trop courte). Aucun débit. Demandez un nouveau prix plus tard.",
+  reach_check_unavailable: REACH_CHECK_UNAVAILABLE_MESSAGE,
   idempotency_conflict: "Cet achat est en conflit avec une demande précédente. Demandez un nouveau prix, puis réessayez.",
   boost_purchase_unavailable: "L'achat de boost est temporairement indisponible. Réessayez dans un instant.",
 });
@@ -1360,6 +1371,8 @@ export function describeApiError(error: unknown, context: ApiErrorContext = "def
     if (error.status === 409 && error.code === "offer_not_boostable") {
       return "Pour booster cette annonce, indiquez sa catégorie, sa marque et son modèle.";
     }
+    if (error.status === 429) return BOOST_RATE_LIMITED_MESSAGE;
+    if (error.status === 503 && error.code === "reach_check_unavailable") return REACH_CHECK_UNAVAILABLE_MESSAGE;
     if (error.status === 503) return "Le boost est temporairement indisponible. Réessayez plus tard.";
   }
   if (context === "wallet" || context === "purchase") {

@@ -7,9 +7,11 @@ import { requireTransactionPool, requireUuid } from "../catalog/validation";
 import { buildMatchingFreshnessPredicate, MATCHING_FRESHNESS_FROM, resolveMatchingFreshnessParams } from "../matching/persistence";
 import { withPostgresTransaction, type SqlExecutor } from "../postgres/client";
 import {
-  BOOST_DURATION_CODES, BOOST_LOCK_TIMEOUT_MS, BOOST_QUOTE_LOCK_NAMESPACE, BOOST_UNAVAILABLE_QUOTE_SECONDS,
+  BOOST_DURATION_CODES, BOOST_LOCK_TIMEOUT_MS, BOOST_QUOTE_LOCK_NAMESPACE, BOOST_QUOTE_RATE_LIMIT, BOOST_QUOTE_RATE_NAMESPACE,
+  BOOST_QUOTE_RATE_WINDOW_SECONDS, BOOST_REACH_MAX_CONCURRENCY, BOOST_REACH_QUEUE_WAIT_MS, BOOST_UNAVAILABLE_QUOTE_SECONDS,
   type BoostDurationCode,
 } from "./boost-config";
+import { createReachGate, type ReachGate } from "./gate";
 import {
   BOOST_ELIGIBLE_OFFER_SQL, BoostError, boostEffectiveSql, completeScope, computeSellerLimit, computeSlots, loadOfferFacts,
   readBoostSettings, withReadOnlySnapshot, type BoostScope,
@@ -17,7 +19,7 @@ import {
 import {
   computeBoostPrice, validatePricingSettings, type BoostPriceFactors, type BoostPricingSettings,
 } from "./pricing";
-import { computeBoostReach } from "./reach";
+import { BOOST_QUOTE_REACH_BUDGET_MS, BOOST_REUSE_REACH_BUDGET_MS, computeBoostReach, isReachUndetermined, type BoostReach } from "./reach";
 
 /**
  * Cotations vendeur du boost (lot 2I2) : un prix daté, conservé pendant sa courte validité. AUCUN paiement, achat, crédit ni
@@ -43,6 +45,11 @@ export interface BoostQuoteInputs {
    * l'ordre des motifs). Au-delà de `BOOST_REACH_COUNT_LIMIT` besoins évalués, c'est un minimum. Ne change jamais le prix.
    */
   reachableBuyers: number | null;
+  /**
+   * Lot P3 : la portée est une ESTIMATION bornée (20 besoins comptés, 50 examinés, budget de temps). Vrai : des besoins compatibles n'ont pas été
+   * examinés, `reachableBuyers` est un minimum (« au moins X »). Faux : compte exact, ou portée non évaluée.
+   */
+  reachTruncated: boolean;
   slotsTotal: number;
   slotsUsed: number;
 }
@@ -79,8 +86,18 @@ export interface BoostScopePricePoint {
 }
 
 export interface BoostQuoteTestHooks {
-  /** Réservé aux tests : appelé dans la transaction, après le calcul et juste avant l'INSERT. */
+  /** Réservé aux tests : appelé dans la transaction d'ÉCRITURE (verrous pris), après le calcul et juste avant l'INSERT. */
   beforeInsert?: () => void | Promise<void>;
+  /** Réservé aux tests : appelé pendant le calcul de la portée (AUCUN verrou tenu), avant l'examen de chaque besoin (rang à partir de 0). */
+  beforeReachDemand?: (index: number) => void | Promise<void>;
+  /** Réservé aux tests : horloge et budget (ms) du calcul de la portée. */
+  reachClock?: () => number;
+  reachBudgetMs?: number;
+  /** Réservé aux tests : créneaux de calcul (par défaut ceux du processus) et attente maximale d'un créneau (ms). */
+  reachGate?: ReachGate;
+  reachQueueWaitMs?: number;
+  /** Réservé aux tests (lot P3-bis) : budget (ms) de la revérification de la portée d'un devis « disponible » réutilisé. */
+  reuseReachBudgetMs?: number;
 }
 
 // ───────────── validations (avant tout SQL) ─────────────
@@ -228,6 +245,7 @@ interface QuoteRow {
   competing_sellers: number;
   compatible_buyers: number;
   reachable_buyers: number | null;
+  reach_truncated: boolean | null;
   slots_total: number;
   slots_used: number;
   pricing_key: string;
@@ -238,7 +256,7 @@ interface QuoteRow {
 }
 
 const QUOTE_COLUMNS = `id, offer_id, duration_code, currency, status, unavailable_reason, amount, raw_amount::text AS raw_amount,
-  competition_milli, demand_milli, scarcity_milli, duration_milli, competing_sellers, compatible_buyers, reachable_buyers, slots_total, slots_used,
+  competition_milli, demand_milli, scarcity_milli, duration_milli, competing_sellers, compatible_buyers, reachable_buyers, reach_truncated, slots_total, slots_used,
   pricing_key, pricing_version, computed_at, expires_at`;
 
 function mapQuote(row: QuoteRow): Omit<BoostQuote, "reused"> {
@@ -256,7 +274,7 @@ function mapQuote(row: QuoteRow): Omit<BoostQuote, "reused"> {
     },
     inputs: {
       competingSellers: row.competing_sellers, compatibleBuyers: row.compatible_buyers, reachableBuyers: row.reachable_buyers,
-      slotsTotal: row.slots_total, slotsUsed: row.slots_used,
+      reachTruncated: row.reach_truncated === true, slotsTotal: row.slots_total, slotsUsed: row.slots_used,
     },
     pricing: { key: row.pricing_key, version: row.pricing_version },
     computedAt: row.computed_at,
@@ -266,14 +284,107 @@ function mapQuote(row: QuoteRow): Omit<BoostQuote, "reused"> {
 
 // ───────────── cotation ─────────────
 
+/** Créneaux de calcul de portée de CE processus (exportés pour l'observation et les essais : jamais pour contourner la limite). */
+export const processReachGate: ReachGate = createReachGate(BOOST_REACH_MAX_CONCURRENCY);
+
+interface QuoteBasis {
+  scope: BoostScope;
+  /** Cotation encore valable à renvoyer telle quelle (même offre, durée, vendeur, périmètre ; jamais une cotation déjà achetée). */
+  reusable: QuoteRow | null;
+  /** Calculs, seulement si aucune cotation n'est réutilisable. */
+  computed: {
+    pricing: BoostPricingSettings;
+    counts: ScopeCountsRow;
+    slotsTotal: number;
+    slotsUsed: number;
+    reason: BoostQuoteUnavailableReason | null;
+  } | null;
+}
+
+/** Cotation réutilisable d'une offre (voir `quoteOfferBoost`). */
+async function findReusableQuote(
+  client: SqlExecutor,
+  input: { offerId: string; ownerId: string; durationCode: BoostDurationCode; scope: BoostScope; excludeQuoteId?: string | null },
+): Promise<QuoteRow | null> {
+  // `excludeQuoteId` (lot P3-bis) : un devis « disponible » dont la portée vient d'être revérifiée et NE tient plus n'est pas réutilisé.
+  const existing = await client.query<QuoteRow>(
+    `SELECT ${QUOTE_COLUMNS} FROM boost_quotes
+      WHERE offer_id = $1::uuid AND duration_code = $2 AND seller_id = $3::uuid
+        AND scope_category = $4 AND scope_brand = $5 AND scope_model = $6
+        AND expires_at > clock_timestamp()
+        AND ($7::uuid IS NULL OR id <> $7::uuid)
+        AND NOT EXISTS (SELECT 1 FROM boost_purchases p WHERE p.quote_id = boost_quotes.id)
+      ORDER BY computed_at DESC, id DESC
+      LIMIT 1`,
+    [input.offerId, input.durationCode, input.ownerId, input.scope.category, input.scope.brand, input.scope.model, input.excludeQuoteId ?? null],
+  );
+  return existing.rows[0] ?? null;
+}
+
 /**
- * Cotation du boost d'une offre pour une durée. Transaction READ COMMITTED : après BEGIN, `lock_timeout` puis verrou consultatif
- * par offre (jamais un instantané pris avant le verrou : il masquerait une cotation concurrente et créerait un doublon). Si une
- * cotation de cette offre, de même durée, même vendeur et même périmètre est encore valable, elle est renvoyée telle quelle
- * (`reused: true`, aucune écriture), même si les comptages ou la version tarifaire ont changé ; une cotation déjà achetée n'est jamais
- * réutilisée (lot P1b, migration 0015 requise). Sinon : comptages (une requête),
- * prix (pricing.ts) ou indisponibilité (ordre : offre déjà boostée, plus de place, plafond vendeur, aucun acheteur compatible, aucun effet
- * visible : des acheteurs compatibles existent mais aucun ne verrait l'offre monter, voir reach.ts), puis INSERT. Aucune place n'est réservée.
+ * Contrôles de l'offre, cotation réutilisable, puis (sinon) réglages, comptages et motif d'indisponibilité ANTÉRIEUR à la portée. Lu deux fois :
+ * dans un instantané SANS verrou (savoir s'il faut calculer la portée) puis, sous les verrous, pour l'écriture (`lockOffer`).
+ */
+async function readQuoteBasis(
+  client: SqlExecutor,
+  input: { offerId: string; ownerId: string; durationCode: BoostDurationCode; lockOffer: boolean; excludeQuoteId?: string | null },
+): Promise<QuoteBasis> {
+  // Mêmes contrôles de l'offre que l'attribution ; sous verrou, la ligne reste verrouillée en lecture partagée jusqu'à la fin.
+  const facts = await loadOfferFacts(client, input.offerId, input.lockOffer);
+  if (!facts) throw new BoostError("offer_not_found");
+  if (facts.owner_id !== input.ownerId) throw new BoostError("offer_not_owned");
+  if (!facts.eligible) throw new BoostError("offer_not_eligible");
+  const scope = completeScope(facts);
+
+  // Réutilisation d'une cotation encore valable (même offre, durée, vendeur et périmètre), JAMAIS d'une cotation déjà achetée (lot
+  // P1b : un devis ne s'achète qu'une fois, même remboursé ; le renvoyer bloquerait le vendeur jusqu'à son échéance). Une nouvelle
+  // cotation est alors calculée : indisponible (offer_already_boosted) tant que le boost acheté est actif, normale ensuite.
+  const reusable = await findReusableQuote(client, { offerId: input.offerId, ownerId: input.ownerId, durationCode: input.durationCode, scope, excludeQuoteId: input.excludeQuoteId });
+  if (reusable) return { scope, reusable, computed: null };
+
+  const pricing = await readBoostPricingSettings(client, scope.category);
+  const settings = await readBoostSettings(client, scope.category);
+  const counts = await readQuoteCounts(client, input.offerId, input.ownerId, scope);
+  const slotsTotal = computeSlots(counts.offers_in_scope, settings);
+  const slotsUsed = counts.slots_used;
+
+  // Indisponibilité, par ordre de priorité.
+  let reason: BoostQuoteUnavailableReason | null = null;
+  if (counts.already_boosted) reason = "offer_already_boosted";
+  else if (slotsTotal === 0 || slotsUsed >= slotsTotal) reason = "no_slot_available";
+  else if (counts.seller_used >= computeSellerLimit(slotsTotal, settings)) reason = "seller_boost_limit_reached";
+  else if (counts.compatible_buyers === 0) reason = "no_compatible_buyer";
+  return { scope, reusable: null, computed: { pricing, counts, slotsTotal, slotsUsed, reason } };
+}
+
+/** Limite de débit : au plus `BOOST_QUOTE_RATE_LIMIT` devis calculés par vendeur sur la dernière minute (`rate_limited` au-delà). */
+async function assertQuoteRate(client: SqlExecutor, ownerId: string): Promise<void> {
+  const recent = await client.query<{ n: number }>(
+    "SELECT count(*)::int AS n FROM boost_quotes WHERE seller_id = $1::uuid AND computed_at > clock_timestamp() - make_interval(secs => $2::int)",
+    [ownerId, BOOST_QUOTE_RATE_WINDOW_SECONDS],
+  );
+  if (recent.rows[0].n >= BOOST_QUOTE_RATE_LIMIT) throw new BoostError("rate_limited");
+}
+
+function sameScope(a: BoostScope, b: BoostScope): boolean {
+  return a.category === b.category && a.brand === b.brand && a.model === b.model;
+}
+
+/**
+ * Cotation du boost d'une offre pour une durée, en TROIS temps (lot P3 : le calcul de la portée ne tient plus aucun verrou) :
+ *  1. lecture SANS verrou (instantané en lecture seule) : contrôles de l'offre, cotation réutilisable (renvoyée telle quelle : `reused: true`,
+ *     aucune écriture ; lot P3-bis : un devis « disponible » n'est réutilisé qu'après REVÉRIFICATION de sa portée, voir 1b), limite de débit,
+ *     comptages et motif d'indisponibilité antérieur à la portée ;
+ *  2. si aucun motif antérieur ne s'applique : PORTÉE visible (reach.ts), dans un autre instantané en lecture seule, sous un créneau de calcul
+ *     (au plus 4 calculs simultanés par processus), un budget de temps et un `statement_timeout`. C'est une ESTIMATION DATÉE : l'achat la
+ *     revérifie sous le verrou du périmètre ;
+ *  3. transaction courte READ COMMITTED : `lock_timeout`, verrou consultatif par offre (jamais un instantané pris avant le verrou : il masquerait une
+ *     cotation concurrente et créerait un doublon), verrou consultatif du vendeur (limite de débit exacte), relecture complète de l'étape 1 sous
+ *     verrou (l'offre a pu changer : pause, autre produit), puis prix ou indisponibilité, et INSERT. Lot P3-bis : `no_visible_effect` n'est écrit que
+ *     s'il est DÉMONTRÉ (tous les besoins examinés dans les bornes, aucun atteignable) ; si l'étape 2 n'a rien démontré pour CE périmètre, ou si son
+ *     budget / `statement_timeout` s'est épuisé sans acheteur trouvé, la demande échoue en `reach_check_unavailable` (503) et AUCUN devis n'est écrit.
+ * Indisponibilité (ordre) : offre déjà boostée, plus de place, plafond vendeur, aucun acheteur compatible, aucun effet visible. Aucune place n'est
+ * réservée. Une cotation déjà achetée n'est jamais réutilisée (lot P1b, migration 0015) ; migration 0017 requise (`reach_truncated`).
  */
 export async function quoteOfferBoost(input: {
   pool: Pool;
@@ -286,53 +397,91 @@ export async function quoteOfferBoost(input: {
   const ownerId = requireUuid(input.ownerId, "ownerId").toLowerCase();
   const offerId = requireUuid(input.offerId, "offerId").toLowerCase();
   const durationCode = requireQuoteDuration(input.durationCode);
+  const hooks = input.hooks;
 
+  // 1. Lecture sans verrou.
+  const readEarly = (excludeQuoteId: string | null) => withReadOnlySnapshot(pool, async (client) => {
+    const basis = await readQuoteBasis(client, { offerId, ownerId, durationCode, lockOffer: false, excludeQuoteId });
+    if (!basis.reusable) await assertQuoteRate(client, ownerId);
+    return basis;
+  });
+  let early = await readEarly(null);
+
+  // 1b. (lot P3-bis) Un devis « disponible » n'est réutilisé que si sa portée tient TOUJOURS : « premier acheteur atteignable », hors verrous, budget
+  // court, sous un créneau de calcul. Atteignable → renvoyé tel quel. Démontré inatteignable (la place a été prise, les listes ont changé) → il n'est
+  // PLUS réutilisé : un devis neuf est calculé (indisponible `no_visible_effect`), sans quoi « acheter → refus → redemander un devis » bouclerait
+  // jusqu'à l'échéance. Non démontrable dans le budget → `reach_check_unavailable` (503, rien d'écrit, rien de réutilisé).
+  let staleQuoteId: string | null = null;
+  let verified: BoostReach | null = null;
+  if (early.reusable) {
+    const candidate = early.reusable;
+    if (candidate.status !== "available") return { ...mapQuote(candidate), reused: true };
+    const release = await (hooks?.reachGate ?? processReachGate).acquire(hooks?.reachQueueWaitMs ?? BOOST_REACH_QUEUE_WAIT_MS);
+    let recheck: BoostReach;
+    try {
+      recheck = await withReadOnlySnapshot(pool, (client) => computeBoostReach(client, {
+        offerId, mode: "first", budgetMs: hooks?.reuseReachBudgetMs ?? BOOST_REUSE_REACH_BUDGET_MS, clock: hooks?.reachClock, beforeDemand: hooks?.beforeReachDemand,
+      }));
+    } finally {
+      release();
+    }
+    if (recheck.reachableBuyers > 0) return { ...mapQuote(candidate), reused: true };
+    if (isReachUndetermined(recheck)) throw new BoostError("reach_check_unavailable");
+    staleQuoteId = candidate.id;
+    verified = recheck;
+    early = await readEarly(staleQuoteId);
+    if (early.reusable) return { ...mapQuote(early.reusable), reused: true };
+  }
+
+  // 2. Portée visible, sans verrou : seulement si aucun motif antérieur ne s'applique (inutile de la payer quand la cotation est déjà refusée). Une
+  // portée démontrée nulle à l'étape 1b n'est pas recalculée.
+  let estimate: { scope: BoostScope; reach: BoostReach } | null = verified ? { scope: early.scope, reach: verified } : null;
+  if (!estimate && early.computed && early.computed.reason === null) {
+    const release = await (hooks?.reachGate ?? processReachGate).acquire(hooks?.reachQueueWaitMs ?? BOOST_REACH_QUEUE_WAIT_MS);
+    try {
+      const reused = await withReadOnlySnapshot(pool, async (client) => {
+        // Une demande identique a pu aboutir pendant l'attente d'un créneau : sa cotation est renvoyée, rien n'est recalculé.
+        const again = await findReusableQuote(client, { offerId, ownerId, durationCode, scope: early.scope, excludeQuoteId: staleQuoteId });
+        if (again) return again;
+        const reach = await computeBoostReach(client, {
+          offerId, mode: "count", budgetMs: hooks?.reachBudgetMs ?? BOOST_QUOTE_REACH_BUDGET_MS, clock: hooks?.reachClock, beforeDemand: hooks?.beforeReachDemand,
+        });
+        estimate = { scope: early.scope, reach };
+        return null;
+      });
+      if (reused) return { ...mapQuote(reused), reused: true };
+    } finally {
+      release();
+    }
+  }
+
+  // 3. Écriture, sous les verrous : transaction courte.
   return withPostgresTransaction(async (client) => {
     await client.query(`SET LOCAL lock_timeout = '${BOOST_LOCK_TIMEOUT_MS}ms'`);
     await client.query("SELECT pg_advisory_xact_lock($1::int, hashtext($2::text))", [BOOST_QUOTE_LOCK_NAMESPACE, offerId]);
+    // Un vendeur à la fois pour compter puis écrire (limite de débit exacte) : pris après le verrou de l'offre, dans tous les devis.
+    await client.query("SELECT pg_advisory_xact_lock($1::int, hashtext($2::text))", [BOOST_QUOTE_RATE_NAMESPACE, ownerId]);
 
-    // Mêmes contrôles de l'offre que l'attribution ; la ligne reste verrouillée en lecture partagée jusqu'à la fin.
-    const facts = await loadOfferFacts(client, offerId, true);
-    if (!facts) throw new BoostError("offer_not_found");
-    if (facts.owner_id !== ownerId) throw new BoostError("offer_not_owned");
-    if (!facts.eligible) throw new BoostError("offer_not_eligible");
-    const scope = completeScope(facts);
+    const basis = await readQuoteBasis(client, { offerId, ownerId, durationCode, lockOffer: true, excludeQuoteId: staleQuoteId });
+    if (basis.reusable) return { ...mapQuote(basis.reusable), reused: true };
+    const computed = basis.computed!;
+    await assertQuoteRate(client, ownerId);
+    const { pricing, counts, slotsTotal, slotsUsed } = computed;
+    let reason = computed.reason;
 
-    // Réutilisation d'une cotation encore valable (même offre, durée, vendeur et périmètre), JAMAIS d'une cotation déjà achetée (lot
-    // P1b : un devis ne s'achète qu'une fois, même remboursé ; le renvoyer bloquerait le vendeur jusqu'à son échéance). Une nouvelle
-    // cotation est alors calculée : indisponible (offer_already_boosted) tant que le boost acheté est actif, normale ensuite.
-    const existing = await client.query<QuoteRow>(
-      `SELECT ${QUOTE_COLUMNS} FROM boost_quotes
-        WHERE offer_id = $1::uuid AND duration_code = $2 AND seller_id = $3::uuid
-          AND scope_category = $4 AND scope_brand = $5 AND scope_model = $6
-          AND expires_at > clock_timestamp()
-          AND NOT EXISTS (SELECT 1 FROM boost_purchases p WHERE p.quote_id = boost_quotes.id)
-        ORDER BY computed_at DESC, id DESC
-        LIMIT 1`,
-      [offerId, durationCode, ownerId, scope.category, scope.brand, scope.model],
-    );
-    if (existing.rows[0]) return { ...mapQuote(existing.rows[0]), reused: true };
-
-    const pricing = await readBoostPricingSettings(client, scope.category);
-    const settings = await readBoostSettings(client, scope.category);
-    const counts = await readQuoteCounts(client, offerId, ownerId, scope);
-    const slotsTotal = computeSlots(counts.offers_in_scope, settings);
-    const slotsUsed = counts.slots_used;
-
-    // Indisponibilité, par ordre de priorité.
-    let reason: BoostQuoteUnavailableReason | null = null;
-    if (counts.already_boosted) reason = "offer_already_boosted";
-    else if (slotsTotal === 0 || slotsUsed >= slotsTotal) reason = "no_slot_available";
-    else if (counts.seller_used >= computeSellerLimit(slotsTotal, settings)) reason = "seller_boost_limit_reached";
-    else if (counts.compatible_buyers === 0) reason = "no_compatible_buyer";
-
-    // Portée visible (lot P2-bis), calculée seulement quand les motifs précédents n'ont rien exclu : le prix ne change pas (le facteur demande
-    // reste fondé sur les acheteurs compatibles), mais un devis « disponible » promet au moins UN acheteur qui verrait l'offre monter.
+    // Portée visible (lots P2-bis et P3) : le prix ne change pas (le facteur demande reste fondé sur les acheteurs compatibles), mais un devis
+    // « disponible » promet au moins UN acheteur qui verrait l'offre monter, au moment de l'estimation.
     let reachableBuyers: number | null = counts.compatible_buyers === 0 && reason === "no_compatible_buyer" ? 0 : null;
+    let reachTruncated: boolean | null = reachableBuyers === null ? null : false;
     if (reason === null) {
-      const reach = await computeBoostReach(client, { offerId });
-      // Les comptages sont lus à des instants légèrement différents (READ COMMITTED) : jamais plus d'atteignables que de compatibles.
-      reachableBuyers = Math.min(reach.reachableBuyers, counts.compatible_buyers);
+      const found = estimate as { scope: BoostScope; reach: BoostReach } | null;
+      // Lot P3-bis : « aucun effet visible » n'est écrit que s'il est DÉMONTRÉ. Rien démontré pour ce périmètre (l'offre a changé de produit entre les deux
+      // lectures, ou un motif antérieur a disparu), ou budget / délai épuisé sans acheteur trouvé : refus 503 à réessayer, AUCUN devis persisté (un devis
+      // « indisponible » écrit ici serait réutilisé 60 s : une lenteur deviendrait un refus).
+      if (!found || !sameScope(found.scope, basis.scope) || isReachUndetermined(found.reach)) throw new BoostError("reach_check_unavailable");
+      // Les comptages sont lus à des instants légèrement différents : jamais plus d'atteignables que de compatibles.
+      reachableBuyers = Math.min(found.reach.reachableBuyers, counts.compatible_buyers);
+      reachTruncated = found.reach.truncated;
       if (reachableBuyers === 0) reason = "no_visible_effect";
     }
 
@@ -342,7 +491,7 @@ export async function quoteOfferBoost(input: {
       })
       : null;
 
-    if (input.hooks?.beforeInsert) await input.hooks.beforeInsert();
+    if (hooks?.beforeInsert) await hooks.beforeInsert();
 
     const validitySeconds = price ? pricing.quoteValiditySeconds : BOOST_UNAVAILABLE_QUOTE_SECONDS;
     const inserted = await client.query<QuoteRow>(
@@ -350,17 +499,17 @@ export async function quoteOfferBoost(input: {
        INSERT INTO boost_quotes (
          id, offer_id, seller_id, scope_category, scope_brand, scope_model, duration_code, pricing_key, pricing_version, currency,
          status, unavailable_reason, amount, raw_amount, competition_milli, demand_milli, scarcity_milli, duration_milli,
-         competing_sellers, compatible_buyers, reachable_buyers, slots_total, slots_used, computed_at, expires_at)
+         competing_sellers, compatible_buyers, reachable_buyers, reach_truncated, slots_total, slots_used, computed_at, expires_at)
        SELECT $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9::int, 'XOF',
               $10, $11, $12::int, $13::numeric, $14::int, $15::int, $16::int, $17::int,
-              $18::int, $19::int, $20::int, $21::int, $22::int, t.now, t.now + make_interval(secs => $23::int)
+              $18::int, $19::int, $20::int, $24::boolean, $21::int, $22::int, t.now, t.now + make_interval(secs => $23::int)
          FROM t
        RETURNING ${QUOTE_COLUMNS}`,
       [
-        randomUUID(), offerId, ownerId, scope.category, scope.brand, scope.model, durationCode, pricing.key, pricing.version,
+        randomUUID(), offerId, ownerId, basis.scope.category, basis.scope.brand, basis.scope.model, durationCode, pricing.key, pricing.version,
         price ? "available" : "unavailable", reason, price?.amount ?? null, price?.rawAmount ?? null,
         price?.factors.competitionMilli ?? null, price?.factors.demandMilli ?? null, price?.factors.scarcityMilli ?? null, price?.factors.durationMilli ?? null,
-        counts.competing_sellers, counts.compatible_buyers, reachableBuyers, slotsTotal, slotsUsed, validitySeconds,
+        counts.competing_sellers, counts.compatible_buyers, reachableBuyers, slotsTotal, slotsUsed, validitySeconds, reachTruncated,
       ],
     );
     return { ...mapQuote(inserted.rows[0]), reused: false };

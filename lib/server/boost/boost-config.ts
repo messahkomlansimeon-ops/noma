@@ -57,3 +57,23 @@ export const BOOST_EXPIRY_MAX_LIMIT = 1_000;
 
 /** Au-delà de ce retard (secondes), un boost échu resté `active` déclenche l'avertissement `boost_expiry_overdue` du statut. */
 export const BOOST_EXPIRY_OVERDUE_SECONDS = 600;
+
+/**
+ * Espace du verrou consultatif par VENDEUR qui sérialise le comptage et l'écriture d'un devis calculé (limite de débit, lot P3) : pris APRÈS le
+ * verrou de cotation de l'offre, tenu quelques millisecondes (comptage + INSERT). Distinct de 1_314_664_945 à 951.
+ */
+export const BOOST_QUOTE_RATE_NAMESPACE = 1_314_664_952;
+
+/** Limite de débit des devis : au plus `BOOST_QUOTE_RATE_LIMIT` devis CALCULÉS (écrits) par vendeur sur `BOOST_QUOTE_RATE_WINDOW_SECONDS` secondes. */
+export const BOOST_QUOTE_RATE_LIMIT = 20;
+export const BOOST_QUOTE_RATE_WINDOW_SECONDS = 60;
+
+/**
+ * Calculs de portée simultanés (par processus) : au-delà, les demandes de devis attendent un créneau au plus `BOOST_REACH_QUEUE_WAIT_MS`, puis
+ * sont refusées (503). Garde des connexions du pool et de la boucle d'événements pour les autres requêtes (porte-monnaie, annonces…).
+ */
+export const BOOST_REACH_MAX_CONCURRENCY = 4;
+export const BOOST_REACH_QUEUE_WAIT_MS = 5_000;
+
+/** `Retry-After` (secondes) d'une vérification de portée non terminée à temps (`reach_check_unavailable`, lot P3-bis) : court, la nouvelle tentative est légère. */
+export const BOOST_REACH_RETRY_AFTER_SECONDS = 2;

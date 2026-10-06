@@ -20,6 +20,7 @@ import { checkWalletIntegrity, runWalletCheck, type WalletCheckReport } from "..
 import { WalletError } from "../../lib/server/wallet/errors";
 import { readWalletBalance, readWalletOverview, recordWalletTransaction } from "../../lib/server/wallet/ledger";
 import { applyProviderEvent, createTopupIntent, type ProviderEvent } from "../../lib/server/wallet/topups";
+import { addReachableBuyer, insertEvaluation } from "./boost-fixtures";
 import { runScript } from "./run-script";
 import {
   createTemporarySchemaName, openVerifiedIsolatedPool, openVerifiedTestDatabase, quoteTemporarySchema, type DedicatedTestDatabase,
@@ -162,6 +163,16 @@ interface QuoteOptions {
   /** Secondes avant l'échéance (négatif : déjà échue). */
   expiresInSeconds?: number;
   sellerId?: string;
+  /** Faux : l'offre n'a AUCUN acheteur qui la verrait monter (par défaut un acheteur atteignable existe : l'achat revérifie la portée, lot P3). */
+  reachable?: boolean;
+}
+
+/** Offres qui ont déjà un acheteur atteignable (une fois par offre, quel que soit le nombre de cotations). */
+const reachableOffers = new Set<string>();
+async function ensureReachable(offer: OfferRecord, db: Pool): Promise<void> {
+  if (reachableOffers.has(offer.id)) return;
+  reachableOffers.add(offer.id);
+  await addReachableBuyer(db, offer);
 }
 
 /** Cotation insérée directement (lignes immuables : seul le code les écrit en production). Le prix est celui qu'on donne. */
@@ -185,6 +196,7 @@ async function insertQuote(offer: OfferRecord, options: QuoteOptions = {}, db: P
       available ? 1000 : null, available ? 1000 : null, available ? 1000 : null, available ? 1000 : null, expiresIn,
     ],
   );
+  if (options.reachable !== false) await ensureReachable(offer, db);
   return id;
 }
 
@@ -299,14 +311,14 @@ async function tamperPurchasedBoost(boostId: string, assignments: string): Promi
 
 // ═════════════ 1. Migration 0015 ═════════════
 
-test("migration 0015 (suivie de 0016) : 16 appliquées, la relance n'en applique aucune, tables, index et déclencheurs présents", async () => {
-  assert.equal(firstMigration.applied.length, 16);
+test("migration 0015 (suivie de 0016 et 0017) : 17 appliquées, la relance n'en applique aucune, tables, index et déclencheurs présents", async () => {
+  assert.equal(firstMigration.applied.length, 17);
   assert.ok(firstMigration.applied.includes("0015_boost_purchases"));
-  assert.equal(firstMigration.applied.at(-1), "0016_boost_quote_reach");
+  assert.equal(firstMigration.applied.at(-1), "0017_boost_quote_reach_truncated");
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 16);
-  assert.equal(rerun.skipped.at(-1), "0016_boost_quote_reach");
+  assert.equal(rerun.skipped.length, 17);
+  assert.equal(rerun.skipped.at(-1), "0017_boost_quote_reach_truncated");
   assert.equal(await countRows("boost_purchases"), 0);
 
   const columns = (await pool.query<{ column_name: string; is_nullable: string; data_type: string }>(
@@ -1948,8 +1960,251 @@ test("une cotation déjà achetée n'est JAMAIS réutilisée par quoteOfferBoost
   const fresh = await quoteAgain();
   assert.ok(fresh.id !== world.quoteId && fresh.id !== after.id);
   assert.equal(fresh.reused, false);
-  assert.equal(fresh.unavailableReason, "no_compatible_buyer", "plus de boost actif : la raison est celle du marché (aucun acheteur dans ce schéma)");
+  assert.deepEqual([fresh.status, fresh.unavailableReason], ["available", null], "plus de boost actif : cotation normale (un acheteur atteignable existe dans ce monde de test, lot P3)");
   await expectRefusal("la cotation achetée puis remboursée reste consommée", () => buy(world), "quote_already_used");
+});
+
+// ═════════════ 12b. Portée REVÉRIFIÉE à l'achat (lot P3) ═════════════
+
+const placementOf = async (demand: DemandRecord, buyerId: string) => (await listStoredOfferMatchesForDemand(buyerId, demand.id, { sort: "relevance", limit: 100 }, pool)).items;
+
+test("portée revérifiée à l'achat — le scénario B de l'audit : D achète en premier (atteignable), puis A (mieux classé, devis calculé AVANT l'achat de D) → no_visible_effect au devis ET à l'achat avec le devis réutilisé ; D garde sa place sponsorisée, aucun débit pour A", async () => {
+  // Liste de 8 offres (quota floor(0,15 × 8) = 1), périmètre à 2 places : A (classée avant D) et D du même périmètre, 6 remplissages.
+  const scope = makeScope();
+  await setCategorySettings(scope.category, { min_slots: 2, max_slots: 5, max_active_per_seller: 2, max_seller_slot_share: 1 });
+  try {
+    const sellerA = await makeUser();
+    const sellerD = await makeUser();
+    const offerA = await makeOffer({ ownerId: sellerA, scope });
+    const offerD = await makeOffer({ ownerId: sellerD, scope });
+    const buyer = await addReachableBuyer(pool, offerA, { listSize: 7, offerScore: 95 });
+    await insertEvaluation(pool, { offer: offerD, demand: buyer.demand, score: 90 });
+    const organic = await placementOf(buyer.demand, buyer.buyerId);
+    assert.equal(organic.length, 8, "liste de 8 offres");
+    const indexOf = (offer: OfferRecord) => organic.findIndex((item) => item.candidateId === offer.id);
+    assert.ok(indexOf(offerA) < indexOf(offerD), "A est mieux classée que D");
+    assert.ok(indexOf(offerD) > 0 && indexOf(offerA) > 0, "ni A ni D n'est déjà en tête : un boost les ferait monter");
+    await fund(sellerA, 20_000);
+    await fund(sellerD, 20_000);
+
+    // Le devis d'A est calculé AVANT l'achat de D (réel : aucun boost, A atteignable) ; il est disponible.
+    const quoteA = await quoteOfferBoost({ pool, ownerId: sellerA, offerId: offerA.id, durationCode: "24h" });
+    assert.deepEqual([quoteA.status, quoteA.inputs.reachableBuyers], ["available", 1], "avant l'achat de D, A est atteignable");
+    // D achète : son devis réel est disponible (D est atteignable tant qu'aucun boost n'existe) et l'achat réussit.
+    const quoteD = await quoteOfferBoost({ pool, ownerId: sellerD, offerId: offerD.id, durationCode: "24h" });
+    assert.equal(quoteD.status, "available");
+    const bought = await purchaseOfferBoost({ pool, sellerId: sellerD, offerId: offerD.id, quoteId: quoteD.id, idempotencyKey: randomUUID() });
+    assert.equal(bought.reused, false);
+    const balanceA = await balanceOf(sellerA);
+    const balanceD = await balanceOf(sellerD);
+
+    // D est SPONSORISÉ dans la liste de l'acheteur.
+    const afterD = await placementOf(buyer.demand, buyer.buyerId);
+    assert.equal(afterD.find((item) => item.candidateId === offerD.id)!.sponsored, true, "D est sponsorisé");
+    assert.equal(afterD[0].candidateId, offerD.id, "D est promu en tête");
+
+    // A achète avec son devis (calculé avant, encore valable) : revérification à l'achat → no_visible_effect, rien n'est écrit.
+    await expectRefusal("A achète avec son devis réutilisé", () => purchaseOfferBoost({
+      pool, sellerId: sellerA, offerId: offerA.id, quoteId: quoteA.id, idempotencyKey: randomUUID(),
+    }), "no_visible_effect");
+    assert.equal(await balanceOf(sellerA), balanceA, "aucun débit pour A");
+    assert.equal(await balanceOf(sellerD), balanceD, "D n'est pas touché");
+    assert.equal(await countRows("offer_boosts", "offer_id = $1", [offerA.id]), 0, "aucun boost pour A");
+    assert.equal(await countRows("boost_purchases", "seller_id = $1", [sellerA]), 0, "aucun achat pour A");
+    assert.equal(await countRows("boost_purchases", "quote_id = $1", [quoteA.id]), 0, "le devis d'A n'est pas consommé");
+    // D n'a pas été évincé : toujours promu, toujours en tête ; A n'est pas sponsorisée.
+    const afterA = await placementOf(buyer.demand, buyer.buyerId);
+    assert.equal(afterA.find((item) => item.candidateId === offerD.id)!.sponsored, true, "D reste sponsorisé");
+    assert.equal(afterA.find((item) => item.candidateId === offerA.id)!.sponsored, false);
+    assert.deepEqual(afterA.map((item) => item.candidateId), afterD.map((item) => item.candidateId), "l'ordre servi n'a pas changé");
+    // Un NOUVEAU devis pour A dit la même chose : indisponible, aucun effet visible.
+    const freshA = await quoteOfferBoost({ pool, ownerId: sellerA, offerId: offerA.id, durationCode: "3d" });
+    assert.deepEqual([freshA.status, freshA.unavailableReason, freshA.inputs.reachableBuyers], ["unavailable", "no_visible_effect", 0], "le devis aussi");
+    await assertWalletGreen("après le scénario B");
+  } finally {
+    await pool.query("DELETE FROM boost_settings WHERE key = $1", [scope.category]);
+  }
+});
+
+test("devis réutilisé revérifié (lot P3-bis, N1) — la boucle de l'audit : D achète, A (devis disponible calculé avant) est refusée à l'achat ; redemander le devis ne rend PLUS le même devis « disponible » : un devis neuf indisponible (aucun effet visible), puis plus aucune boucle ; la place libérée et l'indisponible échu, le devis encore valable redevient réutilisable", async () => {
+  const scope = makeScope();
+  await setCategorySettings(scope.category, { min_slots: 2, max_slots: 5, max_active_per_seller: 2, max_seller_slot_share: 1 });
+  try {
+    const sellerA = await makeUser();
+    const sellerD = await makeUser();
+    const offerA = await makeOffer({ ownerId: sellerA, scope });
+    const offerD = await makeOffer({ ownerId: sellerD, scope });
+    const buyer = await addReachableBuyer(pool, offerA, { listSize: 7, offerScore: 95 });
+    await insertEvaluation(pool, { offer: offerD, demand: buyer.demand, score: 90 });
+    await fund(sellerA, 20_000);
+    await fund(sellerD, 20_000);
+    const quoteOf = (owner: string, offer: OfferRecord) => quoteOfferBoost({ pool, ownerId: owner, offerId: offer.id, durationCode: "24h" });
+
+    const quoteA = await quoteOf(sellerA, offerA);
+    assert.deepEqual([quoteA.status, quoteA.inputs.reachableBuyers, quoteA.reused], ["available", 1, false]);
+    // Tant que la portée tient, le MÊME devis est renvoyé (revérifié : toujours atteignable).
+    const stillOk = await quoteOf(sellerA, offerA);
+    assert.deepEqual([stillOk.id, stillOk.reused, stillOk.status], [quoteA.id, true, "available"], "portée intacte : réutilisé comme avant");
+    // D achète avant A : la place sponsorisée de l'acheteur est prise.
+    const quoteD = await quoteOf(sellerD, offerD);
+    await purchaseOfferBoost({ pool, sellerId: sellerD, offerId: offerD.id, quoteId: quoteD.id, idempotencyKey: randomUUID() });
+    await expectRefusal("A achète avec son devis calculé avant", () => purchaseOfferBoost({
+      pool, sellerId: sellerA, offerId: offerA.id, quoteId: quoteA.id, idempotencyKey: randomUUID(),
+    }), "no_visible_effect");
+
+    // A redemande le devis (même durée) : PLUS le même devis « disponible ».
+    const again = await quoteOf(sellerA, offerA);
+    assert.notEqual(again.id, quoteA.id, "le devis périmé n'est plus rendu");
+    assert.deepEqual([again.status, again.unavailableReason, again.amount, again.inputs.reachableBuyers, again.reused], ["unavailable", "no_visible_effect", null, 0, false]);
+    // Aucune boucle : la demande suivante renvoie ce devis indisponible (60 s), jamais un « disponible » ; rien de nouveau n'est écrit.
+    const rows = await countRows("boost_quotes", "offer_id = $1", [offerA.id]);
+    const third = await quoteOf(sellerA, offerA);
+    assert.deepEqual([third.id, third.status, third.reused], [again.id, "unavailable", true]);
+    assert.equal(await countRows("boost_quotes", "offer_id = $1", [offerA.id]), rows);
+    // Le devis d'avant n'est ni modifié ni consommé (lignes immuables) ; il reste simplement non réutilisé tant que la portée ne tient pas.
+    assert.equal(await countRows("boost_purchases", "quote_id = $1", [quoteA.id]), 0);
+
+    // La place revient (le boost de D est annulé) et l'indisponible échoit : le devis d'origine, encore valable, est de nouveau réutilisable (revérifié atteignable).
+    const boostD = await pool.query<{ id: string }>("SELECT id FROM offer_boosts WHERE offer_id = $1", [offerD.id]);
+    await cancelOfferBoost({ pool, boostId: boostD.rows[0].id, ownerId: sellerD });
+    await pool.query("UPDATE boost_quotes SET computed_at = clock_timestamp() - interval '2 hours', expires_at = clock_timestamp() - interval '1 hour' WHERE id = $1", [again.id]);
+    const back = await quoteOf(sellerA, offerA);
+    assert.deepEqual([back.id, back.status, back.reused], [quoteA.id, "available", true]);
+    const bought = await purchaseOfferBoost({ pool, sellerId: sellerA, offerId: offerA.id, quoteId: quoteA.id, idempotencyKey: randomUUID() });
+    assert.equal(bought.reused, false);
+    await assertWalletGreen("après la boucle de l'audit");
+  } finally {
+    await pool.query("DELETE FROM boost_settings WHERE key = $1", [scope.category]);
+  }
+});
+
+test("portée revérifiée à l'achat : sans acheteur atteignable (liste devenue courte) → no_visible_effect, rien d'écrit, le devis reste utilisable ; la liste rétablie, le MÊME devis s'achète", async () => {
+  const world = await setup({ credit: 10_000 });
+  // Le seul acheteur de l'offre voit sa demande satisfaite : plus aucun acheteur compatible.
+  await pool.query("UPDATE demands SET status = 'satisfied' WHERE id IN (SELECT demand_id FROM matching_evaluations WHERE offer_id = $1)", [world.offer.id]);
+  await expectRefusal("aucun acheteur atteignable", () => buy(world), "no_visible_effect");
+  assert.equal(await countRows("boost_purchases", "quote_id = $1", [world.quoteId]), 0);
+  await pool.query("UPDATE demands SET status = 'active' WHERE id IN (SELECT demand_id FROM matching_evaluations WHERE offer_id = $1)", [world.offer.id]);
+  const bought = await buy(world);
+  assert.equal(bought.reused, false);
+  assert.equal(bought.boost.source, "purchase");
+});
+
+test("portée revérifiée à l'achat : un REJEU de la même clé renvoie l'achat déjà fait (aucune revérification, aucun débit) même quand plus aucun acheteur n'est atteignable", async () => {
+  const world = await setup({ credit: 10_000 });
+  const key = randomUUID();
+  const first = await buy(world, { idempotencyKey: key });
+  await pool.query("UPDATE demands SET status = 'satisfied' WHERE id IN (SELECT demand_id FROM matching_evaluations WHERE offer_id = $1)", [world.offer.id]);
+  const balance = await balanceOf(world.sellerId);
+  const replay = await buy(world, { idempotencyKey: key });
+  assert.equal(replay.reused, true);
+  assert.equal(replay.purchase.id, first.purchase.id);
+  assert.equal(await balanceOf(world.sellerId), balance);
+});
+
+test("portée revérifiée à l'achat : SOUS le verrou du périmètre (verrous de périmètre et d'idempotence tenus, verrou de cotation jamais), après les contrôles de places et AVANT le débit (ordre des étapes)", async () => {
+  const world = await setup({ credit: 10_000 });
+  const observer = (await distinctPools(1))[0];
+  let seen: { scope: number; idempotency: number; quote: number } | null = null;
+  // Ordre des étapes de l'achat : le débit est invisible depuis une autre connexion avant le COMMIT, c'est donc l'ORDRE des crochets qui prouve que la revérification
+  // précède le débit : portée (besoin n° 0) → « juste avant le débit » → « juste après le débit ».
+  const events: string[] = [];
+  const bought = await buy(world, {
+    hooks: {
+      beforeReachDemand: async (index) => {
+        events.push(`portée:${index}`);
+        if (index !== 0) return;
+        const locks = await observer.query<{ namespace: number }>("SELECT classid::int AS namespace FROM pg_locks WHERE locktype = 'advisory' AND granted AND classid IN (1314664948, 1314664949, 1314664951)");
+        const count = (namespace: number) => locks.rows.filter((row) => row.namespace === namespace).length;
+        seen = { scope: count(1_314_664_948), idempotency: count(1_314_664_951), quote: count(1_314_664_949) };
+      },
+      beforeDebit: async () => { events.push("avant-débit"); },
+      afterDebit: async () => { events.push("après-débit"); },
+    },
+  });
+  assert.deepEqual(seen, { scope: 1, idempotency: 1, quote: 0 }, "pendant la revérification : périmètre et idempotence tenus, cotation jamais");
+  assert.deepEqual(events, ["portée:0", "avant-débit", "après-débit"], "la revérification de la portée précède le débit");
+  assert.equal(bought.reused, false);
+});
+
+test("portée revérifiée à l'achat (lot P3-bis, N3) : budget épuisé SANS acheteur trouvé → reach_check_unavailable (503), jamais no_visible_effect : aucune écriture, devis non consommé ; la MÊME clé réessayée aboutit ; budget suffisant → l'achat passe", async () => {
+  const world = await setup({ credit: 10_000 });
+  // Horloge factice : chaque lecture avance de 2 000 ms (budget 1 500 ms) → épuisé avant le premier besoin ; avance de 600 ms → le premier besoin est examiné.
+  const ticking = (step: number) => { let t = 0; return () => (t += step); };
+  const key = randomUUID();
+  await expectRefusal("budget épuisé avant le premier besoin", () => buy(world, { idempotencyKey: key, hooks: { reachBudgetMs: 1_500, reachClock: ticking(2_000) } }), "reach_check_unavailable");
+  assert.equal(await countRows("boost_purchases", "seller_id = $1", [world.sellerId]), 0);
+  assert.equal(await countRows("offer_boosts", "offer_id = $1", [world.offer.id]), 0);
+  assert.equal(await countRows("boost_purchases", "quote_id = $1", [world.quoteId]), 0, "le devis n'est pas consommé");
+  assert.equal(await balanceOf(world.sellerId), BigInt(10_000), "aucun débit");
+  await assertWalletGreen("après un 503 de vérification");
+  // Même clé d'idempotence, vérification qui aboutit : l'achat passe (une seule fois).
+  const bought = await buy(world, { idempotencyKey: key, hooks: { reachBudgetMs: 1_500, reachClock: ticking(600) } });
+  assert.equal(bought.purchase.quoteId, world.quoteId);
+  assert.equal(bought.reused, false);
+  assert.equal(await countRows("boost_purchases", "seller_id = $1", [world.sellerId]), 1);
+  await assertWalletGreen("après la relance avec la même clé");
+});
+
+test("portée revérifiée à l'achat (lot P3-bis, N3) : un verrou RÉEL tenu sur matching_evaluations (la lecture est bloquée, statement_timeout) → reach_check_unavailable vite, rien d'écrit ; le verrou relâché, la même clé aboutit ; no_visible_effect reste réservé au cas démontré", async () => {
+  const world = await setup({ credit: 10_000 });
+  const [holder] = await distinctPools(1);
+  const lockClient = await holder.connect();
+  const key = randomUUID();
+  try {
+    await lockClient.query("BEGIN");
+    await lockClient.query("LOCK TABLE matching_evaluations IN ACCESS EXCLUSIVE MODE");
+    const startedAt = Date.now();
+    await expectRefusal("lecture des évaluations bloquée", () => buy(world, { idempotencyKey: key, hooks: { reachBudgetMs: 400 } }), "reach_check_unavailable");
+    assert.ok(Date.now() - startedAt < 2_500, `refus borné par le budget (${Date.now() - startedAt} ms)`);
+  } finally {
+    await lockClient.query("ROLLBACK").catch(() => {});
+    lockClient.release();
+  }
+  const bought = await buy(world, { idempotencyKey: key });
+  assert.equal(bought.reused, false);
+  assert.equal(await countRows("boost_purchases", "seller_id = $1", [world.sellerId]), 1);
+  // Cas DÉMONTRÉ : plus aucun acheteur compatible, aucune interruption → no_visible_effect (et non reach_check_unavailable).
+  const other = await setup({ credit: 10_000 });
+  await pool.query("UPDATE demands SET status = 'satisfied' WHERE id IN (SELECT demand_id FROM matching_evaluations WHERE offer_id = $1)", [other.offer.id]);
+  await expectRefusal("aucun acheteur démontré", () => buy(other), "no_visible_effect");
+  await assertWalletGreen("après le verrou réel");
+});
+
+test("portée revérifiée à l'achat (lot P3-bis) : des acheteurs trouvés avant l'épuisement du budget → l'achat passe (le budget épuisé n'est un refus que sans acheteur démontré)", async () => {
+  const world = await setup({ credit: 10_000 });
+  let t = 0;
+  // 1er besoin examiné à 100 ms (budget 150 ms), il est atteignable : mode « premier » s'arrête dessus, jamais d'épuisement constaté.
+  const bought = await buy(world, { hooks: { reachBudgetMs: 150, reachClock: () => (t += 50) } });
+  assert.equal(bought.reused, false);
+  assert.equal(bought.purchase.quoteId, world.quoteId);
+});
+
+test("portée revérifiée à l'achat : un boost PLUS ANCIEN dans la liste de l'acheteur garde le quota ; l'ordre d'attribution fait foi (le boost attribué d'abord est servi d'abord)", async () => {
+  // Liste de 7 (quota 1) : une offre d'un autre vendeur du périmètre est boostée (attribution) AVANT l'achat → la liste n'a plus de place pour l'acheté.
+  const scope = makeScope();
+  await setCategorySettings(scope.category, { min_slots: 3, max_slots: 5, max_active_per_seller: 2, max_seller_slot_share: 1 });
+  try {
+    const sellerA = await makeUser();
+    const offerA = await makeOffer({ ownerId: sellerA, scope });
+    const other = await makeOffer({ scope });
+    const buyer = await addReachableBuyer(pool, offerA, { listSize: 6, offerScore: 95 });
+    await insertEvaluation(pool, { offer: other, demand: buyer.demand, score: 90 });
+    await fund(sellerA, 10_000);
+    const quoteA = await insertQuote(offerA, { reachable: false });
+    // Un boost plus ancien sur `other` (attribution d'administration) : quota 1 (liste de 7) consommé.
+    await grantOfferBoost({ pool, offerId: other.id, ownerId: other.ownerId, durationCode: "24h", source: "admin_grant" });
+    await expectRefusal("le quota de la liste est pris par un boost plus ancien", () => purchaseOfferBoost({
+      pool, sellerId: sellerA, offerId: offerA.id, quoteId: quoteA, idempotencyKey: randomUUID(),
+    }), "no_visible_effect");
+    // Le boost plus ancien est annulé : la place revient, le MÊME devis s'achète.
+    const boost = await pool.query<{ id: string }>("SELECT id FROM offer_boosts WHERE offer_id = $1", [other.id]);
+    await cancelOfferBoost({ pool, boostId: boost.rows[0].id, ownerId: other.ownerId });
+    const bought = await purchaseOfferBoost({ pool, sellerId: sellerA, offerId: offerA.id, quoteId: quoteA, idempotencyKey: randomUUID() });
+    assert.equal(bought.reused, false);
+  } finally {
+    await pool.query("DELETE FROM boost_settings WHERE key = $1", [scope.category]);
+  }
 });
 
 // ═════════════ 13. Cohérence finale ═════════════

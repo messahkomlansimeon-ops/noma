@@ -30,7 +30,7 @@ function availableQuote(overrides: Partial<BoostQuote> = {}): BoostQuote {
     amount: 2300,
     unavailableReason: null,
     factors: { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 },
-    inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, slotsTotal: 3, slotsUsed: 1 },
+    inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, reachTruncated: false, slotsTotal: 3, slotsUsed: 1 },
     computedAt: "2031-01-01T09:55:00.000Z",
     expiresAt: "2031-01-01T10:10:00.000Z",
     reused: false,
@@ -90,7 +90,13 @@ describe("motifs d'indisponibilité en clair", () => {
     assert.equal(unavailableReasonText("no_slot_available"), "Il n'y a plus de place disponible pour ce produit pour le moment.");
     assert.equal(unavailableReasonText("seller_boost_limit_reached"), "Vous avez atteint votre plafond de boosts pour ce produit.");
     assert.equal(unavailableReasonText("no_compatible_buyer"), "Aucun acheteur compatible pour le moment : un boost ne serait pas utile.");
-    assert.equal(unavailableReasonText("no_visible_effect"), "Pas encore assez d'annonces comparables : un boost ne changerait rien à l'ordre des résultats.");
+    assert.equal(unavailableReasonText("no_visible_effect"), "Pour le moment, un boost ne ferait monter votre annonce chez aucun acheteur : leurs listes sont trop courtes, ou la place mise en avant y est déjà occupée par un boost acheté plus tôt.");
+    // Lot P3-bis (N2) : texte neutre : il couvre « listes trop courtes » ET « place prise par un boost acheté plus tôt » ; l'ancien texte (« pas assez d'annonces comparables ») est faux dans le second cas.
+    const noEffect = unavailableReasonText("no_visible_effect");
+    assert.match(noEffect, /trop courtes/);
+    assert.match(noEffect, /déjà occupée par un boost acheté plus tôt/);
+    assert.equal(noEffect.includes("comparables"), false);
+    assert.equal(noEffect.includes("ordre des résultats"), false);
     for (const [code, text] of Object.entries(UNAVAILABLE_REASON_TEXT)) {
       assert.notEqual(text, code);
       assert.equal(text.includes("_"), false, `« ${text} » contient un code brut`);
@@ -140,7 +146,7 @@ describe("montant et explication des facteurs", () => {
 
   test("portée visible : « Mise en avant visible auprès de X acheteur(s) » (pluriel, zéro), rien pour un devis non évalué ; jamais un code brut", () => {
     const reach = (reachableBuyers: number | null) =>
-      explainFactors(availableQuote({ inputs: { competingSellers: 1, compatibleBuyers: 5, reachableBuyers, slotsTotal: 2, slotsUsed: 0 } })).filter((line) => line.key === "reach");
+      explainFactors(availableQuote({ inputs: { competingSellers: 1, compatibleBuyers: 5, reachableBuyers, reachTruncated: false, slotsTotal: 2, slotsUsed: 0 } })).filter((line) => line.key === "reach");
     assert.deepEqual(reach(1).map((line) => line.text), ["Mise en avant visible auprès de 1 acheteur."]);
     assert.deepEqual(reach(3).map((line) => line.text), ["Mise en avant visible auprès de 3 acheteurs."]);
     assert.deepEqual(reach(0).map((line) => line.text), ["Mise en avant visible auprès de 0 acheteur."]);
@@ -148,12 +154,21 @@ describe("montant et explication des facteurs", () => {
     assert.equal(JSON.stringify(reach(3)).includes("reachable"), false);
   });
 
+  test("portée estimée et bornée (lot P3) : « au moins X acheteur(s) » quand l'estimation est tronquée, jamais sinon", () => {
+    const reach = (reachableBuyers: number | null, reachTruncated: boolean) =>
+      explainFactors(availableQuote({ inputs: { competingSellers: 1, compatibleBuyers: 50, reachableBuyers, reachTruncated, slotsTotal: 2, slotsUsed: 0 } })).filter((line) => line.key === "reach");
+    assert.deepEqual(reach(20, true).map((line) => line.text), ["Mise en avant visible auprès d'au moins 20 acheteurs."]);
+    assert.deepEqual(reach(1, true).map((line) => line.text), ["Mise en avant visible auprès d'au moins 1 acheteur."]);
+    assert.deepEqual(reach(20, false).map((line) => line.text), ["Mise en avant visible auprès de 20 acheteurs."]);
+    assert.deepEqual(reach(null, true), [], "portée non évaluée : aucune ligne, même si le drapeau est vrai");
+  });
+
   test("accords au singulier et cas sans concurrent", () => {
     const lines = explainFactors(
       availableQuote({
         durationCode: "24h",
         factors: { competitionMilli: 1000, demandMilli: 1000, scarcityMilli: 1000, durationMilli: 1000 },
-        inputs: { competingSellers: 0, compatibleBuyers: 1, reachableBuyers: 1, slotsTotal: 1, slotsUsed: 0 },
+        inputs: { competingSellers: 0, compatibleBuyers: 1, reachableBuyers: 1, reachTruncated: false, slotsTotal: 1, slotsUsed: 0 },
       }),
     );
     assert.equal(lines[0].text, "Aucun autre vendeur ne propose ce produit.");
@@ -161,7 +176,7 @@ describe("montant et explication des facteurs", () => {
     assert.equal(lines[2].text, "0 place de mise en avant utilisée sur 1.");
     assert.equal(lines[3].effect, "durée de référence (prix de base)");
     assert.equal(lines[4].text, "Mise en avant visible auprès de 1 acheteur.", "singulier");
-    assert.equal(explainFactors(availableQuote({ inputs: { competingSellers: 1, compatibleBuyers: 2, reachableBuyers: 2, slotsTotal: 3, slotsUsed: 2 } }))[0].text, "1 autre vendeur propose ce produit.");
+    assert.equal(explainFactors(availableQuote({ inputs: { competingSellers: 1, compatibleBuyers: 2, reachableBuyers: 2, reachTruncated: false, slotsTotal: 3, slotsUsed: 2 } }))[0].text, "1 autre vendeur propose ce produit.");
   });
 
   test("devis indisponible : aucune ligne de facteur", () => {

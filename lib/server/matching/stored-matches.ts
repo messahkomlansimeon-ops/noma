@@ -6,13 +6,13 @@ import { CatalogValidationError } from "../catalog/errors";
 import { mapDemand, mapOffer, type DemandRow, type OfferRow } from "../catalog/shared";
 import type { DemandRecord, OfferRecord } from "../catalog/types";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
-import { readBoostSettings, readEffectiveBoostsByOffer } from "../boost/boosts";
+import { rankEffectiveBoosts, readBoostSettings, readEffectiveBoostDetails } from "../boost/boosts";
 import { recordBoostExposures, type BoostExposureBatch, type BoostExposureRow } from "../boost/exposures";
 import { placeBoostedItems } from "../boost/placement";
 import { validateCandidateLimit } from "./candidates";
 import {
   computeAvailabilityIndicator, computeConfidenceIndicator, computePriceIndicator, computeRelevance,
-  type AvailabilityIndicator, type ConfidenceIndicator, type PriceIndicator, type RelevanceSense,
+  type AvailabilityIndicator, type ConfidenceIndicator, type MarketReference, type PriceIndicator, type RelevanceSense,
 } from "./indicators";
 import { readMarketReferences, type MarketQuery } from "./market";
 import { RELEVANCE_CONFIG, RELEVANCE_WINDOW } from "./relevance-config";
@@ -417,19 +417,35 @@ interface OwnerFacts {
   phoneVerified: boolean;
 }
 
-/** Vérification du téléphone et ancienneté des propriétaires des candidats : une requête pour toute la liste. */
-async function readOwnerFacts(client: SqlExecutor, ownerIds: readonly string[]): Promise<Map<string, OwnerFacts>> {
-  const facts = new Map<string, OwnerFacts>();
-  if (ownerIds.length === 0) return facts;
+/**
+ * Vérification du téléphone et ancienneté des propriétaires des candidats : une requête pour toute la liste. Avec `known` (portée d'un
+ * boost, lot P3 : plusieurs listes d'acheteurs lues de suite dans le MÊME instantané), seuls les propriétaires pas encore lus sont demandés ;
+ * le résultat est le même, sans relire ce qui ne dépend pas de la demande.
+ */
+async function readOwnerFacts(client: SqlExecutor, ownerIds: readonly string[], known?: Map<string, OwnerFacts>): Promise<Map<string, OwnerFacts>> {
+  const facts = known ?? new Map<string, OwnerFacts>();
+  const missing = [...new Set(ownerIds)].filter((id) => !facts.has(id));
+  if (missing.length === 0) return facts;
   const result = await client.query<{ id: string; created_at: Date; phone_verified: boolean }>(
     `SELECT u.id, u.created_at,
             EXISTS (SELECT 1 FROM phone_identities p WHERE p.user_id = u.id AND p.verified_at IS NOT NULL) AS phone_verified
        FROM users u WHERE u.id = ANY($1::uuid[])`,
-    [[...new Set(ownerIds)]],
+    [missing],
   );
   for (const row of result.rows) facts.set(row.id, { createdAt: row.created_at, phoneVerified: row.phone_verified });
   return facts;
 }
+
+/**
+ * Éléments qui ne dépendent PAS de la demande (propriétaires, marché observé de chaque offre) et que la portée d'un boost relit pour chaque
+ * liste d'acheteur d'une même cotation : mémorisés entre deux lectures du MÊME instantané. Jamais partagé entre deux requêtes de l'utilisateur.
+ */
+export interface OrganicReadCache {
+  owners: Map<string, OwnerFacts>;
+  markets: Map<string, MarketReference>;
+}
+
+export const createOrganicReadCache = (): OrganicReadCache => ({ owners: new Map(), markets: new Map() });
 
 /**
  * Items + indicateurs + pertinence pour des lignes déjà lues. Faits relus dans le MÊME instantané : marché (une requête,
@@ -443,17 +459,27 @@ async function buildItems<TCandidate extends OfferRecord | DemandRecord, TRow ex
     rows: Array<CandidateRow<TRow>>;
     mapCandidate: (row: TRow) => TCandidate;
     now: Date;
+    cache?: OrganicReadCache;
   },
 ): Promise<Array<RankedItem<TCandidate>>> {
   const candidates = input.rows.map((row) => input.mapCandidate(row));
-  const owners = await readOwnerFacts(client, candidates.map((candidate) => candidate.ownerId));
+  const owners = await readOwnerFacts(client, candidates.map((candidate) => candidate.ownerId), input.cache?.owners);
   // Sens demande : l'acheteur voit des OFFRES, dont le prix se situe par rapport au marché observé.
   const senseIsDemandSource = input.sourceKind === "demand";
-  const markets = senseIsDemandSource
-    ? await readMarketReferences(client, (candidates as OfferRecord[]).map((offer): MarketQuery => ({
+  let markets = new Map<string, MarketReference>();
+  if (senseIsDemandSource) {
+    const known = input.cache?.markets;
+    const wanted = (candidates as OfferRecord[]).filter((offer) => !known?.has(offer.id)).map((offer): MarketQuery => ({
       offerId: offer.id, category: offer.category, brand: offer.brand, model: offer.model, currency: offer.price?.currency ?? null,
-    })))
-    : new Map();
+    }));
+    const fetched = wanted.length > 0 ? await readMarketReferences(client, wanted) : new Map<string, MarketReference>();
+    if (known) {
+      for (const [offerId, reference] of fetched) known.set(offerId, reference);
+      markets = known;
+    } else {
+      markets = fetched;
+    }
+  }
   const sense: RelevanceSense = senseIsDemandSource ? "demand_source" : "offer_source";
 
   return input.rows.map((row, index): RankedItem<TCandidate> => {
@@ -543,7 +569,8 @@ interface BoostedOrder<TCandidate extends OfferRecord | DemandRecord> {
  * Boost (brief §15 : compatibles, puis pertinence, puis boost À L'INTÉRIEUR du classement). `organic` est la fenêtre
  * entière déjà triée par pertinence. Sont promouvables les éléments dont l'offre a un boost EFFECTIF à `at` et dont la
  * pertinence atteint le seuil des réglages de la catégorie de la demande ; au plus floor(part promue × N) sont promus,
- * à des positions k × ceil(1 / part), et un promu ne peut que MONTER (« sponsorisé » = a gagné des places). Aucune ligne
+ * à des positions k × ceil(1 / part), le boost le plus ANCIEN d'abord (priorité d'ancienneté, lot P3), et un promu ne peut que MONTER
+ * (« sponsorisé » = a gagné des places). Aucune ligne
  * n'est ajoutée ni retirée : seules des lignes confirmées et fraîches (déjà dans `organic`) peuvent apparaître.
  * Voir BOOST.md.
  */
@@ -552,18 +579,20 @@ async function computeBoostedOrder<TCandidate extends OfferRecord | DemandRecord
   input: { organic: Array<RankedItem<TCandidate>>; demand: DemandRecord; at: Date },
 ): Promise<BoostedOrder<TCandidate>> {
   // Une SEULE lecture des boosts effectifs sert l'ordre servi ET le journal d'exposition : ils ne peuvent pas diverger.
-  const boosts = await readEffectiveBoostsByOffer(client, input.organic.map((entry) => entry.item.candidateId), toIsoMicros(input.at));
+  const boosts = await readEffectiveBoostDetails(client, input.organic.map((entry) => entry.item.candidateId), toIsoMicros(input.at));
   if (boosts.size === 0) return { items: input.organic.map((entry) => entry.item), exposures: [] };
   const settings = await readBoostSettings(client, input.demand.category);
+  // Priorité d'ANCIENNETÉ (lot P3) : à quota insuffisant, la promotion va aux boosts les plus anciens, jamais selon l'ordre organique.
+  const ranks = rankEffectiveBoosts(boosts);
   const placed = placeBoostedItems(
     input.organic,
-    (entry) => boosts.has(entry.item.candidateId) && entry.item.relevance >= settings.minRelevance,
+    (entry) => (entry.item.relevance >= settings.minRelevance ? ranks.get(entry.item.candidateId) ?? null : null),
     settings.maxPromotedShare,
   );
   const organicPosition = new Map(input.organic.map((entry, index) => [entry.item.candidateId, index]));
   const exposures: BoostExposureRow[] = [];
   placed.forEach(({ item, promoted }, position) => {
-    const boostId = boosts.get(item.item.candidateId);
+    const boostId = boosts.get(item.item.candidateId)?.boostId;
     if (boostId === undefined) return;
     exposures.push({
       boostId, offerId: item.item.candidateId, position, sponsored: promoted,
@@ -749,30 +778,50 @@ export interface DemandOrganicEntry {
 }
 
 /**
- * Nombre d'offres que la lecture des résultats d'une demande servirait (lignes confirmées et fraîches, plafonné à la fenêtre du tri par
- * pertinence) : c'est le N du quota de places promues. Une seule requête, mêmes conditions que `fetchRows`.
+ * Nombre d'offres que la lecture des résultats de CHACUNE de ces demandes servirait (lignes confirmées et fraîches, plafonné à la fenêtre du tri
+ * par pertinence) : c'est le N du quota de places promues. UNE SEULE requête pour toutes les demandes (lot P3 : la portée d'un boost écarte
+ * ainsi les listes dont le quota est nul sans relire leur classement), mêmes conditions que `fetchRows`. Une demande sans ligne vaut 0.
+ * `cap` (1 à la fenêtre, défaut la fenêtre) PLAFONNE le comptage de chaque demande : au plus `cap` lignes sont lues par demande ; le résultat est
+ * min(taille réelle, cap). Un appelant qui n'a besoin que de savoir si la liste atteint un seuil (le quota de places promues est nul sous
+ * ceil(1 / part) offres) passe ce seuil : le coût ne dépend plus de la taille des listes (mesuré : 600 ms pour 50 listes de 200 offres sans plafond).
  */
-export async function countDemandOrganicList(client: SqlExecutor, demandId: string): Promise<number> {
-  const freshness = buildMatchingFreshnessPredicate(resolveMatchingFreshnessParams(), 2);
-  const result = await client.query<{ n: number }>(
+export async function countDemandOrganicLists(client: SqlExecutor, demandIds: readonly string[], cap: number = RELEVANCE_WINDOW): Promise<Map<string, number>> {
+  const bound = Math.min(RELEVANCE_WINDOW, Math.max(1, Math.trunc(cap)));
+  const sizes = new Map<string, number>(demandIds.map((demandId) => [demandId, 0]));
+  if (demandIds.length === 0) return sizes;
+  const freshness = buildMatchingFreshnessPredicate(resolveMatchingFreshnessParams(), 3);
+  const result = await client.query<{ demand_id: string; n: number }>(
     `WITH ${MATCHING_CURRENT_CLOCK_CTE}
-     SELECT count(*)::int AS n
-       FROM ${MATCHING_FRESHNESS_FROM}
-      WHERE e.demand_id = $1::uuid AND e.is_confirmed_match = TRUE
-        AND ${freshness.conditions.join("\n        AND ")}`,
-    [demandId, ...freshness.values],
+     SELECT req.demand_id,
+            (SELECT count(*)::int FROM (
+               SELECT 1
+                 FROM ${MATCHING_FRESHNESS_FROM}
+                WHERE e.demand_id = req.demand_id AND e.is_confirmed_match = TRUE
+                  AND ${freshness.conditions.join("\n                  AND ")}
+                LIMIT $2::int
+             ) counted) AS n
+       FROM unnest($1::uuid[]) AS req(demand_id)`,
+    [[...demandIds], bound, ...freshness.values],
   );
-  return Math.min(result.rows[0]?.n ?? 0, RELEVANCE_WINDOW);
+  for (const row of result.rows) sizes.set(row.demand_id, Math.min(row.n, RELEVANCE_WINDOW));
+  return sizes;
+}
+
+/** Taille de la liste d'UNE demande (voir `countDemandOrganicLists`). */
+export async function countDemandOrganicList(client: SqlExecutor, demandId: string): Promise<number> {
+  return (await countDemandOrganicLists(client, [demandId])).get(demandId) ?? 0;
 }
 
 /**
  * Le classement ORGANIQUE (pertinence décroissante, départage de `compareByRelevance`) que le tri par pertinence servirait à l'acheteur de
  * cette demande, avant tout boost : mêmes lignes (fenêtre `RELEVANCE_WINDOW`), mêmes indicateurs, même pertinence, calculés avec la même
- * fonction que la lecture. `at` est l'horloge des indicateurs. Lecture seule.
+ * fonction que la lecture. `at` est l'horloge des indicateurs. Lecture seule. `cache` (optionnel) évite de relire, pour une autre demande du
+ * MÊME instantané, les propriétaires et le marché de chaque offre : le résultat est identique.
  */
 export async function readDemandOrganicRanking(
   client: SqlExecutor,
   input: { demandId: string; ownerId: string; at: Date },
+  cache?: OrganicReadCache,
 ): Promise<DemandOrganicEntry[]> {
   const demand = await loadSourceDemand(input.ownerId, input.demandId, client);
   const rows = await fetchRows<OfferRow>(client, {
@@ -781,7 +830,7 @@ export async function readDemandOrganicRanking(
   });
   const ranked = await buildItems<OfferRecord, OfferRow>(client, {
     sourceKind: "demand", source: demand, rows: rows.length > RELEVANCE_WINDOW ? rows.slice(0, RELEVANCE_WINDOW) : rows,
-    mapCandidate: mapOffer, now: input.at,
+    mapCandidate: mapOffer, now: input.at, cache,
   });
   ranked.sort(compareByRelevance);
   return ranked.map((entry) => ({ offerId: entry.item.candidateId, relevance: entry.item.relevance }));

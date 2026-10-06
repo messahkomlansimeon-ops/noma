@@ -66,7 +66,8 @@ export const UNAVAILABLE_REASON_TEXT: Readonly<Record<string, string>> = Object.
   no_slot_available: "Il n'y a plus de place disponible pour ce produit pour le moment.",
   seller_boost_limit_reached: "Vous avez atteint votre plafond de boosts pour ce produit.",
   no_compatible_buyer: "Aucun acheteur compatible pour le moment : un boost ne serait pas utile.",
-  no_visible_effect: "Pas encore assez d'annonces comparables : un boost ne changerait rien à l'ordre des résultats.",
+  no_visible_effect:
+    "Pour le moment, un boost ne ferait monter votre annonce chez aucun acheteur : leurs listes sont trop courtes, ou la place mise en avant y est déjà occupée par un boost acheté plus tôt.",
 });
 
 export const UNAVAILABLE_FALLBACK_TEXT = "Le boost n'est pas disponible pour cette annonce pour le moment.";
@@ -140,18 +141,23 @@ export function explainFactors(quote: Pick<BoostQuote, "factors" | "inputs" | "d
       text: `Mise en avant pendant ${durationLabel(quote.durationCode)}.`,
       effect: durationEffect,
     },
-    ...reachLines(quote.inputs.reachableBuyers),
+    ...reachLines(quote.inputs.reachableBuyers, quote.inputs.reachTruncated),
   ];
 }
 
-/** Portée visible : « Mise en avant visible auprès de X acheteur(s) » ; rien pour un devis ancien (non évalué). Elle n'entre pas dans le prix. */
-function reachLines(reachableBuyers: number | null): FactorLine[] {
+/**
+ * Portée visible : « Mise en avant visible auprès de X acheteur(s) » ; « d'au moins X » quand l'estimation a été bornée (des acheteurs n'ont pas
+ * été examinés : le nombre est un minimum) ; rien pour un devis ancien (non évalué). Elle n'entre pas dans le prix.
+ */
+function reachLines(reachableBuyers: number | null, truncated: boolean): FactorLine[] {
   if (reachableBuyers === null) return [];
   return [
     {
       key: "reach",
       title: "Visibilité",
-      text: `Mise en avant visible auprès de ${reachableBuyers} acheteur${plural(reachableBuyers, "", "s")}.`,
+      text: truncated
+        ? `Mise en avant visible auprès d'au moins ${reachableBuyers} acheteur${plural(reachableBuyers, "", "s")}.`
+        : `Mise en avant visible auprès de ${reachableBuyers} acheteur${plural(reachableBuyers, "", "s")}.`,
       effect: "n'entre pas dans le prix",
     },
   ];

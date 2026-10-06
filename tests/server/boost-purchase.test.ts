@@ -57,6 +57,15 @@ test("erreurs de domaine de l'achat : un message fixe par code, sans donnée (ni
   assert.equal(new Set(codes.map((code) => BOOST_ERROR_MESSAGES[code])).size, codes.length, "messages tous différents");
 });
 
+test("erreur de domaine reach_check_unavailable (lot P3-bis) : texte fixe, distinct de no_visible_effect, retriable (jamais un refus définitif), sans donnée", () => {
+  const error = new BoostError("reach_check_unavailable");
+  assert.equal(error.code, "reach_check_unavailable");
+  assert.equal(error.message, "Vérification impossible pour le moment, réessayez dans un instant.");
+  assert.notEqual(BOOST_ERROR_MESSAGES.reach_check_unavailable, BOOST_ERROR_MESSAGES.no_visible_effect);
+  assert.ok(!/[0-9]/.test(BOOST_ERROR_MESSAGES.reach_check_unavailable), "aucun chiffre");
+  assert.equal(/rien n'a été acheté|aucun acheteur/.test(BOOST_ERROR_MESSAGES.reach_check_unavailable), false, "ne dit jamais « aucun effet » : rien n'est démontré");
+});
+
 test("transaction du grand livre `boost_purchase` et `boost_refund` : métadonnées exactes et référence dérivée de l'achat, validées avant tout SQL", () => {
   const purchase = randomUUID();
   const quote = randomUUID();

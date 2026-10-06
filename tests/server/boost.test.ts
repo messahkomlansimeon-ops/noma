@@ -4,7 +4,10 @@ import {
   BOOST_DURATION_CODES, BOOST_DURATION_SECONDS, BOOST_SCOPE_LOCK_NAMESPACE, BOOST_SOURCES,
 } from "../../lib/server/boost/boost-config";
 import { computeSellerLimit, computeSlots, type BoostSettings } from "../../lib/server/boost/boosts";
-import { computeMaxPromoted, computePromotionStep, isPromotedByBoost, placeBoostedItems } from "../../lib/server/boost/placement";
+import {
+  compareBoostAge, computeMaxPromoted, computePromotionStep, isPromotedByBoost, placeBoostedItems, rankBoostsByAge, type AgedBoost,
+} from "../../lib/server/boost/placement";
+import { createReachGate } from "../../lib/server/boost/gate";
 import { CatalogValidationError } from "../../lib/server/catalog/errors";
 
 const DEFAULTS: BoostSettings = {
@@ -93,7 +96,7 @@ const indexOfLabel = (label: string) => Number(label.slice("item-".length));
 
 /** Ordre final sous forme d'indices organiques, et ensemble des promus. */
 function run(count: number, promotable: ReadonlySet<number>, share: number) {
-  const placed = placeBoostedItems(labels(count), (_, index) => promotable.has(index), share);
+  const placed = placeBoostedItems(labels(count), (_, index) => (promotable.has(index) ? index : null), share);
   return { order: placed.map((entry) => indexOfLabel(entry.item)), promoted: new Set(placed.filter((entry) => entry.promoted).map((entry) => indexOfLabel(entry.item))) };
 }
 
@@ -137,7 +140,7 @@ test("placeBoostedItems : exemples calculés à la main (tête déjà promouvabl
   assert.deepEqual([...quotaKept.promoted], [12]);
   // Aucun promouvable, liste vide.
   assert.deepEqual(run(12, new Set(), 0.15).order, Array.from({ length: 12 }, (_, index) => index));
-  assert.deepEqual(placeBoostedItems([], () => true, 0.15), []);
+  assert.deepEqual(placeBoostedItems([], () => 0, 0.15), []);
   // Plusieurs promus qui montent réellement : quota atteint (N = 30, maxPromus = 4, promouvables lointains).
   const far = run(30, new Set([25, 26, 27, 28, 29]), 0.15);
   assert.deepEqual(far.order.slice(0, 22), [25, 0, 1, 2, 3, 4, 5, 26, 6, 7, 8, 9, 10, 11, 27, 12, 13, 14, 15, 16, 17, 28]);
@@ -213,23 +216,23 @@ test("isPromotedByBoost (portée visible, lot P2-bis) : sous 7 éléments aucun 
   const list = (count: number) => Array.from({ length: count }, (_, index) => index);
   for (let count = 1; count <= 6; count += 1) {
     assert.equal(computeMaxPromoted(count, 0.15), 0, `quota nul pour ${count} élément(s)`);
-    for (let target = 0; target < count; target += 1) assert.equal(isPromotedByBoost(list(count), target, (item) => item === target, 0.15), false, `N=${count}, cible ${target}`);
+    for (let target = 0; target < count; target += 1) assert.equal(isPromotedByBoost(list(count), target, (item) => (item === target ? item : null), 0.15), false, `N=${count}, cible ${target}`);
   }
   for (const count of [7, 8, 13]) {
-    assert.equal(isPromotedByBoost(list(count), 0, (item) => item === 0, 0.15), false, `N=${count} : déjà premier, rien ne monte`);
-    for (let target = 1; target < count; target += 1) assert.equal(isPromotedByBoost(list(count), target, (item) => item === target, 0.15), true, `N=${count}, cible ${target}`);
+    assert.equal(isPromotedByBoost(list(count), 0, (item) => (item === 0 ? item : null), 0.15), false, `N=${count} : déjà premier, rien ne monte`);
+    for (let target = 1; target < count; target += 1) assert.equal(isPromotedByBoost(list(count), target, (item) => (item === target ? item : null), 0.15), true, `N=${count}, cible ${target}`);
   }
   // Non promouvable (pertinence sous le seuil) : jamais.
-  assert.equal(isPromotedByBoost(list(10), 5, () => false, 0.15), false);
+  assert.equal(isPromotedByBoost(list(10), 5, () => null, 0.15), false);
   // Quota 1 (N = 7 à 13) pris par un autre élément promouvable classé avant la cible : la cible ne monte pas ; quota 2 (N = 14, positions 0 et 7) : elle monte (à condition de gagner des places).
-  assert.equal(isPromotedByBoost(list(7), 5, (item) => item === 5 || item === 2, 0.15), false);
-  assert.equal(isPromotedByBoost(list(14), 12, (item) => item === 12 || item === 2, 0.15), true);
+  assert.equal(isPromotedByBoost(list(7), 5, (item) => (item === 5 || item === 2 ? item : null), 0.15), false);
+  assert.equal(isPromotedByBoost(list(14), 12, (item) => (item === 12 || item === 2 ? item : null), 0.15), true);
   // Un autre promouvable DÉJÀ premier ne consomme pas le quota, mais la position 0 est passée : la cible attend la position suivante (7).
-  assert.equal(isPromotedByBoost(list(7), 5, (item) => item === 5 || item === 0, 0.15), false);
-  assert.equal(isPromotedByBoost(list(14), 12, (item) => item === 12 || item === 0, 0.15), true);
+  assert.equal(isPromotedByBoost(list(7), 5, (item) => (item === 5 || item === 0 ? item : null), 0.15), false);
+  assert.equal(isPromotedByBoost(list(14), 12, (item) => (item === 12 || item === 0 ? item : null), 0.15), true);
   // Indices invalides : faux, jamais d'exception.
-  for (const target of [-1, 10, 1.5, Number.NaN]) assert.equal(isPromotedByBoost(list(10), target, () => true, 0.15), false, String(target));
-  assert.throws(() => isPromotedByBoost(list(10), 3, () => true, 0), RangeError);
+  for (const target of [-1, 10, 1.5, Number.NaN]) assert.equal(isPromotedByBoost(list(10), target, () => 0, 0.15), false, String(target));
+  assert.throws(() => isPromotedByBoost(list(10), 3, () => 0, 0), RangeError);
 });
 
 test("isPromotedByBoost : identique, pour chaque élément de chaque liste, à la décision de placeBoostedItems (une seule implémentation du placement)", () => {
@@ -238,14 +241,213 @@ test("isPromotedByBoost : identique, pour chaque élément de chaque liste, à l
     for (let count = 1; count <= 40; count += 1) {
       const items = Array.from({ length: count }, (_, index) => index);
       for (const promotable of [new Set<number>(), new Set([count - 1]), new Set([0, count - 1]), new Set(items), new Set(items.filter((item) => item % 3 === 0))]) {
-        const placed = placeBoostedItems(items, (item) => promotable.has(item), share);
+        const placed = placeBoostedItems(items, (item) => (promotable.has(item) ? item : null), share);
         for (let target = 0; target < count; target += 1) {
           const expected = placed.some((entry) => entry.item === target && entry.promoted);
-          assert.equal(isPromotedByBoost(items, target, (item) => promotable.has(item), share), expected, `part ${share}, N=${count}, cible ${target}`);
+          assert.equal(isPromotedByBoost(items, target, (item) => (promotable.has(item) ? item : null), share), expected, `part ${share}, N=${count}, cible ${target}`);
           cases += 1;
         }
       }
     }
   }
   assert.ok(cases > 10_000, `${cases} cas`);
+});
+
+// ═════════════ Priorité d'ANCIENNETÉ (lot P3) ═════════════
+
+/** Rangs d'ancienneté d'un ensemble de promouvables : `order` liste les indices organiques du boost le plus ANCIEN au plus récent. */
+const ranksOf = (order: readonly number[]): ReadonlyMap<number, number> => new Map(order.map((organicIndex, rank) => [organicIndex, rank]));
+
+function runAged(count: number, order: readonly number[], share: number) {
+  const ranks = ranksOf(order);
+  const placed = placeBoostedItems(labels(count), (_, index) => ranks.get(index) ?? null, share);
+  return { order: placed.map((entry) => indexOfLabel(entry.item)), promoted: new Set(placed.filter((entry) => entry.promoted).map((entry) => indexOfLabel(entry.item))) };
+}
+
+test("priorité d'ancienneté : le scénario B de l'audit (liste de 8, quota 1) — D acheté en premier garde sa place, A (mieux classé, acheté après) ne la prend pas", () => {
+  // N = 8, part 0,15 → quota 1 (position 0). A est classé 2e (indice 2), D 6e (indice 5). Ancien ordre (organique) : A prenait le quota, D payait pour rien.
+  const organicFirst = run(8, new Set([2, 5]), 0.15);
+  assert.deepEqual([...organicFirst.promoted], [2], "ancien placement : A promu, D évincé");
+  // Priorité d'ancienneté : D (rang 0, le plus ancien) est promu, A (rang 1) n'a plus de place.
+  const aged = runAged(8, [5, 2], 0.15);
+  assert.deepEqual(aged.order, [5, 0, 1, 2, 3, 4, 6, 7]);
+  assert.deepEqual([...aged.promoted], [5], "D promu en tête (5 → 0)");
+  assert.ok(!aged.promoted.has(2), "A n'est pas promu : le quota est épuisé par le boost plus ancien");
+  // Si A est le plus ancien, c'est lui qui est promu.
+  assert.deepEqual([...runAged(8, [2, 5], 0.15).promoted], [2]);
+});
+
+test("priorité d'ancienneté : exemples calculés à la main (deux positions de promotion, boost ancien non montant, boost ancien déjà en tête)", () => {
+  // N = 20 → quota 3, pas 7. Promouvables 10 (le plus ancien), 6, 15 (le plus récent).
+  // p0 : le plus ancien promouvable est 10 (10 > 0) → promu en 0. p1 à p6 : têtes 0 1 2 3 4 5. p7 : restants 6 7 8 9 11 … ; le plus ancien promouvable restant est 6, la
+  // tête : sa position organique (6) n'est pas > 7, il n'a RIEN à gagner → la tête est placée, le quota n'est pas consommé, et 15 (plus récent) ne prend PAS p7.
+  // p8 à p13 : 7 8 9 11 12 13. p14 : tête 14, le seul promouvable restant est 15 (15 > 14) → promu en 14 (quota consommé : 2 sur 3).
+  const result = runAged(20, [10, 6, 15], 0.15);
+  assert.deepEqual(result.order.slice(0, 16), [10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 15, 14]);
+  assert.deepEqual([...result.promoted].sort((a, b) => a - b), [10, 15]);
+  assert.equal(result.order.indexOf(6), 7, "le boost ancien qui n'a rien à gagner garde sa place (6 → 7, descendu d'un seul cran par le promu 10)");
+  assert.equal(result.order.indexOf(15), 14, "15 est promu à la position de promotion suivante (14), pas avant");
+  // Même liste, ordre d'ancienneté inversé (le plus récent d'abord) : 15 est servi en premier, 10 à la position suivante.
+  const reversed = runAged(20, [15, 6, 10], 0.15);
+  assert.equal(reversed.order[0], 15);
+  assert.ok(reversed.promoted.has(15));
+  // Boost ancien en tête de file : il n'est pas promu (rien à gagner), le plus récent attend la position suivante.
+  const head = runAged(14, [0, 9], 0.15);
+  assert.deepEqual([...head.promoted], [9]);
+  assert.equal(head.order.indexOf(9), 7);
+});
+
+test("compareBoostAge et rankBoostsByAge : starts_at croissant à la microseconde, puis identifiant du boost ; rang 0 = le plus ancien", () => {
+  const boost = (key: string, startsAt: string, boostId: string): AgedBoost => ({ key, startsAt, boostId });
+  const a = boost("a", "2026-10-06T10:00:00.000002Z", "00000000-0000-4000-8000-000000000002");
+  const b = boost("b", "2026-10-06T10:00:00.000001Z", "00000000-0000-4000-8000-000000000009"); // plus ancien d'une microseconde malgré l'identifiant plus grand
+  const c = boost("c", "2026-10-06T10:00:00.000002Z", "00000000-0000-4000-8000-000000000001"); // même instant que a, identifiant plus petit
+  assert.equal(compareBoostAge(b, a), -1);
+  assert.equal(compareBoostAge(a, b), 1);
+  assert.equal(compareBoostAge(c, a), -1, "à l'instant égal, l'identifiant du boost départage");
+  assert.equal(compareBoostAge(a, a), 0);
+  assert.deepEqual([...rankBoostsByAge([a, b, c])], [["b", 0], ["c", 1], ["a", 2]]);
+  assert.deepEqual([...rankBoostsByAge([c, a, b])], [["b", 0], ["c", 1], ["a", 2]], "indépendant de l'ordre d'entrée");
+  assert.deepEqual([...rankBoostsByAge([])], []);
+  // Un jour plus tard ou une année plus tard : l'ordre du texte est l'ordre du temps (largeur fixe).
+  assert.equal(compareBoostAge(boost("x", "2026-10-06T23:59:59.999999Z", "f"), boost("y", "2026-10-07T00:00:00.000000Z", "0")), -1);
+});
+
+/** Ancien placement (organique d'abord), recopié ICI comme modèle de référence indépendant, en entiers (centièmes). */
+function referenceOrganicFirst(count: number, promotable: ReadonlySet<number>, hundredths: number) {
+  const step = Math.ceil(100 / hundredths);
+  const maxPromoted = Math.floor((hundredths * count) / 100);
+  const queue = Array.from({ length: count }, (_, index) => index);
+  const order: number[] = [];
+  const promoted = new Set<number>();
+  for (let position = 0; position < count; position += 1) {
+    let pick = queue[0];
+    if (position % step === 0 && promoted.size < maxPromoted) {
+      const candidate = queue.find((index) => promotable.has(index));
+      if (candidate !== undefined && candidate !== queue[0]) { pick = candidate; promoted.add(candidate); }
+    }
+    queue.splice(queue.indexOf(pick), 1);
+    order.push(pick);
+  }
+  return { order, promoted };
+}
+
+function permutations(items: readonly number[]): number[][] {
+  if (items.length <= 1) return [[...items]];
+  return items.flatMap((item, index) => permutations([...items.slice(0, index), ...items.slice(index + 1)]).map((rest) => [item, ...rest]));
+}
+
+test("placement par ancienneté : propriétés exhaustives (listes de 0 à 9 éléments, 6 parts, tous les ensembles de promouvables et leurs ordres d'ancienneté ≤ 4 boosts, échantillon au-delà)", () => {
+  let seed = 7_061_026;
+  const random = () => { seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0; return seed / 0x1_0000_0000; };
+  let cases = 0;
+  let noEvictionChecks = 0;
+  for (const hundredths of [5, 15, 20, 34, 50, 100]) {
+    const share = hundredths / 100;
+    const step = Math.ceil(100 / hundredths);
+    for (let count = 0; count <= 9; count += 1) {
+      const maxPromoted = Math.floor((hundredths * count) / 100);
+      for (let mask = 0; mask < 1 << count; mask += 1) {
+        const promotable = Array.from({ length: count }, (_, index) => index).filter((index) => (mask >> index) & 1);
+        const orders = promotable.length <= 4
+          ? permutations(promotable)
+          : Array.from({ length: 6 }, () => [...promotable].sort(() => random() - 0.5));
+        for (const order of orders) {
+          const context = `part ${share}, N=${count}, ancienneté ${order.join(">")}`;
+          const result = runAged(count, order, share);
+          // Permutation exacte : aucun doublon, ajout ni retrait.
+          assert.deepEqual([...result.order].sort((x, y) => x - y), Array.from({ length: count }, (_, index) => index), context);
+          const finalOf = new Map(result.order.map((organicIndex, position) => [organicIndex, position]));
+          // Un promu est promouvable, MONTE strictement ; promu ⇔ position finale < position organique ; au plus floor(part × N) ; positions k × pas.
+          for (let index = 0; index < count; index += 1) {
+            const final = finalOf.get(index)!;
+            assert.equal(result.promoted.has(index), final < index, `promu ⇔ montée ; ${index} → ${final} ; ${context}`);
+            if (result.promoted.has(index)) {
+              assert.ok(order.includes(index), `promu non promouvable ; ${context}`);
+              assert.equal(final % step, 0, `position de promotion ; ${context}`);
+            }
+          }
+          assert.ok(result.promoted.size <= maxPromoted, `quota ; ${context}`);
+          // Les non-promus gardent leur ordre relatif.
+          const others = result.order.filter((index) => !result.promoted.has(index));
+          assert.deepEqual(others, [...others].sort((x, y) => x - y), `ordre des non-promus ; ${context}`);
+          // Les promus se suivent du boost le plus ANCIEN au plus récent (jamais selon l'ordre organique).
+          const promotedByPosition = [...result.promoted].sort((x, y) => finalOf.get(x)! - finalOf.get(y)!);
+          const ranks = ranksOf(order);
+          for (let i = 1; i < promotedByPosition.length; i += 1) {
+            assert.ok(ranks.get(promotedByPosition[i - 1])! < ranks.get(promotedByPosition[i])!, `ancienneté croissante des promus ; ${context}`);
+          }
+          // Avec priorité = indice organique, c'est EXACTEMENT l'ancien placement (modèle de référence indépendant).
+          if (order.every((organicIndex, position) => position === 0 || order[position - 1] < organicIndex)) {
+            const reference = referenceOrganicFirst(count, new Set(promotable), hundredths);
+            assert.deepEqual(result.order, reference.order, `équivalence avec l'ancien placement ; ${context}`);
+            assert.deepEqual([...result.promoted].sort((x, y) => x - y), [...reference.promoted].sort((x, y) => x - y), context);
+          }
+          // AUCUNE ÉVICTION : ajouter un promouvable PLUS RÉCENT que tous les autres ne change la décision (promu ou non) d'aucun autre élément.
+          for (let extra = 0; extra < count; extra += 1) {
+            if (order.includes(extra)) continue;
+            const withExtra = runAged(count, [...order, extra], share);
+            for (const other of order) {
+              assert.equal(withExtra.promoted.has(other), result.promoted.has(other), `éviction de ${other} par ${extra} ; ${context}`);
+            }
+            for (let index = 0; index < count; index += 1) {
+              if (index !== extra && !order.includes(index)) assert.ok(!withExtra.promoted.has(index), `non promouvable promu ; ${context}`);
+            }
+            noEvictionChecks += 1;
+          }
+          cases += 1;
+        }
+      }
+    }
+  }
+  assert.ok(cases > 20_000, `${cases} cas`);
+  assert.ok(noEvictionChecks > 20_000, `${noEvictionChecks} vérifications d'absence d'éviction`);
+});
+
+test("isPromotedByBoost avec priorité d'ancienneté : le candidat AJOUTÉ comme boost le plus récent n'est atteignable que s'il est promu sans évincer personne", () => {
+  const list = Array.from({ length: 8 }, (_, index) => index);
+  // Liste de 8 (quota 1) ; D (indice 5) est déjà boosté : A (indice 2), ajouté comme le plus récent, n'est pas atteignable.
+  const ranks = new Map<number, number>([[5, 0]]);
+  const candidate = 2;
+  const priority = (item: number) => (item === candidate ? ranks.size : ranks.get(item) ?? null);
+  assert.equal(isPromotedByBoost(list, candidate, priority, 0.15), false);
+  assert.equal(isPromotedByBoost(list, 5, priority, 0.15), true, "D garde sa place promue, même quand A est candidat");
+  // Sans boost existant, A (indice 2) est atteignable (promu en tête).
+  assert.equal(isPromotedByBoost(list, candidate, (item) => (item === candidate ? 0 : null), 0.15), true);
+  // Liste de 14 (quota 2 : positions 0 et 7) : D (indice 5) promu en 0, A (indice 9, candidat le plus récent) promu en 7 : deux places, aucune éviction.
+  const list14 = Array.from({ length: 14 }, (_, index) => index);
+  assert.equal(isPromotedByBoost(list14, 9, (item) => (item === 9 ? 1 : item === 5 ? 0 : null), 0.15), true);
+  assert.equal(isPromotedByBoost(list14, 5, (item) => (item === 9 ? 1 : item === 5 ? 0 : null), 0.15), true, "D reste promu");
+  // Un candidat déjà proche de la tête (indice 2) n'atteint pas la position 7 : rien à gagner.
+  assert.equal(isPromotedByBoost(list14, 2, (item) => (item === 2 ? 1 : item === 5 ? 0 : null), 0.15), false);
+});
+
+test("créneaux de calcul (createReachGate) : au plus `capacité` simultanés, file équitable, attente bornée → quote_busy, libération idempotente", async () => {
+  assert.throws(() => createReachGate(0), RangeError);
+  assert.throws(() => createReachGate(1.5), RangeError);
+  const gate = createReachGate(2);
+  const releaseA = await gate.acquire(50);
+  const releaseB = await gate.acquire(50);
+  assert.deepEqual(gate.stats(), { active: 2, waiting: 0 });
+  const order: string[] = [];
+  const waitingC = gate.acquire(1_000).then((release) => { order.push("C"); return release; });
+  const waitingD = gate.acquire(1_000).then((release) => { order.push("D"); return release; });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.deepEqual(gate.stats(), { active: 2, waiting: 2 }, "deux attendent");
+  assert.deepEqual(order, []);
+  releaseA();
+  releaseA(); // idempotent : un second appel ne libère pas un second créneau
+  const releaseC = await waitingC;
+  assert.deepEqual(order, ["C"], "premier arrivé, premier servi");
+  assert.deepEqual(gate.stats(), { active: 2, waiting: 1 });
+  // Attente bornée : un troisième arrivant sans créneau est refusé après son délai.
+  const refused = await gate.acquire(30).then(() => "accepté", (error: unknown) => (error as { code?: string }).code);
+  assert.equal(refused, "quote_busy");
+  assert.deepEqual(gate.stats(), { active: 2, waiting: 1 }, "la demande refusée n'est plus en file");
+  releaseB();
+  const releaseD = await waitingD;
+  assert.deepEqual(order, ["C", "D"]);
+  releaseC();
+  releaseD();
+  assert.deepEqual(gate.stats(), { active: 0, waiting: 0 });
 });

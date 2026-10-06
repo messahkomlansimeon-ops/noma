@@ -15,7 +15,7 @@
  * désactivé, « Solde insuffisant » et « Recharger » pour un vendeur sans crédit), puis le motif « déjà boostée ».
  *
  * Partie 3 (lots P2 et P2-bis) : porte-monnaie, recharge SIMULÉE et achat de boost, tout dans le navigateur. Autre produit : l'offre de A (la plus
- * chère, créée dans le navigateur) et le besoin de B ; A est la SEULE annonce : devis « Pas encore assez d'annonces comparables » (aucun prix,
+ * chère, créée dans le navigateur) et le besoin de B ; A est la SEULE annonce : devis « Pour le moment, un boost ne ferait monter votre annonce chez aucun acheteur… » (aucun prix,
  * aucun « Acheter ») ; puis `dev:seed` ajoute 8 annonces d'exemple (vendeurs fictifs) : devis disponible avec « Mise en avant visible auprès de
  * 1 acheteur ». A sans crédit : « Solde insuffisant (0 FCFA) », « Recharger » → montants refusés (dont « 000000000500 » normalisé) → 2 000 FCFA →
  * page « paiement simulé » (bandeau SIMULATION) → « Confirmer le paiement » → retour à l'annonce. Devis RÉUTILISÉ (âgé de ≥ 30 s) : première
@@ -28,10 +28,21 @@
  * signés colorés) ; B voit « Sponsorisé » ; recharge : 429 puis réponse perdue puis rechargement de la page → même clé d'idempotence (clé conservée
  * dans l'onglet, effacée à l'état terminal) ; échec simulé ; retour sûr pour CHAQUE valeur `next` hostile ; compte à rebours indifférent à
  * l'horloge murale (Date.now décalée de ±1 h) et expiration à l'écran (horloge monotone avancée) ; type d'opération inconnu → « Opération ».
+ *
+ * Partie 4 (lot P3) : (C) achat RETENU côté serveur (la demande d'achat n'est reçue par le serveur que 3,5 s après la réponse perdue) : l'écran dit
+ * « Pas encore enregistré : l'achat peut encore aboutir. » (jamais « aucun débit »), relit les achats tout seul (2 s, 5 s, 10 s), retrouve l'achat
+ * sans aucun clic, UNE seule requête d'achat de la page, UN seul débit (remboursement d'administration de l'achat précédent pour libérer l'annonce) ;
+ * (D) deux onglets partageant une clé de recharge : l'onglet qui paie est « crédité » ; l'autre, au même montant, recrée UNE fois avec une clé NEUVE et
+ * propose de payer (jamais « crédité » sans paiement) ; la page d'une recharge déjà terminée, rouverte ou rechargée après le paiement, dit « déjà créditée… une seule fois » (réussie) ou « terminée sans paiement » (échouée).
+ *
+ * Partie 5 (lot P3-bis) : (N1) un autre vendeur D du même produit achète en premier ; A (devis « disponible » calculé avant) est refusé à l'achat (409,
+ * texte neutre), le devis redemandé est INDISPONIBLE (jamais le même « disponible »), plus aucun « Acheter », deux requêtes seulement (achat, devis),
+ * aucune boucle ; (N4) la page d'une recharge rechargée après le paiement dit « déjà créditée… une seule fois », celle d'une recharge échouée rechargée
+ * « terminée sans paiement » ; (N2) textes neutres du devis et du refus d'achat.
  * Captures d'écran dans NOMA_E2E_SHOTS.
  *
  * Variables : NOMA_E2E_BASE_URL (relais, défaut http://localhost:3212), NOMA_E2E_SERVER_LOG, NOMA_E2E_DATABASE_URL (noma_e2e,
- * pour boost:grant), NOMA_E2E_SHOTS (défaut /tmp/noma-e1b-shots), NOMA_E2E_CHROME (défaut /usr/bin/google-chrome-stable),
+ * pour boost:grant, dev:seed et boost:refund-purchase), NOMA_E2E_SHOTS (défaut /tmp/noma-e1b-shots), NOMA_E2E_CHROME (défaut /usr/bin/google-chrome-stable),
  * NOMA_E2E_WORKER_TIMEOUT_MS (défaut 600000 : la base noma_e2e grossit à chaque essai et le worker évalue chaque besoin contre toutes les
  * offres de la catégorie ; ~1 200 offres : plus de 4 minutes pour l'essai complet). Voir scripts/e2e-common.ts.
  */
@@ -47,6 +58,7 @@ import {
   awaitOtpLine,
   grantBoostByAdministration,
   loginWithOtp,
+  refundPurchaseByAdministration,
   seedExamplesByAdministration,
   uniquePhone,
 } from "./e2e-common";
@@ -626,22 +638,23 @@ async function main(): Promise<void> {
       .getByRole("link", { name: "Voir les offres", exact: true })
       .click();
     await buyerPage.waitForURL(/\/besoins\/[0-9a-f-]{36}$/);
+    const payResultsUrl = buyerPage.url();
     await refreshUntil(buyerPage, "l'offre de A dans les résultats de B", async () => (await cards.count()) >= 1);
     assert.equal(await cards.count(), 1);
     assert.equal(await buyerPage.getByText("Sponsorisé", { exact: true }).count(), 0);
     ok("B : 1 seule offre (celle de A), aucun badge « Sponsorisé »");
 
-    step("Vendeur A : seule annonce pour ce produit → devis INDISPONIBLE « Pas encore assez d'annonces comparables » (lot P2-bis, S1)");
+    step("Vendeur A : seule annonce pour ce produit → devis INDISPONIBLE « Pour le moment, un boost ne ferait monter votre annonce chez aucun acheteur… » (lot P2-bis, S1)");
     await refreshUntil(sellerPage, "le besoin de B dans « Acheteurs intéressés » (seconde offre)", async () => (await sellerPage.getByTestId("interested-buyer").count()) >= 1);
     const payDurations = sellerPage.getByRole("group", { name: "Durée du boost" });
     await payDurations.getByRole("button", { name: "24 h", exact: true }).click();
     await sellerPage.getByTestId("boost-unavailable").waitFor();
     const noEffect = norm(await sellerPage.getByTestId("boost-unavailable").textContent());
-    assert.equal(noEffect, "Pas encore assez d'annonces comparables : un boost ne changerait rien à l'ordre des résultats.");
+    assert.equal(noEffect, "Pour le moment, un boost ne ferait monter votre annonce chez aucun acheteur : leurs listes sont trop courtes, ou la place mise en avant y est déjà occupée par un boost acheté plus tôt.");
     assert.equal(noEffect.includes("no_visible_effect"), false, "jamais le code brut");
     assert.equal(await sellerPage.getByRole("button", { name: "Acheter", exact: true }).count(), 0, "aucun bouton d'achat : le devis n'a pas de prix");
     assert.equal(await sellerPage.getByTestId("boost-amount").count(), 0);
-    ok("1 annonce + 1 besoin : devis 24 h indisponible, « Pas encore assez d'annonces comparables : un boost ne changerait rien à l'ordre des résultats. », aucun prix, aucun bouton « Acheter »");
+    ok("1 annonce + 1 besoin : devis 24 h indisponible, « Pour le moment, un boost ne ferait monter votre annonce chez aucun acheteur : leurs listes sont trop courtes, ou la place mise en avant y est déjà occupée par un boost acheté plus tôt. », aucun prix, aucun bouton « Acheter »");
     await shot(sellerPage, "13a-annonce-devis-sans-effet-visible");
 
     step("dev:seed : 8 annonces concurrentes d'exemple (vendeurs fictifs) ajoutées par la commande, comme dans ESSAYER.md");
@@ -1004,14 +1017,16 @@ async function main(): Promise<void> {
     });
     assert.equal(norm(await sellerPage.getByTestId("boost-buy-error").textContent()), "Connexion impossible. Vérifiez votre réseau et réessayez.");
     assert.equal(await sellerPage.getByTestId("boost-success").count(), 0);
-    // S4 : après TOUT échec, solde, achats et devis sont relus ; aucun achat retrouvé → « Aucun achat n'est enregistré… » et « Vérifier / réessayer ».
-    await sellerPage.waitForFunction(() => (document.querySelector("[data-testid=boost-unresolved]")?.textContent ?? "").includes("Aucun achat n'est enregistré pour ce devis (aucun débit)"));
+    // S4 : après TOUT échec, solde, achats et devis sont relus ; aucun achat retrouvé → « Pas encore enregistré : l'achat peut encore aboutir. » (lot P3 : jamais « aucun débit »,
+    // le serveur peut enregistrer l'achat après coup) et « Vérifier / réessayer ».
+    await sellerPage.waitForFunction(() => (document.querySelector("[data-testid=boost-unresolved]")?.textContent ?? "").includes("Pas encore enregistré : l'achat peut encore aboutir."));
+    assert.equal((await sellerPage.getByTestId("boost-unresolved").textContent() ?? "").includes("aucun débit"), false, "jamais « aucun débit » : le débit peut encore arriver");
     assert.ok(reads.wallet > readsBeforeFailure.wallet && reads.purchases > readsBeforeFailure.purchases && reads.quotes > readsBeforeFailure.quotes, "solde, achats et devis relus après l'échec");
     const verifyButton = sellerPage.getByTestId("boost-verify");
     assert.equal(norm(await verifyButton.textContent()), "Vérifier / réessayer");
     const untouched = (await (await sellerContext.request.get(`${BASE}/api/wallet`)).json()) as { balanceXof: number };
     assert.equal(untouched.balanceXof, 2_000, "la demande n'a jamais atteint le serveur : aucun débit");
-    ok("réponse perdue avant le serveur : « Connexion impossible… », solde/achats/devis relus, « Aucun achat n'est enregistré pour ce devis (aucun débit) » + « Vérifier / réessayer », solde serveur 2 000 FCFA");
+    ok("réponse perdue avant le serveur : « Connexion impossible… », solde/achats/devis relus, « Pas encore enregistré : l'achat peut encore aboutir. » (jamais « aucun débit ») + « Vérifier / réessayer », solde serveur 2 000 FCFA");
     await shot(sellerPage, "20-achat-reponse-perdue");
     // Le devis expire à l'écran (horloge monotone +16 min) : la vérification reste possible avec la MÊME clé (le serveur rejoue la clé).
     await sellerPage.evaluate(() => ((window as unknown as { __perfSkewMs: number }).__perfSkewMs += 16 * 60_000));
@@ -1207,6 +1222,15 @@ async function main(): Promise<void> {
     assert.equal(await retry.getAttribute("href"), `/compte/porte-monnaie?recharger=1&next=${encodeURIComponent(payOfferPath)}`);
     ok("« Faire échouer le paiement » : « Le paiement a échoué. Votre porte-monnaie n'a pas été crédité. », lien « Réessayer la recharge » (panneau ouvert, retour mémorisé)");
     await shot(sellerPage, "24-paiement-simule-echoue");
+    // Lot P3-bis (N4) : recharger la page d'une recharge ÉCHOUÉE (déjà terminée avant cette visite) : « terminée sans paiement », jamais d'alarme ni de crédit.
+    await sellerPage.reload();
+    await sellerPage.getByTestId("sim-result").waitFor();
+    assert.equal(await sellerPage.getByTestId("sim-result").getAttribute("data-kind"), "failed");
+    const failedReloaded = norm(await sellerPage.getByTestId("sim-result").textContent());
+    assert.ok(failedReloaded.includes("Cette recharge est terminée sans paiement : aucun montant n'a été crédité."), failedReloaded);
+    assert.equal(failedReloaded.includes("Le paiement a échoué"), false, "rechargée : plus le message de l'échec vécu sur la page");
+    assert.equal(failedReloaded.includes("a été crédité de"), false);
+    ok("rechargement de la page d'une recharge ÉCHOUÉE : « Cette recharge est terminée sans paiement : aucun montant n'a été crédité. » (lot P3-bis, N4)");
     await retry.click();
     await sellerPage.getByTestId("wallet-balance").waitFor();
     assert.equal(norm(await sellerPage.getByTestId("wallet-balance").textContent()), fmt(2_000 - quoteAmount));
@@ -1316,6 +1340,214 @@ async function main(): Promise<void> {
     assert.equal(await sellerPage.getByTestId("wallet-row").count(), 21, "le reste de l'historique s'affiche (20 lignes de la page + la ligne inconnue)");
     await sellerPage.unroute(/\/api\/wallet(\?.*)?$/);
     ok("type d'opération inconnu : ligne « Opération … +300 FCFA » (jamais le code brut), le reste de l'historique reste affiché");
+
+    step("Achat RETENU côté serveur (3,5 s) alors que la réponse est perdue : « Pas encore enregistré », relectures automatiques à 2 s, 5 s, 10 s, puis l'achat apparaît tout seul ; UN seul débit (lot P3, C)");
+    // Remboursement d'administration de l'achat précédent : l'annonce est de nouveau achetable et le crédit rendu.
+    const earlier = (await (await sellerContext.request.get(`${BASE}/api/offers/${payOfferId}/boost-purchases`)).json()) as { purchases: Array<{ id: string }> };
+    assert.equal(earlier.purchases.length, 1, "un achat à rembourser");
+    const refundLine = await refundPurchaseByAdministration(earlier.purchases[0].id, "essai_retenu");
+    assert.match(refundLine, /remboursé/);
+    ok(`boost:refund-purchase (base noma_e2e) : ${refundLine.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/, "<id>")}`);
+    const balanceBefore = ((await (await sellerContext.request.get(`${BASE}/api/wallet`)).json()) as { balanceXof: number }).balanceXof;
+    await sellerPage.goto(`${BASE}${payOfferPath}`);
+    await payDurations.getByRole("button", { name: "3 jours", exact: true }).click();
+    await sellerPage.getByTestId("boost-amount").waitFor();
+    const retainedAmount = Number(norm(await sellerPage.getByTestId("boost-amount").textContent()).replace(/\D/g, ""));
+    assert.ok(retainedAmount > 0 && balanceBefore >= retainedAmount, `solde ${balanceBefore} couvre le prix ${retainedAmount}`);
+    const retainedMs = 3_500;
+    const retainedBodies: string[] = [];
+    const retainedServer: Array<Promise<number>> = [];
+    await sellerPage.route(/\/api\/offers\/[0-9a-f-]{36}\/boost-purchases$/, async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      // La page ne reçoit rien (réponse perdue) ; le serveur reçoit la MÊME requête 3,5 s plus tard : l'achat n'existe pas encore quand l'écran relit les achats.
+      retainedBodies.push(route.request().postData() ?? "");
+      const url = route.request().url();
+      const body = route.request().postData() ?? "";
+      retainedServer.push((async () => {
+        await new Promise((resolve) => setTimeout(resolve, retainedMs));
+        return (await sellerContext.request.post(url, { data: body, headers: { "content-type": "application/json", origin: new URL(BASE).origin } })).status();
+      })());
+      await route.abort("failed");
+    });
+    let purchasesReads = 0;
+    sellerPage.on("response", (response) => {
+      if (response.request().method() === "GET" && /\/api\/offers\/[0-9a-f-]{36}\/boost-purchases(\?.*)?$/.test(response.url())) purchasesReads += 1;
+    });
+    await payBuy.click();
+    const retainedStartedAt = Date.now();
+    await expectingConsoleErrors("achat retenu : réponse perdue", /net::ERR_FAILED/, async () => {
+      await sellerPage.getByTestId("boost-confirm-button").click();
+      await sellerPage.getByTestId("boost-unresolved").waitFor();
+    });
+    const unresolvedText = norm(await sellerPage.getByTestId("boost-unresolved").textContent());
+    assert.ok(unresolvedText.includes("Pas encore enregistré : l'achat peut encore aboutir."), unresolvedText);
+    assert.equal(unresolvedText.includes("aucun débit"), false, "jamais « aucun débit » : l'achat peut encore aboutir");
+    assert.equal(await sellerPage.getByTestId("boost-success").count(), 0, "à ce moment, l'achat n'existe pas côté serveur");
+    const readsAtFailure = purchasesReads;
+    ok(`réponse perdue, achat encore absent du serveur : « ${unresolvedText.slice(0, 70)}… » (pas de « aucun débit »)`);
+    await shot(sellerPage, "27-achat-retenu-pas-encore-enregistre");
+    // Aucun clic : l'écran relit les achats tout seul (2 s, 5 s, 10 s) ; l'achat est enregistré par le serveur à 3,5 s et apparaît à la relecture de 5 s.
+    await sellerPage.getByTestId("boost-success").waitFor({ timeout: 15_000 }).catch(() => {
+      throw new Error("ACHAT RETENU : l'écran n'a pas retrouvé l'achat tout seul (relectures automatiques à 2 s, 5 s, 10 s absentes ou inopérantes)");
+    });
+    const found = (Date.now() - retainedStartedAt) / 1000;
+    assert.ok(found >= 3.5 && found <= 12, `succès affiché après ${found.toFixed(1)} s (achat serveur à 3,5 s, relecture à 5 s)`);
+    assert.ok(purchasesReads - readsAtFailure >= 1, `relectures automatiques des achats : ${purchasesReads - readsAtFailure}`);
+    assert.match(norm(await sellerPage.getByTestId("boost-success").textContent()), /^Boost actif jusqu'au \d{2}\/\d{2}\/\d{4} à \d{2}:\d{2}/);
+    assert.deepEqual(await Promise.all(retainedServer), [201], "une seule requête d'achat : celle du serveur, 201");
+    assert.equal(retainedBodies.length, 1, "la page n'a envoyé qu'UNE requête d'achat : les relectures automatiques sont de simples lectures");
+    const afterRetained = ((await (await sellerContext.request.get(`${BASE}/api/wallet`)).json()) as { balanceXof: number }).balanceXof;
+    assert.equal(afterRetained, balanceBefore - retainedAmount, "UN seul débit");
+    await sellerPage.getByTestId("boost-balance-amount").waitFor();
+    await waitUntil("solde relu à l'écran", async () => norm(await sellerPage.getByTestId("boost-balance-amount").textContent()) === fmt(afterRetained));
+    ok(`achat retenu : l'écran retrouve l'achat TOUT SEUL après ${found.toFixed(1)} s (aucun clic), une seule requête d'achat, un seul débit (${fmt(retainedAmount)}), solde ${fmt(afterRetained)}`);
+    await shot(sellerPage, "28-achat-retenu-retrouve");
+    await sellerPage.unroute(/\/api\/offers\/[0-9a-f-]{36}\/boost-purchases$/);
+
+    step("Devis périmé (lot P3-bis, N1) : un autre vendeur D achète en premier ; A (devis « disponible » calculé avant) est refusé à l'achat, redemande un devis et obtient un devis INDISPONIBLE au texte neutre : plus aucune boucle");
+    const apiOrigin = new URL(BASE).origin;
+    // Libère l'annonce de A : les achats non remboursés sont remboursés par l'administration (le boost acheté est annulé, le crédit rendu).
+    const heldPurchases = (await (await sellerContext.request.get(`${BASE}/api/offers/${payOfferId}/boost-purchases`)).json()) as { purchases: Array<{ id: string; refundedAt: string | null }> };
+    for (const held of heldPurchases.purchases.filter((purchase) => purchase.refundedAt === null)) await refundPurchaseByAdministration(held.id, "essai_boucle");
+    // Vendeur D (par l'API) : une annonce du MÊME produit (189 000 FCFA, juste moins chère que A), du crédit, un devis disponible.
+    const sellerD = new RelaySession("vendeur D");
+    const dApi = sellerD.client();
+    await loginWithOtp(sellerD, uniquePhone("55"));
+    const dBuilt = buildOfferInput({
+      title: `${payProduct.brand} ${payProduct.model} · offre de D`, description: "", category: payProduct.category, brand: payProduct.brand, model: payProduct.model,
+      variant: "", condition: "Occasion", location: "Abidjan", price: "189 000", available: true,
+    });
+    assert.ok(dBuilt.ok);
+    const dCreated = await dApi.offers.create(dBuilt.input);
+    const dOffer = await dApi.offers.publish(dCreated.id, dCreated.contentVersion);
+    const dTopup = await dApi.wallet.createTopup({ amountXof: 5_000, idempotencyKey: randomUUID() });
+    await dApi.devPayments.confirm(dTopup.topup.id);
+    // A : crédit suffisant (recharge simulée par l'API) ; le besoin de B voit l'offre de D (10 offres : quota 1, aucun boost actif).
+    const aTopup = await sellerContext.request.post(`${BASE}/api/wallet/topups`, { data: { amountXof: 5_000, idempotencyKey: randomUUID() }, headers: { origin: apiOrigin } });
+    assert.equal(aTopup.status(), 201);
+    const aTopupId = ((await aTopup.json()) as { topup: { id: string } }).topup.id;
+    assert.equal((await sellerContext.request.post(`${BASE}/api/dev/fake-payments/${aTopupId}/confirm`, { headers: { origin: apiOrigin } })).status(), 200);
+    await buyerPage.goto(payResultsUrl);
+    await refreshUntil(buyerPage, "l'offre de D dans les résultats de B (10 offres)", async () => (await cards.count()) >= payTotal + 1);
+    ok(`D : annonce à 189 000 FCFA et crédit 5 000 FCFA ; B voit ${payTotal + 1} offres (les 8 d'exemple, A et D), aucun boost actif`);
+    // A (navigateur) : devis 24 h DISPONIBLE, calculé AVANT l'achat de D.
+    await sellerPage.goto(`${BASE}${payOfferPath}`);
+    await payDurations.getByRole("button", { name: "24 h", exact: true }).click();
+    await sellerPage.getByTestId("boost-amount").waitFor();
+    const staleAmount = norm(await sellerPage.getByTestId("boost-amount").textContent());
+    assert.equal(await payBuy.isEnabled(), true, "A : « Acheter » actif sur un devis disponible");
+    await shot(sellerPage, "28a-devis-avant-achat-de-d");
+    // D achète d'abord : sa place mise en avant est prise (quota 1, ancienneté).
+    const dQuote = await dApi.boostQuotes.create(dOffer.id, "24h");
+    assert.equal(dQuote.status, "available", `devis de D : ${dQuote.status} ${String(dQuote.unavailableReason)}`);
+    const dBought = await dApi.boostPurchases.create(dOffer.id, { quoteId: dQuote.id, idempotencyKey: randomUUID() });
+    assert.equal(dBought.purchase.reused, false);
+    ok(`D achète son boost de 24 h (${dBought.purchase.amountXof} FCFA) : le quota de la liste de B est pris`);
+    // A achète avec son devis périmé : 409, message neutre, un SEUL nouveau devis est demandé, il est INDISPONIBLE ; aucune boucle.
+    const loopPosts: string[] = [];
+    const onRequest = (request: import("../poc/node_modules/playwright").Request) => {
+      if (request.method() === "POST" && /boost-(quotes|purchases)$/.test(request.url())) loopPosts.push(request.url().split("/").pop()!);
+    };
+    sellerPage.on("request", onRequest);
+    await expectingConsoleErrors("achat refusé 409 no_visible_effect (vrai refus du serveur)", /status of 409/, async () => {
+      await payBuy.click();
+      await sellerPage.getByTestId("boost-confirm-button").click();
+      await sellerPage.getByTestId("boost-unavailable").waitFor();
+    });
+    const NO_EFFECT_PURCHASE = "Ce boost ne ferait plus monter votre annonce chez aucun acheteur (place déjà occupée par un boost acheté plus tôt, ou liste trop courte). Aucun débit. Demandez un nouveau prix plus tard.";
+    const NO_EFFECT_QUOTE = "Pour le moment, un boost ne ferait monter votre annonce chez aucun acheteur : leurs listes sont trop courtes, ou la place mise en avant y est déjà occupée par un boost acheté plus tôt.";
+    assert.equal(norm(await sellerPage.getByTestId("boost-buy-error").textContent()), NO_EFFECT_PURCHASE, "texte du refus d'achat (neutre)");
+    assert.equal(norm(await sellerPage.getByTestId("boost-unavailable").textContent()), NO_EFFECT_QUOTE, "texte du devis (neutre)");
+    assert.equal(await sellerPage.getByTestId("boost-quote").getAttribute("data-status"), "unavailable", "le devis redemandé n'est PLUS « disponible »");
+    assert.equal(await sellerPage.getByTestId("boost-amount").count(), 0, "aucun prix");
+    assert.equal(await payBuy.count(), 0, "plus aucun bouton « Acheter » : la boucle est rompue");
+    assert.equal(norm(await sellerPage.getByTestId("boost-quote").textContent()).includes(staleAmount), false, "l'ancien prix n'est plus affiché");
+    assert.deepEqual(loopPosts, ["boost-purchases", "boost-quotes"], `une demande d'achat refusée puis UN seul devis redemandé : ${loopPosts.join(",")}`);
+    await sleep(4_000);
+    assert.deepEqual(loopPosts, ["boost-purchases", "boost-quotes"], "aucune requête de plus pendant 4 s : aucune boucle");
+    sellerPage.off("request", onRequest);
+    ok("A : « Acheter » → 409 « Ce boost ne ferait plus monter… (place déjà occupée… ou liste trop courte). Aucun débit. » ; le devis redemandé est INDISPONIBLE (texte neutre), aucun « Acheter », 2 requêtes seulement (achat, devis), aucune boucle");
+    await shot(sellerPage, "28c-devis-perime-sans-boucle");
+    // Redemander encore : le devis indisponible (60 s) est renvoyé tel quel (200, reused), jamais un devis « disponible » ; le solde de A n'a pas bougé.
+    const again = await sellerContext.request.post(`${BASE}/api/offers/${payOfferId}/boost-quotes`, { data: { durationCode: "24h" }, headers: { origin: apiOrigin } });
+    const againBody = (await again.json()) as { quote: { status: string; unavailableReason: string | null; reused: boolean } };
+    assert.deepEqual([again.status(), againBody.quote.status, againBody.quote.unavailableReason, againBody.quote.reused], [200, "unavailable", "no_visible_effect", true]);
+    ok("redemander le devis : 200, indisponible (aucun effet visible), réutilisé — jamais le devis « disponible » périmé");
+
+    step("Deux onglets qui partagent une clé de recharge : la recharge payée dans l'un ne s'affiche JAMAIS « créditée » dans l'autre sans paiement (lot P3, D)");
+    const topupKey = "noma:topup-key:2000";
+    const sellerBalance = async () => ((await (await sellerContext.request.get(`${BASE}/api/wallet`)).json()) as { balanceXof: number }).balanceXof;
+    const balanceStart = await sellerBalance();
+    const tab1 = sellerPage;
+    await tab1.goto(`${BASE}/compte/porte-monnaie?recharger=1`);
+    await tab1.getByTestId("topup-panel").waitFor();
+    await tab1.getByTestId("topup-preset-2000").click();
+    await tab1.getByTestId("topup-submit").click();
+    await tab1.waitForURL((url) => url.pathname.startsWith("/paiement-simule/"));
+    const sharedKey = await tab1.evaluate((name) => window.sessionStorage.getItem(name), topupKey);
+    assert.match(String(sharedKey), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/, "l'onglet 1 conserve la clé de la recharge de 2 000 FCFA");
+    const firstTopupId = new URL(tab1.url()).pathname.split("/").pop()!;
+    // Onglet 2 = un onglet DUPLIQUÉ : il hérite du sessionStorage de l'onglet 1 (donc de la même clé).
+    const tab2 = await sellerContext.newPage();
+    openPages.push(tab2);
+    watch(tab2);
+    const tab2Posts: string[] = [];
+    await tab2.route(/\/api\/wallet\/topups$/, async (route) => {
+      if (route.request().method() === "POST") tab2Posts.push(route.request().postData() ?? "");
+      await route.continue();
+    });
+    await tab2.goto(`${BASE}/compte/porte-monnaie?recharger=1`);
+    await tab2.getByTestId("topup-panel").waitFor();
+    await tab2.evaluate(([name, value]) => window.sessionStorage.setItem(name, value), [topupKey, String(sharedKey)]);
+    // L'onglet 1 PAIE : « crédité » à juste titre.
+    await tab1.getByTestId("sim-confirm").click();
+    await tab1.getByTestId("sim-result").waitFor();
+    assert.equal(norm(await tab1.getByTestId("sim-result").textContent()), `Votre porte-monnaie a été crédité de ${fmt(2_000)}.`);
+    assert.equal(await sellerBalance(), balanceStart + 2_000, "recharge payée dans l'onglet 1 : +2 000 FCFA");
+    // Lot P3-bis (N4) : celui qui vient de payer recharge la page : « déjà créditée… une seule fois », jamais « n'a rien ajouté » (alarmant, faux pour lui) ni un second crédit.
+    await tab1.reload();
+    await tab1.getByTestId("sim-result").waitFor();
+    assert.equal(await tab1.getByTestId("sim-result").getAttribute("data-kind"), "succeeded");
+    const paidReloaded = norm(await tab1.getByTestId("sim-result").textContent());
+    assert.equal(paidReloaded, `Cette recharge a déjà été créditée sur votre porte-monnaie (${fmt(2_000)}, une seule fois).`, "rechargement après paiement : « déjà créditée »");
+    assert.equal(paidReloaded.includes("n'a rien ajouté"), false, "plus de message alarmant");
+    assert.equal(paidReloaded.includes("a été crédité de"), false, "« a été crédité de » reste réservé au paiement fait sur la page");
+    assert.equal(await sellerBalance(), balanceStart + 2_000, "recharger la page ne crédite rien de plus");
+    ok("rechargement de la page APRÈS le paiement : « Cette recharge a déjà été créditée sur votre porte-monnaie (2 000 FCFA, une seule fois). », solde inchangé (lot P3-bis, N4)");
+    await shot(tab1, "28b-recharge-payee-rechargee");
+    // L'onglet 2 (même clé) demande une NOUVELLE recharge de 2 000 FCFA : l'intention de la clé est déjà TERMINÉE ailleurs → clé neuve, nouvelle intention, à payer.
+    await tab2.getByTestId("topup-preset-2000").click();
+    await tab2.getByTestId("topup-submit").click();
+    await tab2.waitForURL((url) => url.pathname.startsWith("/paiement-simule/") && !url.pathname.endsWith(firstTopupId));
+    await tab2.getByTestId("sim-confirm").waitFor();
+    assert.equal(tab2Posts.length, 2, `deux créations dans l'onglet 2 (clé partagée puis clé neuve) : ${tab2Posts.length}`);
+    const [sharedPost, freshPost] = tab2Posts.map((body) => JSON.parse(body) as { amountXof: number; idempotencyKey: string });
+    assert.equal(sharedPost.idempotencyKey, sharedKey, "premier envoi : la clé partagée");
+    assert.notEqual(freshPost.idempotencyKey, sharedKey, "second envoi : clé NEUVE");
+    assert.equal(await tab2.getByTestId("sim-result").count(), 0, "ONGLET 2 : aucun « crédité » : la page propose de PAYER");
+    assert.equal((await tab2.locator("main").innerText()).includes("a été crédité"), false, "ONGLET 2 : jamais « crédité » sans paiement");
+    assert.equal(await sellerBalance(), balanceStart + 2_000, "rien n'est crédité tant que l'onglet 2 n'a pas payé");
+    ok("onglet 2 (clé partagée, recharge déjà payée dans l'onglet 1) : clé neuve, nouvelle recharge à payer (« Confirmer le paiement »), aucun « crédité », solde inchangé");
+    await shot(tab2, "29-deux-onglets-nouvelle-recharge");
+    await tab2.getByTestId("sim-confirm").click();
+    await tab2.getByTestId("sim-result").waitFor();
+    assert.equal(norm(await tab2.getByTestId("sim-result").textContent()), `Votre porte-monnaie a été crédité de ${fmt(2_000)}.`, "payée ici : « crédité »");
+    assert.equal(await sellerBalance(), balanceStart + 4_000);
+    // Rouvrir la page de l'ANCIENNE recharge (déjà terminée avant la visite) : jamais « crédité ».
+    await tab2.goto(`${BASE}/paiement-simule/${firstTopupId}`);
+    await tab2.getByTestId("sim-result").waitFor();
+    const reopened = norm(await tab2.getByTestId("sim-result").textContent());
+    assert.equal(await tab2.getByTestId("sim-result").getAttribute("data-kind"), "succeeded");
+    assert.equal(reopened, `Cette recharge a déjà été créditée sur votre porte-monnaie (${fmt(2_000)}, une seule fois).`, "RECHARGE DÉJÀ TERMINÉE rouverte : « déjà créditée… une seule fois »");
+    assert.equal(reopened.includes("a été crédité de"), false, "RECHARGE DÉJÀ TERMINÉE rouverte : jamais la phrase du paiement immédiat");
+    assert.equal(reopened.includes("n'a rien ajouté"), false, "plus de message alarmant");
+    assert.equal(await sellerBalance(), balanceStart + 4_000, "rouvrir la page ne crédite rien");
+    ok("page d'une recharge déjà terminée rouverte : « Cette recharge a déjà été créditée sur votre porte-monnaie (… une seule fois). » (jamais « a été crédité de »), solde inchangé");
+    await tab2.unroute(/\/api\/wallet\/topups$/);
+    await tab2.close();
 
     await sellerContext.close();
     await buyerContext.close();

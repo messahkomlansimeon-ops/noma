@@ -15,6 +15,8 @@ export const FAKE_PHONE_PREFIX = "+2250799999";
 export const MAX_SEED_OFFERS = 50;
 export const DEFAULT_SEED_OFFERS = 8;
 export const DEFAULT_SEED_BASE_PRICE = 150_000;
+/** Espace du verrou consultatif qui sérialise deux `dev:seed` (distinct de 1_314_664_945 à 952 : migrations, matching, boosts, portefeuille). */
+export const SEED_LOCK_NAMESPACE = 1_314_664_953;
 /** Repère placé dans la description de chaque annonce d'exemple : c'est lui qui rend la commande rejouable sans doublon. */
 export const SEED_MARKER = "[dev:seed]";
 export const SEED_DESCRIPTION = `${SEED_MARKER} Annonce d'exemple : aucun vrai vendeur, aucun vrai produit.`;
@@ -52,7 +54,15 @@ export interface SeedOptions {
 
 export class SeedUsageError extends Error {}
 
-const TEXT_VALUE = /^[^\u0000-\u001f\u007f]{1,60}$/u;
+/**
+ * Texte d'un produit (`--category`, `--brand`, `--model`) : 1 à 60 caractères, sans caractère de CONTRÔLE (Cc : C0 et C1), de FORMAT (Cf : direction de
+ * texte U+061C, U+200E, U+200F, U+202A à U+202E, U+2066 à U+2069 ; invisibles U+200B à U+200D, U+2060, U+FEFF, trait d'union conditionnel…) ni
+ * de séparation de ligne ou de paragraphe (U+2028, U+2029) : un texte « bidi » ou « invisible » peut afficher dans le terminal ou l'écran autre chose que ce
+ * qui est enregistré, ou créer deux produits qui se ressemblent (lots P3 et P3-bis, constaté : --model accepté avec U+202E, puis avec U+200B).
+ */
+const FORBIDDEN_CHARACTER = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+const TEXT_VALUE = /^[^\p{Cc}\p{Cf}\p{Zl}\p{Zp}]{1,60}$/u;
+const CONTROL_FREE_TEXT = "un texte de 1 à 60 caractères sans caractère de contrôle ni de direction de texte, ni caractère invisible";
 
 /** Arguments : `--category`, `--brand`, `--model` obligatoires ; `--offers` (1 à 50, défaut 8) ; `--price` (prix de référence, défaut 150 000). */
 export function parseSeedArguments(args: readonly string[]): SeedOptions {
@@ -67,8 +77,15 @@ export function parseSeedArguments(args: readonly string[]): SeedOptions {
     values.set(flag, value);
   }
   const category = values.get("--category");
-  const brand = values.get("--brand")?.trim();
-  const model = values.get("--model")?.trim();
+  const rawBrand = values.get("--brand");
+  const rawModel = values.get("--model");
+  // Les caractères interdits sont cherchés dans la valeur BRUTE : `trim()` retire U+FEFF et d'autres blancs de bord sans le dire. Pour la catégorie, avant la
+  // résolution : le message « catégorie inconnue » cite la valeur saisie, qui ne doit jamais contenir de caractère invisible ni de direction.
+  for (const [name, raw] of [["--category", category], ["--brand", rawBrand], ["--model", rawModel]] as const) {
+    if (raw !== undefined && FORBIDDEN_CHARACTER.test(raw)) throw new SeedUsageError(`${name} doit être ${CONTROL_FREE_TEXT}`);
+  }
+  const brand = rawBrand?.trim();
+  const model = rawModel?.trim();
   if (category === undefined) throw new SeedUsageError("--category est obligatoire");
   if (!brand) throw new SeedUsageError("--brand est obligatoire");
   if (!model) throw new SeedUsageError("--model est obligatoire");
@@ -77,7 +94,7 @@ export function parseSeedArguments(args: readonly string[]): SeedOptions {
     throw new SeedUsageError(`catégorie inconnue « ${category.slice(0, 40)} » (essayez : phones, ou ${CATEGORY_OPTIONS.map((option) => `« ${option.label} »`).join(", ")})`);
   }
   for (const [name, text] of [["--brand", brand], ["--model", model]] as const) {
-    if (!TEXT_VALUE.test(text)) throw new SeedUsageError(`${name} doit être un texte de 1 à 60 caractères sans caractère de contrôle`);
+    if (!TEXT_VALUE.test(text)) throw new SeedUsageError(`${name} doit être ${CONTROL_FREE_TEXT}`);
   }
   const offersText = values.get("--offers");
   const offers = offersText === undefined ? DEFAULT_SEED_OFFERS : /^[0-9]{1,3}$/.test(offersText) ? Number(offersText) : Number.NaN;
@@ -100,9 +117,16 @@ export function databaseNameOf(databaseUrl: string): string {
 }
 
 /**
+ * LISTE BLANCHE des bases que `dev:seed` peut peupler (lot P3) : `noma_essai`, `noma_e2e`, et les bases jetables `noma_essai_*` (minuscules, chiffres et
+ * tiret bas). Tout le reste est refusé, dont `noma_test` (base des tests), `noma_prod` et `noma_dev` : un nom en `noma_*` ne suffit pas à désigner une base
+ * d'essai. Comparaison exacte, sensible à la casse (PostgreSQL est sensible à la casse des noms entre guillemets).
+ */
+const SEED_DATABASE_NAME = /^(noma_essai|noma_e2e|noma_essai_[a-z0-9_]{1,40})$/;
+
+/**
  * Garde-fous AVANT toute connexion : `NODE_ENV` absent, vide ou « development » (même règle que `dev:try`) ; `DATABASE_URL` présent dans
- * l'environnement de lancement (aucun fichier .env lu) ; base de CE poste (même règle que `dev:try`) ; nom de base commençant par `noma_` et
- * différent de `noma_dev` (la base de développement habituelle n'est jamais peuplée d'exemples). Le motif de refus ne contient jamais l'adresse.
+ * l'environnement de lancement (aucun fichier .env lu) ; base de CE poste (même règle que `dev:try`) ; nom de base dans la liste blanche
+ * (`noma_essai`, `noma_e2e`, `noma_essai_*`). Le motif de refus ne contient jamais l'adresse.
  */
 export function checkSeedEnvironment(env: Readonly<Record<string, string | undefined>>): SeedEnvironmentCheck {
   const nodeEnv = checkDevelopmentNodeEnv(env.NODE_ENV);
@@ -123,11 +147,11 @@ export function checkSeedEnvironment(env: Readonly<Record<string, string | undef
   const local = checkLocalDatabaseUrl(databaseUrl);
   if (!local.ok) return { ok: false, reason: local.reason.replace("dev:try n'envoie", "dev:seed n'écrit") };
   const databaseName = databaseNameOf(databaseUrl);
-  if (!databaseName.startsWith("noma_")) {
-    return { ok: false, reason: "Le nom de la base d'essai doit commencer par « noma_ » (par exemple noma_essai) : dev:seed refuse toute autre base." };
-  }
-  if (databaseName.toLowerCase() === "noma_dev") {
-    return { ok: false, reason: "dev:seed refuse la base noma_dev (base de développement) : utilisez une base d'essai (noma_essai, noma_e2e…)." };
+  if (!SEED_DATABASE_NAME.test(databaseName)) {
+    return {
+      ok: false,
+      reason: "dev:seed ne peuple que les bases d'essai noma_essai, noma_e2e et noma_essai_* : toute autre base (noma_dev, noma_test, noma_prod…) est refusée.",
+    };
   }
   return { ok: true, databaseName };
 }

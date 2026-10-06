@@ -7,15 +7,19 @@ import { CatalogValidationError } from "../../lib/server/catalog/errors";
 import type { DemandRecord, OfferRecord } from "../../lib/server/catalog/types";
 import { BoostError, grantOfferBoost, readBoostSlots, type BoostErrorCode } from "../../lib/server/boost/boosts";
 import {
-  listOfferBoostQuotes, quoteOfferBoost, readBoostPricingSettings, readScopeBoostPriceHistory, type BoostQuote,
+  listOfferBoostQuotes, quoteOfferBoost, readBoostPricingSettings, readScopeBoostPriceHistory, type BoostQuote, type BoostQuoteTestHooks,
 } from "../../lib/server/boost/quotes";
-import { BOOST_REACH_COUNT_LIMIT, BOOST_REACH_SEARCH_LIMIT, computeBoostReach } from "../../lib/server/boost/reach";
+import { createReachGate } from "../../lib/server/boost/gate";
+import { BOOST_QUOTE_RATE_LIMIT, BOOST_QUOTE_RATE_NAMESPACE } from "../../lib/server/boost/boost-config";
+import {
+  BOOST_PURCHASE_REACH_BUDGET_MS, BOOST_QUOTE_REACH_BUDGET_MS, BOOST_REACH_COUNT_LIMIT, BOOST_REACH_SEARCH_LIMIT, BOOST_REACH_STATEMENT_TIMEOUT_MS, BOOST_REUSE_REACH_BUDGET_MS, computeBoostReach, isReachUndetermined,
+} from "../../lib/server/boost/reach";
 import { listStoredOfferMatchesForDemand, readDemandOrganicRanking } from "../../lib/server/matching/stored-matches";
 import { computeScoringConfigHash, normalizeScoringConfig } from "../../lib/server/matching/persistence";
 import { MATCHING_SCORING_CONTRACT_VERSION } from "../../lib/server/matching/scoring-types";
 import { MATCHING_OFFLINE_CONTRACT_VERSION } from "../../lib/server/matching/types";
 import { runMigrations } from "../../lib/server/postgres/migrations";
-import { EVALUATION_SUMMARY_JSON, PREFERENCES_SUMMARY_JSON, REACHABLE_LIST_SIZE, SCORING_SUMMARY_JSON } from "./boost-fixtures";
+import { EVALUATION_SUMMARY_JSON, PREFERENCES_SUMMARY_JSON, REACHABLE_LIST_SIZE, SCORING_SUMMARY_JSON, slowReachPool } from "./boost-fixtures";
 import { runScript } from "./run-script";
 import {
   createTemporarySchemaName, openVerifiedIsolatedPool, openVerifiedTestDatabase, quoteTemporarySchema, type DedicatedTestDatabase,
@@ -145,7 +149,7 @@ async function addDemand(offer: OfferRecord, buyerId: string, options: EvalOptio
 const wipe = () => { fillerOffers = []; return wipeTables(); };
 const wipeTables = () => pool.query("TRUNCATE boost_quotes, offer_boosts, matching_evaluations, matching_jobs, matching_outbox_events, demands, offers CASCADE");
 const sqlRow = async <T extends Record<string, unknown>>(text: string, values: unknown[] = []): Promise<T> => (await pool.query<T>(text, values)).rows[0];
-const quote = (offer: OfferRecord, durationCode: "24h" | "3d" | "7d" = "24h", db: Pool = pool, hooks?: { beforeInsert?: () => Promise<void> | void }) =>
+const quote = (offer: OfferRecord, durationCode: "24h" | "3d" | "7d" = "24h", db: Pool = pool, hooks?: BoostQuoteTestHooks) =>
   quoteOfferBoost({ pool: db, ownerId: offer.ownerId, offerId: offer.id, durationCode, hooks });
 const grant = (offer: OfferRecord) => grantOfferBoost({ pool, offerId: offer.id, ownerId: offer.ownerId, durationCode: "24h", source: "admin_grant" });
 
@@ -196,13 +200,13 @@ async function controlWorld() {
 
 // ═════════════ 1. Migration 0012 ═════════════
 
-test("migration 0012 : 16 appliquées (dont 0012 et 0016), la relance n'en applique aucune, ligne default v1 exacte, index présents", async () => {
-  assert.equal(firstMigration.applied.length, 16);
-  assert.equal(firstMigration.applied.at(-1), "0016_boost_quote_reach");
+test("migration 0012 : 17 appliquées (dont 0012, 0016 et 0017), la relance n'en applique aucune, ligne default v1 exacte, index présents", async () => {
+  assert.equal(firstMigration.applied.length, 17);
+  assert.equal(firstMigration.applied.at(-1), "0017_boost_quote_reach_truncated");
   assert.ok(firstMigration.applied.includes("0012_boost_pricing"));
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 16);
+  assert.equal(rerun.skipped.length, 17);
   const rows = (await pool.query("SELECT * FROM boost_pricing_settings")).rows;
   assert.equal(rows.length, 1);
   const { created_at: createdAt, ...rest } = rows[0];
@@ -342,7 +346,7 @@ test("exemple de contrôle de bout en bout : S = 3, D = 4, 1 place utilisée sur
   assert.equal(result.rawAmount, "2296.092500000000");
   assert.equal(result.currency, "XOF");
   assert.deepEqual(result.factors, { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 });
-  assert.deepEqual(result.inputs, { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, slotsTotal: 3, slotsUsed: 1 });
+  assert.deepEqual(result.inputs, { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, reachTruncated: false, slotsTotal: 3, slotsUsed: 1 });
   assert.deepEqual(result.pricing, { key: "default", version: 1 });
   assert.equal(result.unavailableReason, null);
   assert.equal(result.durationCode, "3d");
@@ -437,7 +441,7 @@ test("indisponibilités : chaque motif, comptages renseignés, aucun prix ni fac
   const boosted = await quote(world.offer);
   assert.deepEqual({ status: boosted.status, reason: boosted.unavailableReason, amount: boosted.amount, raw: boosted.rawAmount, factors: boosted.factors },
     { status: "unavailable", reason: "offer_already_boosted", amount: null, raw: null, factors: null });
-  assert.deepEqual(boosted.inputs, { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: null, slotsTotal: 3, slotsUsed: 2 });
+  assert.deepEqual(boosted.inputs, { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: null, reachTruncated: false, slotsTotal: 3, slotsUsed: 2 });
   assert.equal(boosted.expiresAt.getTime() - boosted.computedAt.getTime(), 60_000, "validité de 60 s");
   assert.equal(boosted.reused, false);
   const row = await sqlRow<Record<string, unknown>>("SELECT * FROM boost_quotes WHERE id = $1", [boosted.id]);
@@ -453,7 +457,7 @@ test("indisponibilités : chaque motif, comptages renseignés, aucun prix ni fac
   await addBuyer(lone);
   const noSlot = await quote(lone);
   assert.equal(noSlot.unavailableReason, "no_slot_available");
-  assert.deepEqual(noSlot.inputs, { competingSellers: 1, compatibleBuyers: 1, reachableBuyers: null, slotsTotal: 1, slotsUsed: 1 });
+  assert.deepEqual(noSlot.inputs, { competingSellers: 1, compatibleBuyers: 1, reachableBuyers: null, reachTruncated: false, slotsTotal: 1, slotsUsed: 1 });
 
   // total = 0 (min_slots = max_slots = 0) : indisponible, jamais un prix infini.
   await setBoostSettings("smartphones", { min_slots: 0, max_slots: 0 });
@@ -474,14 +478,14 @@ test("indisponibilités : chaque motif, comptages renseignés, aucun prix ni fac
   await addBuyer(b);
   const limit = await quote(b);
   assert.equal(limit.unavailableReason, "seller_boost_limit_reached");
-  assert.deepEqual(limit.inputs, { competingSellers: 5, compatibleBuyers: 1, reachableBuyers: null, slotsTotal: 2, slotsUsed: 1 });
+  assert.deepEqual(limit.inputs, { competingSellers: 5, compatibleBuyers: 1, reachableBuyers: null, reachTruncated: false, slotsTotal: 2, slotsUsed: 1 });
 
   // no_compatible_buyer : aucune évaluation → pas de vente sans exposition possible.
   await wipe();
   const unseen = await makeOffer();
   const noBuyer = await quote(unseen);
   assert.equal(noBuyer.unavailableReason, "no_compatible_buyer");
-  assert.deepEqual(noBuyer.inputs, { competingSellers: 0, compatibleBuyers: 0, reachableBuyers: 0, slotsTotal: 1, slotsUsed: 0 });
+  assert.deepEqual(noBuyer.inputs, { competingSellers: 0, compatibleBuyers: 0, reachableBuyers: 0, reachTruncated: false, slotsTotal: 1, slotsUsed: 0 });
   assert.equal(noBuyer.factors, null);
 });
 
@@ -1026,27 +1030,308 @@ test("portée visible : ordre des motifs — aucun effet visible est le DERNIER 
   assert.deepEqual([fourth.unavailableReason, fourth.inputs.compatibleBuyers, fourth.inputs.reachableBuyers], ["no_visible_effect", 1, 0]);
 });
 
-test("portée visible : bornes — au-delà de 200 besoins évalués on cherche seulement un premier acheteur atteignable (et on s'arrête dès qu'il est trouvé) ; sinon on s'arrête à 200", async () => {
-  assert.equal(BOOST_REACH_COUNT_LIMIT, 200);
-  assert.equal(BOOST_REACH_SEARCH_LIMIT, 1000);
-  // Le seul besoin atteignable est le PLUS ANCIEN, derrière 203 besoins à liste courte : trouvé quand même au-delà de 200.
+const REACH_BUDGET = 30_000;
+const reachOf = (offerId: string, mode: "count" | "first" = "count", extra: Partial<Parameters<typeof computeBoostReach>[1]> = {}) =>
+  inTransaction((client) => computeBoostReach(client, { offerId, mode, budgetMs: REACH_BUDGET, ...extra }));
+
+test("portée visible (lot P3) : bornes — 20 besoins comptés, 50 examinés pour trouver un premier acheteur ; tronqué = le compte est un minimum", async () => {
+  assert.equal(BOOST_REACH_COUNT_LIMIT, 20);
+  assert.equal(BOOST_REACH_SEARCH_LIMIT, 50);
+  assert.equal(BOOST_QUOTE_REACH_BUDGET_MS, 3_000);
+  assert.equal(BOOST_PURCHASE_REACH_BUDGET_MS, 1_500);
+  assert.equal(BOOST_REUSE_REACH_BUDGET_MS, 1_000);
+  assert.equal(BOOST_REACH_STATEMENT_TIMEOUT_MS, 2_000);
+  // (1) Le seul besoin atteignable est le PLUS ANCIEN, derrière 44 besoins à liste courte : trouvé au-delà de 20 (45e examiné) ; 45 besoins existent, le compte est exact.
   await wipe();
   const offer = await makeOffer();
   await addBuyer(offer, { listSize: 7 });
-  for (let index = 0; index < 203; index++) await addBuyer(offer, { listSize: 1 });
-  const found = await inTransaction((client) => computeBoostReach(client, { offerId: offer.id }));
-  assert.equal(found.reachableBuyers, 1);
-  assert.equal(found.evaluatedDemands, 204, "204 besoins examinés : on a continué au-delà de 200 tant que rien n'était atteignable");
-  assert.equal(found.truncated, false);
-  assert.equal((await freshQuote(offer)).status, "available");
-  // Trois acheteurs atteignables parmi les 200 plus récents : le comptage s'arrête à 200 besoins évalués (minimum).
+  for (let index = 0; index < 44; index++) await addBuyer(offer, { listSize: 1 });
+  const found = await reachOf(offer.id);
+  assert.deepEqual([found.reachableBuyers, found.evaluatedDemands, found.truncated, found.budgetExhausted], [1, 45, false, false]);
+  const availableQuote = await freshQuote(offer);
+  assert.deepEqual([availableQuote.status, availableQuote.inputs.reachableBuyers, availableQuote.inputs.reachTruncated], ["available", 1, false]);
+  // (2) 51 besoins, l'atteignable est le 51e (le plus ancien) : au-delà de la borne de recherche (50) → non trouvé, tronqué, aucun effet démontré.
+  await wipe();
+  const far = await makeOffer();
+  await addBuyer(far, { listSize: 7 });
+  for (let index = 0; index < 50; index++) await addBuyer(far, { listSize: 1 });
+  const missed = await reachOf(far.id);
+  assert.deepEqual([missed.reachableBuyers, missed.evaluatedDemands, missed.truncated], [0, 50, true]);
+  const refused = await freshQuote(far);
+  assert.deepEqual([refused.status, refused.unavailableReason, refused.inputs.compatibleBuyers, refused.inputs.reachableBuyers, refused.inputs.reachTruncated], ["unavailable", "no_visible_effect", 51, 0, true]);
+  // (3) Trois atteignables parmi les 20 plus récents, 30 besoins plus anciens non examinés : comptage borné à 20, tronqué (minimum).
   await wipe();
   const crowded = await makeOffer();
-  for (let index = 0; index < 205; index++) await addBuyer(crowded, { listSize: index >= 202 ? 7 : 1 });
-  const capped = await inTransaction((client) => computeBoostReach(client, { offerId: crowded.id }));
-  assert.equal(capped.reachableBuyers, 3);
-  assert.equal(capped.evaluatedDemands, 200);
-  assert.equal(capped.truncated, true, "plus de besoins compatibles que ceux examinés : minimum");
+  for (let index = 0; index < 30; index++) await addBuyer(crowded, { listSize: 1 });
+  for (let index = 0; index < 17; index++) await addBuyer(crowded, { listSize: 1 });
+  for (let index = 0; index < 3; index++) await addBuyer(crowded, { listSize: 7 });
+  const capped = await reachOf(crowded.id);
+  assert.deepEqual([capped.reachableBuyers, capped.evaluatedDemands, capped.truncated], [3, 20, true]);
+  const cappedQuote = await freshQuote(crowded);
+  assert.deepEqual([cappedQuote.status, cappedQuote.inputs.compatibleBuyers, cappedQuote.inputs.reachableBuyers, cappedQuote.inputs.reachTruncated], ["available", 50, 3, true]);
+  const stored = await sqlRow<{ reachable_buyers: number; reach_truncated: boolean }>("SELECT reachable_buyers, reach_truncated FROM boost_quotes WHERE id = $1", [cappedQuote.id]);
+  assert.deepEqual(stored, { reachable_buyers: 3, reach_truncated: true });
+  // Relu tel quel : réutilisation et historique portent le drapeau.
+  assert.equal((await quote(crowded)).inputs.reachTruncated, true);
+  assert.equal((await listOfferBoostQuotes({ pool, ownerId: crowded.ownerId, offerId: crowded.id, limit: 5 }))[0].inputs.reachTruncated, true);
+  // (4) Exactement 20 besoins, tous atteignables : compte exact (aucun besoin laissé de côté).
+  await wipe();
+  const exact = await makeOffer();
+  for (let index = 0; index < 20; index++) await addBuyer(exact, { listSize: 7 });
+  const all = await reachOf(exact.id);
+  assert.deepEqual([all.reachableBuyers, all.evaluatedDemands, all.truncated], [20, 20, false]);
+  // (5) Mode « premier » (revérification d'un achat) : arrêt au premier acheteur atteignable, quel que soit le nombre d'autres.
+  const firstOnly = await reachOf(exact.id, "first");
+  assert.deepEqual([firstOnly.reachableBuyers, firstOnly.evaluatedDemands, firstOnly.truncated], [1, 1, true]);
+});
+
+test("portée visible (lot P3) : budget de temps — épuisé, le calcul s'arrête et rend ce qui est démontré ; sans acheteur démontré → aucun effet visible (jamais une promesse)", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  for (let index = 0; index < 6; index++) await addBuyer(offer, { listSize: 7 });
+  // Horloge factice : chaque lecture avance de 50 ms ; budget 120 ms → un seul besoin est examiné avant l'épuisement.
+  const ticking = () => { let t = 0; return () => (t += 50); };
+  const limited = await reachOf(offer.id, "count", { budgetMs: 120, clock: ticking() });
+  assert.deepEqual([limited.evaluatedDemands, limited.reachableBuyers, limited.budgetExhausted, limited.truncated], [1, 1, true, true]);
+  const none = await reachOf(offer.id, "count", { budgetMs: 40, clock: ticking() });
+  assert.deepEqual([none.evaluatedDemands, none.reachableBuyers, none.budgetExhausted, none.truncated], [0, 0, true, true], "budget épuisé avant le premier besoin : rien de démontré");
+  assert.equal(isReachUndetermined(none), true, "zéro acheteur ET budget épuisé : indéterminé (lot P3-bis)");
+  assert.equal(isReachUndetermined(limited), false, "un acheteur démontré : pas indéterminé");
+  assert.equal(isReachUndetermined({ reachableBuyers: 0, budgetExhausted: false }), false, "zéro acheteur, aucun épuisement : DÉMONTRÉ (no_visible_effect)");
+  // Devis (lot P3-bis, N3) : budget épuisé SANS acheteur démontré → reach_check_unavailable (503) et AUCUN devis écrit (jamais un « aucun effet visible » : rien n'est
+  // démontré) ; budget épuisé AVEC un acheteur démontré → disponible, « au moins 1 ».
+  assert.equal(await code(quote(offer, "24h", pool, { reachBudgetMs: 40, reachClock: ticking() })), "reach_check_unavailable");
+  assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes")).n, 0, "aucun devis indéterminé n'est persisté (il serait réutilisé 60 s)");
+  await pool.query("DELETE FROM boost_quotes");
+  const partial = await quote(offer, "24h", pool, { reachBudgetMs: 120, reachClock: ticking() });
+  assert.deepEqual([partial.status, partial.inputs.reachableBuyers, partial.inputs.reachTruncated, partial.inputs.compatibleBuyers], ["available", 1, true, 6]);
+});
+
+test("portée visible (lot P3) : statement_timeout — une requête plus lente que le délai est interrompue (57014), le calcul s'arrête sans erreur, la transaction reste utilisable et le délai est rétabli", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  for (let index = 0; index < 3; index++) await addBuyer(offer, { listSize: 7 });
+  const started = Date.now();
+  const result = await inTransaction(async (client) => {
+    const realQuery = client.query.bind(client) as (...args: unknown[]) => Promise<unknown>;
+    // La première lecture d'un classement (tri par score) est précédée d'une instruction de 2 s : sous un délai de 100 ms elle doit être interrompue.
+    let slept = false;
+    (client as unknown as { query: unknown }).query = async (...args: unknown[]) => {
+      const text = typeof args[0] === "string" ? args[0] : "";
+      if (!slept && /ORDER BY e\.score/.test(text)) { slept = true; await realQuery("SELECT pg_sleep(2)"); }
+      return realQuery(...args);
+    };
+    const reach = await computeBoostReach(client, { offerId: offer.id, mode: "count", budgetMs: REACH_BUDGET, statementTimeoutMs: 100 });
+    (client as unknown as { query: unknown }).query = realQuery;
+    const setting = (await client.query<{ statement_timeout: string }>("SHOW statement_timeout")).rows[0].statement_timeout;
+    const usable = (await client.query<{ n: number }>("SELECT 1 AS n")).rows[0].n;
+    return { reach, setting, usable };
+  });
+  assert.ok(Date.now() - started < 1_500, `l'instruction de 2 s a été interrompue vers 100 ms (${Date.now() - started} ms)`);
+  assert.deepEqual([result.reach.budgetExhausted, result.reach.truncated, result.reach.reachableBuyers], [true, true, 0]);
+  assert.equal(result.setting, "0", "délai rétabli (la transaction de l'appelant peut continuer vers un débit)");
+  assert.equal(result.usable, 1, "la transaction reste utilisable après l'interruption");
+});
+
+test("devis (lot P3) : AUCUN verrou tenu pendant le calcul de la portée — un devis concurrent d'une autre durée et une mise en pause de l'offre passent pendant le calcul ; l'écriture relit l'offre sous verrou", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  for (let index = 0; index < 3; index++) await addBuyer(offer, { listSize: 7 });
+  const observer = (await distinctPools(1))[0];
+  let blocked!: () => void;
+  const inReach = new Promise<void>((resolve) => { blocked = resolve; });
+  let release!: () => void;
+  const hold = new Promise<void>((resolve) => { release = resolve; });
+  let first = true;
+  const slow = quote(offer, "24h", pool, {
+    beforeReachDemand: async () => { if (first) { first = false; blocked(); await hold; } },
+  });
+  const slowOutcome = slow.then((value) => ({ value }), (error: unknown) => ({ error }));
+  await inReach;
+  try {
+    const locks = await observer.query("SELECT classid::int AS namespace FROM pg_locks WHERE locktype = 'advisory' AND granted AND classid IN (1314664948, 1314664949, 1314664952)");
+    assert.deepEqual(locks.rows, [], "aucun verrou consultatif de périmètre, de cotation ni de vendeur pendant le calcul de la portée");
+    const startedAt = Date.now();
+    const concurrent = await quote(offer, "3d", observer);
+    assert.equal(concurrent.status, "available", "un devis d'une autre durée aboutit pendant le calcul du premier");
+    const pause = await observer.query("UPDATE offers SET status = 'paused' WHERE id = $1", [offer.id]);
+    assert.equal(pause.rowCount, 1, "la mise en pause de l'offre n'attend aucun verrou");
+    assert.ok(Date.now() - startedAt < 2_000, `concurrent + pause en ${Date.now() - startedAt} ms`);
+  } finally {
+    release();
+  }
+  const outcome = await slowOutcome;
+  assert.ok("error" in outcome && (outcome.error as { code?: string }).code === "offer_not_eligible", "l'écriture relit l'offre sous verrou : elle est en pause, le premier devis est refusé");
+  assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes WHERE duration_code = '24h'")).n, 0, "rien n'est écrit pour le devis refusé");
+});
+
+test("devis (lot P3, P3-bis) : la portée est une estimation datée — si l'offre change de produit pendant le calcul, rien n'est démontré pour le nouveau périmètre : reach_check_unavailable (rien d'écrit), jamais un effet promis ni un refus définitif non démontré", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  for (let index = 0; index < 2; index++) await addBuyer(offer, { listSize: 7 });
+  let moved = false;
+  const writer = (await distinctPools(1))[0];
+  const hooks: BoostQuoteTestHooks = {
+    beforeReachDemand: async () => {
+      if (!moved) { moved = true; await writer.query("UPDATE offers SET model = 'Autre produit' WHERE id = $1", [offer.id]); }
+    },
+  };
+  assert.equal(await code(quote(offer, "24h", pool, hooks)), "reach_check_unavailable");
+  assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes")).n, 0, "rien n'est écrit : aucune portée démontrée pour le nouveau périmètre");
+  // Réessayé : la portée est calculée pour le périmètre actuel et le devis est écrit (réponse DÉMONTRÉE, jamais un 503).
+  const retried = await quote(offer, "24h");
+  assert.equal(retried.reused, false);
+  const row = await sqlRow<{ scope_model: string }>("SELECT scope_model FROM boost_quotes WHERE id = $1", [retried.id]);
+  assert.equal(row.scope_model, "autre produit", "le devis est écrit pour le périmètre actuel de l'offre");
+});
+
+test("devis (lot P3) : un créneau de calcul manquant → quote_busy (503 côté HTTP) sans rien écrire ; créneau libéré, le devis aboutit", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  for (let index = 0; index < 2; index++) await addBuyer(offer, { listSize: 7 });
+  const gate = createReachGate(1);
+  const second = (await distinctPools(1))[0];
+  let release!: () => void;
+  const hold = new Promise<void>((resolve) => { release = resolve; });
+  let inReach!: () => void;
+  const entered = new Promise<void>((resolve) => { inReach = resolve; });
+  const first = quote(offer, "24h", pool, { reachGate: gate, beforeReachDemand: async (index) => { if (index === 0) { inReach(); await hold; } } });
+  await entered;
+  assert.deepEqual(gate.stats(), { active: 1, waiting: 0 });
+  const refused = await code(quote(offer, "3d", second, { reachGate: gate, reachQueueWaitMs: 50 }));
+  assert.equal(refused, "quote_busy");
+  assert.equal((await second.query<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes")).rows[0].n, 0, "le refus n'écrit rien");
+  release();
+  assert.equal((await first).status, "available");
+  assert.deepEqual(gate.stats(), { active: 0, waiting: 0 }, "le créneau est libéré (aussi après un refus)");
+  assert.equal((await quote(offer, "3d", second, { reachGate: gate })).status, "available");
+});
+
+test("devis réutilisé revérifié (lot P3-bis, N1) : atteignable → même devis ; plus atteignable (démontré) → devis neuf INDISPONIBLE, jamais le même « disponible », sans boucle ; revérification non terminée → reach_check_unavailable, rien d'écrit ni modifié ; la portée revenue, le devis d'origine redevient réutilisable", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  await addBuyer(offer, { listSize: 7 });
+  const first = await quote(offer);
+  assert.deepEqual([first.status, first.inputs.reachableBuyers, first.reused], ["available", 1, false]);
+  const same = await quote(offer);
+  assert.deepEqual([same.id, same.reused, same.status], [first.id, true, "available"], "portée intacte : réutilisé");
+  const stored = () => sqlRow<Record<string, unknown>>("SELECT * FROM boost_quotes WHERE id = $1", [first.id]);
+  const snapshot = await stored();
+  const total = () => sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes").then((row) => row.n);
+  assert.equal(await total(), 1);
+
+  // Vérification NON TERMINÉE (budget épuisé avant le premier besoin) : 503, le devis d'origine n'est ni renvoyé, ni modifié, et rien n'est écrit.
+  let t = 0;
+  assert.equal(await code(quote(offer, "24h", pool, { reuseReachBudgetMs: 40, reachClock: () => (t += 50) })), "reach_check_unavailable");
+  assert.equal(await total(), 1, "aucun devis écrit");
+  assert.deepEqual(await stored(), snapshot, "le devis d'origine est intact");
+
+  // La place disparaît (part promue ramenée à 5 % : floor(0,05 × 7) = 0) : portée DÉMONTRÉE nulle → devis neuf indisponible, pas le même « disponible ».
+  await setBoostSettings("smartphones", { max_promoted_share: 0.05 });
+  const stale = await quote(offer);
+  assert.notEqual(stale.id, first.id, "le devis périmé n'est plus rendu");
+  assert.deepEqual([stale.status, stale.unavailableReason, stale.amount, stale.inputs.reachableBuyers, stale.inputs.reachTruncated, stale.reused], ["unavailable", "no_visible_effect", null, 0, false, false]);
+  assert.equal(await total(), 2);
+  // Pas de boucle : l'indisponible (60 s) est ensuite renvoyé tel quel, rien n'est recalculé ni écrit.
+  const loop = await quote(offer);
+  assert.deepEqual([loop.id, loop.status, loop.reused], [stale.id, "unavailable", true]);
+  assert.equal(await total(), 2);
+  assert.deepEqual(await stored(), snapshot, "le devis d'origine reste immuable");
+
+  // La portée revient et l'indisponible échoit : le devis d'origine, encore valable, est revérifié atteignable et renvoyé.
+  await resetBoostSettings();
+  await expire(stale.id);
+  const back = await quote(offer);
+  assert.deepEqual([back.id, back.reused, back.status], [first.id, true, "available"]);
+  assert.equal(await total(), 2);
+});
+
+test("devis (lot P3-bis, N3) : une vérification non terminée n'écrit AUCUN devis (rien n'est réutilisé 60 s) ; la demande suivante calcule normalement ; no_visible_effect n'est écrit que s'il est démontré", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  for (let index = 0; index < 3; index++) await addBuyer(offer, { listSize: 7 });
+  const total = () => sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes").then((row) => row.n);
+  // Budget épuisé avant le premier besoin, puis en cours de route sans acheteur trouvé : dans les deux cas 503, aucune ligne.
+  let t = 0;
+  assert.equal(await code(quote(offer, "24h", pool, { reachBudgetMs: 40, reachClock: () => (t += 50) })), "reach_check_unavailable");
+  assert.equal(await total(), 0);
+  // Statement_timeout réel : une lecture du classement plus longue que le délai est interrompue → même refus, rien d'écrit.
+  assert.equal(await code(quote(offer, "24h", slowReachPool(pool))), "reach_check_unavailable");
+  assert.equal(await total(), 0, "délai d'une requête dépassé : aucun devis écrit");
+  // La demande suivante (sans lenteur) calcule et écrit un devis disponible : rien d'indéterminé n'a été mis en cache.
+  const ok = await quote(offer);
+  assert.deepEqual([ok.status, ok.reused, ok.inputs.reachableBuyers], ["available", false, 3]);
+  assert.equal(await total(), 1);
+  // Démontré : une liste courte, aucune interruption → no_visible_effect écrit (et réutilisé 60 s).
+  await wipe();
+  const lonely = await makeOffer();
+  await addBuyer(lonely, { listSize: 1 });
+  const demonstrated = await quote(lonely);
+  assert.deepEqual([demonstrated.status, demonstrated.unavailableReason], ["unavailable", "no_visible_effect"]);
+  assert.equal((await quote(lonely)).id, demonstrated.id);
+});
+
+test("limite de débit (lot P3) : 20 devis CALCULÉS par vendeur et par minute → le 21e est refusé (rate_limited) sans rien écrire ; une cotation réutilisée n'est pas comptée ; un autre vendeur n'est pas touché ; la fenêtre glisse", async () => {
+  assert.equal(BOOST_QUOTE_RATE_LIMIT, 20);
+  await wipe();
+  const seller = await makeUser();
+  const offers: OfferRecord[] = [];
+  for (let index = 0; index < 7; index++) offers.push(await makeOffer({ ownerId: seller }));
+  const buyer = await addBuyer(offers[0], { listSize: 7 });
+  void buyer;
+  const durations = ["24h", "3d", "7d"] as const;
+  const plan = offers.flatMap((offer) => durations.map((duration) => ({ offer, duration })));
+  assert.equal(plan.length, 21);
+  for (const { offer, duration } of plan.slice(0, 20)) assert.notEqual(await code(quote(offer, duration)), "rate_limited");
+  assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes")).n, 20);
+  // Le 21e calcul : refusé, rien d'écrit.
+  const last = plan[20];
+  assert.equal(await code(quote(last.offer, last.duration)), "rate_limited");
+  assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes")).n, 20);
+  // Une cotation encore valable est renvoyée telle quelle (aucun calcul, donc aucune limite).
+  const reused = await quote(plan[0].offer, plan[0].duration);
+  assert.equal(reused.reused, true);
+  // Un autre vendeur n'est pas concerné.
+  const other = await makeOffer();
+  assert.notEqual(await code(quote(other, "24h")), "rate_limited");
+  // La fenêtre est glissante : des devis vieux de plus d'une minute ne comptent plus.
+  await pool.query("UPDATE boost_quotes SET computed_at = computed_at - interval '2 minutes', expires_at = expires_at - interval '2 minutes' WHERE seller_id = $1", [seller]);
+  assert.notEqual(await code(quote(last.offer, last.duration)), "rate_limited");
+});
+
+test("limite de débit (lot P3) : 30 demandes SIMULTANÉES du même vendeur (offres et durées distinctes) → exactement 20 devis écrits, 10 refus rate_limited (le verrou du vendeur rend le compte exact)", async () => {
+  await wipe();
+  const seller = await makeUser();
+  const offers: OfferRecord[] = [];
+  for (let index = 0; index < 10; index++) offers.push(await makeOffer({ ownerId: seller }));
+  await addBuyer(offers[0], { listSize: 7 });
+  const concurrentPool = new Pool({ connectionString: target.connectionString, max: 12, options: `-c search_path=${schema}` });
+  extraPools.push(concurrentPool);
+  const plan = offers.flatMap((offer) => (["24h", "3d", "7d"] as const).map((duration) => ({ offer, duration })));
+  const outcomes = await Promise.all(plan.map(({ offer, duration }) => code(quote(offer, duration, concurrentPool))));
+  assert.equal(outcomes.filter((outcome) => outcome === "rate_limited").length, 10, outcomes.join(","));
+  assert.equal(outcomes.filter((outcome) => outcome === "ok").length, 20, outcomes.join(","));
+  assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes")).n, 20, "exactement 20 devis écrits");
+  // Le verrou du vendeur n'est tenu que pendant l'écriture : aucun reste après coup.
+  assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND classid = $1", [BOOST_QUOTE_RATE_NAMESPACE])).n, 0);
+});
+
+test("migration 0017 (lot P3) : reach_truncated booléen (NULL permis, seulement avec reachable_buyers), index (vendeur, calculé le) présent", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  const base = { offerId: offer.id, sellerId: offer.ownerId };
+  const column = await sqlRow<{ data_type: string; is_nullable: string }>(
+    "SELECT data_type, is_nullable FROM information_schema.columns WHERE table_schema = $1 AND table_name = 'boost_quotes' AND column_name = 'reach_truncated'", [schema]);
+  assert.deepEqual(column, { data_type: "boolean", is_nullable: "YES" });
+  const index = await sqlRow<{ indexdef: string }>("SELECT indexdef FROM pg_indexes WHERE schemaname = $1 AND indexname = 'idx_boost_quotes_seller_computed'", [schema]);
+  assert.match(index.indexdef, /\(seller_id, computed_at DESC\)/);
+  await insertQuote({ ...base, buyers: 3, reachable: 3 });
+  await pool.query("UPDATE boost_quotes SET reach_truncated = TRUE WHERE reachable_buyers = 3");
+  await insertQuote({ ...base, buyers: 3, reachable: null, duration: "3d" });
+  await assert.rejects(pool.query("UPDATE boost_quotes SET reach_truncated = TRUE WHERE duration_code = '3d'"), /chk_boost_quotes_reach_truncated/, "drapeau renseigné sans portée évaluée : refusé");
+  await pool.query("UPDATE boost_quotes SET reach_truncated = FALSE WHERE reachable_buyers = 3");
+  await pool.query("UPDATE boost_quotes SET reach_truncated = TRUE WHERE reachable_buyers = 3");
+  assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes WHERE reach_truncated IS TRUE")).n, 1);
 });
 
 test("portée visible : une évaluation illisible n'empêche pas la cotation — ce besoin est écarté, les autres comptent ; si tous sont illisibles, aucun effet visible (jamais une erreur)", async () => {

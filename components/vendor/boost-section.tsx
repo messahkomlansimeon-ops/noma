@@ -46,6 +46,7 @@ import {
   purchaseFollowUp,
   purchaseHistoryRow,
   reanchorQuote,
+  schedulePurchaseRechecks,
   walletHref,
   type BuyState,
   type QuoteClock,
@@ -111,6 +112,8 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
   const quoteGuard = useRef(createGenerationGuard());
   // Dernier achat au résultat inconnu, lu par l'écouteur de retour au premier plan (qui ne se recrée pas à chaque rendu).
   const unresolvedRef = useRef<UnresolvedPurchase | null>(null);
+  // Relectures automatiques d'un achat au résultat inconnu (2 s, 5 s, 10 s après l'incident) : `recheckEpoch` change à chaque nouvel incident.
+  const [recheckEpoch, setRecheckEpoch] = useState(0);
   const ticking = entry !== null || (history?.quotes.length ?? 0) > 0;
 
   useEffect(() => {
@@ -262,6 +265,38 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
     unresolvedRef.current = unresolved;
   }, [unresolved]);
 
+  // Le serveur peut enregistrer l'achat APRÈS une réponse perdue (constaté : réponse perdue à 0,8 s, achat enregistré à 3,5 s) : tant que l'issue est
+  // inconnue, les ACHATS de l'annonce sont relus après 2 s, 5 s et 10 s (lecture seule : aucun nouvel envoi, donc aucun risque de double débit ; ni le devis
+  // affiché ni son compte à rebours ne sont touchés). L'achat retrouvé → le succès s'affiche tout seul, le solde et les historiques sont relus.
+  const recheck = useCallback(
+    async (attempt: BoostQuote) => {
+      try {
+        const items = await api.boostPurchases.list(offerId, { limit: HISTORY_LIMIT });
+        const bought = items.find((item) => item.quoteId === attempt.id);
+        if (!bought) return;
+        setPurchases(items);
+        applyPurchaseSuccess(bought.endsAt);
+        setWalletKey((key) => key + 1);
+        setHistoryKey((key) => key + 1);
+      } catch (failure) {
+        redirectIfUnauthorized(failure);
+      }
+    },
+    [offerId, redirectIfUnauthorized, applyPurchaseSuccess],
+  );
+  const recheckRef = useRef(recheck);
+  useEffect(() => {
+    recheckRef.current = recheck;
+  }, [recheck]);
+  useEffect(() => {
+    if (recheckEpoch === 0) return;
+    return schedulePurchaseRechecks(() => {
+      const pending = unresolvedRef.current;
+      if (!pending || buyingRef.current) return;
+      void recheckRef.current(pending.quote);
+    });
+  }, [recheckEpoch]);
+
   // Un devis acheté est consommé : l'historique des devis le dit (« Acheté »), il ne reste jamais « En cours de validité ».
   const purchasedQuoteIds = new Set((purchases ?? []).map((item) => item.quoteId));
   const quotePending = pending !== null;
@@ -302,6 +337,7 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
       setBuyError(describeApiError(failure, "purchase"));
       const unknown = apiFailure ? isPurchaseOutcomeUnknown(apiFailure) : true;
       setUnresolved(unknown ? { quote, verified: false } : null);
+      if (unknown) setRecheckEpoch((epoch) => epoch + 1);
       const next = apiFailure ? purchaseFollowUp(apiFailure) : null;
       if (next?.closeConfirmation) setConfirming(false);
       const found = await reconcile(quote, unknown);

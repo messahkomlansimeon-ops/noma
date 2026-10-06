@@ -7,6 +7,8 @@ import {
   API_INVALID_RESPONSE,
   API_NETWORK_ERROR,
   ApiError,
+  BOOST_RATE_LIMITED_MESSAGE,
+  REACH_CHECK_UNAVAILABLE_MESSAGE,
   GENERIC_ERROR_MESSAGE,
   LIST_ALL_MAX_PAGES,
   PAGE_LIMIT,
@@ -730,7 +732,7 @@ function quoteDto(overrides: Record<string, unknown> = {}) {
     amount: 2300,
     unavailableReason: null,
     factors: { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 },
-    inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, slotsTotal: 3, slotsUsed: 1 },
+    inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, reachTruncated: false, slotsTotal: 3, slotsUsed: 1 },
     computedAt: "2031-01-01T10:00:00.000Z",
     expiresAt: "2031-01-01T10:15:00.000Z",
     reused: false,
@@ -773,7 +775,7 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
     assert.equal(created.expired, null);
     assert.equal(reused.reused, true);
     assert.deepEqual(created.factors, { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 });
-    assert.deepEqual(created.inputs, { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, slotsTotal: 3, slotsUsed: 1 });
+    assert.deepEqual(created.inputs, { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, reachTruncated: false, slotsTotal: 3, slotsUsed: 1 });
   });
 
   test("un devis indisponible est un SUCCÈS (jamais une erreur) avec son motif", async () => {
@@ -791,7 +793,7 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
   });
 
   test("portée visible : reachableBuyers (entier ≥ 0 ou null) relu ; motif no_visible_effect = un devis INDISPONIBLE (succès), jamais une erreur", async () => {
-    const withInputs = (reachableBuyers: number | null) => ({ competingSellers: 3, compatibleBuyers: 4, reachableBuyers, slotsTotal: 3, slotsUsed: 1 });
+    const withInputs = (reachableBuyers: number | null) => ({ competingSellers: 3, compatibleBuyers: 4, reachableBuyers, reachTruncated: false, slotsTotal: 3, slotsUsed: 1 });
     for (const reachable of [0, 1, 4, null]) {
       const { client } = harness(() => json(201, { contractVersion: "boost-quote/v1", quote: quoteDto({ inputs: withInputs(reachable) }) }));
       assert.equal((await client.boostQuotes.create(ID, "3d")).inputs.reachableBuyers, reachable);
@@ -804,6 +806,22 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
     );
     const useless = await client.boostQuotes.create(ID, "24h");
     assert.deepEqual([useless.status, useless.unavailableReason, useless.amount, useless.inputs.reachableBuyers], ["unavailable", "no_visible_effect", null, 0]);
+  });
+
+  test("portée estimée (lot P3) : reachTruncated booléen relu ; absent = faux ; une valeur qui n'est pas un booléen est refusée (invalid_response)", async () => {
+    const inputs = (reachTruncated: unknown) => ({ competingSellers: 3, compatibleBuyers: 40, reachableBuyers: 20, reachTruncated, slotsTotal: 3, slotsUsed: 1 });
+    for (const [sent, expected] of [[true, true], [false, false]] as const) {
+      const { client } = harness(() => json(201, { contractVersion: "boost-quote/v1", quote: quoteDto({ inputs: inputs(sent) }) }));
+      assert.equal((await client.boostQuotes.create(ID, "3d")).inputs.reachTruncated, expected);
+    }
+    const legacyInputs: Record<string, unknown> = inputs(true);
+    delete legacyInputs.reachTruncated;
+    const legacy = harness(() => json(201, { contractVersion: "boost-quote/v1", quote: quoteDto({ inputs: legacyInputs }) }));
+    assert.equal((await legacy.client.boostQuotes.create(ID, "3d")).inputs.reachTruncated, false, "champ absent : faux");
+    for (const bad of ["true", 1, null, {}]) {
+      const { client } = harness(() => json(201, { contractVersion: "boost-quote/v1", quote: quoteDto({ inputs: inputs(bad) }) }));
+      await assert.rejects(client.boostQuotes.create(ID, "3d"), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE, String(bad));
+    }
   });
 
   test("list : GET avec limit seulement, plus récentes d'abord ; chaque devis porte `expired`", async () => {
@@ -843,7 +861,7 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
   });
 
   test("erreurs du serveur (403, 404, 409, 503) : code et statut venant du corps seulement", async () => {
-    for (const [status, code] of [[403, "invalid_origin"], [404, "resource_not_found"], [409, "offer_not_eligible"], [409, "offer_not_boostable"], [503, "boost_unavailable"]] as const) {
+    for (const [status, code] of [[403, "invalid_origin"], [404, "resource_not_found"], [409, "offer_not_eligible"], [409, "offer_not_boostable"], [503, "boost_unavailable"], [503, "reach_check_unavailable"]] as const) {
       const { client } = harness(() => json(status, { error: { code, message: "ignoré" } }));
       await assert.rejects(
         client.boostQuotes.create(ID, "3d"),
@@ -912,6 +930,14 @@ describe("messages fixes : correspondances et boost", () => {
     assert.equal(message(409, "offer_not_eligible"), "Cette annonce ne peut pas être boostée : elle doit être en ligne et disponible.");
     assert.equal(message(409, "offer_not_boostable"), "Pour booster cette annonce, indiquez sa catégorie, sa marque et son modèle.");
     assert.equal(message(503, "boost_unavailable"), "Le boost est temporairement indisponible. Réessayez plus tard.");
+    // Lot P3-bis : vérification de la portée non terminée (503 reach_check_unavailable) : message propre, retriable, jamais le code brut.
+    assert.equal(message(503, "reach_check_unavailable"), "Vérification impossible pour le moment, réessayez dans un instant.");
+    assert.equal(message(503, "reach_check_unavailable"), REACH_CHECK_UNAVAILABLE_MESSAGE);
+    assert.equal(message(503, "reach_check_unavailable").includes("reach_check"), false);
+    // Lot P3 : limite de débit des devis (429 rate_limited), message propre (jamais celui des codes de connexion).
+    assert.equal(message(429, "rate_limited"), "Trop de demandes de prix en peu de temps. Patientez une minute, puis réessayez.");
+    assert.equal(message(429, "rate_limited"), BOOST_RATE_LIMITED_MESSAGE);
+    assert.equal(message(429, "rate_limited").includes("code"), false);
     assert.equal(message(409, "autre"), GENERIC_ERROR_MESSAGE);
     assert.equal(message(403, "invalid_origin"), "Requête refusée. Rechargez la page et réessayez.");
   });
@@ -1298,7 +1324,7 @@ describe("couche cliente : achat de boost (boostPurchases)", () => {
     const cases: [number, string][] = [
       [400, "invalid_request"], [401, "authentication_required"], [403, "invalid_origin"], [404, "resource_not_found"],
       [409, "insufficient_balance"], [409, "quote_expired"], [409, "quote_unavailable"], [409, "quote_already_used"], [409, "offer_not_eligible"],
-      [409, "offer_already_boosted"], [409, "no_slot_available"], [409, "seller_boost_limit_reached"], [409, "idempotency_conflict"], [503, "boost_purchase_unavailable"],
+      [409, "offer_already_boosted"], [409, "no_slot_available"], [409, "seller_boost_limit_reached"], [409, "no_visible_effect"], [409, "idempotency_conflict"], [503, "boost_purchase_unavailable"], [503, "reach_check_unavailable"],
     ];
     for (const [status, code] of cases) {
       const { client } = harness(() => json(status, { error: { code, message: "ignoré" } }));
@@ -1330,6 +1356,17 @@ describe("messages fixes : porte-monnaie et achat de boost (jamais le code brut)
     assert.match(purchase(409, "quote_unavailable"), /pas de prix/);
     assert.equal(purchase(409, "no_slot_available"), "Il n'y a plus de place de mise en avant disponible pour ce produit pour le moment.");
     assert.equal(purchase(409, "seller_boost_limit_reached"), "Vous avez atteint votre plafond de boosts pour ce produit.");
+    // Lot P3 : portée revérifiée à l'achat : message simple, rien n'a été acheté, un nouveau prix est à demander.
+    // Lot P3-bis (N2) : texte neutre unique, qui couvre aussi « place prise par un boost plus ancien ».
+    assert.equal(
+      purchase(409, "no_visible_effect"),
+      "Ce boost ne ferait plus monter votre annonce chez aucun acheteur (place déjà occupée par un boost acheté plus tôt, ou liste trop courte). Aucun débit. Demandez un nouveau prix plus tard.",
+    );
+    // Lot P3-bis (N3) : vérification non terminée = 503 retriable, jamais confondue avec « aucun effet ».
+    assert.equal(purchase(503, "reach_check_unavailable"), "Vérification impossible pour le moment, réessayez dans un instant.");
+    assert.equal(purchase(503, "reach_check_unavailable"), REACH_CHECK_UNAVAILABLE_MESSAGE);
+    assert.notEqual(purchase(503, "reach_check_unavailable"), purchase(409, "no_visible_effect"));
+    assert.equal(purchase(503, "reach_check_unavailable").includes("Aucun débit"), false);
     assert.equal(purchase(409, "offer_already_boosted"), "Cette annonce est déjà boostée.");
     assert.equal(purchase(409, "offer_not_eligible"), "Cette annonce ne peut pas être boostée : elle doit être en ligne et disponible.");
     assert.match(purchase(409, "idempotency_conflict"), /conflit avec une demande précédente/);
@@ -1353,7 +1390,7 @@ describe("messages fixes : porte-monnaie et achat de boost (jamais le code brut)
     const walletCodes: [number, string][] = [[400, "invalid_request"], [404, "resource_not_found"], [409, "too_many_pending_topups"], [409, "idempotency_conflict"], [503, "payment_unavailable"], [503, "wallet_unavailable"]];
     const purchaseCodes: [number, string][] = [
       [400, "invalid_request"], [404, "resource_not_found"], [409, "insufficient_balance"], [409, "quote_expired"], [409, "quote_already_used"], [409, "quote_unavailable"],
-      [409, "offer_not_eligible"], [409, "offer_already_boosted"], [409, "no_slot_available"], [409, "seller_boost_limit_reached"], [409, "idempotency_conflict"], [503, "boost_purchase_unavailable"],
+      [409, "offer_not_eligible"], [409, "offer_already_boosted"], [409, "no_slot_available"], [409, "seller_boost_limit_reached"], [409, "no_visible_effect"], [409, "idempotency_conflict"], [503, "boost_purchase_unavailable"], [503, "reach_check_unavailable"],
     ];
     for (const [status, code] of walletCodes) {
       const text = wallet(status, code);

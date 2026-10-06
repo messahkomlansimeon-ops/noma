@@ -299,6 +299,23 @@ export function createTopupKeys(storage: KeyStorage | undefined = browserSession
   return createIdempotencyKeys(newIdempotencyKey, storage, TOPUP_KEY_PREFIX);
 }
 
+/**
+ * Crée une recharge avec la clé du montant. Si le serveur renvoie une intention RÉUTILISÉE déjà TERMINÉE (réussie, échouée ou expirée : par
+ * exemple payée dans un autre onglet qui partageait cette clé), la clé n'a plus d'objet : elle est oubliée, une clé neuve est générée et la recharge
+ * est recréée UNE seule fois. Sans cela, la page de paiement afficherait « crédité » pour un paiement que l'utilisateur n'a pas fait.
+ */
+export async function createTopupWithFreshKey<T extends Pick<WalletTopup, "status">>(input: {
+  create: (request: { amountXof: number; idempotencyKey: string }) => Promise<{ topup: T; reused: boolean }>;
+  keys: IdempotencyKeys;
+  scope: string;
+  amountXof: number;
+}): Promise<{ topup: T; reused: boolean }> {
+  const first = await input.create({ amountXof: input.amountXof, idempotencyKey: input.keys.keyFor(input.scope) });
+  if (!first.reused || first.topup.status === "pending") return first;
+  input.keys.forget(input.scope);
+  return input.create({ amountXof: input.amountXof, idempotencyKey: input.keys.keyFor(input.scope) });
+}
+
 // ─── Adresses et retours ────────────────────────────────────────────────────────────────────────
 
 export const WALLET_PATH = "/compte/porte-monnaie";
@@ -360,7 +377,17 @@ export type CheckoutView =
   | { kind: "not_found"; message: string }
   | { kind: "error"; message: string };
 
+/** Recharge réussie, déjà terminée avant cette visite (lot P3-bis) : dit que le crédit a bien eu lieu, une seule fois. */
+export const checkoutAlreadyCreditedMessage = (amountText: string): string =>
+  `Cette recharge a déjà été créditée sur votre porte-monnaie (${amountText}, une seule fois).`;
+
 export const CHECKOUT_MESSAGES = Object.freeze({
+  /**
+   * Recharge déjà terminée AVANT cette visite (page rouverte, rechargée après le paiement, ou payée ailleurs). Lot P3-bis : elle dit ce qui est vrai (réussie :
+   * déjà créditée, une seule fois ; échouée ou expirée : terminée sans paiement), sans alarmer ni annoncer un crédit « de cette page » (« a été crédité de »
+   * reste réservé à la recharge payée sur cette page).
+   */
+  alreadyEndedUnpaid: "Cette recharge est terminée sans paiement : aucun montant n'a été crédité.",
   failed: "Le paiement a échoué. Votre porte-monnaie n'a pas été crédité. Vous pouvez réessayer.",
   expired: "Cette recharge a expiré. Votre porte-monnaie n'a pas été crédité. Vous pouvez recommencer.",
   unavailable: "Le paiement simulé n'est pas disponible pour le moment.",
@@ -368,8 +395,12 @@ export const CHECKOUT_MESSAGES = Object.freeze({
   error: "La recharge n'a pas pu être lue. Réessayez dans un instant.",
 });
 
-/** Ce que la page de paiement simulé affiche, d'après l'état LU de la recharge (jamais d'après la réponse d'un bouton). */
-export function checkoutView(input: { topup: WalletTopup | null; failure: CheckoutFailure | null }): CheckoutView {
+/**
+ * Ce que la page de paiement simulé affiche, d'après l'état LU de la recharge (jamais d'après la réponse d'un bouton). `paidHere` : cette page a
+ * VU la recharge en attente (c'est elle qu'on vient de payer) ; une recharge déjà réussie à la première lecture n'est pas annoncée « créditée »
+ * (lot P3 : une clé de recharge partagée entre deux onglets menait ici sans aucun paiement).
+ */
+export function checkoutView(input: { topup: WalletTopup | null; failure: CheckoutFailure | null; paidHere?: boolean }): CheckoutView {
   const { topup, failure } = input;
   if (topup) {
     const amountText = formatFcfa(topup.amountXof);
@@ -377,11 +408,14 @@ export function checkoutView(input: { topup: WalletTopup | null; failure: Checko
       case "pending":
         return { kind: "pending", amountText };
       case "succeeded":
-        return { kind: "succeeded", amountText, message: `Votre porte-monnaie a été crédité de ${amountText}.` };
+        return {
+          kind: "succeeded", amountText,
+          message: input.paidHere === false ? checkoutAlreadyCreditedMessage(amountText) : `Votre porte-monnaie a été crédité de ${amountText}.`,
+        };
       case "failed":
-        return { kind: "failed", amountText, message: CHECKOUT_MESSAGES.failed };
+        return { kind: "failed", amountText, message: input.paidHere === false ? CHECKOUT_MESSAGES.alreadyEndedUnpaid : CHECKOUT_MESSAGES.failed };
       default:
-        return { kind: "expired", amountText, message: CHECKOUT_MESSAGES.expired };
+        return { kind: "expired", amountText, message: input.paidHere === false ? CHECKOUT_MESSAGES.alreadyEndedUnpaid : CHECKOUT_MESSAGES.expired };
     }
   }
   if (failure) {
@@ -568,13 +602,39 @@ export function canBuy(state: BuyState, pending: boolean): boolean {
  * (réponse perdue). Un refus explicite (400, 401, 403, 404, 409, 429…) est définitif : rien n'a été débité.
  */
 export function isPurchaseOutcomeUnknown(failure: { status: number; code: string }): boolean {
+  // Lot P3-bis : `reach_check_unavailable` est une réponse EXPLICITE du serveur (la transaction a été annulée : rien n'est débité ni enregistré) ; réessayer
+  // avec la même clé est sans risque, ce n'est pas un résultat inconnu.
+  if (failure.status === 503 && failure.code === "reach_check_unavailable") return false;
   return failure.code === "network_error" || failure.code === "invalid_response" || failure.status >= 500;
 }
 
 export const UNRESOLVED_PURCHASE_TEXT =
   "Nous ne savons pas si votre achat est passé. Appuyez sur « Vérifier / réessayer » : vous ne serez débité qu'une seule fois.";
 export const PURCHASE_NOT_RECORDED_TEXT =
-  "Aucun achat n'est enregistré pour ce devis (aucun débit). Appuyez sur « Vérifier / réessayer » pour recommencer : vous ne serez débité qu'une seule fois.";
+  "Pas encore enregistré : l'achat peut encore aboutir. Nous revérifions automatiquement, ou appuyez sur « Vérifier / réessayer » : vous ne serez débité qu'une seule fois.";
+
+/**
+ * Tant que l'issue d'un achat est INCONNUE (réponse perdue), l'écran relit les achats de l'annonce (le serveur peut encore enregistrer l'achat :
+ * constaté, une réponse perdue à 0,8 s pour un achat qui aboutit à 3,5 s) après 2 s, 5 s puis 10 s, comptées depuis l'incident. Délais en ms.
+ */
+export const PURCHASE_RECHECK_DELAYS_MS: readonly number[] = Object.freeze([2_000, 5_000, 10_000]);
+
+/**
+ * Programme les relectures `PURCHASE_RECHECK_DELAYS_MS` ; renvoie la fonction qui les annule toutes (changement d'écran, issue connue). `onTick`
+ * reçoit le rang de la relecture (0, 1, 2). Les minuteries sont injectables (tests sans attente réelle).
+ */
+export function schedulePurchaseRechecks(
+  onTick: (attempt: number) => void,
+  timers: { set: (callback: () => void, ms: number) => unknown; clear: (handle: unknown) => void } = {
+    set: (callback, ms) => setTimeout(callback, ms),
+    clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+  },
+): () => void {
+  const handles = PURCHASE_RECHECK_DELAYS_MS.map((delay, attempt) => timers.set(() => onTick(attempt), delay));
+  return () => {
+    for (const handle of handles) timers.clear(handle);
+  };
+}
 /** Précision sur ce que fait un boost acheté (aucune promesse de position ni de vente). */
 export const BOOST_SUCCESS_NOTE =
   "Votre boost est actif : votre annonce peut monter dans les résultats des acheteurs concernés, avec le badge « Sponsorisé », parmi des offres déjà pertinentes. Ce n'est pas une garantie de position ni de vente.";
@@ -621,6 +681,7 @@ const QUOTE_CODES: readonly string[] = [
   "offer_already_boosted",
   "no_slot_available",
   "seller_boost_limit_reached",
+  "no_visible_effect",
   "idempotency_conflict",
 ];
 

@@ -576,7 +576,7 @@ async function main(): Promise<void> {
     assert.equal(created.reused, false);
     assert.ok(created.amount !== null && created.amount >= 500, `montant : ${String(created.amount)}`);
     // Lot P2-bis (S1) : `reachableBuyers` = acheteurs chez qui le boost ferait monter l'offre (ici B : 9 offres, une place mise en avant).
-    assert.deepEqual(created.inputs, { competingSellers: 1, compatibleBuyers: 1, slotsTotal: 2, slotsUsed: 0, reachableBuyers: 1 });
+    assert.deepEqual(created.inputs, { competingSellers: 1, compatibleBuyers: 1, slotsTotal: 2, slotsUsed: 0, reachableBuyers: 1, reachTruncated: false });
     assert.ok(created.factors);
     firstQuoteId = created.id;
     ok(

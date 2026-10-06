@@ -5,6 +5,7 @@ import type { Pool, PoolClient } from "pg";
 import { CatalogValidationError } from "../catalog/errors";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
 import { withPostgresTransaction, type SqlExecutor } from "../postgres/client";
+import { rankBoostsByAge } from "./placement";
 import {
   BOOST_DEFAULT_SETTINGS_KEY, BOOST_DURATION_CODES, BOOST_EXPIRY_DEFAULT_LIMIT, BOOST_EXPIRY_MAX_LIMIT, BOOST_DURATION_SECONDS, BOOST_LOCK_TIMEOUT_MS,
   BOOST_SCOPE_LOCK_NAMESPACE, BOOST_SOURCES, type BoostDurationCode, type BoostRecordSource, type BoostSource,
@@ -38,7 +39,13 @@ export type BoostErrorCode =
   | "quote_already_used"
   | "idempotency_conflict"
   | "purchase_not_found"
-  | "already_refunded";
+  | "already_refunded"
+  // Portée du boost, limite de débit et saturation des devis (lot P3).
+  | "no_visible_effect"
+  | "rate_limited"
+  | "quote_busy"
+  // Vérification de la portée non terminée à temps (lot P3-bis) : ni effet démontré, ni absence d'effet démontrée ; à réessayer, rien d'écrit.
+  | "reach_check_unavailable";
 
 /** Textes fixes : jamais de donnée de la base (ni identifiant, ni texte métier). */
 export const BOOST_ERROR_MESSAGES: Readonly<Record<BoostErrorCode, string>> = Object.freeze({
@@ -60,6 +67,10 @@ export const BOOST_ERROR_MESSAGES: Readonly<Record<BoostErrorCode, string>> = Ob
   idempotency_conflict: "Cette clé d'idempotence a déjà servi pour un autre achat.",
   purchase_not_found: "Achat introuvable.",
   already_refunded: "Cet achat est déjà remboursé.",
+  no_visible_effect: "Ce boost ne ferait monter l'offre dans la liste d'aucun acheteur : rien n'a été acheté.",
+  rate_limited: "Trop de devis demandés en peu de temps : réessayez dans une minute.",
+  quote_busy: "Le calcul des devis est momentanément saturé : réessayez dans un instant.",
+  reach_check_unavailable: "Vérification impossible pour le moment, réessayez dans un instant.",
 });
 
 export class BoostError extends Error {
@@ -567,20 +578,29 @@ export async function readEffectiveBoostedOfferIds(
   return new Set(result.rows.map((row) => row.offer_id));
 }
 
+/** Boost effectif d'une offre à l'instant `at` : son identifiant et son DÉBUT (ISO UTC à la microseconde), qui fixent son rang d'ancienneté. */
+export interface EffectiveBoost {
+  boostId: string;
+  /** `starts_at` du boost, ISO UTC à la microseconde (`YYYY-MM-DDTHH:MM:SS.ffffffZ`, largeur fixe : l'ordre du texte est l'ordre du temps). */
+  startsAt: string;
+}
+
 /**
- * Comme `readEffectiveBoostedOfferIds` (MÊMES conditions, mot pour mot) mais renvoie aussi le boost : offre → identifiant du boost
- * effectif à `at`. Une offre a au plus un boost actif (index unique partiel de 0011), donc au plus une entrée par offre. Sert au
- * classement ET au journal d'exposition (lot 2I4) à partir d'une SEULE lecture : l'ordre servi et les lignes journalisées ne
- * peuvent pas diverger. Les clés égalent le résultat de `readEffectiveBoostedOfferIds` (vérifié par test différentiel).
+ * Comme `readEffectiveBoostedOfferIds` (MÊMES conditions, mot pour mot) mais renvoie aussi le boost et son début : offre → boost effectif à
+ * `at`. Une offre a au plus un boost actif (index unique partiel de 0011), donc au plus une entrée par offre. Sert au classement (priorité
+ * d'ancienneté : `starts_at` puis identifiant du boost, lot P3), au journal d'exposition (lot 2I4) et à la portée d'un boost (`reach.ts`) à
+ * partir d'une SEULE lecture : l'ordre servi et les lignes journalisées ne peuvent pas diverger. Les clés égalent le résultat de
+ * `readEffectiveBoostedOfferIds` (vérifié par test différentiel).
  */
-export async function readEffectiveBoostsByOffer(
+export async function readEffectiveBoostDetails(
   executor: SqlExecutor,
   offerIds: readonly string[],
   at: string,
-): Promise<Map<string, string>> {
+): Promise<Map<string, EffectiveBoost>> {
   if (offerIds.length === 0) return new Map();
-  const result = await executor.query<{ offer_id: string; boost_id: string }>(
-    `SELECT b.offer_id, b.id AS boost_id
+  const result = await executor.query<{ offer_id: string; boost_id: string; starts_at_iso: string }>(
+    `SELECT b.offer_id, b.id AS boost_id,
+            to_char(b.starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS starts_at_iso
        FROM offer_boosts b
        JOIN offers o ON o.id = b.offer_id AND o.owner_id = b.seller_id
        JOIN users u ON u.id = b.seller_id
@@ -593,5 +613,23 @@ export async function readEffectiveBoostsByOffer(
         AND lower(btrim(o.model)) = b.scope_model`,
     [[...offerIds], at],
   );
-  return new Map(result.rows.map((row) => [row.offer_id, row.boost_id]));
+  return new Map(result.rows.map((row) => [row.offer_id, { boostId: row.boost_id, startsAt: row.starts_at_iso }]));
+}
+
+/** Offre → identifiant du boost effectif à `at` (lecture de `readEffectiveBoostDetails`, sans le début du boost). */
+export async function readEffectiveBoostsByOffer(
+  executor: SqlExecutor,
+  offerIds: readonly string[],
+  at: string,
+): Promise<Map<string, string>> {
+  const details = await readEffectiveBoostDetails(executor, offerIds, at);
+  return new Map([...details].map(([offerId, boost]) => [offerId, boost.boostId]));
+}
+
+/**
+ * Rang d'ancienneté de chaque offre boostée (0 = boost le plus ancien : `starts_at` puis identifiant du boost). Fonction PARTAGÉE par la
+ * lecture des résultats et la portée d'un boost : l'ordre de priorité du placement ne peut pas diverger entre les deux.
+ */
+export function rankEffectiveBoosts(details: ReadonlyMap<string, EffectiveBoost>): Map<string, number> {
+  return rankBoostsByAge([...details].map(([key, boost]) => ({ key, startsAt: boost.startsAt, boostId: boost.boostId })));
 }
