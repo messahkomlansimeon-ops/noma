@@ -7,13 +7,14 @@ import { requireTransactionPool, requireUuid } from "../catalog/validation";
 import { withPostgresTransaction, type SqlExecutor } from "../postgres/client";
 import {
   BOOST_DEFAULT_SETTINGS_KEY, BOOST_DURATION_CODES, BOOST_EXPIRY_DEFAULT_LIMIT, BOOST_EXPIRY_MAX_LIMIT, BOOST_DURATION_SECONDS, BOOST_LOCK_TIMEOUT_MS,
-  BOOST_SCOPE_LOCK_NAMESPACE, BOOST_SOURCES, type BoostDurationCode, type BoostSource,
+  BOOST_SCOPE_LOCK_NAMESPACE, BOOST_SOURCES, type BoostDurationCode, type BoostRecordSource, type BoostSource,
 } from "./boost-config";
 
 /**
  * Boosts d'offres (lot 2I1) : réglages en base, places par périmètre, plafond par vendeur, attribution et annulation.
- * AUCUN paiement : l'attribution est une opération d'administration. Un boost est EFFECTIF si
- * `status = 'active' AND starts_at <= now < ends_at` (now = clock_timestamp() de la base). Voir BOOST.md.
+ * L'attribution d'administration (`grantOfferBoost`) n'est pas payante ; l'ACHAT avec les crédits du portefeuille (lot P1b,
+ * `purchase.ts`) réutilise EXACTEMENT les mêmes règles de places et de plafond par `placeOfferBoostInTransaction`. Un boost est
+ * EFFECTIF si `status = 'active' AND starts_at <= now < ends_at` (now = clock_timestamp() de la base). Voir BOOST.md.
  */
 
 // ───────────── erreurs de domaine ─────────────
@@ -29,7 +30,15 @@ export type BoostErrorCode =
   | "boost_not_found"
   | "boost_not_owned"
   | "boost_settings_missing"
-  | "boost_pricing_missing";
+  | "boost_pricing_missing"
+  // Achat et remboursement (lot P1b).
+  | "quote_not_found"
+  | "quote_expired"
+  | "quote_unavailable"
+  | "quote_already_used"
+  | "idempotency_conflict"
+  | "purchase_not_found"
+  | "already_refunded";
 
 /** Textes fixes : jamais de donnée de la base (ni identifiant, ni texte métier). */
 export const BOOST_ERROR_MESSAGES: Readonly<Record<BoostErrorCode, string>> = Object.freeze({
@@ -44,6 +53,13 @@ export const BOOST_ERROR_MESSAGES: Readonly<Record<BoostErrorCode, string>> = Ob
   boost_not_owned: "Ce boost n'appartient pas à ce vendeur.",
   boost_settings_missing: "Réglages de boost absents (ligne « default »).",
   boost_pricing_missing: "Réglages tarifaires du boost absents (ni ligne de la catégorie, ni ligne « default »).",
+  quote_not_found: "Cotation introuvable.",
+  quote_expired: "Cette cotation a expiré ou ne correspond plus à l'offre.",
+  quote_unavailable: "Cette cotation est indisponible : aucun prix n'a été établi.",
+  quote_already_used: "Cette cotation a déjà été achetée.",
+  idempotency_conflict: "Cette clé d'idempotence a déjà servi pour un autre achat.",
+  purchase_not_found: "Achat introuvable.",
+  already_refunded: "Cet achat est déjà remboursé.",
 });
 
 export class BoostError extends Error {
@@ -95,7 +111,7 @@ export interface OfferBoostRecord {
   durationCode: BoostDurationCode;
   startsAt: Date;
   endsAt: Date;
-  source: BoostSource;
+  source: BoostRecordSource;
   createdAt: Date;
   cancelledAt: Date | null;
 }
@@ -295,7 +311,7 @@ export async function readBoostSlots(input: { pool: Pool; offerId: string }): Pr
   });
 }
 
-interface BoostRow {
+export interface BoostRow {
   id: string;
   offer_id: string;
   seller_id: string;
@@ -306,15 +322,15 @@ interface BoostRow {
   duration_code: BoostDurationCode;
   starts_at: Date;
   ends_at: Date;
-  source: BoostSource;
+  source: BoostRecordSource;
   created_at: Date;
   cancelled_at: Date | null;
 }
 
-const BOOST_COLUMNS = `id, offer_id, seller_id, scope_category, scope_brand, scope_model, status, duration_code,
+export const BOOST_COLUMNS = `id, offer_id, seller_id, scope_category, scope_brand, scope_model, status, duration_code,
   starts_at, ends_at, source, created_at, cancelled_at`;
 
-function mapBoost(row: BoostRow): OfferBoostRecord {
+export function mapBoost(row: BoostRow): OfferBoostRecord {
   return {
     id: row.id,
     offerId: row.offer_id,
@@ -332,13 +348,95 @@ function mapBoost(row: BoostRow): OfferBoostRecord {
 
 // ───────────── attribution ─────────────
 
+/** Contexte transmis aux rappels de `placeOfferBoostInTransaction` : l'offre et son périmètre (déjà verrouillé). */
+export interface BoostPlacementContext {
+  offerId: string;
+  ownerId: string;
+  scope: BoostScope;
+}
+
 /**
- * Attribue un boost à une offre (opération d'administration, sans paiement), en UNE transaction :
- * a) l'offre appartient à `ownerId`, est éligible et a une clé produit complète ; b) verrou consultatif sur le
- * périmètre ; c) les boosts actifs de CETTE offre dont ends_at est passé deviennent `expired` ; d) un boost effectif ou
- * futur existe déjà → `offer_already_boosted` ; e) plus de place → `no_slot_available` ; f) plafond du vendeur atteint
- * → `seller_boost_limit_reached` ; g) INSERT (starts_at = maintenant, ends_at = maintenant + durée, calculés par la base).
- * Toute erreur de domaine est une `BoostError` au code stable.
+ * RÈGLES DE PLACEMENT D'UN BOOST, UNIQUES : appelées par l'attribution d'administration (`grantOfferBoost`) ET par l'achat
+ * (`purchaseOfferBoost`, lot P1b). Aucune autre copie de ces règles n'existe.
+ *
+ * PRÉCONDITIONS : `client` est dans une transaction SQL ouverte (`withPostgresTransaction`) dont l'appelant a déjà posé
+ * `SET LOCAL lock_timeout` ; `offerId` et `ownerId` sont des UUID validés en minuscules. Étapes :
+ * a) l'offre appartient à `ownerId`, est éligible et a une clé produit complète (la ligne reste verrouillée en lecture partagée) ;
+ * b) verrou consultatif sur le périmètre (places et plafond vendeur sont des invariants de périmètre) ;
+ *    `afterScopeLock` : rappel de l'appelant, SOUS le verrou (l'achat y revérifie sa cotation) ;
+ * c) les boosts actifs de CETTE offre dont ends_at est passé deviennent `expired` ;
+ * d) un boost effectif ou futur existe déjà → `offer_already_boosted` ;
+ * e) plus de place → `no_slot_available` ; f) plafond du vendeur atteint → `seller_boost_limit_reached` ;
+ *    `beforeInsert` : rappel de l'appelant, après TOUS les contrôles et juste avant l'INSERT (l'achat y DÉBITE : un refus ci-dessus
+ *    ne débite donc jamais) ; puis le crochet de test `hooks.beforeInsert` ;
+ * g) INSERT (starts_at = maintenant, ends_at = maintenant + durée, un seul instantané de la base).
+ * Toute erreur de domaine est une `BoostError` au code stable ; la transaction est à annuler par l'appelant.
+ */
+export async function placeOfferBoostInTransaction(client: PoolClient, input: {
+  offerId: string;
+  ownerId: string;
+  durationCode: BoostDurationCode;
+  source: BoostRecordSource;
+  afterScopeLock?: (context: BoostPlacementContext) => Promise<void>;
+  beforeInsert?: (context: BoostPlacementContext) => Promise<void>;
+  hooks?: BoostTestHooks;
+}): Promise<{ boost: OfferBoostRecord; scope: BoostScope; settings: BoostSettings }> {
+  const { offerId, ownerId, durationCode, source } = input;
+
+  // a) L'offre reste verrouillée en lecture partagée jusqu'à la fin : sa clé produit ne change pas sous nos pieds.
+  const facts = await loadOfferFacts(client, offerId, true);
+  if (!facts) throw new BoostError("offer_not_found");
+  if (facts.owner_id !== ownerId) throw new BoostError("offer_not_owned");
+  if (!facts.eligible) throw new BoostError("offer_not_eligible");
+  const scope = completeScope(facts);
+  const context: BoostPlacementContext = { offerId, ownerId, scope };
+
+  // b) Sérialise les attributions et les achats d'un même périmètre.
+  await client.query(
+    "SELECT pg_advisory_xact_lock($1::int, hashtext($2::text || chr(31) || $3::text || chr(31) || $4::text))",
+    [BOOST_SCOPE_LOCK_NAMESPACE, scope.category, scope.brand, scope.model],
+  );
+  if (input.afterScopeLock) await input.afterScopeLock(context);
+
+  // c) Boosts de cette offre arrivés à échéance.
+  await client.query(
+    "UPDATE offer_boosts SET status = 'expired' WHERE offer_id = $1::uuid AND status = 'active' AND ends_at <= clock_timestamp()",
+    [offerId],
+  );
+
+  // d) Il reste alors un boost effectif (ou futur).
+  const existing = await client.query("SELECT 1 FROM offer_boosts WHERE offer_id = $1::uuid AND status = 'active' LIMIT 1", [offerId]);
+  if (existing.rowCount) throw new BoostError("offer_already_boosted");
+
+  // e) f)
+  const settings = await readBoostSettings(client, scope.category);
+  const total = computeSlots(await countOffersInScope(client, scope), settings);
+  if ((await countEffectiveBoosts(client, scope, null)) >= total) throw new BoostError("no_slot_available");
+  if ((await countEffectiveBoosts(client, scope, ownerId)) >= computeSellerLimit(total, settings)) {
+    throw new BoostError("seller_boost_limit_reached");
+  }
+
+  if (input.beforeInsert) await input.beforeInsert(context);
+  if (input.hooks?.beforeInsert) await input.hooks.beforeInsert();
+
+  // g) Un seul instantané pour starts_at et ends_at.
+  const inserted = await client.query<BoostRow>(
+    `WITH t AS (SELECT clock_timestamp() AS now)
+     INSERT INTO offer_boosts (id, offer_id, seller_id, scope_category, scope_brand, scope_model, status, duration_code,
+                               starts_at, ends_at, source)
+     SELECT $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, 'active', $7, t.now, t.now + make_interval(secs => $8::int), $9
+       FROM t
+     RETURNING ${BOOST_COLUMNS}`,
+    [randomUUID(), offerId, ownerId, scope.category, scope.brand, scope.model, durationCode,
+      BOOST_DURATION_SECONDS[durationCode], source],
+  );
+  return { boost: mapBoost(inserted.rows[0]), scope, settings };
+}
+
+/**
+ * Attribue un boost à une offre (opération d'administration, sans paiement), en UNE transaction : voir
+ * `placeOfferBoostInTransaction` pour les contrôles et l'INSERT. Seule la source `admin_grant` est acceptée ici : un boost
+ * `purchase` n'est créé que par `purchaseOfferBoost`. Toute erreur de domaine est une `BoostError` au code stable.
  */
 export async function grantOfferBoost(input: {
   pool: Pool;
@@ -356,61 +454,46 @@ export async function grantOfferBoost(input: {
 
   return withPostgresTransaction(async (client) => {
     await client.query(`SET LOCAL lock_timeout = '${BOOST_LOCK_TIMEOUT_MS}ms'`);
-
-    // a) L'offre reste verrouillée en lecture partagée jusqu'à la fin : sa clé produit ne change pas sous nos pieds.
-    const facts = await loadOfferFacts(client, offerId, true);
-    if (!facts) throw new BoostError("offer_not_found");
-    if (facts.owner_id !== ownerId) throw new BoostError("offer_not_owned");
-    if (!facts.eligible) throw new BoostError("offer_not_eligible");
-    const scope = completeScope(facts);
-
-    // b) Sérialise les attributions d'un même périmètre (places et plafond vendeur sont des invariants de périmètre).
-    await client.query(
-      "SELECT pg_advisory_xact_lock($1::int, hashtext($2::text || chr(31) || $3::text || chr(31) || $4::text))",
-      [BOOST_SCOPE_LOCK_NAMESPACE, scope.category, scope.brand, scope.model],
-    );
-
-    // c) Boosts de cette offre arrivés à échéance.
-    await client.query(
-      "UPDATE offer_boosts SET status = 'expired' WHERE offer_id = $1::uuid AND status = 'active' AND ends_at <= clock_timestamp()",
-      [offerId],
-    );
-
-    // d) Il reste alors un boost effectif (ou futur).
-    const existing = await client.query("SELECT 1 FROM offer_boosts WHERE offer_id = $1::uuid AND status = 'active' LIMIT 1", [offerId]);
-    if (existing.rowCount) throw new BoostError("offer_already_boosted");
-
-    // e) f)
-    const settings = await readBoostSettings(client, scope.category);
-    const total = computeSlots(await countOffersInScope(client, scope), settings);
-    if ((await countEffectiveBoosts(client, scope, null)) >= total) throw new BoostError("no_slot_available");
-    if ((await countEffectiveBoosts(client, scope, ownerId)) >= computeSellerLimit(total, settings)) {
-      throw new BoostError("seller_boost_limit_reached");
-    }
-
-    if (input.hooks?.beforeInsert) await input.hooks.beforeInsert();
-
-    // g) Un seul instantané pour starts_at et ends_at.
-    const inserted = await client.query<BoostRow>(
-      `WITH t AS (SELECT clock_timestamp() AS now)
-       INSERT INTO offer_boosts (id, offer_id, seller_id, scope_category, scope_brand, scope_model, status, duration_code,
-                                 starts_at, ends_at, source)
-       SELECT $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, 'active', $7, t.now, t.now + make_interval(secs => $8::int), $9
-         FROM t
-       RETURNING ${BOOST_COLUMNS}`,
-      [randomUUID(), offerId, ownerId, scope.category, scope.brand, scope.model, durationCode,
-        BOOST_DURATION_SECONDS[durationCode], source],
-    );
-    return { boost: mapBoost(inserted.rows[0]), slots: await readSlots(client, scope, settings) };
+    const placed = await placeOfferBoostInTransaction(client, { offerId, ownerId, durationCode, source, hooks: input.hooks });
+    return { boost: placed.boost, slots: await readSlots(client, placed.scope, placed.settings) };
   }, pool);
 }
 
 // ───────────── annulation ─────────────
 
 /**
+ * Annulation d'un boost DANS la transaction de l'appelant (partagée par `cancelOfferBoost` et par le remboursement d'un achat,
+ * lot P1b). La ligne du boost est verrouillée (`FOR UPDATE`). Conditionnelle et idempotente : seul un boost `active` non échu
+ * passe à `cancelled` (avec `cancelled_at`) ; un boost `active` dont ends_at est passé est marqué `expired` ; un boost annulé ou
+ * expiré est renvoyé tel quel, sans rien modifier. `boost_not_found` / `boost_not_owned` sinon.
+ */
+export async function cancelOfferBoostInTransaction(
+  client: PoolClient,
+  input: { boostId: string; ownerId: string },
+): Promise<{ boost: OfferBoostRecord; cancelled: boolean }> {
+  const found = await client.query<BoostRow & { lapsed: boolean }>(
+    `SELECT ${BOOST_COLUMNS}, (ends_at <= clock_timestamp()) AS lapsed FROM offer_boosts WHERE id = $1::uuid FOR UPDATE`,
+    [input.boostId],
+  );
+  const row = found.rows[0];
+  if (!row) throw new BoostError("boost_not_found");
+  if (row.seller_id !== input.ownerId) throw new BoostError("boost_not_owned");
+  if (row.status !== "active") return { boost: mapBoost(row), cancelled: false };
+
+  const updated = await client.query<BoostRow>(
+    row.lapsed
+      ? `UPDATE offer_boosts SET status = 'expired' WHERE id = $1::uuid RETURNING ${BOOST_COLUMNS}`
+      : `UPDATE offer_boosts SET status = 'cancelled', cancelled_at = clock_timestamp() WHERE id = $1::uuid RETURNING ${BOOST_COLUMNS}`,
+    [input.boostId],
+  );
+  return { boost: mapBoost(updated.rows[0]), cancelled: !row.lapsed };
+}
+
+/**
  * Annule un boost du vendeur. Conditionnel (seul un boost `active` non échu passe à `cancelled`, avec `cancelled_at`) et
  * idempotent : annuler un boost déjà annulé ou expiré renvoie son état courant, sans rien modifier. Un boost `active`
- * dont ends_at est passé est d'abord marqué `expired` (il n'est plus annulable).
+ * dont ends_at est passé est d'abord marqué `expired` (il n'est plus annulable). Aucun remboursement : celui d'un achat est une
+ * opération d'administration distincte (`refundBoostPurchase`).
  */
 export async function cancelOfferBoost(input: {
   pool: Pool;
@@ -421,24 +504,7 @@ export async function cancelOfferBoost(input: {
   const boostId = requireUuid(input.boostId, "boostId").toLowerCase();
   const ownerId = requireUuid(input.ownerId, "ownerId").toLowerCase();
 
-  return withPostgresTransaction(async (client) => {
-    const found = await client.query<BoostRow & { lapsed: boolean }>(
-      `SELECT ${BOOST_COLUMNS}, (ends_at <= clock_timestamp()) AS lapsed FROM offer_boosts WHERE id = $1::uuid FOR UPDATE`,
-      [boostId],
-    );
-    const row = found.rows[0];
-    if (!row) throw new BoostError("boost_not_found");
-    if (row.seller_id !== ownerId) throw new BoostError("boost_not_owned");
-    if (row.status !== "active") return { boost: mapBoost(row), cancelled: false };
-
-    const updated = await client.query<BoostRow>(
-      row.lapsed
-        ? `UPDATE offer_boosts SET status = 'expired' WHERE id = $1::uuid RETURNING ${BOOST_COLUMNS}`
-        : `UPDATE offer_boosts SET status = 'cancelled', cancelled_at = clock_timestamp() WHERE id = $1::uuid RETURNING ${BOOST_COLUMNS}`,
-      [boostId],
-    );
-    return { boost: mapBoost(updated.rows[0]), cancelled: !row.lapsed };
-  }, pool);
+  return withPostgresTransaction((client) => cancelOfferBoostInTransaction(client, { boostId, ownerId }), pool);
 }
 
 // ───────────── expiration automatique (lot 2I4) ─────────────

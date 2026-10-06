@@ -21,8 +21,11 @@ import { WalletError } from "./errors";
 export const WALLET_ACCOUNT_KINDS = ["user", "provider_clearing", "boost_revenue"] as const;
 export type WalletAccountKind = (typeof WALLET_ACCOUNT_KINDS)[number];
 
-/** Types de transaction. `boost_purchase` et `refund` viendront en P1b (remplacer chk_wallet_transactions_kind). */
-export const WALLET_TRANSACTION_KINDS = ["topup", "adjustment"] as const;
+/**
+ * Types de transaction (même liste que chk_wallet_transactions_kind, migration 0015) : recharge, ajustement d'administration, achat
+ * de boost et remboursement intégral d'un achat (lot P1b).
+ */
+export const WALLET_TRANSACTION_KINDS = ["topup", "adjustment", "boost_purchase", "boost_refund"] as const;
 export type WalletTransactionKind = (typeof WALLET_TRANSACTION_KINDS)[number];
 
 export type LedgerAccountRef =
@@ -41,6 +44,10 @@ export interface WalletTransactionMetadata {
   paymentIntentId?: string;
   provider?: string;
   reasonCode?: string;
+  /** Achat de boost dont découle l'opération : l'achat lui-même (`boost_purchase`) ou l'achat remboursé (`boost_refund`). */
+  boostPurchaseId?: string;
+  /** Cotation achetée (`boost_purchase` seulement). */
+  quoteId?: string;
 }
 
 export interface WalletTransactionInput {
@@ -98,6 +105,8 @@ function requireMetadata(value: unknown): WalletTransactionMetadata {
     if (key === "paymentIntentId" && UUID_LOWER.test(entry)) result.paymentIntentId = entry;
     else if (key === "provider" && PROVIDER_CODE.test(entry)) result.provider = entry;
     else if (key === "reasonCode" && REASON_CODE.test(entry)) result.reasonCode = entry;
+    else if (key === "boostPurchaseId" && UUID_LOWER.test(entry)) result.boostPurchaseId = entry;
+    else if (key === "quoteId" && UUID_LOWER.test(entry)) result.quoteId = entry;
     else throw new CatalogValidationError(`metadata.${key} refusé (clé inconnue ou forme invalide).`);
   }
   return result;
@@ -128,6 +137,17 @@ export function validateWalletTransactionInput(input: unknown): Required<WalletT
   const metadata = requireMetadata(input.metadata);
   if (kind === "topup" && (metadata.paymentIntentId === undefined || reference !== `topup:${metadata.paymentIntentId}`)) {
     throw new CatalogValidationError("Une recharge porte paymentIntentId et sa référence en dérive.");
+  }
+  // Mêmes règles que chk_wallet_transactions_boost : clés exactes, référence dérivée de l'achat ; aucune autre sorte n'en porte.
+  const metadataKeys = Object.keys(metadata).sort().join(",");
+  if (kind === "boost_purchase" && (metadataKeys !== "boostPurchaseId,quoteId" || reference !== `boost_purchase:${metadata.boostPurchaseId}`)) {
+    throw new CatalogValidationError("Un achat de boost porte boostPurchaseId et quoteId, et sa référence en dérive de l'achat.");
+  }
+  if (kind === "boost_refund" && (metadataKeys !== "boostPurchaseId,reasonCode" || reference !== `boost_refund:${metadata.boostPurchaseId}`)) {
+    throw new CatalogValidationError("Un remboursement de boost porte boostPurchaseId et reasonCode, et sa référence en dérive de l'achat.");
+  }
+  if (kind !== "boost_purchase" && kind !== "boost_refund" && (metadata.boostPurchaseId !== undefined || metadata.quoteId !== undefined)) {
+    throw new CatalogValidationError("boostPurchaseId et quoteId sont réservés aux achats et remboursements de boost.");
   }
   if (!Array.isArray(entries) || entries.length < 2 || entries.length > MAX_ENTRIES) {
     throw new CatalogValidationError(`Une transaction compte de 2 à ${MAX_ENTRIES} écritures.`);

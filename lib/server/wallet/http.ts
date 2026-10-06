@@ -135,8 +135,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-/** Corps JSON strict (voir strict-json.ts) : `Content-Type: application/json`, plafond d'octets, aucune clé en double. */
-async function readStrictJsonBody(request: Request, maxBytes: number): Promise<{ ok: true; value: unknown } | { ok: false }> {
+/** Corps JSON strict (voir strict-json.ts) : `Content-Type: application/json`, plafond d'octets, aucune clé en double. Partagé avec l'achat de boost (P1b). */
+export async function readStrictJsonBody(request: Request, maxBytes: number): Promise<{ ok: true; value: unknown } | { ok: false }> {
   const contentType = request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
   if (contentType !== "application/json") {
     void request.body?.cancel().catch(() => {});

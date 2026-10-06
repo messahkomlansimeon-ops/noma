@@ -4,8 +4,10 @@ Le socle de l'argent de noma : un **grand livre en partie double, immuable**, et
 prestataire de paiement **fictif** (aucun réseau, aucun argent réel). Monnaie : francs CFA (XOF), **1 crédit = 1 XOF**, montants
 **entiers** (`BIGINT` en base, `bigint` en JavaScript, entiers JSON dans les réponses) : aucun flottant n'entre jamais dans un montant.
 
-**Ce lot n'a PAS** : d'achat de boost (lot P1b), de remboursement, d'écran (lot P2), de vrai prestataire (décision du propriétaire),
-de branchement au worker. Voir « Ce qui n'existe pas encore ».
+**Ce lot n'a PAS** : d'achat de boost, de remboursement, d'écran (lot P2), de vrai prestataire (décision du propriétaire),
+de branchement au worker. Voir « Ce qui n'existe pas encore ». **L'achat de boost avec ces crédits et son remboursement d'administration
+existent depuis le lot P1b : `BOOST-PURCHASE.md`** (migration 0015, types de transaction `boost_purchase` et `boost_refund`, contrôles
+supplémentaires de `wallet:check`) ; ce document décrit l'état du lot P1a et les ajouts de P1b sont signalés par « (P1b) ».
 
 Code : `lib/server/wallet/` (`ledger.ts`, `topups.ts`, `fake-provider.ts`, `http.ts`, `check.ts`, `config.ts`, `errors.ts`,
 `strict-json.ts`, `index.ts`), migration `database/migrations/0014_wallet_ledger.sql`, routes `app/api/wallet/**`,
@@ -17,8 +19,8 @@ Code : `lib/server/wallet/` (`ledger.ts`, `topups.ts`, `fake-provider.ts`, `http
 
 | Table | Rôle |
 |---|---|
-| `wallet_accounts` | Un compte par utilisateur (créé à la première écriture) et un compte par type système : `provider_clearing` (ce que le prestataire nous doit : devient négatif à chaque recharge) et `boost_revenue` (réservé à P1b). `balance` en `BIGINT`, **toujours nul à la création**. |
-| `wallet_transactions` | Une opération : `kind` (`topup`, `adjustment`), `reference` **unique** (`<type>:<identifiant>`, clé d'idempotence), `metadata` JSONB, `created_xid` (identifiant de la transaction SQL de premier niveau qui l'a créée). |
+| `wallet_accounts` | Un compte par utilisateur (créé à la première écriture) et un compte par type système : `provider_clearing` (ce que le prestataire nous doit : devient négatif à chaque recharge) et `boost_revenue` (**P1b** : crédité par chaque achat de boost, débité par chaque remboursement). `balance` en `BIGINT`, **toujours nul à la création**. |
+| `wallet_transactions` | Une opération : `kind` (`topup`, `adjustment`, et depuis P1b `boost_purchase`, `boost_refund`), `reference` **unique** (`<type>:<identifiant>`, clé d'idempotence), `metadata` JSONB, `created_xid` (identifiant de la transaction SQL de premier niveau qui l'a créée). |
 | `wallet_entries` | Les écritures d'une opération : `account_id`, `amount` (positif = crédit du compte, négatif = débit), jamais nul. |
 | `payment_intents` | Une intention de recharge : propriétaire, montant, `status` (`pending`, `succeeded`, `failed`, `expired`), `idempotency_key` (unique par propriétaire), `provider_reference` (unique par prestataire), échéance 30 min. |
 | `payment_events` | Journal de **tout** événement du prestataire dont la signature était valide et la forme correcte, avec son issue (`applied`, `duplicate`, `rejected_amount`, `rejected_state`, `rejected_unknown_intent`) et l'empreinte SHA-256 du corps. |
@@ -50,11 +52,14 @@ Exemple : une recharge de 2 500 XOF écrit **une** transaction `topup:<intention
 8. **Recharge ↔ intention** : une intention `succeeded` a **exactement une** transaction `topup` de même montant (deux écritures :
    compte du propriétaire, `provider_clearing`) et réciproquement ; vérifié par `wallet:check` (et la référence d'une recharge dérive
    du `paymentIntentId` de ses métadonnées : `CHECK chk_wallet_transactions_topup`).
-9. **Métadonnées sans donnée personnelle** : clés `paymentIntentId`, `provider`, `reasonCode` seulement, valeurs textuelles de forme
-   contrôlée (`CHECK chk_wallet_transactions_metadata`, doublé dans le code).
+9. **Métadonnées sans donnée personnelle** : clés `paymentIntentId`, `provider`, `reasonCode` (et, depuis P1b, `boostPurchaseId` et
+   `quoteId`, UUID) seulement, valeurs textuelles de forme contrôlée (`CHECK chk_wallet_transactions_metadata`, doublé dans le code).
+   (P1b) La forme des transactions `boost_purchase` (`boostPurchaseId` + `quoteId`, référence `boost_purchase:<achat>`) et
+   `boost_refund` (`boostPurchaseId` + `reasonCode`, référence `boost_refund:<achat>`) est exacte (`CHECK chk_wallet_transactions_boost`).
 
 Ordre des verrous : intention de paiement (`FOR UPDATE`), puis comptes par identifiant croissant (les écritures sont insérées dans cet
-ordre : pas d'interblocage entre transactions croisées). Le compte `provider_clearing` est touché par **chaque** recharge : c'est un
+ordre : pas d'interblocage entre transactions croisées). (P1b) Un achat ou un remboursement de boost prend ses verrous métier AVANT
+ceux des comptes (ordre global dans `BOOST-PURCHASE.md`) ; `boost_revenue`, touché par chacun, est pris tard dans leur transaction. Le compte `provider_clearing` est touché par **chaque** recharge : c'est un
 point chaud, les recharges se sérialisent sur cette ligne le temps de leur transaction (acceptable à cette échelle).
 
 ## Cycle d'une recharge
@@ -164,6 +169,11 @@ brut, de requête, de montant ni d'identifiant.
     appartenant à des transactions de type ≠ topup)` ;
   - chaque intention `succeeded` ↔ exactement une recharge de même montant sur le bon compte, deux écritures
     (`succeeded_intent_without_topup`, `topup_without_succeeded_intent`, `topup_mismatch`) ;
+  - **(P1b) achats de boost** : `boost_purchase_transaction_orphan`, `boost_purchase_mismatch`, `boost_purchase_quote_mismatch`,
+    `boost_purchase_boost_mismatch`, `boost_purchase_window_mismatch`, `purchase_boost_without_purchase`, `boost_refund_transaction_orphan`, `boost_refund_mismatch`,
+    `refunded_purchase_boost_active` et **`boost_revenue_mismatch`** (formule exacte : `balance(boost_revenue) = somme(amount_xof des
+    achats) − somme(amount_xof des achats remboursés) + somme(amount des écritures de boost_revenue appartenant à des transactions de
+    type 'adjustment')`) : détail dans `BOOST-PURCHASE.md` ;
   - **intentions ↔ événements** : toute intention `succeeded` a un `payment.succeeded` « applied » de même montant
     (`succeeded_intent_without_applied_event`), toute intention `failed` un `payment.failed` « applied » de même montant
     (`failed_intent_without_applied_event`), tout événement « applied » pointe une intention dans l'état qu'il produit et du même
@@ -177,6 +187,10 @@ brut, de requête, de montant ni d'identifiant.
   peut-être été encaissé chez le prestataire **sans crédit** : à traiter à la main (rapprochement avec le prestataire, crédit par un
   ajustement). Ils ne changent pas le code de sortie sans `--strict`. Le journal étant immuable, ils restent comptés une fois
   traités : il n'existe pas encore de marque « traité ».
+  **(P1b) Avertissement `adjustment_credits_user_account`** : nombre et exemples (transaction, compte, montant, motif) des écritures
+  d'**ajustement** qui **créditent** un compte utilisateur (un crédit sans recharge ni remboursement d'achat : de la valeur créée par
+  l'administration, à justifier). Il vient après les avertissements d'événements refusés, ne change pas le code de sortie sans
+  `--strict`, et n'expose que des identifiants techniques.
 - `npm run wallet:expire-intents [-- --limit N]` — appelle `expirePaymentIntents` (1 à 1000, 200 par défaut). Sûr en parallèle.
   Le worker pourra l'appeler plus tard : il n'est **pas** branché au runner dans ce lot.
 
@@ -207,13 +221,14 @@ brut, de requête, de montant ni d'identifiant.
   processus (`guard()`), pas au démarrage ni dans les routes du portefeuille ; elle protège donc surtout l'exploitation (un
   déploiement mal configuré échoue visiblement). La protection effective du fictif est la liste d'autorisation de
   `resolveFakePaymentConfig`.
-- Pour ajouter `boost_purchase` et `refund` (P1b) : remplacer `chk_wallet_transactions_kind` (et, si de nouvelles clés de métadonnée
-  sont utiles, `chk_wallet_transactions_metadata`) dans une nouvelle migration.
+- Pour ajouter un type de transaction : remplacer `chk_wallet_transactions_kind` (et, si de nouvelles clés de métadonnée sont utiles,
+  `chk_wallet_transactions_metadata`) dans une nouvelle migration. La migration 0015 (P1b) l'a fait pour `boost_purchase` et
+  `boost_refund` ; la **migration 0015 est requise** pour que `wallet:check` fonctionne (tables et colonnes de P1b).
 
 ## Ce qui n'existe pas encore
 
-- **Achat de boost** (débit du compte, crédit de `boost_revenue`, transaction atomique avec la création du boost) : lot **P1b**.
-- **Remboursement et compensation** d'un boost interrompu : P1b ou après.
+- ~~Achat de boost~~ : **fait au lot P1b** (`BOOST-PURCHASE.md`), ainsi que le remboursement **intégral** d'administration d'un achat.
+- **Remboursement au prorata**, remboursement par une route HTTP, compensation automatique d'un boost interrompu : plus tard.
 - **Écrans** (recharge, page de paiement simulé, solde) : lot **P2**.
 - **Vrai prestataire** (Mobile Money) : décision du propriétaire. Il faudra un adaptateur (signature réelle, identifiants réels,
   rapprochement quotidien avec le relevé du prestataire) qui réutilise `applyProviderEvent`.

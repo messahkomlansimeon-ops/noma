@@ -154,6 +154,7 @@ if (!configuredUrl?.trim()) {
         "0012_boost_pricing",
         "0013_boost_exposures",
         "0014_wallet_ledger",
+        "0015_boost_purchases",
       ]);
     });
 

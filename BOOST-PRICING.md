@@ -6,6 +6,9 @@ acceptation de cotation ni réservation de place, et aucune route HTTP ni interf
 2I1-bis (attribution, annulation, places, placement, classement) n'est pas modifié. **Depuis le lot 2I3, le vendeur obtient ces
 cotations par HTTP (`POST` et `GET /api/offers/{id}/boost-quotes`) : voir `BOOST-HTTP.md`.**
 
+**Depuis le lot P1b, une cotation disponible peut être ACHETÉE avec les crédits du portefeuille : `BOOST-PURCHASE.md`** (le prix payé est
+exactement celui de la cotation, jamais recalculé ; une cotation ne s'achète qu'une fois ; la disponibilité est revérifiée à l'achat).
+
 Code : `lib/server/boost/pricing.ts` (fonctions pures), `lib/server/boost/quotes.ts` (comptages, cotation, historiques),
 `database/migrations/0012_boost_pricing.sql`, `scripts/boost-quote.ts`. Tests : `npm run test:boost-pricing` (pur),
 `npm run test:boost-quotes` (base `TEST_DATABASE_URL` dédiée).
@@ -67,7 +70,10 @@ masquerait une cotation concurrente et créerait un doublon.
 1. contrôles de l'offre (ligne verrouillée en lecture partagée) : `offer_not_found`, `offer_not_owned`, `offer_not_eligible`,
    `offer_not_boostable` (mêmes règles que l'attribution) ;
 2. **réutilisation** : une cotation de cette offre, de même durée, même vendeur et même périmètre, avec `expires_at > maintenant`,
-   est renvoyée telle quelle (`reused: true`, aucune écriture), **même si les comptages ou la version tarifaire ont changé** ;
+   est renvoyée telle quelle (`reused: true`, aucune écriture), **même si les comptages ou la version tarifaire ont changé** —
+   **sauf une cotation déjà ACHETÉE** (présente dans `boost_purchases`, lot P1b) : elle n'est jamais renvoyée, une cotation neuve est
+   calculée (indisponible `offer_already_boosted` tant que le boost acheté est actif, normale après remboursement ou annulation, une fois
+   l'éventuelle indisponibilité de 60 s écoulée) ;
 3. sinon : réglages tarifaires (`boost_pricing_missing` sans aucune ligne), puis les comptages en **une seule requête**, puis le
    prix ou l'indisponibilité, puis `INSERT` (`computed_at = clock_timestamp()`).
 
@@ -115,7 +121,8 @@ Cotation disponible : `quote_validity_seconds` (900 s par défaut). Cotation ind
   défaut (valeurs ci-dessus).
 - Changer un tarif : insérer une nouvelle ligne `(key, version + 1)`. Les cotations en cours gardent leur prix jusqu'à leur
   expiration ; l'historique garde la version qui les a produites.
-- La migration 0012 doit être appliquée avant d'utiliser `quoteOfferBoost` ; `MATCHING_REQUIRED_MIGRATION` reste 0010 (le worker
+- La migration 0012 doit être appliquée avant d'utiliser `quoteOfferBoost` (et, depuis le lot P1b, la **migration 0015** : la réutilisation
+  exclut les cotations achetées) ; `MATCHING_REQUIRED_MIGRATION` reste 0010 (le worker
   n'utilise pas les cotations).
 
 ## Limites

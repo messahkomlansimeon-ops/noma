@@ -6,7 +6,10 @@ pertinente pertinente » : on détermine d'abord les compatibles, puis la pertin
 l'intérieur** de ce classement ; **§16** un vendeur ne doit pas monopoliser les places.
 
 **Ce lot n'a AUCUN paiement, crédit, prix dynamique ni interface** : un boost est attribué par une commande
-d'administration (`npm run boost:grant`). Le boost ne s'applique qu'au tri `sort=relevance` du **sens demande**
+d'administration (`npm run boost:grant`). **Depuis le lot P1b, un boost peut aussi être ACHETÉ avec les crédits du portefeuille
+(`BOOST-PURCHASE.md`, source `purchase`) : les règles de places, de plafond par vendeur et de placement décrites ici sont
+INCHANGÉES et partagées (une seule fonction, `placeOfferBoostInTransaction`) ; le paiement ne rend jamais pertinente une annonce non
+pertinente (§15 : le boost n'agit que sur des éléments déjà présents et confirmés du classement, au-dessus de `min_relevance`).** Le boost ne s'applique qu'au tri `sort=relevance` du **sens demande**
 (l'acheteur voit des offres). Le tri par score, le tri par défaut et le sens offre ne changent pas.
 
 Code : `lib/server/boost/boosts.ts` (réglages, places, attribution, annulation, lecture des boosts effectifs),
@@ -30,8 +33,8 @@ catégorie, marque ou modèle (ou dont l'un est blanc) n'est pas boostable** (`o
   minuscules qui la **remplace entièrement** pour les demandes de cette catégorie.
 - `offer_boosts` : un boost par offre et par période. `offer_id`, `seller_id` (propriétaire de l'offre à l'attribution), périmètre
   figé et déjà normalisé (`scope_category`, `scope_brand`, `scope_model`, contrôlé par CHECK), `status` (`active`, `cancelled`,
-  `expired`), `duration_code` (`24h`, `3d`, `7d`), `starts_at`, `ends_at` (`ends_at > starts_at`), `source` (`admin_grant`),
-  `created_at`, `cancelled_at` (non nul si et seulement si `cancelled`, CHECK). Un **index unique partiel** (`offer_id`
+  `expired`), `duration_code` (`24h`, `3d`, `7d`), `starts_at`, `ends_at` (`ends_at > starts_at`), `source` (`admin_grant` ; `purchase` depuis
+  la migration 0015 du lot P1b, créé seulement par un achat), `created_at`, `cancelled_at` (non nul si et seulement si `cancelled`, CHECK). Un **index unique partiel** (`offer_id`
   `WHERE status = 'active'`) interdit deux boosts actifs sur une offre ; deux index partiels (périmètre, vendeur) servent le
   comptage.
 
@@ -72,7 +75,10 @@ exactement, alors que `Math.ceil(0.07 * 100)` vaut 8).
 
 ## Attribution (`grantOfferBoost`)
 
-Validation **avant tout SQL** : pool exigé, UUID, `durationCode`, `source` (`CatalogValidationError`). Puis UNE transaction :
+Validation **avant tout SQL** : pool exigé, UUID, `durationCode`, `source` (`CatalogValidationError` ; seule `admin_grant` est acceptée :
+un boost `purchase` n'est créé que par `purchaseOfferBoost`). Puis UNE transaction. **Les étapes 1 à 7 ci-dessous sont celles de
+`placeOfferBoostInTransaction` (lot P1b), appelée à l'identique par l'attribution d'administration et par l'achat** ; l'achat y insère
+seulement ses rappels (revérification de la cotation sous le verrou, débit juste avant l'INSERT) :
 
 1. l'offre existe (`offer_not_found`), appartient à `ownerId` (`offer_not_owned`), est éligible (publiée, non archivée, non
    indisponible, propriétaire actif : `offer_not_eligible`) et a une clé produit complète (`offer_not_boostable`). La ligne de
@@ -202,11 +208,13 @@ et le classement organique est servi (voir « Panne du boost »). Appliquer la m
 
 ## Limites
 
-- **Aucun paiement, crédit, solde, achat ni réservation de place**, **aucune métrique d'efficacité au-delà du journal d'apparitions servies**
+- **Achat avec les crédits** : depuis le lot P1b (`BOOST-PURCHASE.md`) ; il n'existe toujours **aucune réservation de place** par une
+  cotation (la place est revérifiée à l'achat). **Aucune métrique d'efficacité au-delà du journal d'apparitions servies**
   (`BOOST-METRICS.md` : ni clic, ni contact, ni vente), **aucune interface** (le prix dynamique et
   les cotations vendeur existent depuis le lot 2I2, voir `BOOST-PRICING.md`, et leurs routes HTTP depuis le lot 2I3, voir
   `BOOST-HTTP.md` ; une cotation n'est ni un achat ni une réservation) :
-  l'attribution n'est possible que par l'administration (`boost:grant`) ; les réglages se modifient en SQL.
+  l'attribution gratuite n'est possible que par l'administration (`boost:grant`) ; l'achat par le vendeur et le remboursement
+  d'administration sont décrits dans `BOOST-PURCHASE.md` ; les réglages se modifient en SQL.
 - **Localisation et variante exclues** du périmètre : « iPhone 13 128 Go à Cocody » et « 256 Go à Plateau » partagent les mêmes
   places.
 - **Boost uniquement dans `stored-matches`, tri `relevance`, sens demande** : aucun boost dans `/api/search` ni dans les routes

@@ -5,6 +5,9 @@ offre, relire son historique. **Ce lot n'a AUCUN achat, paiement, crédit, solde
 aucune interface, et aucune route d'administration** (attribution, historique de périmètre). Aucune migration, aucun changement
 de comportement de `quotes.ts`, `pricing.ts`, `boosts.ts`, `placement.ts` ni `stored-matches.ts`.
 
+**Depuis le lot P1b, l'achat d'une cotation a ses propres routes (`POST` et `GET /api/offers/{id}/boost-purchases`) : `BOOST-PURCHASE.md`.**
+Les routes de ce document restent inchangées.
+
 Code : `lib/server/boost/http.ts` (`createBoostHttpHandlers`, `defaultBoostHttpHandlers`),
 `app/api/offers/[id]/boost-quotes/route.ts` (exports `GET` et `POST` seulement, `runtime = "nodejs"`, `dynamic = "force-dynamic"`).
 Tests : `npm run test:boost-http` (base `TEST_DATABASE_URL` dédiée).
@@ -43,7 +46,8 @@ corps trop gros → **400 `invalid_request`** (un corps trop gros n'est pas un 4
 { "durationCode": "3d" }
 ```
 
-Succès : **201** si la cotation vient d'être créée, **200** si une cotation encore valable a été réutilisée (même offre, durée,
+Succès : **201** si la cotation vient d'être créée (y compris quand la cotation encore valable était déjà ACHETÉE : elle n'est jamais
+renvoyée, voir `BOOST-PURCHASE.md`), **200** si une cotation encore valable a été réutilisée (même offre, durée,
 vendeur et périmètre : aucune écriture). Une cotation **indisponible** est un succès (201 ou 200, `status: "unavailable"` et son
 motif), jamais une erreur HTTP.
 
@@ -135,7 +139,8 @@ requête ni un identifiant. Un journal qui lève est ignoré (la réponse ne cha
 ## Exploitation
 
 - `NOMA_AUTH_ORIGIN` est obligatoire pour le POST (comme les routes du catalogue). Sans elle, tout POST répond 503.
-- La migration 0012 doit être appliquée : sans elle, le POST répond 503 (journal `42P01`). `MATCHING_REQUIRED_MIGRATION` reste 0010.
+- La migration 0012 doit être appliquée : sans elle, le POST répond 503 (journal `42P01`). Depuis le lot P1b, la **migration 0015** l'est aussi
+  (la réutilisation d'une cotation exclut celles déjà achetées : `boost_purchases`). `MATCHING_REQUIRED_MIGRATION` reste 0010.
 - Une cotation indisponible n'est pas une erreur : l'interface (lot suivant) devra lire `status` et `unavailableReason`.
 
 ## Limites

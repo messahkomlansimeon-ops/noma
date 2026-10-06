@@ -391,7 +391,7 @@ test("transaction du grand livre : validation complète avant tout SQL (type, r�
     ["null", null],
     ["tableau", []],
     ["type inconnu", { ...good, kind: "refund" }],
-    ["boost_purchase pas encore", { ...good, kind: "boost_purchase" }],
+    ["boost_purchase sans métadonnées d'achat ni référence dérivée de l'achat", { ...good, kind: "boost_purchase" }],
     ["référence sans le type", { ...good, reference: intent }],
     ["référence d'un autre type", { ...good, reference: `adjustment:${intent}` }],
     ["référence vide après le type", { ...good, reference: "topup:" }],

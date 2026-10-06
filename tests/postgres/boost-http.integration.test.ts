@@ -554,7 +554,8 @@ test("503 boost_unavailable : réglages tarifaires absents, réglages de boost a
     await insertDefaultBoostSettings();
   }
   assert.equal((await post(offer.id, { body })).status, 201, "les réglages rétablis, la cotation fonctionne");
-  await pool.query("TRUNCATE boost_quotes");
+  // CASCADE : depuis la migration 0015 (lot P1b), boost_purchases référence boost_quotes (aucun achat n'existe dans ce fichier).
+  await pool.query("TRUNCATE boost_quotes CASCADE");
 
   // Migration 0012 non appliquée (table absente) : 503 pour le POST et le GET, le seul SQLSTATE au journal.
   logs.length = 0;

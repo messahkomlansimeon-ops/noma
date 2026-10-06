@@ -17,10 +17,18 @@ export const BOOST_DURATION_SECONDS: Readonly<Record<BoostDurationCode, number>>
   "7d": 7 * 24 * 3600,
 });
 
-/** Sources d'attribution (même liste que `chk_offer_boosts_source`). Aucun paiement : l'administration seule attribue. */
+/**
+ * Sources acceptées par `grantOfferBoost` : l'administration seule attribue sans achat. Le boost `purchase` n'est créé que par
+ * `purchaseOfferBoost` (lot P1b), dans la transaction qui débite le portefeuille : il n'est donc PAS dans cette liste.
+ */
 export const BOOST_SOURCES = ["admin_grant"] as const;
 
 export type BoostSource = (typeof BOOST_SOURCES)[number];
+
+/** Sources d'un boost ENREGISTRÉ (même liste que `chk_offer_boosts_source`, migration 0015) : attribution d'administration ou achat. */
+export const BOOST_RECORD_SOURCES = ["admin_grant", "purchase"] as const;
+
+export type BoostRecordSource = (typeof BOOST_RECORD_SOURCES)[number];
 
 /** Clé de la ligne de réglages par défaut ; une catégorie en minuscules la surcharge. */
 export const BOOST_DEFAULT_SETTINGS_KEY = "default";
@@ -33,6 +41,12 @@ export const BOOST_LOCK_TIMEOUT_MS = 5_000;
 
 /** Espace du verrou consultatif par OFFRE pour les cotations (distinct de BOOST_SCOPE_LOCK_NAMESPACE et des espaces de matching). */
 export const BOOST_QUOTE_LOCK_NAMESPACE = 1_314_664_949;
+
+/**
+ * Espace du verrou consultatif d'IDEMPOTENCE d'un achat de boost (lot P1b), par (vendeur, clé d'idempotence). Distinct de 1_314_664_945
+ * à 1_314_664_950 (migrations, matching, boosts, recharges du portefeuille).
+ */
+export const BOOST_PURCHASE_LOCK_NAMESPACE = 1_314_664_951;
 
 /** Validité d'une cotation INDISPONIBLE (secondes) : courte, pour que l'indisponibilité ne soit pas figée. */
 export const BOOST_UNAVAILABLE_QUOTE_SECONDS = 60;

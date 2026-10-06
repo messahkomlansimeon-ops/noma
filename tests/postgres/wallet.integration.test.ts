@@ -61,8 +61,8 @@ before(async () => {
   txPool = await openNamed("tx");
   dirtyPool = await openNamed("dirty", dirtySchema);
   holderPool = await openNamed("holder");
-  assert.equal((await runMigrations(pool)).applied.length, 14);
-  assert.equal((await runMigrations(dirtyPool)).applied.length, 14);
+  assert.equal((await runMigrations(pool)).applied.length, 15);
+  assert.equal((await runMigrations(dirtyPool)).applied.length, 15);
 });
 
 after(async () => {
@@ -259,8 +259,8 @@ const insertEntry = (client: PoolClient, transactionId: string, accountId: strin
 test("migration 0014 : 14 appliquées, la relance n'en applique aucune, comptes système créés, tables et index présents", async () => {
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 14);
-  assert.equal(rerun.skipped.at(-1), "0014_wallet_ledger");
+  assert.equal(rerun.skipped.length, 15);
+  assert.equal(rerun.skipped.at(-1), "0015_boost_purchases");
   const accounts = (await pool.query("SELECT kind, owner_id, balance::text AS balance FROM wallet_accounts ORDER BY kind")).rows;
   assert.deepEqual(accounts, [
     { kind: "boost_revenue", owner_id: null, balance: "0" },
@@ -281,7 +281,9 @@ test("migration 0014 : 14 appliquées, la relance n'en applique aucune, comptes 
       WHERE NOT t.tgisinternal AND n.nspname = $1 AND (c.relname LIKE 'wallet\_%' OR c.relname LIKE 'payment\_%') ORDER BY t.tgname`, [schema])).rows.map((row) => row.tgname);
   assert.deepEqual(triggers, [
     "trg_payment_events_immutable", "trg_payment_intents_guard", "trg_wallet_accounts_guard", "trg_wallet_entries_balance", "trg_wallet_entries_balanced",
-    "trg_wallet_entries_immutable", "trg_wallet_entries_same_transaction", "trg_wallet_transactions_balanced", "trg_wallet_transactions_immutable",
+    "trg_wallet_entries_immutable", "trg_wallet_entries_same_transaction", "trg_wallet_transactions_balanced",
+    // Ajouté par la migration 0015 (lot P1b) : une transaction d'achat ou de remboursement de boost n'existe jamais sans son achat (contrainte différée).
+    "trg_wallet_transactions_boost_linked", "trg_wallet_transactions_immutable",
   ]);
   const deferrable = (await pool.query(
     `SELECT t.tgname, t.tgdeferrable, t.tginitdeferred FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -459,7 +461,8 @@ test("0014 wallet_transactions : chaque CHECK (type, référence, métadonnées,
   const reference = () => `adjustment:${randomBytes(8).toString("hex")}`;
   const insert = (over: Record<string, string>) => (client: PoolClient) => insertTransaction(client, over);
   await expectFailure("type inconnu", insert({ kind: "'refund'", reference: "'refund:abc'" }), "23514", "chk_wallet_transactions_kind");
-  await expectFailure("type boost_purchase pas encore autorisé", insert({ kind: "'boost_purchase'", reference: "'boost_purchase:abc'" }), "23514", "chk_wallet_transactions_kind");
+  // Depuis la migration 0015 (lot P1b), boost_purchase est un type autorisé : sans les métadonnées de l'achat, c'est chk_wallet_transactions_boost qui le refuse.
+  await expectFailure("type boost_purchase sans métadonnées d'achat", insert({ kind: "'boost_purchase'", reference: "'boost_purchase:abc'" }), "23514", "chk_wallet_transactions_boost");
   await expectFailure("référence avec espace", insert({ reference: "'adjustment:a b'" }), "23514", "chk_wallet_transactions_reference");
   await expectFailure("référence sans séparateur", insert({ reference: "'adjustmentabc'" }), "23514", "chk_wallet_transactions_reference");
   await expectFailure("référence d'un autre type", insert({ reference: "'topup:abc'" }), "23514", "chk_wallet_transactions_reference");
@@ -1428,7 +1431,8 @@ test("wallet:check vert sur la base saine (toutes les opérations des tests pré
   assert.equal(report.ok, true);
   assert.ok(report.totals.accounts >= 10 && report.totals.transactions >= 20 && report.totals.entries >= 40 && report.totals.paymentIntents >= 10 && report.totals.paymentEvents >= 10, JSON.stringify(report.totals));
   // Les tests précédents ont fait refuser des payment.succeeded (montant falsifié, état, intention inconnue) : ce sont des AVERTISSEMENTS, jamais des écarts.
-  assert.deepEqual(report.warnings.map((warning) => warning.code).sort(), ["succeeded_event_rejected_amount", "succeeded_event_rejected_state", "succeeded_event_rejected_unknown_intent"]);
+  // Depuis le lot P1b, les ajustements qui créditent un compte utilisateur (crédits de départ des tests) sont aussi signalés.
+  assert.deepEqual(report.warnings.map((warning) => warning.code).sort(), ["adjustment_credits_user_account", "succeeded_event_rejected_amount", "succeeded_event_rejected_state", "succeeded_event_rejected_unknown_intent"]);
   assert.ok(report.warnings.every((warning) => warning.count >= 1 && warning.examples.length >= 1 && warning.examples.length <= 20));
   const [empty] = [createTemporarySchemaName()];
   await admin.query(`CREATE SCHEMA ${quoteTemporarySchema(empty)}`);
@@ -1572,7 +1576,8 @@ test("wallet:check ROUGE : intention réussie sans recharge, recharge sans inten
   });
   assert.ok(codesOf(concordantButTooMany).includes("topup_mismatch"), JSON.stringify(codesOf(concordantButTooMany)));
   assert.ok(!codesOf(concordantButTooMany).includes("provider_clearing_mismatch"), "les montants de provider_clearing concordent : seul le nombre d'écritures est en cause");
-  assert.deepEqual(codesOf(concordantButTooMany), ["topup_mismatch"]);
+  // Depuis le lot P1b, l'écriture boost_revenue d'une recharge n'est pas une écriture d'ajustement : le solde de boost_revenue la signale aussi.
+  assert.deepEqual(codesOf(concordantButTooMany), ["boost_revenue_mismatch", "topup_mismatch"]);
 
   // Contrôles positifs : une recharge COMPLÈTE (intention, événement « applied », deux écritures) et des ajustements qui touchent provider_clearing ne lèvent rien.
   const proper = await checkAfter(async (client) => { await settledTopupSql(client, owner, ownerAccount, clearing, 1000); });

@@ -258,7 +258,8 @@ function mapQuote(row: QuoteRow): Omit<BoostQuote, "reused"> {
  * Cotation du boost d'une offre pour une durée. Transaction READ COMMITTED : après BEGIN, `lock_timeout` puis verrou consultatif
  * par offre (jamais un instantané pris avant le verrou : il masquerait une cotation concurrente et créerait un doublon). Si une
  * cotation de cette offre, de même durée, même vendeur et même périmètre est encore valable, elle est renvoyée telle quelle
- * (`reused: true`, aucune écriture), même si les comptages ou la version tarifaire ont changé. Sinon : comptages (une requête),
+ * (`reused: true`, aucune écriture), même si les comptages ou la version tarifaire ont changé ; une cotation déjà achetée n'est jamais
+ * réutilisée (lot P1b, migration 0015 requise). Sinon : comptages (une requête),
  * prix (pricing.ts) ou indisponibilité (ordre : offre déjà boostée, plus de place, plafond vendeur, aucun acheteur compatible),
  * puis INSERT. Aucune place n'est réservée.
  */
@@ -285,12 +286,15 @@ export async function quoteOfferBoost(input: {
     if (!facts.eligible) throw new BoostError("offer_not_eligible");
     const scope = completeScope(facts);
 
-    // Réutilisation d'une cotation encore valable (même offre, durée, vendeur et périmètre).
+    // Réutilisation d'une cotation encore valable (même offre, durée, vendeur et périmètre), JAMAIS d'une cotation déjà achetée (lot
+    // P1b : un devis ne s'achète qu'une fois, même remboursé ; le renvoyer bloquerait le vendeur jusqu'à son échéance). Une nouvelle
+    // cotation est alors calculée : indisponible (offer_already_boosted) tant que le boost acheté est actif, normale ensuite.
     const existing = await client.query<QuoteRow>(
       `SELECT ${QUOTE_COLUMNS} FROM boost_quotes
         WHERE offer_id = $1::uuid AND duration_code = $2 AND seller_id = $3::uuid
           AND scope_category = $4 AND scope_brand = $5 AND scope_model = $6
           AND expires_at > clock_timestamp()
+          AND NOT EXISTS (SELECT 1 FROM boost_purchases p WHERE p.quote_id = boost_quotes.id)
         ORDER BY computed_at DESC, id DESC
         LIMIT 1`,
       [offerId, durationCode, ownerId, scope.category, scope.brand, scope.model],

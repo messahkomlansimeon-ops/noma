@@ -4,26 +4,39 @@ import { closePostgresPool, getPostgresPool, requireDatabaseUrl } from "../lib/s
 /**
  * COMMANDE D'ADMINISTRATION (lecture seule) : contrôle de réconciliation du portefeuille. Usage :
  *   npm run wallet:check [-- --strict]
- * DATABASE_URL est obligatoire. Code de sortie : 0 aucun écart, 1 au moins un écart (rapport sur la sortie standard) ou, avec
- * --strict, au moins un avertissement, 2 erreur d'usage ou technique. Les AVERTISSEMENTS (payment.succeeded refusés : argent
- * peut-être encaissé sans crédit, à traiter à la main) sont listés à part et ne changent pas le code de sortie sans --strict.
+ * DATABASE_URL est obligatoire (base à jour de la migration 0015). Code de sortie : 0 aucun écart, 1 au moins un écart (rapport sur
+ * la sortie standard) ou, avec --strict, au moins un avertissement, 2 erreur d'usage ou technique. Les AVERTISSEMENTS (payment.succeeded
+ * refusés : argent peut-être encaissé sans crédit, à traiter à la main ; ajustements d'administration qui créditent un compte
+ * utilisateur : valeur créée sans recharge) sont listés à part et ne changent pas le code de sortie sans --strict.
  * Le rapport ne contient aucune donnée personnelle : comptages, identifiants techniques et montants.
  */
 const USAGE = "Usage : npm run wallet:check [-- --strict]";
 
 class UsageError extends Error {}
 
+function printWarningExamples(warning: WalletCheckReport["warnings"][number], unit: string): void {
+  console.log(`AVERTISSEMENT ${warning.code} : ${warning.count} ${unit} (${warning.examples.length} exemple(s) affiché(s), ${WALLET_CHECK_EXAMPLE_LIMIT} au plus).`);
+  for (const example of warning.examples) {
+    console.log(`  ${Object.entries(example).map(([key, value]) => `${key}=${value}`).join(" ")}`);
+  }
+}
+
 function printWarnings(report: WalletCheckReport): void {
-  if (report.warnings.length === 0) return;
-  console.log(
-    "AVERTISSEMENTS (payment.succeeded refusés : de l'argent a peut-être été encaissé chez le prestataire sans crédit, " +
-    "à traiter à la main ; sans effet sur le code de sortie hors --strict) :",
-  );
-  for (const warning of report.warnings) {
-    console.log(`AVERTISSEMENT ${warning.code} : ${warning.count} événement(s) (${warning.examples.length} exemple(s) affiché(s), ${WALLET_CHECK_EXAMPLE_LIMIT} au plus).`);
-    for (const example of warning.examples) {
-      console.log(`  ${Object.entries(example).map(([key, value]) => `${key}=${value}`).join(" ")}`);
-    }
+  const rejected = report.warnings.filter((warning) => warning.code.startsWith("succeeded_event_rejected_"));
+  const adjustments = report.warnings.filter((warning) => warning.code === "adjustment_credits_user_account");
+  if (rejected.length > 0) {
+    console.log(
+      "AVERTISSEMENTS (payment.succeeded refusés : de l'argent a peut-être été encaissé chez le prestataire sans crédit, " +
+      "à traiter à la main ; sans effet sur le code de sortie hors --strict) :",
+    );
+    for (const warning of rejected) printWarningExamples(warning, "événement(s)");
+  }
+  if (adjustments.length > 0) {
+    console.log(
+      "AVERTISSEMENTS (ajustements d'administration qui créditent un compte utilisateur : de la valeur créée sans recharge, " +
+      "à justifier par leur motif ; sans effet sur le code de sortie hors --strict) :",
+    );
+    for (const warning of adjustments) printWarningExamples(warning, "crédit(s) d'ajustement");
   }
 }
 

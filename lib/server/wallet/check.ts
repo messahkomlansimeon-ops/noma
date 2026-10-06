@@ -20,6 +20,16 @@ import { requireWalletPool } from "./ledger";
  * Solde de provider_clearing (formule exacte) :
  *   balance(provider_clearing) = - somme(amount_xof des intentions `succeeded`)
  *                                + somme(amount des écritures de provider_clearing appartenant à des transactions de type <> 'topup')
+ *
+ * Achats de boost (lot P1b) : chaque transaction `boost_purchase` ↔ exactement UNE ligne boost_purchases de même montant (deux écritures :
+ * vendeur −montant, boost_revenue +montant) ; chaque achat ↔ une cotation disponible qui lui correspond (offre, vendeur, durée, montant)
+ * et un boost `purchase` du même vendeur, de la même offre et de la même durée, dont la FENÊTRE est exactement celle payée (durée exacte du
+ * code, début à l'instant de l'achat à 60 s près : `boost_purchase_window_mismatch`) ; chaque boost `purchase` ↔ un achat ; chaque
+ * transaction `boost_refund` ↔ un achat remboursé du même montant (deux écritures : boost_revenue −montant, vendeur +montant) ; le boost
+ * d'un achat remboursé n'est plus actif. Solde de boost_revenue (formule exacte) :
+ *   balance(boost_revenue) = somme(amount_xof des achats) - somme(amount_xof des achats remboursés)
+ *                            + somme(amount des écritures de boost_revenue appartenant à des transactions de type 'adjustment')
+ * (toute autre écriture de boost_revenue rompt l'égalité).
  */
 
 export type WalletCheckCode =
@@ -35,12 +45,23 @@ export type WalletCheckCode =
   | "succeeded_intent_without_applied_event"
   | "failed_intent_without_applied_event"
   | "applied_event_state_mismatch"
-  | "duplicate_applied_event";
+  | "duplicate_applied_event"
+  | "boost_purchase_transaction_orphan"
+  | "boost_purchase_mismatch"
+  | "boost_purchase_quote_mismatch"
+  | "boost_purchase_boost_mismatch"
+  | "boost_purchase_window_mismatch"
+  | "purchase_boost_without_purchase"
+  | "boost_refund_transaction_orphan"
+  | "boost_refund_mismatch"
+  | "refunded_purchase_boost_active"
+  | "boost_revenue_mismatch";
 
 export type WalletCheckWarningCode =
   | "succeeded_event_rejected_amount"
   | "succeeded_event_rejected_state"
-  | "succeeded_event_rejected_unknown_intent";
+  | "succeeded_event_rejected_unknown_intent"
+  | "adjustment_credits_user_account";
 
 export interface WalletCheckViolation {
   code: WalletCheckCode;
@@ -52,9 +73,15 @@ export interface WalletCheckViolation {
 
 export interface WalletCheckWarning {
   code: WalletCheckWarningCode;
-  /** Nombre total d'événements `payment.succeeded` refusés de ce type (le journal est immuable : ils restent comptés). */
+  /**
+   * Nombre total de constats de ce type (le journal et le grand livre sont immuables : ils restent comptés) : événements
+   * `payment.succeeded` refusés, ou écritures d'ajustement qui créditent un compte utilisateur.
+   */
   count: number;
-  /** Au plus WALLET_CHECK_EXAMPLE_LIMIT exemples : identifiant d'événement, intention (vide si inconnue) et montant. */
+  /**
+   * Au plus WALLET_CHECK_EXAMPLE_LIMIT exemples : pour un événement refusé, identifiant d'événement, intention (vide si inconnue) et
+   * montant ; pour un ajustement, transaction, compte (identifiants techniques), montant et code de motif.
+   */
   examples: Array<Record<string, string>>;
 }
 
@@ -180,13 +207,138 @@ const CHECKS: ReadonlyArray<{ code: WalletCheckCode; sql: string }> = [
            WHERE outcome = 'applied'
            GROUP BY intent_id, type HAVING count(*) > 1`,
   },
+  {
+    // Achat de boost : chaque transaction `boost_purchase` appartient à exactement UN achat dont elle porte la référence.
+    code: "boost_purchase_transaction_orphan",
+    sql: `SELECT t.id::text AS transaction_id, t.reference AS reference
+            FROM wallet_transactions t
+           WHERE t.kind = 'boost_purchase'
+             AND (SELECT count(*) FROM boost_purchases p WHERE p.transaction_id = t.id AND t.reference = 'boost_purchase:' || p.id::text) <> 1`,
+  },
+  {
+    // Chaque achat a sa transaction : deux écritures exactement, vendeur −montant, boost_revenue +montant.
+    code: "boost_purchase_mismatch",
+    sql: `SELECT p.id::text AS purchase_id, COALESCE(t.id::text, '') AS transaction_id, p.amount_xof::text AS amount
+            FROM boost_purchases p LEFT JOIN wallet_transactions t ON t.id = p.transaction_id
+           WHERE NOT (
+                 t.id IS NOT NULL AND t.kind = 'boost_purchase' AND t.reference = 'boost_purchase:' || p.id::text
+             AND (SELECT count(*) FROM wallet_entries e WHERE e.transaction_id = t.id) = 2
+             AND EXISTS (SELECT 1 FROM wallet_entries e JOIN wallet_accounts a ON a.id = e.account_id
+                          WHERE e.transaction_id = t.id AND a.kind = 'user' AND a.owner_id = p.seller_id AND e.amount = -p.amount_xof)
+             AND EXISTS (SELECT 1 FROM wallet_entries e JOIN wallet_accounts a ON a.id = e.account_id
+                          WHERE e.transaction_id = t.id AND a.kind = 'boost_revenue' AND e.amount = p.amount_xof))`,
+  },
+  {
+    // Le prix payé est celui de la cotation (disponible, de la même offre, du même vendeur, de la même durée).
+    code: "boost_purchase_quote_mismatch",
+    sql: `SELECT p.id::text AS purchase_id, p.quote_id::text AS quote_id, p.amount_xof::text AS amount, COALESCE(q.amount::text, '') AS quote_amount
+            FROM boost_purchases p LEFT JOIN boost_quotes q ON q.id = p.quote_id
+           WHERE NOT (q.id IS NOT NULL AND q.status = 'available' AND q.amount = p.amount_xof AND q.duration_code = p.duration_code
+                      AND q.offer_id = p.offer_id AND q.seller_id = p.seller_id)`,
+  },
+  {
+    // Chaque achat a son boost : source `purchase`, même vendeur, même offre, même durée.
+    code: "boost_purchase_boost_mismatch",
+    sql: `SELECT p.id::text AS purchase_id, p.boost_id::text AS boost_id
+            FROM boost_purchases p LEFT JOIN offer_boosts b ON b.id = p.boost_id
+           WHERE NOT (b.id IS NOT NULL AND b.source = 'purchase' AND b.seller_id = p.seller_id AND b.offer_id = p.offer_id
+                      AND b.duration_code = p.duration_code)`,
+  },
+  {
+    // La fenêtre du boost est celle qui a été payée : ends_at − starts_at = durée EXACTE du code de l'achat (24 h, 3 j, 7 j), et starts_at
+    // égal à l'instant de l'achat à 60 s près (le boost est inséré dans la même transaction que la ligne d'achat : l'écart réel est de
+    // quelques millisecondes ; 60 s est une borne large, les attentes de verrou étant limitées à 5 s).
+    code: "boost_purchase_window_mismatch",
+    sql: `SELECT p.id::text AS purchase_id, b.id::text AS boost_id,
+                 extract(epoch FROM b.ends_at - b.starts_at)::text AS boost_seconds,
+                 (CASE p.duration_code WHEN '24h' THEN 86400 WHEN '3d' THEN 259200 WHEN '7d' THEN 604800 END)::text AS expected_seconds,
+                 extract(epoch FROM p.created_at - b.starts_at)::text AS start_offset_seconds
+            FROM boost_purchases p JOIN offer_boosts b ON b.id = p.boost_id
+           WHERE extract(epoch FROM b.ends_at - b.starts_at) <> (CASE p.duration_code WHEN '24h' THEN 86400 WHEN '3d' THEN 259200 WHEN '7d' THEN 604800 END)
+              OR b.starts_at > p.created_at OR p.created_at - b.starts_at > interval '60 seconds'`,
+  },
+  {
+    // Aucun boost `purchase` sans achat (un boost payé sans débit).
+    code: "purchase_boost_without_purchase",
+    sql: `SELECT b.id::text AS boost_id, b.offer_id::text AS offer_id
+            FROM offer_boosts b
+           WHERE b.source = 'purchase' AND (SELECT count(*) FROM boost_purchases p WHERE p.boost_id = b.id) <> 1`,
+  },
+  {
+    // Chaque transaction `boost_refund` appartient à exactement UN achat remboursé dont elle porte la référence.
+    code: "boost_refund_transaction_orphan",
+    sql: `SELECT t.id::text AS transaction_id, t.reference AS reference
+            FROM wallet_transactions t
+           WHERE t.kind = 'boost_refund'
+             AND (SELECT count(*) FROM boost_purchases p
+                   WHERE p.refund_transaction_id = t.id AND p.refunded_at IS NOT NULL AND t.reference = 'boost_refund:' || p.id::text) <> 1`,
+  },
+  {
+    // Chaque achat remboursé a son remboursement INTÉGRAL : deux écritures, boost_revenue −montant, vendeur +montant.
+    code: "boost_refund_mismatch",
+    sql: `SELECT p.id::text AS purchase_id, COALESCE(t.id::text, '') AS refund_transaction_id, p.amount_xof::text AS amount
+            FROM boost_purchases p LEFT JOIN wallet_transactions t ON t.id = p.refund_transaction_id
+           WHERE (p.refunded_at IS NOT NULL OR p.refund_transaction_id IS NOT NULL) AND NOT (
+                 p.refunded_at IS NOT NULL AND t.id IS NOT NULL AND t.kind = 'boost_refund' AND t.reference = 'boost_refund:' || p.id::text
+             AND (SELECT count(*) FROM wallet_entries e WHERE e.transaction_id = t.id) = 2
+             AND EXISTS (SELECT 1 FROM wallet_entries e JOIN wallet_accounts a ON a.id = e.account_id
+                          WHERE e.transaction_id = t.id AND a.kind = 'boost_revenue' AND e.amount = -p.amount_xof)
+             AND EXISTS (SELECT 1 FROM wallet_entries e JOIN wallet_accounts a ON a.id = e.account_id
+                          WHERE e.transaction_id = t.id AND a.kind = 'user' AND a.owner_id = p.seller_id AND e.amount = p.amount_xof))`,
+  },
+  {
+    // Un achat remboursé n'a plus de boost actif (il a été annulé, ou était déjà expiré ou annulé).
+    code: "refunded_purchase_boost_active",
+    sql: `SELECT p.id::text AS purchase_id, b.id::text AS boost_id
+            FROM boost_purchases p JOIN offer_boosts b ON b.id = p.boost_id
+           WHERE p.refunded_at IS NOT NULL AND b.status = 'active'`,
+  },
+  {
+    // Solde de boost_revenue = achats − remboursements + écritures de boost_revenue des ajustements (formule du commentaire de tête).
+    code: "boost_revenue_mismatch",
+    sql: `SELECT q.balance::text AS balance, (q.purchases_total - q.refunds_total + q.adjustments_total)::text AS expected,
+                q.purchases_total::text AS purchases_total, q.refunds_total::text AS refunds_total, q.adjustments_total::text AS adjustments_total
+            FROM (SELECT COALESCE((SELECT sum(a.balance) FROM wallet_accounts a WHERE a.kind = 'boost_revenue'), 0) AS balance,
+                         COALESCE((SELECT sum(p.amount_xof) FROM boost_purchases p), 0) AS purchases_total,
+                         COALESCE((SELECT sum(p.amount_xof) FROM boost_purchases p WHERE p.refunded_at IS NOT NULL), 0) AS refunds_total,
+                         COALESCE((SELECT sum(e.amount) FROM wallet_entries e
+                                     JOIN wallet_accounts a ON a.id = e.account_id
+                                     JOIN wallet_transactions t ON t.id = e.transaction_id
+                                    WHERE a.kind = 'boost_revenue' AND t.kind = 'adjustment'), 0) AS adjustments_total) q
+           WHERE q.balance <> q.purchases_total - q.refunds_total + q.adjustments_total`,
+  },
 ];
 
 /** Événements payment.succeeded REFUSÉS : de l'argent a peut-être été encaissé sans crédit (à traiter à la main). */
-const WARNINGS: ReadonlyArray<{ code: WalletCheckWarningCode; outcome: string }> = [
+const REJECTED_EVENT_WARNINGS: ReadonlyArray<{ code: WalletCheckWarningCode; outcome: string }> = [
   { code: "succeeded_event_rejected_amount", outcome: "rejected_amount" },
   { code: "succeeded_event_rejected_state", outcome: "rejected_state" },
   { code: "succeeded_event_rejected_unknown_intent", outcome: "rejected_unknown_intent" },
+];
+
+/**
+ * Avertissements, dans l'ordre du rapport : les événements refusés, puis les ajustements qui créditent un compte utilisateur.
+ * Un ajustement est une écriture d'administration SANS contrepartie métier (ni recharge, ni remboursement d'achat) : il crée de la
+ * valeur pour un utilisateur à partir de boost_revenue. Chaque crédit de ce genre doit pouvoir être justifié (motif `reasonCode`).
+ */
+const WARNINGS: ReadonlyArray<{ code: WalletCheckWarningCode; sql: string }> = [
+  ...REJECTED_EVENT_WARNINGS.map((warning) => ({
+    code: warning.code,
+    sql: `SELECT provider_event_id AS event_id, COALESCE(intent_id::text, '') AS intent_id, amount_xof::text AS amount
+            FROM payment_events
+           WHERE type = 'payment.succeeded' AND outcome = '${warning.outcome}'
+           ORDER BY received_at DESC, id DESC`,
+  })),
+  {
+    code: "adjustment_credits_user_account",
+    sql: `SELECT t.id::text AS transaction_id, a.id::text AS account_id, e.amount::text AS amount,
+                 COALESCE(t.metadata ->> 'reasonCode', '') AS reason_code
+            FROM wallet_entries e
+            JOIN wallet_accounts a ON a.id = e.account_id
+            JOIN wallet_transactions t ON t.id = e.transaction_id
+           WHERE t.kind = 'adjustment' AND a.kind = 'user' AND e.amount > 0
+           ORDER BY t.created_at DESC, t.id DESC, e.id DESC`,
+  },
 ];
 
 /** Les requêtes de contrôle, sur un exécuteur quelconque (un client dans une transaction de test, par exemple). */
@@ -210,12 +362,7 @@ export async function runWalletCheck(executor: SqlExecutor): Promise<WalletCheck
   const warnings: WalletCheckWarning[] = [];
   for (const warning of WARNINGS) {
     const result = await executor.query<Record<string, string>>(
-      `SELECT q.*, count(*) OVER ()::text AS total_rows
-         FROM (SELECT provider_event_id AS event_id, COALESCE(intent_id::text, '') AS intent_id, amount_xof::text AS amount
-                 FROM payment_events
-                WHERE type = 'payment.succeeded' AND outcome = '${warning.outcome}'
-                ORDER BY received_at DESC, id DESC) q
-        LIMIT ${WALLET_CHECK_EXAMPLE_LIMIT}`,
+      `SELECT q.*, count(*) OVER ()::text AS total_rows FROM (${warning.sql}) q LIMIT ${WALLET_CHECK_EXAMPLE_LIMIT}`,
     );
     if (result.rows.length === 0) continue;
     warnings.push({
