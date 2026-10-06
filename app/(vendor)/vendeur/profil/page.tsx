@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Check, CircleCheck, CirclePlus, LogOut, Phone, Plus, Store, X } from "lucide-react";
+import { Check, CircleCheck, CirclePlus, LogOut, Phone, Plus, Store, Wallet, X } from "lucide-react";
 import { useLogout } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
-import { FieldLabel, Input, Switch } from "@/components/ui";
+import { FieldLabel, Input, MenuRow, Switch } from "@/components/ui";
+import { walletHref } from "@/lib/client/wallet-view";
 import { useNoma } from "@/lib/store";
 
 export default function ProfilVendeur() {
@@ -149,10 +150,14 @@ export default function ProfilVendeur() {
           Vendeur vérifié par téléphone
         </div>
 
+        <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-white">
+          <MenuRow icon={Wallet} label="Mon porte-monnaie" href={walletHref({ next: "/vendeur/profil" })} />
+        </div>
+
         <button
           onClick={() => void logout()}
           disabled={loggingOut}
-          className="flex w-full items-center justify-center gap-2 py-2 text-[14px] font-bold text-ink-soft transition hover:text-ink disabled:opacity-40"
+          className="mt-2 flex w-full items-center justify-center gap-2 py-2 text-[14px] font-bold text-ink-soft transition hover:text-ink disabled:opacity-40"
         >
           <LogOut className="size-4" />
           {loggingOut ? "Déconnexion…" : "Se déconnecter"}

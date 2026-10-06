@@ -128,6 +128,61 @@ describe("dev:try : préparation de l'environnement", () => {
     assert.equal(bare.plan.env.NOMA_TURNSTILE_DISABLED, "1");
   });
 
+  test("paiement simulé : NOMA_FAKE_PAYMENTS=1 toujours posé, secret généré (32 octets au moins) sans jamais être affiché", () => {
+    const bare = prepareDevTry({ DATABASE_URL }, fixedRandom(5));
+    assert.ok(bare.ok);
+    assert.equal(bare.plan.env.NOMA_FAKE_PAYMENTS, "1");
+    const secret = bare.plan.env.NOMA_FAKE_PAYMENT_SECRET as string;
+    assert.ok(Buffer.byteLength(secret, "utf8") >= 32, "32 octets au moins (la règle de lib/server/wallet/fake-provider.ts)");
+    // Quoi que dise l'environnement : le drapeau vaut « 1 » (comme les autres drapeaux de simulation).
+    for (const flag of ["0", "", "true", "yes"]) {
+      const forced = prepareDevTry({ DATABASE_URL, NOMA_FAKE_PAYMENTS: flag }, fixedRandom(5));
+      assert.ok(forced.ok);
+      assert.equal(forced.plan.env.NOMA_FAKE_PAYMENTS, "1", flag);
+    }
+    // Le secret n'apparaît dans aucun avertissement ni refus ; deux démarrages n'en partagent pas.
+    assert.equal(JSON.stringify(bare.plan.warnings).includes(secret), false);
+    const other = prepareDevTry({ DATABASE_URL });
+    const another = prepareDevTry({ DATABASE_URL });
+    assert.ok(other.ok && another.ok);
+    assert.notEqual(other.plan.env.NOMA_FAKE_PAYMENT_SECRET, another.plan.env.NOMA_FAKE_PAYMENT_SECRET);
+    // Il est tiré À PART des secrets d'authentification et de proxy (chaque secret a son propre tirage).
+    let draw = 0;
+    const sequential = prepareDevTry({ DATABASE_URL }, (size) => Buffer.alloc(size, (draw += 1)));
+    assert.ok(sequential.ok);
+    assert.equal(draw, 3, "trois tirages : authentification, proxy, prestataire fictif");
+    const fake = sequential.plan.env.NOMA_FAKE_PAYMENT_SECRET;
+    assert.notEqual(fake, sequential.plan.env.NOMA_AUTH_SECRET);
+    assert.notEqual(fake, sequential.plan.env.NOMA_AUTH_PROXY_SECRET);
+    // Les messages fixes d'avertissement n'ont pas changé (aucun avertissement de plus).
+    assert.equal(bare.plan.warnings.length, 2);
+  });
+
+  test("paiement simulé : un secret fourni est conservé (espaces autour retirés) ; trop court : refus sans afficher la valeur", () => {
+    const given = "q".repeat(40);
+    const kept = prepareDevTry({ DATABASE_URL, NOMA_FAKE_PAYMENT_SECRET: `  ${given}  ` });
+    assert.ok(kept.ok);
+    assert.equal(kept.plan.env.NOMA_FAKE_PAYMENT_SECRET, given);
+    assert.equal(kept.plan.env.NOMA_FAKE_PAYMENTS, "1");
+    assert.equal(prepareDevTry({ DATABASE_URL, NOMA_FAKE_PAYMENT_SECRET: "q".repeat(32) }).ok, true, "32 octets : accepté");
+    for (const short of ["trop-court", "q".repeat(31)]) {
+      const refused = prepareDevTry({ DATABASE_URL, NOMA_FAKE_PAYMENT_SECRET: short });
+      assert.equal(refused.ok, false, short);
+      assert.match((refused as { reason: string }).reason, /NOMA_FAKE_PAYMENT_SECRET doit contenir au moins 32 octets/);
+      assert.equal(JSON.stringify(refused).includes(short), false, "la valeur n'est jamais affichée");
+    }
+    // Vide ou espaces seulement : comme absent, un secret est généré.
+    const blank = prepareDevTry({ DATABASE_URL, NOMA_FAKE_PAYMENT_SECRET: "   " }, fixedRandom(3));
+    assert.ok(blank.ok);
+    assert.ok(Buffer.byteLength(blank.plan.env.NOMA_FAKE_PAYMENT_SECRET as string, "utf8") >= 32);
+  });
+
+  test("le prestataire fictif reste soumis à la liste d'autorisation du serveur : hors développement, dev:try refuse de démarrer", () => {
+    for (const nodeEnv of ["production", "test", "staging"]) {
+      assert.equal(prepareDevTry({ DATABASE_URL, NODE_ENV: nodeEnv, NOMA_FAKE_PAYMENTS: "1" }).ok, false, nodeEnv);
+    }
+  });
+
   test("base de données : seulement CE poste (127.0.0.1, localhost, ::1), y compris par le paramètre host", () => {
     const accepted = [
       DATABASE_URL,
@@ -440,6 +495,54 @@ describe("dev:try : ports", () => {
 describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
   const guide = readFileSync(fileURLToPath(new URL("../../ESSAYER.md", import.meta.url)), "utf8");
   const normalized = guide.replace(/\s+/g, " ");
+
+  test("le guide dit (lots P2 et P2-bis) : base à 16 migrations, recharge simulée, achat de boost, « aucun argent réel », « Sponsorisé »", () => {
+    for (const expected of [
+      "16 migrations",
+      "0016",
+      "0015",
+      "noma_schema_migrations",
+      "Mon porte-monnaie",
+      "Recharger",
+      "paiement simulé",
+      "SIMULATION — aucun argent réel",
+      "Confirmer le paiement",
+      "Faire échouer le paiement",
+      "Solde insuffisant",
+      "Acheter",
+      "Confirmer l'achat",
+      "Boost actif jusqu'au",
+      "Sponsorisé",
+      "aucun argent réel n'est utilisé",
+      "NOMA_FAKE_PAYMENTS=1",
+      "NOMA_FAKE_PAYMENT_SECRET",
+      "ne définissez jamais ces variables en production",
+    ]) {
+      assert.ok(normalized.includes(expected), `ESSAYER.md doit contenir « ${expected} »`);
+    }
+    // Lot P2-bis (S1) : le badge n'est promis qu'avec assez d'offres comparables, et le guide explique comment les obtenir (dev:seed).
+    for (const expected of [
+      "npm run dev:seed -- --category phones --brand apple --model \"iphone 12\" --offers 8",
+      "au moins **7 offres**",
+      "Pas encore assez d'annonces comparables : un boost ne changerait rien à l'ordre des résultats.",
+      "Mise en avant visible auprès de X acheteur(s)",
+      "vendeurs fictifs",
+      "+225 07 99 99 99 01",
+      "Vérifier / réessayer",
+      "Un boost n'est ni une garantie de position, ni une garantie de vente.",
+    ]) {
+      assert.ok(normalized.includes(expected), `ESSAYER.md doit contenir « ${expected} »`);
+    }
+    const seedStep = normalized.indexOf("npm run dev:seed");
+    const quoteStep = normalized.indexOf("Booster cette annonce");
+    assert.ok(seedStep !== -1 && quoteStep !== -1 && seedStep < quoteStep, "l'étape des annonces d'exemple vient AVANT l'essai du boost");
+    assert.equal(/15 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations");
+    assert.equal(/l'annonce boostée est en tête avec le badge/.test(normalized), false, "le badge n'est plus promis sans condition");
+    // Le guide ne dit plus que l'achat est éteint ou que le paiement n'existe pas.
+    assert.equal(/le paiement n'existe pas encore/.test(normalized), false);
+    assert.equal(/aucun paiement n'est possible/.test(normalized), false);
+    assert.equal(/Paiement bientôt disponible/.test(normalized), false);
+  });
 
   test("le guide dit : base indiquée dans la commande, base de CE poste, NODE_ENV, recherche simulée, besoins, port jamais exposé", () => {
     for (const expected of [

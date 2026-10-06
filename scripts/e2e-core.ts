@@ -11,18 +11,28 @@
  * 8 offres du même produit, le vendeur A publie la plus chère, l'acheteur B active son besoin, devis de boost (201 puis 200
  * réutilisé, 409 pour une annonce en pause), attribution d'un boost par la commande d'administration `boost:grant`
  * (aucun paiement), puis l'acheteur voit l'offre « sponsorisée » en tête ; aucune identité de l'autre partie dans aucune réponse.
+ * Scénario du lot P2 (porte-monnaie) : un autre produit (8 offres d'un vendeur concurrent, l'offre de A la plus chère) ; achat refusé
+ * sans crédit (409 insufficient_balance) ; recharge par le prestataire FICTIF (montant vérifié par le serveur, idempotence, 404
+ * indiscernables entre comptes, confirmation fictive, rejeux sans second crédit, échec simulé) ; achat de boost avec le solde (201,
+ * rejeu 200 « reused », un seul débit, devis consommé) ; historique du porte-monnaie ; l'acheteur voit « Sponsorisé » ; `wallet:check`
+ * (réconciliation du grand livre, lecture seule). Scénario du lot P2-bis (portée visible) : un produit à UNE annonce et un besoin → devis 24 h
+ * INDISPONIBLE (`no_visible_effect`, `inputs.reachableBuyers` = 0, aucun prix), achat refusé 409 `quote_unavailable`, aucun débit ; la commande
+ * `dev:seed` (base noma_e2e) ajoute 8 annonces d'exemple de vendeurs fictifs ; devis 3 jours DISPONIBLE (`reachableBuyers` = 1) ; `dev:seed`
+ * relancé : aucun doublon. Suppose un serveur lancé par `npm run dev:try` (prestataire fictif actif).
  *
  * Variables (voir scripts/e2e-common.ts) : NOMA_E2E_BASE_URL (relais, défaut http://localhost:3212), NOMA_E2E_SERVER_LOG,
  * NOMA_E2E_DATABASE_URL (noma_e2e, pour boost:grant), NOMA_E2E_DIRECT_URL (Next sans relais, défaut http://127.0.0.1:3211),
- * NOMA_E2E_WORKER_TIMEOUT_MS (attente bornée du worker, défaut 90000), NOMA_E2E_SEARCH_STREAM=1 (ajoute le contrôle du flux
+ * NOMA_E2E_WORKER_TIMEOUT_MS (attente bornée du worker, défaut 300000 : la base noma_e2e grossit à chaque essai et le worker évalue chaque besoin contre toutes les offres de la catégorie), NOMA_E2E_SEARCH_STREAM=1 (ajoute le contrôle du flux
  * NDJSON de /api/search : serveur lancé avec fausses sources, ce que fait `dev:try` sans aucune autre variable).
  * Les codes OTP lus dans le journal ne sont jamais affichés.
  */
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import {
   ApiError,
   createApiClient,
   describeApiError,
+  type BoostQuote,
   type DemandRecord,
   type OfferRecord,
   type StoredMatch,
@@ -37,11 +47,13 @@ import {
   logSize,
   loginWithOtp,
   pollUntil,
+  seedExamplesByAdministration,
   uniquePhone,
+  walletCheckByAdministration,
 } from "./e2e-common";
 
 const DIRECT = (process.env.NOMA_E2E_DIRECT_URL ?? "http://127.0.0.1:3211").replace(/\/$/, "");
-const WORKER_TIMEOUT_MS = Number(process.env.NOMA_E2E_WORKER_TIMEOUT_MS ?? "90000");
+const WORKER_TIMEOUT_MS = Number(process.env.NOMA_E2E_WORKER_TIMEOUT_MS ?? "300000");
 
 if (!E2E_SERVER_LOG) {
   console.error("e2e:core : NOMA_E2E_SERVER_LOG est requis.");
@@ -432,6 +444,8 @@ async function main(): Promise<void> {
       "/alertes",
       "/alerte/nouvelle",
       `/besoins/${demand.id}`,
+      "/compte/porte-monnaie",
+      "/paiement-simule/6f1d4f5c-9d2e-4d8e-8f56-0a8b9f0a1b2c",
     ];
     for (const path of pages) {
       const connected = await seller.fetch(path);
@@ -561,7 +575,8 @@ async function main(): Promise<void> {
     assert.equal(created.status, "available");
     assert.equal(created.reused, false);
     assert.ok(created.amount !== null && created.amount >= 500, `montant : ${String(created.amount)}`);
-    assert.deepEqual(created.inputs, { competingSellers: 1, compatibleBuyers: 1, slotsTotal: 2, slotsUsed: 0 });
+    // Lot P2-bis (S1) : `reachableBuyers` = acheteurs chez qui le boost ferait monter l'offre (ici B : 9 offres, une place mise en avant).
+    assert.deepEqual(created.inputs, { competingSellers: 1, compatibleBuyers: 1, slotsTotal: 2, slotsUsed: 0, reachableBuyers: 1 });
     assert.ok(created.factors);
     firstQuoteId = created.id;
     ok(
@@ -685,6 +700,400 @@ async function main(): Promise<void> {
     assert.equal(row.candidate.budget?.amount, 250000);
     assert.equal(row.sponsored, false, "le sens offre n'a jamais de mise en avant");
     ok("besoin de B vu par A : budget 250 000 FCFA, sponsored=false (sens offre)");
+  });
+
+  // ─── Scénario P2 : porte-monnaie, recharge par le prestataire FICTIF, achat de boost ───
+  const payTag = (Date.now() + 1).toString(36).slice(-5);
+  const payProduct = { category: "Téléphones", brand: "Google", model: `Pixel 7 ${payTag}` };
+  const jsonHeaders = { "content-type": "application/json" };
+  const payRivalOffers: OfferRecord[] = [];
+  let payTarget: OfferRecord = undefined as unknown as OfferRecord;
+  let payDemand: DemandRecord = undefined as unknown as DemandRecord;
+  let payQuote: BoostQuote = undefined as unknown as BoostQuote;
+  const TOPUP_AMOUNT = 5_000;
+
+  await step(`Achat : produit « ${payProduct.brand} ${payProduct.model} », 8 offres du vendeur C, l'offre de A est la plus chère, besoin de B`, async () => {
+    for (let index = 0; index < 8; index += 1) {
+      const built = buildOfferInput({
+        title: `${payProduct.brand} ${payProduct.model} · offre ${index + 1}`,
+        description: "",
+        category: payProduct.category,
+        brand: payProduct.brand,
+        model: payProduct.model,
+        variant: "",
+        condition: "Occasion",
+        location: "Abidjan",
+        price: String(100_000 + index * 5_000),
+        available: true,
+      });
+      assert.ok(built.ok);
+      const created = await rivalApi.offers.create(built.input);
+      payRivalOffers.push(await rivalApi.offers.publish(created.id, created.contentVersion));
+    }
+    const built = buildOfferInput({
+      title: `${payProduct.brand} ${payProduct.model} · offre de A`,
+      description: "",
+      category: payProduct.category,
+      brand: payProduct.brand,
+      model: payProduct.model,
+      variant: "",
+      condition: "Occasion",
+      location: "Abidjan",
+      price: "190 000",
+      available: true,
+    });
+    assert.ok(built.ok);
+    const created = await sellerApi.offers.create(built.input);
+    payTarget = await sellerApi.offers.publish(created.id, created.contentVersion);
+    const demandBuilt = buildDemandInput(
+      {
+        text: `Je cherche un ${payProduct.brand} ${payProduct.model}`,
+        category: payProduct.category,
+        brand: payProduct.brand,
+        model: payProduct.model,
+        variant: "",
+        condition: "Occasion",
+        location: "Abidjan",
+        budget: "250 000",
+        deadline: "",
+      },
+      new Date().toISOString().slice(0, 10),
+    );
+    assert.ok(demandBuilt.ok);
+    const demandCreated = await buyerApi.demands.create(demandBuilt.input);
+    payDemand = await buyerApi.demands.activate(demandCreated.id, demandCreated.contentVersion);
+    ok("C : 8 offres publiées ; A : offre à 190 000 FCFA ; B : besoin actif (budget 250 000 FCFA)");
+    const wanted = [payTarget.id, ...payRivalOffers.map((candidate) => candidate.id)];
+    const seen = await pollUntil(
+      "les 9 offres dans les résultats de B",
+      async () => {
+        const items = await allMatches(buyer, payDemand.id, "relevance");
+        return wanted.every((id) => items.some((item) => item.candidateId === id)) ? items : null;
+      },
+      WORKER_TIMEOUT_MS * 2,
+    );
+    assert.equal(seen.some((item) => item.sponsored), false);
+    await pollUntil(
+      "le besoin de B parmi les acheteurs intéressés de A",
+      async () => ((await allDemandMatches(seller, payTarget.id)).some((item) => item.candidateId === payDemand.id) ? true : null),
+      WORKER_TIMEOUT_MS,
+    );
+    ok(`${seen.length} offre(s) dans les résultats de B (aucune « sponsorisée ») ; le besoin de B figure dans les acheteurs intéressés de A`);
+  });
+
+  await step("Achat sans crédit : solde nul, devis disponible, achat refusé 409 insufficient_balance", async () => {
+    const wallet = await sellerApi.wallet.overview();
+    assert.equal(wallet.balanceXof, 0);
+    assert.deepEqual(wallet.transactions, []);
+    assert.equal(wallet.nextCursor, null);
+    const rawWallet = await seller.fetch("/api/wallet");
+    assert.equal(rawWallet.status, 200);
+    assert.equal(rawWallet.headers.get("cache-control"), "no-store");
+    ok("GET /api/wallet : solde 0, historique vide, Cache-Control: no-store");
+    payQuote = await sellerApi.boostQuotes.create(payTarget.id, "3d");
+    assert.equal(payQuote.status, "available");
+    assert.ok(payQuote.amount !== null && payQuote.amount >= 500 && payQuote.amount <= TOPUP_AMOUNT, `montant du devis : ${String(payQuote.amount)}`);
+    ok(`devis 3 jours disponible : ${payQuote.amount} FCFA (valable ${Math.round((Date.parse(payQuote.expiresAt) - Date.parse(payQuote.computedAt)) / 1000)} s)`);
+    const refused = await rejects(sellerApi.boostPurchases.create(payTarget.id, { quoteId: payQuote.id, idempotencyKey: randomUUID() }));
+    expectApiError(refused, 409, "insufficient_balance");
+    assert.equal(describeApiError(refused, "purchase"), "Solde insuffisant : rechargez votre porte-monnaie, puis réessayez.");
+    ok("POST boost-purchases sans crédit : 409 insufficient_balance → « Solde insuffisant : rechargez votre porte-monnaie… »");
+    assert.deepEqual(await sellerApi.boostPurchases.list(payTarget.id), []);
+    assert.equal((await sellerApi.wallet.overview()).balanceXof, 0);
+    const stillQuote = await sellerApi.boostQuotes.create(payTarget.id, "3d");
+    assert.equal(stillQuote.id, payQuote.id, "le devis n'est pas consommé par un refus");
+    assert.equal(stillQuote.reused, true);
+    ok("aucun achat, aucun débit ; le devis refusé reste utilisable (réutilisé, 200)");
+    const results = await allMatches(buyer, payDemand.id, "relevance");
+    assert.equal(results.some((item) => item.sponsored), false);
+    ok("l'acheteur B ne voit aucune offre « sponsorisée »");
+  });
+
+  const topupKey = randomUUID();
+  let topupId = "";
+  await step("Recharge simulée : bornes vérifiées par le serveur, idempotence, isolation entre comptes, origine et session", async () => {
+    for (const [amountXof, label] of [[550, "pas un multiple de 100"], [100, "sous le minimum"], [500_100, "au-dessus du maximum"]] as const) {
+      const bad = await rejects(sellerApi.wallet.createTopup({ amountXof, idempotencyKey: randomUUID() }));
+      expectApiError(bad, 400, "invalid_request");
+      assert.match(describeApiError(bad, "wallet"), /500 à 500\s000 FCFA, par multiples de 100/);
+      ok(`POST /api/wallet/topups ${amountXof} (${label}) : 400 invalid_request → message avec les bornes`);
+    }
+    const created = await sellerApi.wallet.createTopup({ amountXof: TOPUP_AMOUNT, idempotencyKey: topupKey });
+    assert.equal(created.reused, false);
+    assert.equal(created.topup.status, "pending");
+    assert.equal(created.topup.amountXof, TOPUP_AMOUNT);
+    assert.equal(created.topup.checkoutPath, `/paiement-simule/${created.topup.id}`);
+    topupId = created.topup.id;
+    ok(`POST /api/wallet/topups ${TOPUP_AMOUNT} : 201, en attente, checkoutPath /paiement-simule/<id>`);
+    const again = await sellerApi.wallet.createTopup({ amountXof: TOPUP_AMOUNT, idempotencyKey: topupKey });
+    assert.equal(again.reused, true);
+    assert.equal(again.topup.id, topupId);
+    ok("même clé d'idempotence, même montant : 200, la même intention (aucune seconde)");
+    const conflict = await rejects(sellerApi.wallet.createTopup({ amountXof: 2_000, idempotencyKey: topupKey }));
+    expectApiError(conflict, 409, "idempotency_conflict");
+    assert.match(describeApiError(conflict, "wallet"), /autre montant/);
+    ok("même clé, autre montant : 409 idempotency_conflict → message fixe");
+    assert.equal((await sellerApi.wallet.topup(topupId)).status, "pending");
+    ok("GET /api/wallet/topups/{id} : en attente");
+    expectApiError(await rejects(buyerApi.wallet.topup(topupId)), 404, "resource_not_found");
+    expectApiError(await rejects(buyerApi.devPayments.confirm(topupId)), 404, "resource_not_found");
+    expectApiError(await rejects(buyerApi.devPayments.fail(topupId)), 404, "resource_not_found");
+    ok("B lit, confirme ou fait échouer la recharge de A : 404 (indiscernable d'une recharge inexistante)");
+    assert.equal((await sellerApi.wallet.topup(topupId)).status, "pending");
+    assert.equal((await sellerApi.wallet.overview()).balanceXof, 0);
+    ok("la recharge de A reste en attente, solde 0");
+    const body = JSON.stringify({ amountXof: 1_000, idempotencyKey: randomUUID() });
+    const noOrigin = await seller.fetch("/api/wallet/topups", { method: "POST", headers: jsonHeaders, body, origin: null });
+    const foreign = await seller.fetch("/api/wallet/topups", { method: "POST", headers: jsonHeaders, body, origin: "http://evil.example" });
+    assert.equal(noOrigin.status, 403);
+    assert.equal(foreign.status, 403);
+    const noSession = await seller.fetch("/api/wallet/topups", { method: "POST", headers: jsonHeaders, body, noCookies: true });
+    assert.equal(noSession.status, 401);
+    ok("POST /api/wallet/topups sans Origin ou avec une origine étrangère : 403 ; sans session : 401");
+    const unsigned = await seller.fetch("/api/payments/fake/webhook", { method: "POST", headers: jsonHeaders, body: "{}", noCookies: true });
+    assert.equal(unsigned.status, 400);
+    assert.equal(((await unsigned.json()) as { error: { code: string } }).error.code, "invalid_signature");
+    ok("webhook du prestataire fictif sans signature : 400 invalid_signature (aucun crédit possible sans signature)");
+  });
+
+  await step("Paiement fictif : confirmation → solde crédité UNE fois, rejeux sans effet, échec simulé sans crédit", async () => {
+    const confirmed = await sellerApi.devPayments.confirm(topupId);
+    assert.equal(confirmed.outcome, "applied");
+    assert.equal(confirmed.topup.status, "succeeded");
+    let wallet = await sellerApi.wallet.overview();
+    assert.equal(wallet.balanceXof, TOPUP_AMOUNT);
+    assert.deepEqual(wallet.transactions.map((entry) => [entry.kind, entry.amountXof]), [["topup", TOPUP_AMOUNT]]);
+    ok(`confirmation fictive : outcome « applied », recharge réussie, solde ${TOPUP_AMOUNT}, historique : une recharge +${TOPUP_AMOUNT}`);
+    const replay = await sellerApi.devPayments.confirm(topupId);
+    assert.equal(replay.outcome, "duplicate");
+    wallet = await sellerApi.wallet.overview();
+    assert.equal(wallet.balanceXof, TOPUP_AMOUNT);
+    assert.equal(wallet.transactions.length, 1);
+    ok("seconde confirmation : outcome « duplicate », aucun second crédit");
+    const lateFail = await sellerApi.devPayments.fail(topupId);
+    assert.equal(lateFail.outcome, "rejected_state");
+    assert.equal(lateFail.topup.status, "succeeded");
+    ok("échec simulé après réussite : outcome « rejected_state », la recharge reste réussie");
+    const second = await sellerApi.wallet.createTopup({ amountXof: 1_000, idempotencyKey: randomUUID() });
+    const failed = await sellerApi.devPayments.fail(second.topup.id);
+    assert.equal(failed.outcome, "applied");
+    assert.equal(failed.topup.status, "failed");
+    assert.equal((await sellerApi.wallet.topup(second.topup.id)).status, "failed");
+    wallet = await sellerApi.wallet.overview();
+    assert.equal(wallet.balanceXof, TOPUP_AMOUNT);
+    assert.equal(wallet.transactions.length, 1, "une recharge échouée n'écrit rien dans l'historique");
+    ok("recharge de 1 000 : échec simulé → « failed », aucun crédit, historique inchangé");
+  });
+
+  await step("Achat de boost avec le solde : 201, un seul débit, rejeu 200 « reused », devis consommé", async () => {
+    const key = randomUUID();
+    const amount = payQuote.amount as number;
+    const post = (idempotencyKey: string, quoteId = payQuote.id) =>
+      seller.fetch(`/api/offers/${payTarget.id}/boost-purchases`, { method: "POST", headers: jsonHeaders, body: JSON.stringify({ quoteId, idempotencyKey }) });
+    const first = await post(key);
+    assert.equal(first.status, 201);
+    assert.equal(first.headers.get("cache-control"), "no-store");
+    const firstText = await first.text();
+    const firstBody = JSON.parse(firstText) as { contractVersion: string; purchase: Record<string, unknown>; balanceXof: number };
+    assert.equal(firstBody.contractVersion, "boost-purchase/v1");
+    assert.equal(firstBody.purchase.reused, false);
+    assert.equal(firstBody.purchase.amountXof, amount, "le prix payé est celui du devis");
+    assert.equal(firstBody.purchase.durationCode, "3d");
+    assert.equal(firstBody.purchase.quoteId, payQuote.id);
+    assert.equal(firstBody.balanceXof, TOPUP_AMOUNT - amount);
+    const windowMs = Date.parse(firstBody.purchase.endsAt as string) - Date.parse(firstBody.purchase.startsAt as string);
+    assert.equal(windowMs, 3 * 24 * 3_600_000, "la fenêtre du boost acheté est exactement de 3 jours");
+    for (const leaked of [sellerId, "sellerId", "boostId", "transactionId", "offerId", "idempotencyKey", key, payTarget.id]) {
+      assert.equal(firstText.includes(leaked), false, `la réponse d'achat ne contient pas « ${leaked} »`);
+    }
+    ok(`POST boost-purchases : 201, ${amount} FCFA débités (prix du devis), solde ${firstBody.balanceXof}, fenêtre de 3 jours, aucun identifiant interne`);
+    const replay = await post(key);
+    assert.equal(replay.status, 200);
+    const replayBody = (await replay.json()) as { purchase: { id: string; reused: boolean }; balanceXof: number };
+    assert.equal(replayBody.purchase.reused, true);
+    assert.equal(replayBody.purchase.id, firstBody.purchase.id);
+    assert.equal(replayBody.balanceXof, TOPUP_AMOUNT - amount);
+    const viaClient = await sellerApi.boostPurchases.create(payTarget.id, { quoteId: payQuote.id, idempotencyKey: key });
+    assert.equal(viaClient.purchase.reused, true);
+    assert.equal(viaClient.balanceXof, TOPUP_AMOUNT - amount);
+    ok("rejeu de la même requête (même clé) : 200 « reused », même achat, aucun second débit (deux rejeux)");
+    const consumed = await rejects(sellerApi.boostPurchases.create(payTarget.id, { quoteId: payQuote.id, idempotencyKey: randomUUID() }));
+    expectApiError(consumed, 409, "quote_already_used");
+    assert.match(describeApiError(consumed, "purchase"), /^Ce devis a déjà servi/);
+    ok("le même devis avec une AUTRE clé : 409 quote_already_used (un devis ne s'achète qu'une fois)");
+    const wallet = await sellerApi.wallet.overview();
+    assert.equal(wallet.balanceXof, TOPUP_AMOUNT - amount);
+    assert.deepEqual(wallet.transactions.map((entry) => [entry.kind, entry.amountXof]), [["boost_purchase", -amount], ["topup", TOPUP_AMOUNT]]);
+    ok(`historique du porte-monnaie : achat de boost −${amount}, recharge +${TOPUP_AMOUNT} (une seule ligne d'achat), solde ${wallet.balanceXof}`);
+    const purchases = await sellerApi.boostPurchases.list(payTarget.id);
+    assert.equal(purchases.length, 1);
+    assert.equal(purchases[0].id, firstBody.purchase.id);
+    assert.equal(purchases[0].amountXof, amount);
+    assert.equal(purchases[0].refundedAt, null);
+    ok("GET boost-purchases : un seul achat, non remboursé");
+    expectApiError(await rejects(rivalApi.boostPurchases.create(payTarget.id, { quoteId: payQuote.id, idempotencyKey: randomUUID() })), 404, "resource_not_found");
+    expectApiError(await rejects(buyerApi.boostPurchases.list(payTarget.id)), 404, "resource_not_found");
+    expectApiError(await rejects(sellerApi.boostPurchases.create(payTarget.id, { quoteId: randomUUID(), idempotencyKey: randomUUID() })), 404, "resource_not_found");
+    ok("un autre compte ne peut ni acheter ni lister les achats de A (404) ; un devis inconnu : 404");
+  });
+
+  await step("Après l'achat : l'acheteur B voit l'offre de A « sponsorisée » en tête, le devis suivant est indisponible, wallet:check", async () => {
+    const after = await allMatches(buyer, payDemand.id, "relevance");
+    const sponsored = after.filter((item) => item.sponsored);
+    assert.equal(sponsored.length, 1, `au plus floor(0,15 × ${after.length}) offres promues`);
+    assert.equal(sponsored[0].candidateId, payTarget.id);
+    assert.equal(after[0].candidateId, payTarget.id, "l'offre sponsorisée passe en tête");
+    ok(`résultats de B : l'offre de A (190 000 FCFA, la plus chère) est « sponsorisée » et passe en tête (${after.length} offres)`);
+    const rawText = await rawAllPages(buyer, `/api/demands/${payDemand.id}/stored-matches?sort=relevance`);
+    for (const forbidden of ["boost", "Boost", "endsAt", "purchase", sellerId, rivalId, sellerPhone, rivalPhone]) {
+      assert.equal(rawText.includes(forbidden), false, `le DTO de B ne contient pas « ${forbidden} »`);
+    }
+    ok("le DTO de B n'expose ni achat, ni boost, ni date, ni identité : seulement « sponsored »");
+    const next = await sellerApi.boostQuotes.create(payTarget.id, "24h");
+    assert.equal(next.status, "unavailable");
+    assert.equal(next.unavailableReason, "offer_already_boosted");
+    ok("devis après l'achat : indisponible, motif offer_already_boosted");
+    const report = await walletCheckByAdministration();
+    assert.match(report, /Portefeuille : aucun écart\./);
+    ok(`wallet:check (base noma_e2e, lecture seule) : « ${report.split("\n").find((line) => line.includes("aucun écart")) ?? "aucun écart"} »`);
+  });
+
+  // ─── Lot P2-bis (S1) : un devis n'est « disponible » que si le boost ferait réellement monter l'offre chez au moins un acheteur ───
+  const reachTag = (Date.now() + 5).toString(36).slice(-5);
+  const reachProduct = { category: "Téléphones", brand: "Nokia", model: `3310 ${reachTag}` };
+  await step(`Portée visible : « ${reachProduct.brand} ${reachProduct.model} », une annonce et un besoin → devis indisponible ; dev:seed (8 annonces d'exemple) → devis disponible`, async () => {
+    const built = buildOfferInput({
+      title: `${reachProduct.brand} ${reachProduct.model} · offre de A`,
+      description: "",
+      category: reachProduct.category,
+      brand: reachProduct.brand,
+      model: reachProduct.model,
+      variant: "",
+      condition: "Occasion",
+      location: "Abidjan",
+      price: "190 000",
+      available: true,
+    });
+    assert.ok(built.ok);
+    const created = await sellerApi.offers.create(built.input);
+    const reachTarget = await sellerApi.offers.publish(created.id, created.contentVersion);
+    const demandBuilt = buildDemandInput(
+      {
+        text: `Je cherche un ${reachProduct.brand} ${reachProduct.model}`,
+        category: reachProduct.category,
+        brand: reachProduct.brand,
+        model: reachProduct.model,
+        variant: "",
+        condition: "Occasion",
+        location: "Abidjan",
+        budget: "250 000",
+        deadline: "",
+      },
+      new Date().toISOString().slice(0, 10),
+    );
+    assert.ok(demandBuilt.ok);
+    const demandCreated = await buyerApi.demands.create(demandBuilt.input);
+    const reachDemand = await buyerApi.demands.activate(demandCreated.id, demandCreated.contentVersion);
+    await pollUntil(
+      "le besoin de B parmi les acheteurs intéressés de A (produit à une seule annonce)",
+      async () => ((await allDemandMatches(seller, reachTarget.id)).some((item) => item.candidateId === reachDemand.id) ? true : null),
+      WORKER_TIMEOUT_MS,
+    );
+    ok("A : une seule annonce ; B : un besoin actif ; le besoin de B figure dans les acheteurs intéressés de A");
+
+    const alone = await sellerApi.boostQuotes.create(reachTarget.id, "24h");
+    assert.equal(alone.status, "unavailable");
+    assert.equal(alone.unavailableReason, "no_visible_effect");
+    assert.equal(alone.amount, null);
+    assert.equal(alone.factors, null);
+    assert.equal(alone.inputs.compatibleBuyers, 1);
+    assert.equal(alone.inputs.reachableBuyers, 0);
+    assert.equal(Date.parse(alone.expiresAt) - Date.parse(alone.computedAt), 60_000, "une cotation indisponible vaut 60 s");
+    const rawAlone = await seller.fetch(`/api/offers/${reachTarget.id}/boost-quotes`, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ durationCode: "24h" }),
+    });
+    const rawAloneText = await rawAlone.text();
+    assert.ok(rawAloneText.includes('"reachableBuyers":0'), "le DTO expose reachableBuyers");
+    assert.equal(rawAloneText.includes("rawAmount"), false, "aucun prix brut");
+    for (const secret of [sellerId, buyerId, sellerPhone]) assert.equal(rawAloneText.includes(secret), false, "aucune identité dans le devis");
+    ok("1 annonce + 1 besoin : devis 24 h INDISPONIBLE, motif no_visible_effect, aucun prix, inputs.reachableBuyers = 0 (1 acheteur compatible mais aucune place mise en avant sous 7 offres)");
+    const refusedPurchase = await rejects(sellerApi.boostPurchases.create(reachTarget.id, { quoteId: alone.id, idempotencyKey: randomUUID() }));
+    expectApiError(refusedPurchase, 409, "quote_unavailable");
+    assert.equal((await sellerApi.wallet.overview({ limit: 1 })).balanceXof, TOPUP_AMOUNT - (payQuote.amount as number), "aucun débit pour un devis sans effet visible");
+    ok("achat de ce devis : 409 quote_unavailable, aucun débit");
+
+    const seedOutput = await seedExamplesByAdministration({ category: "phones", brand: "nokia", model: reachProduct.model, offers: 8 });
+    assert.match(seedOutput, /8 annonce\(s\) d'exemple publiée\(s\), 0 déjà présente\(s\) ; \d+ vendeur\(s\) fictif\(s\) créé\(s\), \d+ déjà présent\(s\)/);
+    ok(`dev:seed (base noma_e2e) : « ${seedOutput.split("\n")[0].replace(/base « [^»]+ »/, "base « … »").slice(0, 150)}… »`);
+    const seen = await pollUntil(
+      "les 9 offres dans les résultats de B",
+      async () => {
+        const items = await allMatches(buyer, reachDemand.id, "relevance");
+        return items.length >= 9 && items.some((item) => item.candidateId === reachTarget.id) ? items : null;
+      },
+      WORKER_TIMEOUT_MS * 2,
+    );
+    assert.equal(seen.length, 9);
+    const rawSeen = await rawAllPages(buyer, `/api/demands/${reachDemand.id}/stored-matches?sort=relevance`);
+    assert.equal(rawSeen.includes("+225079999"), false, "aucun numéro de vendeur fictif dans les résultats");
+    ok("B voit 9 offres (celle de A + les 8 d'exemple), sans aucun numéro de vendeur");
+    // Les 60 s du devis indisponible ne bloquent pas une autre durée : nouveau calcul, désormais disponible.
+    const withSeed = await sellerApi.boostQuotes.create(reachTarget.id, "3d");
+    assert.equal(withSeed.status, "available", `devis après dev:seed : ${withSeed.status} / ${String(withSeed.unavailableReason)}`);
+    assert.equal(withSeed.inputs.reachableBuyers, 1);
+    assert.equal(withSeed.inputs.compatibleBuyers, 1);
+    assert.equal(withSeed.inputs.competingSellers, 8);
+    assert.ok(withSeed.amount !== null && withSeed.amount >= 500);
+    ok(`avec 9 offres : devis 3 jours DISPONIBLE (${withSeed.amount} FCFA), inputs.reachableBuyers = 1, 8 vendeurs concurrents`);
+    const history = await sellerApi.boostQuotes.list(reachTarget.id);
+    assert.deepEqual(history.map((quote) => [quote.durationCode, quote.status, quote.inputs.reachableBuyers]).sort(), [["24h", "unavailable", 0], ["3d", "available", 1]]);
+    ok("GET boost-quotes : l'historique porte reachableBuyers (0 puis 1)");
+    const again = await seedExamplesByAdministration({ category: "phones", brand: "nokia", model: reachProduct.model, offers: 8 });
+    assert.match(again, /0 annonce\(s\) d'exemple publiée\(s\), 8 déjà présente\(s\) ; 0 vendeur\(s\) fictif\(s\) créé\(s\), 8 déjà présent\(s\)/);
+    const afterAgain = await allMatches(buyer, reachDemand.id, "relevance");
+    assert.equal(afterAgain.length, 9, "relancer dev:seed ne crée aucun doublon");
+    ok("dev:seed relancé : 0 annonce créée, 8 déjà présentes, toujours 9 offres chez B");
+  });
+
+  await step("Historique long du porte-monnaie : pages de 20 suivies par curseur, sans doublon ni oubli, du plus récent au plus ancien", async () => {
+    const before = await sellerApi.wallet.overview({ limit: 50 });
+    const known = before.transactions.length;
+    const extra = 21;
+    for (let index = 0; index < extra; index += 1) {
+      const created = await sellerApi.wallet.createTopup({ amountXof: 500, idempotencyKey: randomUUID() });
+      const confirmed = await sellerApi.devPayments.confirm(created.topup.id);
+      assert.equal(confirmed.outcome, "applied");
+    }
+    ok(`${extra} recharges de 500 FCFA créées puis confirmées (historique : ${known + extra} lignes)`);
+    const total = known + extra;
+    const first = await sellerApi.wallet.overview();
+    assert.equal(first.transactions.length, 20, "20 lignes par défaut");
+    assert.ok(first.nextCursor !== null);
+    const second = await sellerApi.wallet.overview({ cursor: first.nextCursor as string });
+    assert.equal(second.transactions.length, total - 20);
+    assert.equal(second.nextCursor, null);
+    const ids = [...first.transactions, ...second.transactions].map((entry) => entry.id);
+    assert.equal(new Set(ids).size, total, "aucun doublon entre les deux pages");
+    ok(`GET /api/wallet : page 1 de 20 lignes avec curseur, page 2 de ${total - 20} ligne(s) sans curseur, ${total} lignes uniques`);
+    const dates = [...first.transactions, ...second.transactions].map((entry) => Date.parse(entry.createdAt));
+    for (let index = 1; index < dates.length; index += 1) assert.ok(dates[index - 1] >= dates[index], "du plus récent au plus ancien");
+    const small: string[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < 20; page += 1) {
+      const result = await sellerApi.wallet.overview({ limit: 5, ...(cursor ? { cursor } : {}) });
+      small.push(...result.transactions.map((entry) => entry.id));
+      if (!result.nextCursor) break;
+      cursor = result.nextCursor;
+    }
+    assert.deepEqual(small, ids, "pages de 5 : exactement les mêmes lignes dans le même ordre");
+    ok("pages de 5 suivies par curseur : les mêmes lignes, dans le même ordre");
+    const wallet = await sellerApi.wallet.overview({ limit: 1 });
+    assert.equal(wallet.balanceXof, TOPUP_AMOUNT - (payQuote.amount as number) + extra * 500);
+    const report = await walletCheckByAdministration();
+    assert.match(report, /Portefeuille : aucun écart\./);
+    ok(`solde ${wallet.balanceXof} ; wallet:check après ces recharges : aucun écart`);
   });
 
   if (process.env.NOMA_E2E_SEARCH_STREAM === "1") {

@@ -79,7 +79,7 @@ interface BoostQuoteDto {
   amount: number | null;
   unavailableReason: BoostQuote["unavailableReason"];
   factors: { competitionMilli: number; demandMilli: number; scarcityMilli: number; durationMilli: number } | null;
-  inputs: { competingSellers: number; compatibleBuyers: number; slotsTotal: number; slotsUsed: number };
+  inputs: { competingSellers: number; compatibleBuyers: number; reachableBuyers: number | null; slotsTotal: number; slotsUsed: number };
   computedAt: string;
   expiresAt: string;
 }
@@ -102,6 +102,7 @@ function quoteDto(quote: BoostQuote | BoostQuoteHistoryItem): BoostQuoteDto {
     inputs: {
       competingSellers: quote.inputs.competingSellers,
       compatibleBuyers: quote.inputs.compatibleBuyers,
+      reachableBuyers: quote.inputs.reachableBuyers,
       slotsTotal: quote.inputs.slotsTotal,
       slotsUsed: quote.inputs.slotsUsed,
     },

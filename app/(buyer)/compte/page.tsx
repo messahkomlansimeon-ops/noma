@@ -14,6 +14,7 @@ import {
   Settings,
   ShieldCheck,
   Store,
+  Wallet,
 } from "lucide-react";
 import { LogoMark } from "@/components/logo";
 import { useLogout } from "@/components/session-gate";
@@ -72,6 +73,7 @@ export default function MonCompte() {
         <div className="mt-4 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">
           <MenuRow icon={MessageCircle} label="Messages" badge={2} href="/messages" />
           <MenuRow icon={Package} label="Mes commandes" badge={3} href="/commandes" />
+          <MenuRow icon={Wallet} label="Mon porte-monnaie" href="/compte/porte-monnaie" />
           <MenuRow icon={Search} label="Mes recherches suivies" href="/alertes" />
           <MenuRow icon={Heart} label="Mes favoris" href="/favoris" />
           <MenuRow icon={CircleUser} label="Informations personnelles" onClick={soon} />

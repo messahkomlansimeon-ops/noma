@@ -7,7 +7,8 @@
  *    des places, durée), jamais en millièmes ni en codes ;
  *  - un devis INDISPONIBLE affiche son motif en clair ; un motif inconnu donne un texte générique, jamais le code brut ;
  *  - un devis est valable un court moment (compte à rebours) ; il n'engage à rien et ne réserve aucune place ;
- *  - AUCUN paiement : le bouton « Acheter » est toujours désactivé, avec la mention « Paiement bientôt disponible ».
+ *  - depuis le lot P2 l'achat existe : sa logique (« Acheter » actif ou non, confirmation, clé d'idempotence) et le compte à
+ *    rebours ANCRÉ sur une horloge monotone (aucune horloge murale) sont dans `wallet-view.ts`.
  */
 
 import { BOOST_DURATION_CODES, type BoostDurationCode, type BoostQuote, type OfferRecord } from "./api";
@@ -65,6 +66,7 @@ export const UNAVAILABLE_REASON_TEXT: Readonly<Record<string, string>> = Object.
   no_slot_available: "Il n'y a plus de place disponible pour ce produit pour le moment.",
   seller_boost_limit_reached: "Vous avez atteint votre plafond de boosts pour ce produit.",
   no_compatible_buyer: "Aucun acheteur compatible pour le moment : un boost ne serait pas utile.",
+  no_visible_effect: "Pas encore assez d'annonces comparables : un boost ne changerait rien à l'ordre des résultats.",
 });
 
 export const UNAVAILABLE_FALLBACK_TEXT = "Le boost n'est pas disponible pour cette annonce pour le moment.";
@@ -94,7 +96,7 @@ export function factorEffectText(milli: number): string {
 }
 
 export interface FactorLine {
-  key: "competition" | "demand" | "scarcity" | "duration";
+  key: "competition" | "demand" | "scarcity" | "duration" | "reach";
   title: string;
   text: string;
   effect: string;
@@ -138,14 +140,21 @@ export function explainFactors(quote: Pick<BoostQuote, "factors" | "inputs" | "d
       text: `Mise en avant pendant ${durationLabel(quote.durationCode)}.`,
       effect: durationEffect,
     },
+    ...reachLines(quote.inputs.reachableBuyers),
   ];
 }
 
-/** Millisecondes de validité restantes (0 si expiré ou si la date est illisible). */
-export function remainingMs(expiresAt: string, now: number): number {
-  const end = Date.parse(expiresAt);
-  if (!Number.isFinite(end)) return 0;
-  return Math.max(0, end - now);
+/** Portée visible : « Mise en avant visible auprès de X acheteur(s) » ; rien pour un devis ancien (non évalué). Elle n'entre pas dans le prix. */
+function reachLines(reachableBuyers: number | null): FactorLine[] {
+  if (reachableBuyers === null) return [];
+  return [
+    {
+      key: "reach",
+      title: "Visibilité",
+      text: `Mise en avant visible auprès de ${reachableBuyers} acheteur${plural(reachableBuyers, "", "s")}.`,
+      effect: "n'entre pas dans le prix",
+    },
+  ];
 }
 
 /** Durée de validité totale d'un devis (expiresAt − computedAt, en ms), ou null si les dates sont illisibles. */
@@ -156,51 +165,12 @@ export function validityWindowMs(quote: Pick<BoostQuote, "computedAt" | "expires
   return end - start;
 }
 
-/**
- * Validité restante, JAMAIS au-delà de la durée de validité du devis : une horloge d'écran en retard (page ouverte depuis
- * longtemps, appareil à l'heure en retard) ne peut pas afficher « 15 min 31 s » pour un prix valable 15 min.
- */
-export function remainingValidityMs(quote: Pick<BoostQuote, "computedAt" | "expiresAt">, now: number): number {
-  const left = remainingMs(quote.expiresAt, now);
-  const window = validityWindowMs(quote);
-  return window === null ? left : Math.min(left, window);
-}
-
 /** « 14 min 59 s », « 45 s » ; « 0 s » à l'échéance. Arrondi par excès : on ne dit jamais « 0 s » avant l'expiration. */
 export function formatCountdown(ms: number): string {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
   return minutes > 0 ? `${minutes} min ${rest} s` : `${rest} s`;
-}
-
-export interface QuoteValidity {
-  expired: boolean;
-  text: string;
-}
-
-export function quoteValidity(quote: Pick<BoostQuote, "computedAt" | "expiresAt" | "status">, now: number): QuoteValidity {
-  const left = remainingValidityMs(quote, now);
-  if (left <= 0) return { expired: true, text: "Ce devis a expiré. Demandez-en un nouveau." };
-  const prefix = quote.status === "available" ? "Prix valable encore" : "Résultat valable encore";
-  return { expired: false, text: `${prefix} ${formatCountdown(left)}` };
-}
-
-/** Bouton d'achat : TOUJOURS désactivé tant que le paiement n'existe pas. */
-export interface BuyButtonState {
-  label: string;
-  disabled: true;
-  note: string;
-}
-
-export const BUY_BUTTON: BuyButtonState = Object.freeze({
-  label: "Acheter",
-  disabled: true as const,
-  note: "Paiement bientôt disponible",
-});
-
-export function buyButtonState(): BuyButtonState {
-  return BUY_BUTTON;
 }
 
 /** Date courte d'un devis de l'historique : « 05/10 17:01 » (fuseau local, ou celui qu'on lui donne en test). */
@@ -223,20 +193,25 @@ export interface QuoteHistoryRow {
   key: string;
   /** « 3 jours · 2 300 FCFA » ou « 3 jours · indisponible ». */
   title: string;
-  /** Motif en clair pour un devis indisponible, « En cours de validité » ou « Expiré ». */
+  /** Motif en clair pour un devis indisponible, « Acheté », « En cours de validité » ou « Expiré ». */
   status: string;
   detail: string;
   tone: "good" | "neutral" | "warn";
 }
 
-export function quoteHistoryRow(quote: BoostQuote, now: number, timeZone?: string): QuoteHistoryRow {
+/**
+ * Une ligne de l'historique. `expired` est décidé par l'appelant sur l'horloge ANCRÉE (`historyEntryExpired`, wallet-view.ts) :
+ * l'horloge murale de l'appareil n'intervient jamais. `purchased` : le devis a été acheté (un achat de l'annonce porte son
+ * identifiant) ; il est alors CONSOMMÉ (« Acheté »), jamais « En cours de validité ».
+ */
+export function quoteHistoryRow(quote: BoostQuote, expired: boolean, timeZone?: string, purchased = false): QuoteHistoryRow {
   const amount = quoteAmountText(quote);
-  const expired = quote.expired === true || remainingMs(quote.expiresAt, now) <= 0;
   const base = {
     key: quote.id,
     title: `${durationLabel(quote.durationCode)} · ${amount ?? "indisponible"}`,
     detail: `Demandé le ${formatQuoteTime(quote.computedAt, timeZone)}`,
   };
+  if (purchased) return { ...base, status: "Acheté", tone: "good" };
   if (quote.status === "unavailable") {
     return { ...base, status: unavailableReasonText(quote.unavailableReason), tone: "warn" };
   }

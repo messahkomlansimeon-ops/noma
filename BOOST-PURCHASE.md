@@ -5,7 +5,7 @@ SQL vérifie la cotation, l'offre, les places et le plafond vendeur, **débite**
 requête ne débite pas deux fois. Brief : AUDIT-EVOLUTION-SCOUTR.md §6 (« Cotation et achat »). Monnaie : XOF entiers (`BIGINT`, `bigint`,
 entiers JSON), 1 crédit = 1 XOF.
 
-**Ce lot n'a PAS** : d'écran (lot P2), de prorata, de route HTTP de remboursement, de vrai prestataire, de métrique d'efficacité.
+**Ce lot n'a PAS** : d'écran (**ajouté au lot P2** : `ECRANS-P2.md`), de prorata, de route HTTP de remboursement, de vrai prestataire, de métrique d'efficacité.
 **Le paiement ne rend JAMAIS pertinente une annonce non pertinente** (brief §15) : un boost acheté a exactement les effets d'un boost
 attribué (`BOOST.md`) — il ne s'applique qu'à des offres déjà présentes dans le classement, ne change ni leur pertinence ni leur score,
 et reste soumis à `min_relevance` et à la part promue maximale.
@@ -51,7 +51,8 @@ Une transaction, dans cet ordre ; tout échec à n'importe quelle étape annule 
 2. **Idempotence** : verrou consultatif (vendeur, clé) puis relecture. Un achat existe pour cette clé : même cotation et même offre → il
    est renvoyé (`reused: true`, aucun nouveau débit, **même si la cotation a expiré depuis**) ; sinon `idempotency_conflict`.
 3. **Cotation** : elle appartient à CETTE offre ET à CE vendeur (sinon `quote_not_found`, **indiscernable** d'une cotation inexistante) ;
-   `quote_unavailable` (aucun prix) ; `quote_expired` (`clock_timestamp()` de la base ≥ échéance) ; `quote_already_used`.
+   `quote_unavailable` (aucun prix : y compris `no_visible_effect` depuis le lot P2-bis, un devis dont le boost ne ferait monter l'offre chez
+   aucun acheteur n'a pas de prix et ne s'achète pas) ; `quote_expired` (`clock_timestamp()` de la base ≥ échéance) ; `quote_already_used`.
 4. **Placement** — `placeOfferBoostInTransaction`, **LA** fonction de `grantOfferBoost` (une seule copie des règles de places) : offre
    existante, à ce vendeur, éligible, clé produit complète (`offer_not_found`, `offer_not_owned`, `offer_not_eligible`,
    `offer_not_boostable`) ; verrou du périmètre ; **la cotation est relue sous le verrou** (échéance à CET instant, achat concurrent,
@@ -147,6 +148,11 @@ recharge, à justifier. Le rapport ne contient aucune donnée personnelle.
   `offer_already_boosted` pendant 60 s (comme toute cotation indisponible) tant que le boost est actif ; après remboursement ou
   annulation et dès que cette indisponibilité de 60 s a expiré, une cotation normale. Contrepartie : la **migration 0015** est requise
   aussi pour demander une cotation.
+- **La portée visible n'est pas recalculée à l'achat** (lot P2-bis, `BOOST-PRICING.md`) : un devis `available` garantit qu'au moment de son
+  calcul au moins un acheteur voyait l'offre monter ; l'achat revérifie places, plafond vendeur et validité du devis (au plus 900 s) mais pas
+  les listes des acheteurs. Si elles changent entre-temps, le boost est acheté au prix du devis sans promesse de position (l'écran le dit :
+  « Ce n'est pas une garantie de position ni de vente »). La migration **0016** est requise pour demander un devis (colonne
+  `reachable_buyers`).
 - **Aucune limite de débit propre à la route** : chaque POST ouvre une transaction et prend des verrous ; une limite de débit en
   amont reste à prévoir avant toute exposition publique.
 - Un corps JSON précédé d'un BOM UTF-8 est lu comme les autres routes de corps utilisateur (le décodeur partagé retire le BOM) ; seuls

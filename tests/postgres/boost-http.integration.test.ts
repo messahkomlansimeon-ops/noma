@@ -15,6 +15,7 @@ import { MATCHING_SCORING_CONTRACT_VERSION } from "../../lib/server/matching/sco
 import { MATCHING_OFFLINE_CONTRACT_VERSION } from "../../lib/server/matching/types";
 import { runMigrations } from "../../lib/server/postgres/migrations";
 import * as boostQuotesRoute from "../../app/api/offers/[id]/boost-quotes/route";
+import { EVALUATION_SUMMARY_JSON, PREFERENCES_SUMMARY_JSON, REACHABLE_LIST_SIZE, SCORING_SUMMARY_JSON } from "./boost-fixtures";
 import {
   createTemporarySchemaName, openVerifiedIsolatedPool, openVerifiedTestDatabase, quoteTemporarySchema, type DedicatedTestDatabase,
 } from "./test-database";
@@ -132,7 +133,7 @@ const list = async (offerId: string, query = "", options: CallOptions = {}): Pro
 interface QuoteDto {
   id: string; durationCode: string; currency: string; status: string; amount: number | null; unavailableReason: string | null;
   factors: { competitionMilli: number; demandMilli: number; scarcityMilli: number; durationMilli: number } | null;
-  inputs: { competingSellers: number; compatibleBuyers: number; slotsTotal: number; slotsUsed: number };
+  inputs: { competingSellers: number; compatibleBuyers: number; reachableBuyers: number | null; slotsTotal: number; slotsUsed: number };
   computedAt: string; expiresAt: string; reused?: boolean; expired?: boolean;
 }
 
@@ -174,7 +175,7 @@ const makeDemand = (ownerId: string): Promise<DemandRecord> => createDemand({
   ownerId, rawText: "RAW_SECRET_TEXT demande", category: "smartphones", brand: "Apple", model: "iPhone 13", status: "active",
 }, pool);
 
-async function evaluate(offer: OfferRecord, demand: DemandRecord): Promise<void> {
+async function evaluate(offer: OfferRecord, demand: DemandRecord, score = 90): Promise<void> {
   await pool.query(
     `INSERT INTO matching_evaluations (
        idempotency_key, attempt_hash, offer_id, demand_id, offer_owner_id, demand_owner_id,
@@ -183,22 +184,36 @@ async function evaluate(offer: OfferRecord, demand: DemandRecord): Promise<void>
        compatibility_status, score, coverage, evaluation_summary, scoring_summary, preferences_summary,
        evaluation_details, is_latest, is_stale, stale_reason, staled_at
      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, '{}'::jsonb, clock_timestamp(), NULL, 'eligible', '{}',
-       'compatible', 90, 80, '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, '{"criteria":[]}'::jsonb, TRUE, FALSE, NULL, NULL)`,
+       'compatible', $12::numeric, 80, '${EVALUATION_SUMMARY_JSON}'::jsonb, '${SCORING_SUMMARY_JSON}'::jsonb, '${PREFERENCES_SUMMARY_JSON}'::jsonb, '{"criteria":[]}'::jsonb, TRUE, FALSE, NULL, NULL)`,
     [
       randomUUID(), `ATTEMPT_${randomUUID()}`, offer.id, demand.id, offer.ownerId, demand.ownerId, offer.contentVersion, demand.contentVersion,
-      MATCHING_OFFLINE_CONTRACT_VERSION, MATCHING_SCORING_CONTRACT_VERSION, HASH,
+      MATCHING_OFFLINE_CONTRACT_VERSION, MATCHING_SCORING_CONTRACT_VERSION, HASH, score,
     ],
   );
+}
+
+/**
+ * Offres « remplissage » (autre modèle : hors périmètre du boost, sans effet sur places, vendeurs concurrents ni prix) : elles complètent la liste
+ * de l'acheteur à 7 offres au moins, sinon le quota de places promues est nul et la cotation est `no_visible_effect` (lot P2-bis). Évaluées APRÈS
+ * l'offre cotée et plus compatibles qu'elle : l'offre est classée après elles, un boost la ferait monter.
+ */
+let fillerOffers: OfferRecord[] = [];
+async function fillersFor(count: number): Promise<OfferRecord[]> {
+  const owner = fillerOffers[0]?.ownerId ?? await makeUser();
+  while (fillerOffers.length < count) fillerOffers.push(await makeOffer({ ownerId: owner, model: "FILLER-MODEL" }));
+  return fillerOffers.slice(0, count);
 }
 
 /** Un acheteur distinct avec une demande active et une évaluation confirmée et fraîche sur l'offre. */
 async function addBuyer(offer: OfferRecord): Promise<string> {
   const buyerId = await makeUser();
-  await evaluate(offer, await makeDemand(buyerId));
+  const demand = await makeDemand(buyerId);
+  await evaluate(offer, demand);
+  for (const filler of await fillersFor(REACHABLE_LIST_SIZE - 1)) await evaluate(filler, demand, 100);
   return buyerId;
 }
 
-const wipe = () => pool.query("TRUNCATE boost_quotes, offer_boosts, matching_evaluations, matching_jobs, matching_outbox_events, demands, offers CASCADE");
+const wipe = () => { fillerOffers = []; return pool.query("TRUNCATE boost_quotes, offer_boosts, matching_evaluations, matching_jobs, matching_outbox_events, demands, offers CASCADE"); };
 const count = async (table = "boost_quotes"): Promise<number> => (await pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`)).rows[0].n;
 
 /** Monde minimal : une offre du vendeur (1 place, aucune utilisée) et `buyers` acheteurs compatibles. */
@@ -244,7 +259,7 @@ const BODY_CAP_BYTES = 32 * 1024;
 const POST_KEYS = sorted([...COMMON_KEYS, "reused"]);
 const GET_KEYS = sorted([...COMMON_KEYS, "expired"]);
 const FACTOR_KEYS = sorted(["competitionMilli", "demandMilli", "scarcityMilli", "durationMilli"]);
-const INPUT_KEYS = sorted(["competingSellers", "compatibleBuyers", "slotsTotal", "slotsUsed"]);
+const INPUT_KEYS = sorted(["competingSellers", "compatibleBuyers", "reachableBuyers", "slotsTotal", "slotsUsed"]);
 
 // ═════════════ 1. Authentification ═════════════
 
@@ -464,7 +479,7 @@ test("cotation indisponible (plus de place, aucun acheteur) : 201 avec status un
   assert.equal(quoteOf(full).unavailableReason, "no_slot_available");
   assert.equal(quoteOf(full).amount, null);
   assert.equal(quoteOf(full).factors, null);
-  assert.deepEqual(quoteOf(full).inputs, { competingSellers: 1, compatibleBuyers: 1, slotsTotal: 1, slotsUsed: 1 });
+  assert.deepEqual(quoteOf(full).inputs, { competingSellers: 1, compatibleBuyers: 1, reachableBuyers: null, slotsTotal: 1, slotsUsed: 1 });
   assert.equal(quoteOf(full).reused, false);
   assert.equal(Date.parse(quoteOf(full).expiresAt) - Date.parse(quoteOf(full).computedAt), 60_000, "validité courte d'une indisponibilité");
   const again = await post(mine.id, { body: { durationCode: "3d" } });
@@ -481,12 +496,50 @@ test("cotation indisponible (plus de place, aucun acheteur) : 201 avec status un
   assert.equal(quoteOf(lonely).unavailableReason, "no_compatible_buyer");
   assert.equal(quoteOf(lonely).amount, null);
   assert.equal(quoteOf(lonely).factors, null);
-  assert.deepEqual(quoteOf(lonely).inputs, { competingSellers: 0, compatibleBuyers: 0, slotsTotal: 1, slotsUsed: 0 });
+  assert.deepEqual(quoteOf(lonely).inputs, { competingSellers: 0, compatibleBuyers: 0, reachableBuyers: 0, slotsTotal: 1, slotsUsed: 0 });
   assert.deepEqual(keys(quoteOf(lonely)), POST_KEYS, "mêmes clés qu'une cotation disponible");
   const history = await list(offer.id);
   assert.equal(history.status, 200);
   assert.equal(quotesOf(history)[0].status, "unavailable");
   assert.equal(quotesOf(history)[0].unavailableReason, "no_compatible_buyer");
+});
+
+test("portée visible (lot P2-bis) : liste de 6 offres → 201 unavailable no_visible_effect (jamais une erreur HTTP), reachableBuyers 0 ; liste de 7 → disponible, reachableBuyers 1 ; historique : devis ancien (NULL) lu comme null", async () => {
+  // Liste de 6 : quota floor(0,15 × 6) = 0, le boost ne ferait rien monter.
+  await wipe();
+  const short = await makeOffer({ ownerId: seller.userId });
+  const buyerId = await makeUser();
+  const demand = await makeDemand(buyerId);
+  await evaluate(short, demand);
+  for (const filler of await fillersFor(5)) await evaluate(filler, demand, 100);
+  const useless = await post(short.id, { body: { durationCode: "24h" } });
+  assert.equal(useless.status, 201);
+  assert.equal(quoteOf(useless).status, "unavailable");
+  assert.equal(quoteOf(useless).unavailableReason, "no_visible_effect");
+  assert.equal(quoteOf(useless).amount, null);
+  assert.equal(quoteOf(useless).factors, null);
+  assert.deepEqual(quoteOf(useless).inputs, { competingSellers: 0, compatibleBuyers: 1, reachableBuyers: 0, slotsTotal: 1, slotsUsed: 0 });
+  assert.deepEqual(keys(quoteOf(useless)), POST_KEYS);
+  assert.deepEqual(keys(quoteOf(useless).inputs), INPUT_KEYS);
+  assert.equal(Date.parse(quoteOf(useless).expiresAt) - Date.parse(quoteOf(useless).computedAt), 60_000);
+  // Liste de 7 : quota 1, l'offre est classée après les autres → disponible.
+  const { offer } = await smallWorld(1);
+  const useful = await post(offer.id, { body: { durationCode: "24h" } });
+  assert.equal(useful.status, 201);
+  assert.equal(quoteOf(useful).status, "available");
+  assert.equal(quoteOf(useful).unavailableReason, null);
+  assert.deepEqual(quoteOf(useful).inputs, { competingSellers: 0, compatibleBuyers: 1, reachableBuyers: 1, slotsTotal: 1, slotsUsed: 0 });
+  assert.equal(quoteOf(useful).amount, 500);
+  // Un devis d'avant la migration 0016 (NULL) est servi avec reachableBuyers null, DTO inchangé par ailleurs.
+  await pool.query("UPDATE boost_quotes SET reachable_buyers = NULL WHERE id = $1", [quoteOf(useful).id]);
+  const history = await list(offer.id);
+  assert.equal(history.status, 200);
+  assert.equal(quotesOf(history)[0].inputs.reachableBuyers, null);
+  assert.deepEqual(keys(quotesOf(history)[0]), GET_KEYS);
+  assert.deepEqual(keys(quotesOf(history)[0].inputs), INPUT_KEYS);
+  // Aucune fuite : ni identité d'acheteur, ni identifiant de besoin dans les réponses.
+  const raw = JSON.stringify([useless.json, useful.json, history.json]);
+  for (const forbidden of [buyerId, demand.id, "demandId", "buyerId", "rawAmount", "reachable_buyers"]) assert.equal(raw.includes(forbidden), false, forbidden);
 });
 
 // ═════════════ 7. 409 ═════════════
@@ -655,7 +708,7 @@ test("DTO : clés EXACTEMENT égales à la liste blanche (POST et GET), valeurs 
   assert.deepEqual(quoteOf(created), {
     id: row.id, durationCode: "3d", currency: "XOF", status: "available", amount: 2300, unavailableReason: null,
     factors: { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 },
-    inputs: { competingSellers: 3, compatibleBuyers: 4, slotsTotal: 3, slotsUsed: 1 },
+    inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, slotsTotal: 3, slotsUsed: 1 },
     computedAt: row.computed_at.toISOString(), expiresAt: row.expires_at.toISOString(), reused: false,
   });
   assert.equal(Date.parse(quoteOf(created).expiresAt) - Date.parse(quoteOf(created).computedAt), 900_000);

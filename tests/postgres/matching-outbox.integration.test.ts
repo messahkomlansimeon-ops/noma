@@ -25,10 +25,10 @@ before(async () => {
   pool = await openVerifiedIsolatedPool(opened.target, schema);
   second = await openVerifiedIsolatedPool(opened.target, schema);
   const first = await runMigrations(pool);
-  assert.equal(first.applied.length, 15);
+  assert.equal(first.applied.length, 16);
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 15);
+  assert.equal(rerun.skipped.length, 16);
   await pool.query(`CREATE FUNCTION reject_audit_outbox() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN RAISE EXCEPTION 'audit outbox failure'; END $$`);
 });

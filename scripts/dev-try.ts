@@ -8,9 +8,11 @@
  * Réglages posés ici : NODE_ENV=development, NOMA_DEV_OTP_CONSOLE=1 (le code OTP s'écrit dans la sortie du serveur ;
  * aucun SMS), NOMA_DEV_PROXY=1, NOMA_AUTH_ORIGIN=http://localhost:3212, PORT=3211, et un montage ENTIÈREMENT SIMULÉ :
  * NOMA_FAKE_SOURCES=1, NOMA_AI_DISABLED=1, NOMA_TURNSTILE_DISABLED=1 (la recherche rapide montre des résultats d'exemple, sans
- * contacter de vrais sites, sans IA, sans captcha). Les secrets NOMA_AUTH_SECRET et NOMA_AUTH_PROXY_SECRET sont lus dans
- * l'environnement s'ils existent ; sinon ils sont générés au hasard à chaque démarrage (les sessions ne survivent alors pas
- * à un redémarrage).
+ * contacter de vrais sites, sans IA, sans captcha) et NOMA_FAKE_PAYMENTS=1 (prestataire de paiement FICTIF : la recharge du
+ * porte-monnaie passe par la page « paiement simulé », aucun argent réel). Les secrets NOMA_AUTH_SECRET, NOMA_AUTH_PROXY_SECRET
+ * et NOMA_FAKE_PAYMENT_SECRET sont lus dans l'environnement s'ils existent (le dernier : 32 octets au moins, sinon refus) ;
+ * sinon ils sont générés au hasard à chaque démarrage (les sessions ne survivent alors pas à un redémarrage ; le secret du
+ * prestataire fictif n'est jamais affiché).
  *
  * Garde-fous (refus clair, code de sortie 1, rien n'est démarré) :
  *  - DATABASE_URL est OBLIGATOIRE dans l'environnement de lancement (aucune valeur par défaut, aucun fichier .env* lu ici : un
@@ -35,6 +37,8 @@ export const DEV_TRY_NEXT_PORT = 3211;
 export const DEV_TRY_PROXY_PORT = 3212;
 const READY_TIMEOUT_MS = 180_000;
 const KILL_GRACE_MS = 20_000;
+/** Taille minimale du secret du prestataire fictif (FAKE_SECRET_MIN_BYTES de lib/server/wallet/config.ts). */
+const FAKE_PAYMENT_MIN_SECRET_BYTES = 32;
 /** Hôtes de base de données acceptés : uniquement ce poste. */
 const LOCAL_DATABASE_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 
@@ -161,6 +165,22 @@ export function prepareDevTry(
     warnings.push("NOMA_AUTH_PROXY_SECRET n'est pas défini : un secret temporaire est généré pour cette session.");
   }
 
+  // Prestataire de paiement FICTIF (lot P2) : le secret signe les événements simulés ; ≥ 32 octets (la règle de
+  // lib/server/wallet/fake-provider.ts), jamais affiché, ni dans un avertissement ni dans un refus.
+  const givenFakePaymentSecret = env.NOMA_FAKE_PAYMENT_SECRET?.trim();
+  let fakePaymentSecret: string;
+  if (givenFakePaymentSecret) {
+    if (Buffer.byteLength(givenFakePaymentSecret, "utf8") < FAKE_PAYMENT_MIN_SECRET_BYTES) {
+      return {
+        ok: false,
+        reason: `NOMA_FAKE_PAYMENT_SECRET doit contenir au moins ${FAKE_PAYMENT_MIN_SECRET_BYTES} octets (ou être retiré : un secret temporaire est alors généré).`,
+      };
+    }
+    fakePaymentSecret = givenFakePaymentSecret;
+  } else {
+    fakePaymentSecret = random(32).toString("base64url");
+  }
+
   const publicOrigin = `http://localhost:${proxyPort}`;
   return {
     ok: true,
@@ -175,6 +195,9 @@ export function prepareDevTry(
         NOMA_FAKE_SOURCES: "1",
         NOMA_AI_DISABLED: "1",
         NOMA_TURNSTILE_DISABLED: "1",
+        // Recharge par le prestataire fictif (page « paiement simulé ») : toujours actif ici, quoi que dise l'environnement.
+        NOMA_FAKE_PAYMENTS: "1",
+        NOMA_FAKE_PAYMENT_SECRET: fakePaymentSecret,
         NOMA_AUTH_ORIGIN: publicOrigin,
         NOMA_AUTH_SECRET: authSecret,
         NOMA_AUTH_PROXY_SECRET: proxySecret,
@@ -365,6 +388,7 @@ async function main(): Promise<void> {
     console.log(" Le code de connexion à 6 chiffres s'affichera dans CE terminal,");
     console.log(" sur une ligne « [auth:dev] code OTP pour … » (aucun SMS n'est envoyé).");
     console.log(" La recherche rapide montre des résultats d'exemple (aucun vrai site n'est contacté).");
+    console.log(" La recharge du porte-monnaie est SIMULÉE : aucun argent réel, aucun paiement.");
     console.log(" Pour tout arrêter : Ctrl+C.");
     console.log("══════════════════════════════════════════════════════════════");
     console.log("");

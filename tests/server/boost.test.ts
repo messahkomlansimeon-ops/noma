@@ -4,7 +4,7 @@ import {
   BOOST_DURATION_CODES, BOOST_DURATION_SECONDS, BOOST_SCOPE_LOCK_NAMESPACE, BOOST_SOURCES,
 } from "../../lib/server/boost/boost-config";
 import { computeSellerLimit, computeSlots, type BoostSettings } from "../../lib/server/boost/boosts";
-import { computeMaxPromoted, computePromotionStep, placeBoostedItems } from "../../lib/server/boost/placement";
+import { computeMaxPromoted, computePromotionStep, isPromotedByBoost, placeBoostedItems } from "../../lib/server/boost/placement";
 import { CatalogValidationError } from "../../lib/server/catalog/errors";
 
 const DEFAULTS: BoostSettings = {
@@ -207,4 +207,45 @@ test("placeBoostedItems : au moins un promu monte réellement quand c'est possib
   assert.equal(result.order[0], 15);
   assert.equal(result.order[5], 16);
   assert.equal(result.promoted.size, 2);
+});
+
+test("isPromotedByBoost (portée visible, lot P2-bis) : sous 7 éléments aucun boost ne monte ; dès 7 l'élément monte sauf s'il est déjà premier ; un autre promouvable mieux classé prend le quota", () => {
+  const list = (count: number) => Array.from({ length: count }, (_, index) => index);
+  for (let count = 1; count <= 6; count += 1) {
+    assert.equal(computeMaxPromoted(count, 0.15), 0, `quota nul pour ${count} élément(s)`);
+    for (let target = 0; target < count; target += 1) assert.equal(isPromotedByBoost(list(count), target, (item) => item === target, 0.15), false, `N=${count}, cible ${target}`);
+  }
+  for (const count of [7, 8, 13]) {
+    assert.equal(isPromotedByBoost(list(count), 0, (item) => item === 0, 0.15), false, `N=${count} : déjà premier, rien ne monte`);
+    for (let target = 1; target < count; target += 1) assert.equal(isPromotedByBoost(list(count), target, (item) => item === target, 0.15), true, `N=${count}, cible ${target}`);
+  }
+  // Non promouvable (pertinence sous le seuil) : jamais.
+  assert.equal(isPromotedByBoost(list(10), 5, () => false, 0.15), false);
+  // Quota 1 (N = 7 à 13) pris par un autre élément promouvable classé avant la cible : la cible ne monte pas ; quota 2 (N = 14, positions 0 et 7) : elle monte (à condition de gagner des places).
+  assert.equal(isPromotedByBoost(list(7), 5, (item) => item === 5 || item === 2, 0.15), false);
+  assert.equal(isPromotedByBoost(list(14), 12, (item) => item === 12 || item === 2, 0.15), true);
+  // Un autre promouvable DÉJÀ premier ne consomme pas le quota, mais la position 0 est passée : la cible attend la position suivante (7).
+  assert.equal(isPromotedByBoost(list(7), 5, (item) => item === 5 || item === 0, 0.15), false);
+  assert.equal(isPromotedByBoost(list(14), 12, (item) => item === 12 || item === 0, 0.15), true);
+  // Indices invalides : faux, jamais d'exception.
+  for (const target of [-1, 10, 1.5, Number.NaN]) assert.equal(isPromotedByBoost(list(10), target, () => true, 0.15), false, String(target));
+  assert.throws(() => isPromotedByBoost(list(10), 3, () => true, 0), RangeError);
+});
+
+test("isPromotedByBoost : identique, pour chaque élément de chaque liste, à la décision de placeBoostedItems (une seule implémentation du placement)", () => {
+  let cases = 0;
+  for (const share of [0.15, 0.2, 0.5, 1, 0.07]) {
+    for (let count = 1; count <= 40; count += 1) {
+      const items = Array.from({ length: count }, (_, index) => index);
+      for (const promotable of [new Set<number>(), new Set([count - 1]), new Set([0, count - 1]), new Set(items), new Set(items.filter((item) => item % 3 === 0))]) {
+        const placed = placeBoostedItems(items, (item) => promotable.has(item), share);
+        for (let target = 0; target < count; target += 1) {
+          const expected = placed.some((entry) => entry.item === target && entry.promoted);
+          assert.equal(isPromotedByBoost(items, target, (item) => promotable.has(item), share), expected, `part ${share}, N=${count}, cible ${target}`);
+          cases += 1;
+        }
+      }
+    }
+  }
+  assert.ok(cases > 10_000, `${cases} cas`);
 });

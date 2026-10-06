@@ -71,3 +71,20 @@ export function placeBoostedItems<T>(
   }
   return placed;
 }
+
+/**
+ * Vrai si, dans ce classement organique, `placeBoostedItems` ferait MONTER l'élément `targetIndex` (il est marqué promu : quota de
+ * places promues non nul et non épuisé, élément promouvable, et pas déjà à la place cible). C'est EXACTEMENT la décision de la lecture des
+ * résultats (une seule implémentation du placement : cette fonction l'appelle, elle ne la recopie pas). Sert à savoir, avant un achat, si un
+ * boost aurait un effet visible dans la liste d'un acheteur (lot P2-bis, `reach.ts`).
+ */
+export function isPromotedByBoost<T>(
+  organic: readonly T[],
+  targetIndex: number,
+  isPromotable: (item: T, organicIndex: number) => boolean,
+  maxPromotedShare: number,
+): boolean {
+  if (!Number.isSafeInteger(targetIndex) || targetIndex < 0 || targetIndex >= organic.length) return false;
+  const target = organic[targetIndex];
+  return placeBoostedItems(organic, isPromotable, maxPromotedShare).some((entry) => entry.item === target && entry.promoted);
+}

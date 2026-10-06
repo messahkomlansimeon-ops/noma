@@ -90,6 +90,7 @@ if (!configuredUrl?.trim()) {
         "0013_boost_exposures",
         "0014_wallet_ledger",
         "0015_boost_purchases",
+        "0016_boost_quote_reach",
       ]);
     });
 

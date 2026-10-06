@@ -93,13 +93,44 @@ disponibilité sera revérifiée à l'achat, au lot paiement (propriété, admis
 ### Indisponibilité
 Une cotation indisponible est enregistrée (`status = 'unavailable'`, montant et facteurs NULL, comptages renseignés, motif).
 Ordre de priorité : `offer_already_boosted` (boost effectif ou futur sur l'offre) → `no_slot_available` (total = 0 ou used ≥ total ;
-jamais un prix infini) → `seller_boost_limit_reached` → `no_compatible_buyer` (D = 0 : pas de vente sans exposition possible).
+jamais un prix infini) → `seller_boost_limit_reached` → `no_compatible_buyer` (D = 0 : pas de vente sans exposition possible) →
+**`no_visible_effect`** (lot P2-bis : des acheteurs compatibles existent, mais le boost ne ferait monter l'offre dans AUCUNE de leurs listes).
+Le calcul de la portée n'a lieu que si aucun motif antérieur ne s'applique (inutile de le payer quand la cotation est déjà refusée).
+
+### Portée visible (lot P2-bis, `lib/server/boost/reach.ts`)
+Un devis n'est **disponible** que si au moins un acheteur verrait réellement l'offre monter. Constat qui a motivé la règle : avec une
+annonce et un besoin, le devis était « disponible », l'achat réussissait et aucun « Sponsorisé » n'apparaissait, parce que le quota de
+places mises en avant, `floor(part promue × N)`, vaut 0 sous 7 offres (part de 0,15). Du crédit dépensé sans aucun effet.
+
+`computeBoostReach` examine les besoins actifs compatibles de l'offre (mêmes évaluations que D), du plus récent au plus ancien, et pour
+chacun :
+1. **N** = taille de la liste que l'acheteur voit (`countDemandOrganicList`, plafonnée à la fenêtre de pertinence) ; si
+   `computeMaxPromoted(N, part promue)` vaut 0, le besoin est écarté sans autre calcul ;
+2. sinon le classement organique de ce besoin est relu avec LA fonction de la lecture des résultats (`readDemandOrganicRanking` :
+   pertinence incluse, `compareByRelevance`) ;
+3. le placement est simulé par `placeBoostedItems` via `isPromotedByBoost` (aucune copie de la logique) : sont promouvables les offres
+   déjà boostées PLUS celle-ci dont la pertinence atteint le seuil `min_relevance` des réglages de la catégorie du besoin ; l'offre est
+   « atteignable » si elle y est marquée promue (quota non épuisé par d'autres boosts, pertinence suffisante, **gain de place strict** :
+   une offre déjà à la place cible ne monte pas).
+Un acheteur n'est compté qu'une fois (un seul besoin atteignable suffit). Chaque besoin est évalué sous un `SAVEPOINT` : une évaluation
+enregistrée illisible ou une erreur SQL sur UN besoin le fait tenir pour non atteignable (journal : le code seul), sans casser la cotation.
+
+Bornes : au plus **200** besoins évalués pour le COMPTAGE (`BOOST_REACH_COUNT_LIMIT`, les plus récents d'abord) ; au-delà, on ne continue
+que tant qu'aucun acheteur atteignable n'est trouvé et on s'arrête au premier, sans dépasser **1 000** besoins évalués au total
+(`BOOST_REACH_SEARCH_LIMIT`). Passé ce plafond sans acheteur atteignable, le résultat est 0 (`no_visible_effect`) : le compte est exact
+jusqu'à 200 besoins évalués, un minimum au-delà. Le résultat est borné par `compatibleBuyers`. **Le prix ne change pas** : `reachableBuyers`
+n'entre dans aucun facteur ; il décide seulement de la disponibilité et s'affiche (« Mise en avant visible auprès de X acheteur(s) »).
+Aucune identité d'acheteur ne sort : seul le nombre.
+
+Migration **0016** : colonne `boost_quotes.reachable_buyers` (entier, NULL si non évalué : ancien devis ou motif antérieur) et CHECK
+`chk_boost_quotes_reason` étendu à `no_visible_effect` ; contraintes : 0 ≤ `reachable_buyers` ≤ `compatible_buyers`, un devis `available`
+n'a jamais `reachable_buyers` = 0, et `no_visible_effect` impose `reachable_buyers` = 0.
 
 ### Validité
 Cotation disponible : `quote_validity_seconds` (900 s par défaut). Cotation indisponible : **60 s**
 (`BOOST_UNAVAILABLE_QUOTE_SECONDS`), pour que l'indisponibilité ne soit pas figée. Résultat `BoostQuote` : `id`, `offerId`,
 `durationCode`, `currency`, `status`, `amount`, `rawAmount` (chaîne), `unavailableReason`, `factors` (millièmes) ou null, `inputs`
-(`competingSellers`, `compatibleBuyers`, `slotsTotal`, `slotsUsed`), `pricing` (`key`, `version`), `computedAt`, `expiresAt`, `reused`.
+(`competingSellers`, `compatibleBuyers`, `slotsTotal`, `slotsUsed`, `reachableBuyers`), `pricing` (`key`, `version`), `computedAt`, `expiresAt`, `reused`.
 
 ## Historiques
 
@@ -122,7 +153,7 @@ Cotation disponible : `quote_validity_seconds` (900 s par défaut). Cotation ind
 - Changer un tarif : insérer une nouvelle ligne `(key, version + 1)`. Les cotations en cours gardent leur prix jusqu'à leur
   expiration ; l'historique garde la version qui les a produites.
 - La migration 0012 doit être appliquée avant d'utiliser `quoteOfferBoost` (et, depuis le lot P1b, la **migration 0015** : la réutilisation
-  exclut les cotations achetées) ; `MATCHING_REQUIRED_MIGRATION` reste 0010 (le worker
+  exclut les cotations achetées ; depuis le lot P2-bis, la **migration 0016** : colonne `reachable_buyers` et motif `no_visible_effect`) ; `MATCHING_REQUIRED_MIGRATION` reste 0010 (le worker
   n'utilise pas les cotations).
 
 ## Limites
@@ -136,7 +167,10 @@ Cotation disponible : `quote_validity_seconds` (900 s par défaut). Cotation ind
   (le brief demande d'exclure l'activité suspecte).
 - **Localisation et variante exclues** du périmètre (comme 2I1) : le marché de la cotation est la clé produit.
 - Un acheteur compatible ne garantit pas d'exposition : `min_relevance` et la part promue maximale s'appliquent encore au
-  classement (voir `BOOST.md`). Une cotation ne promet aucune impression.
+  classement (voir `BOOST.md`). Depuis le lot P2-bis, la cotation ne se déclare « disponible » que si le boost fait monter l'offre chez au
+  moins un acheteur **au moment du calcul** ; l'état des listes peut changer ensuite (autres offres, autres boosts, autres besoins) :
+  une cotation ne promet toujours aucune impression, aucune position et aucune vente, et la portée n'est PAS recalculée à l'achat
+  (l'achat revérifie places, plafond vendeur et validité, `BOOST-PURCHASE.md`).
 - Les durées longues ont un facteur configurable mais la **capacité sur toute la période** n'est pas vérifiée ici (aucune
   réservation) ; elle le sera à l'achat.
 - Pas d'index fonctionnel sur `lower(btrim(...))` : le comptage des offres d'un périmètre est proportionnel à la taille du

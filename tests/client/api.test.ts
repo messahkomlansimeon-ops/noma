@@ -13,6 +13,7 @@ import {
   createApiClient,
   describeApiError,
   isUnauthorized,
+  serverTimeFromDateHeader,
   type ApiErrorContext,
 } from "../../lib/client/api";
 
@@ -456,7 +457,7 @@ describe("couche cliente : ApiError construite uniquement depuis le corps du ser
 });
 
 describe("messages fixes en français pour l'utilisateur", () => {
-  const contexts: ApiErrorContext[] = ["otp-request", "otp-verify", "catalog", "matches", "boost", "default"];
+  const contexts: ApiErrorContext[] = ["otp-request", "otp-verify", "catalog", "matches", "boost", "wallet", "purchase", "default"];
 
   test("les statuts d'authentification 400, 401, 429 et 503 ont chacun un message fixe distinct", () => {
     const message = (status: number, context: ApiErrorContext) =>
@@ -729,7 +730,7 @@ function quoteDto(overrides: Record<string, unknown> = {}) {
     amount: 2300,
     unavailableReason: null,
     factors: { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 },
-    inputs: { competingSellers: 3, compatibleBuyers: 4, slotsTotal: 3, slotsUsed: 1 },
+    inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, slotsTotal: 3, slotsUsed: 1 },
     computedAt: "2031-01-01T10:00:00.000Z",
     expiresAt: "2031-01-01T10:15:00.000Z",
     reused: false,
@@ -738,6 +739,25 @@ function quoteDto(overrides: Record<string, unknown> = {}) {
 }
 
 describe("couche cliente : cotations de boost (boostQuotes)", () => {
+  test("heure du serveur : l'en-tête Date de la réponse est lue (create et list) ; absent, illisible ou trop long : null", async () => {
+    const withDate = (status: number, body: unknown, date: string | null) =>
+      new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...(date === null ? {} : { date }) } });
+    const GMT = "Wed, 06 Oct 2027 12:00:00 GMT";
+    const expected = Date.parse(GMT);
+    const create = harness(() => withDate(200, { contractVersion: "boost-quote/v1", quote: quoteDto({ reused: true }) }, GMT));
+    assert.equal((await create.client.boostQuotes.create(ID, "3d")).serverTime, expected);
+    const listed = harness(() => withDate(200, { contractVersion: "boost-quote/v1", quotes: [{ ...quoteDto(), reused: undefined, expired: false }, { ...quoteDto({ id: "55555555-5555-4555-8555-555555555555" }), reused: undefined, expired: true }] }, GMT));
+    assert.deepEqual((await listed.client.boostQuotes.list(ID)).map((quote) => quote.serverTime), [expected, expected]);
+    for (const date of [null, "pas une date", "", "x".repeat(65)]) {
+      const { client } = harness(() => withDate(201, { contractVersion: "boost-quote/v1", quote: quoteDto() }, date));
+      assert.equal((await client.boostQuotes.create(ID, "3d")).serverTime, null, String(date));
+    }
+    assert.equal(serverTimeFromDateHeader(GMT), expected);
+    assert.equal(serverTimeFromDateHeader(undefined), null);
+    assert.equal(serverTimeFromDateHeader(null), null);
+    assert.equal(serverTimeFromDateHeader(""), null);
+  });
+
   test("create : POST /api/offers/{id}/boost-quotes avec exactement { durationCode }, 201 puis 200 réutilisée", async () => {
     const { client, calls } = harness((_request, index) =>
       json(index === 0 ? 201 : 200, { contractVersion: "boost-quote/v1", quote: quoteDto({ reused: index === 1 }) }),
@@ -753,7 +773,7 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
     assert.equal(created.expired, null);
     assert.equal(reused.reused, true);
     assert.deepEqual(created.factors, { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 });
-    assert.deepEqual(created.inputs, { competingSellers: 3, compatibleBuyers: 4, slotsTotal: 3, slotsUsed: 1 });
+    assert.deepEqual(created.inputs, { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, slotsTotal: 3, slotsUsed: 1 });
   });
 
   test("un devis indisponible est un SUCCÈS (jamais une erreur) avec son motif", async () => {
@@ -768,6 +788,22 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
     assert.equal(quote.amount, null);
     assert.equal(quote.factors, null);
     assert.equal(quote.unavailableReason, "no_compatible_buyer");
+  });
+
+  test("portée visible : reachableBuyers (entier ≥ 0 ou null) relu ; motif no_visible_effect = un devis INDISPONIBLE (succès), jamais une erreur", async () => {
+    const withInputs = (reachableBuyers: number | null) => ({ competingSellers: 3, compatibleBuyers: 4, reachableBuyers, slotsTotal: 3, slotsUsed: 1 });
+    for (const reachable of [0, 1, 4, null]) {
+      const { client } = harness(() => json(201, { contractVersion: "boost-quote/v1", quote: quoteDto({ inputs: withInputs(reachable) }) }));
+      assert.equal((await client.boostQuotes.create(ID, "3d")).inputs.reachableBuyers, reachable);
+    }
+    const { client } = harness(() =>
+      json(201, {
+        contractVersion: "boost-quote/v1",
+        quote: quoteDto({ status: "unavailable", amount: null, factors: null, unavailableReason: "no_visible_effect", inputs: withInputs(0) }),
+      }),
+    );
+    const useless = await client.boostQuotes.create(ID, "24h");
+    assert.deepEqual([useless.status, useless.unavailableReason, useless.amount, useless.inputs.reachableBuyers], ["unavailable", "no_visible_effect", null, 0]);
   });
 
   test("list : GET avec limit seulement, plus récentes d'abord ; chaque devis porte `expired`", async () => {
@@ -827,6 +863,10 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
       wrap(quoteDto({ reused: undefined })),
       wrap(quoteDto({ factors: { competitionMilli: 1060 } })),
       wrap(quoteDto({ inputs: null })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: 4, slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: "4", slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: -1, slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 1.5, slotsTotal: 3, slotsUsed: 1 } })),
       wrap(quoteDto({ expiresAt: 5 })),
       wrap(quoteDto(), { contractVersion: "boost-quote/v2" }),
       json(201, { contractVersion: "boost-quote/v1" }),
@@ -874,5 +914,471 @@ describe("messages fixes : correspondances et boost", () => {
     assert.equal(message(503, "boost_unavailable"), "Le boost est temporairement indisponible. Réessayez plus tard.");
     assert.equal(message(409, "autre"), GENERIC_ERROR_MESSAGE);
     assert.equal(message(403, "invalid_origin"), "Requête refusée. Rechargez la page et réessayez.");
+  });
+});
+
+// ─── Portefeuille, recharge simulée et achat de boost (lot P2) ────────────────────────────────────
+
+const TOPUP_ID = "77777777-7777-4777-8777-777777777777";
+const TX_ID = "88888888-8888-4888-8888-888888888888";
+const QUOTE_ID = "44444444-4444-4444-8444-444444444444";
+const PURCHASE_ID = "99999999-9999-4999-8999-999999999999";
+const KEY = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+function topupDto(overrides: Record<string, unknown> = {}) {
+  return {
+    id: TOPUP_ID,
+    amountXof: 2000,
+    status: "pending",
+    expiresAt: "2031-01-01T10:30:00.000Z",
+    checkoutPath: `/paiement-simule/${TOPUP_ID}`,
+    ...overrides,
+  };
+}
+
+function walletDto(overrides: Record<string, unknown> = {}) {
+  return {
+    contractVersion: "wallet/v1",
+    balanceXof: 700,
+    transactions: [
+      { id: TX_ID, kind: "boost_purchase", amountXof: -1300, createdAt: "2031-01-01T10:05:00.000Z" },
+      { id: "88888888-8888-4888-8888-888888888889", kind: "topup", amountXof: 2000, createdAt: "2031-01-01T10:00:00.000Z" },
+    ],
+    nextCursor: CURSOR,
+    ...overrides,
+  };
+}
+
+function purchaseDto(overrides: Record<string, unknown> = {}) {
+  return {
+    id: PURCHASE_ID,
+    quoteId: QUOTE_ID,
+    durationCode: "3d",
+    amountXof: 1300,
+    startsAt: "2031-01-01T10:05:00.000Z",
+    endsAt: "2031-01-04T10:05:00.000Z",
+    reused: false,
+    ...overrides,
+  };
+}
+
+describe("couche cliente : porte-monnaie (wallet)", () => {
+  test("overview : GET /api/wallet, solde et historique signé relus champ par champ", async () => {
+    const { client, calls } = harness(() => json(200, walletDto()));
+    const overview = await client.wallet.overview();
+    assert.equal(calls[0].url, "/api/wallet");
+    assert.equal(calls[0].init.method, "GET");
+    assert.equal(calls[0].init.body, undefined);
+    assert.equal(overview.balanceXof, 700);
+    assert.deepEqual(overview.transactions.map((entry) => [entry.kind, entry.amountXof]), [["boost_purchase", -1300], ["topup", 2000]]);
+    assert.equal(overview.nextCursor, CURSOR);
+    const last = await harness(() => json(200, walletDto({ nextCursor: null }))).client.wallet.overview();
+    assert.equal(last.nextCursor, null);
+  });
+
+  test("overview : curseur et limite encodés, vérifiés AVANT la requête", async () => {
+    const { client, calls } = harness(() => json(200, walletDto()));
+    await client.wallet.overview({ cursor: CURSOR, limit: 50 });
+    assert.equal(calls[0].url, `/api/wallet?limit=50&cursor=${encodeURIComponent(CURSOR)}`);
+    await client.wallet.overview({ cursor: "a b/c+d" });
+    assert.equal(calls[1].url, "/api/wallet?cursor=a+b%2Fc%2Bd");
+    await client.wallet.overview({ limit: 1 });
+    assert.equal(calls[2].url, "/api/wallet?limit=1");
+    for (const query of [{ limit: 0 }, { limit: 51 }, { limit: 1.5 }, { limit: Number.NaN }, { cursor: "" }, { cursor: "x".repeat(513) }]) {
+      await assert.rejects(client.wallet.overview(query), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ARGUMENT && error.status === 0, JSON.stringify(query));
+    }
+    assert.equal(calls.length, 3);
+  });
+
+  test("overview : réponse hors liste blanche = invalid_response (version de contrat, solde, montant non sûr, type inconnu, date)", async () => {
+    const tx = (overrides: Record<string, unknown>) => ({ id: TX_ID, kind: "topup", amountXof: 2000, createdAt: "2031-01-01T10:00:00.000Z", ...overrides });
+    const bad: Response[] = [
+      json(200, walletDto({ contractVersion: "wallet/v2" })),
+      json(200, walletDto({ contractVersion: undefined })),
+      json(200, walletDto({ balanceXof: "700" })),
+      json(200, walletDto({ balanceXof: 700.5 })),
+      json(200, walletDto({ balanceXof: -1 })),
+      json(200, walletDto({ balanceXof: 2 ** 53 })),
+      json(200, walletDto({ transactions: "non" })),
+      json(200, walletDto({ transactions: [tx({ kind: 5 })] })),
+      json(200, walletDto({ transactions: [tx({ kind: "" })] })),
+      json(200, walletDto({ transactions: [tx({ kind: "x".repeat(65) })] })),
+      json(200, walletDto({ transactions: [tx({ kind: "cadeau", amountXof: 0 })] })),
+      json(200, walletDto({ transactions: [tx({ kind: "cadeau", amountXof: 1.5 })] })),
+      json(200, walletDto({ transactions: [tx({ kind: "cadeau", amountXof: 2 ** 53 })] })),
+      json(200, walletDto({ transactions: [tx({ amountXof: 1.5 })] })),
+      json(200, walletDto({ transactions: [tx({ amountXof: "2000" })] })),
+      json(200, walletDto({ transactions: [tx({ amountXof: 0 })] })),
+      json(200, walletDto({ transactions: [tx({ amountXof: 2 ** 53 })] })),
+      json(200, walletDto({ transactions: [tx({ id: "pas-un-uuid" })] })),
+      json(200, walletDto({ transactions: [tx({ createdAt: "hier" })] })),
+      json(200, walletDto({ nextCursor: "" })),
+      json(200, walletDto({ nextCursor: 5 })),
+      new Response("<html>502</html>", { status: 200 }),
+    ];
+    for (const response of bad) {
+      const { client } = harness(() => response.clone());
+      await assert.rejects(client.wallet.overview(), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE);
+    }
+  });
+
+  test("overview : un type de transaction INCONNU ne rejette pas l'historique : ligne « unknown » (affichée « Opération »), montant validé, code brut jamais conservé", async () => {
+    const tx = (kind: string, amountXof: number, id: string) => ({ id, kind, amountXof, createdAt: "2031-01-01T10:00:00.000Z" });
+    const { client } = harness(() =>
+      json(200, walletDto({
+        transactions: [
+          tx("topup", 2000, "88888888-8888-4888-8888-888888888801"),
+          tx("cadeau_de_noel", -750, "88888888-8888-4888-8888-888888888802"),
+          tx("__proto__", 100, "88888888-8888-4888-8888-888888888803"),
+          tx("boost_refund", 1300, "88888888-8888-4888-8888-888888888804"),
+        ],
+      })),
+    );
+    const overview = await client.wallet.overview();
+    assert.deepEqual(overview.transactions.map((entry) => [entry.kind, entry.amountXof]), [["topup", 2000], ["unknown", -750], ["unknown", 100], ["boost_refund", 1300]]);
+    const text = JSON.stringify(overview);
+    for (const leaked of ["cadeau_de_noel", "__proto__"]) assert.equal(text.includes(leaked), false, leaked);
+  });
+
+  test("overview : un champ que le serveur ajouterait n'atteint jamais l'écran (compte, référence, métadonnées, identifiant d'utilisateur)", async () => {
+    const { client } = harness(() =>
+      json(200, walletDto({
+        accountId: "acct-secret",
+        transactions: [{ id: TX_ID, kind: "topup", amountXof: 2000, createdAt: "2031-01-01T10:00:00.000Z", reference: "topup:secret-ref", metadata: { paymentIntentId: TOPUP_ID }, ownerId: OWNER_ID }],
+      })),
+    );
+    const text = JSON.stringify(await client.wallet.overview());
+    for (const leaked of ["acct-secret", "secret-ref", "metadata", "paymentIntentId", OWNER_ID, "ownerId", "reference", "accountId"]) assert.equal(text.includes(leaked), false, leaked);
+  });
+
+  test("createTopup : POST /api/wallet/topups avec exactement { amountXof, idempotencyKey } ; 201 créé, 200 retrouvé", async () => {
+    const { client, calls } = harness((_request, index) => json(index === 0 ? 201 : 200, { contractVersion: "wallet/v1", topup: topupDto() }));
+    const created = await client.wallet.createTopup({ amountXof: 2000, idempotencyKey: KEY });
+    const again = await client.wallet.createTopup({ amountXof: 2000, idempotencyKey: KEY });
+    assert.equal(calls[0].url, "/api/wallet/topups");
+    assert.equal(calls[0].init.method, "POST");
+    assert.deepEqual(JSON.parse(String(calls[0].init.body)), { amountXof: 2000, idempotencyKey: KEY });
+    assert.equal(headerOf(calls[0], "Content-Type"), "application/json");
+    assert.equal(created.reused, false);
+    assert.equal(again.reused, true);
+    assert.deepEqual(created.topup, { id: TOPUP_ID, amountXof: 2000, status: "pending", expiresAt: "2031-01-01T10:30:00.000Z", checkoutPath: `/paiement-simule/${TOPUP_ID}` });
+    // Le corps ne porte rien d'autre que le montant et la clé (jamais un identifiant d'utilisateur).
+    assert.deepEqual(Object.keys(JSON.parse(String(calls[0].init.body))).sort(), ["amountXof", "idempotencyKey"]);
+  });
+
+  test("createTopup : montant non sûr ou clé invalide refusés AVANT la requête", async () => {
+    const { client, calls } = harness(() => json(201, { contractVersion: "wallet/v1", topup: topupDto() }));
+    const bad: unknown[] = [0, -500, 1.5, 2000.25, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53, 2 ** 60, "2000", null, undefined, BigInt(2000), [2000], { v: 2000 }];
+    for (const amountXof of bad) {
+      await assert.rejects(
+        client.wallet.createTopup({ amountXof: amountXof as number, idempotencyKey: KEY }),
+        (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ARGUMENT && error.status === 0,
+        String(amountXof),
+      );
+    }
+    for (const idempotencyKey of ["", "pas-un-uuid", "aaaaaaaa-aaaa-0aaa-8aaa-aaaaaaaaaaaa", undefined as unknown as string]) {
+      await assert.rejects(client.wallet.createTopup({ amountXof: 2000, idempotencyKey }), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ARGUMENT, String(idempotencyKey));
+    }
+    await assert.rejects(client.wallet.createTopup(undefined as never), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ARGUMENT);
+    assert.equal(calls.length, 0, "aucune requête n'est partie");
+  });
+
+  test("createTopup et topup : réponse hors liste blanche = invalid_response", async () => {
+    const wrap = (topup: unknown, extra: Record<string, unknown> = {}) => json(201, { contractVersion: "wallet/v1", topup, ...extra });
+    const bad: Response[] = [
+      wrap(topupDto({ status: "paid" })),
+      wrap(topupDto({ amountXof: "2000" })),
+      wrap(topupDto({ amountXof: 0 })),
+      wrap(topupDto({ amountXof: 2000.5 })),
+      wrap(topupDto({ id: "pas-un-uuid" })),
+      wrap(topupDto({ expiresAt: "bientôt" })),
+      wrap(topupDto({ checkoutPath: 12 })),
+      wrap(topupDto({ checkoutPath: "x".repeat(201) })),
+      wrap(topupDto(), { contractVersion: "wallet/v2" }),
+      json(201, { contractVersion: "wallet/v1" }),
+      new Response("pas du json", { status: 201 }),
+    ];
+    for (const response of bad) {
+      const { client } = harness(() => response.clone());
+      await assert.rejects(client.wallet.createTopup({ amountXof: 2000, idempotencyKey: KEY }), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE);
+      await assert.rejects(client.wallet.topup(TOPUP_ID), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE);
+    }
+  });
+
+  test("createTopup : un champ ajouté (référence du prestataire, propriétaire, clé) n'atteint jamais l'écran", async () => {
+    const { client } = harness(() => json(201, { contractVersion: "wallet/v1", topup: topupDto({ providerReference: "fakepay_secret", ownerId: OWNER_ID, idempotencyKey: KEY }) }));
+    const text = JSON.stringify(await client.wallet.createTopup({ amountXof: 2000, idempotencyKey: KEY }));
+    for (const leaked of ["fakepay_secret", OWNER_ID, "providerReference", "ownerId"]) assert.equal(text.includes(leaked), false, leaked);
+    assert.equal(text.includes(KEY), false, "la clé d'idempotence n'est pas renvoyée");
+  });
+
+  test("topup : GET /api/wallet/topups/{id} ; identifiant non UUID refusé sans requête", async () => {
+    const { client, calls } = harness(() => json(200, { contractVersion: "wallet/v1", topup: topupDto({ status: "succeeded" }) }));
+    const topup = await client.wallet.topup(TOPUP_ID);
+    assert.equal(calls[0].url, `/api/wallet/topups/${TOPUP_ID}`);
+    assert.equal(calls[0].init.method, "GET");
+    assert.equal(topup.status, "succeeded");
+    for (const bad of ["pas-un-uuid", "../x", `${TOPUP_ID}/confirm`, ""]) {
+      await assert.rejects(client.wallet.topup(bad), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ID, bad);
+    }
+    assert.equal(calls.length, 1);
+  });
+
+  test("erreurs du serveur (400, 401, 403, 404, 409, 503) : statut et code viennent du corps seulement", async () => {
+    const cases: [number, string][] = [[400, "invalid_request"], [401, "authentication_required"], [403, "invalid_origin"], [404, "resource_not_found"], [409, "idempotency_conflict"], [409, "too_many_pending_topups"], [503, "payment_unavailable"], [503, "wallet_unavailable"]];
+    for (const [status, code] of cases) {
+      const { client } = harness(() => json(status, { error: { code, message: "ignoré" } }));
+      await assert.rejects(client.wallet.createTopup({ amountXof: 2000, idempotencyKey: KEY }), (error: unknown) => error instanceof ApiError && error.status === status && error.code === code);
+      await assert.rejects(client.wallet.overview(), (error: unknown) => error instanceof ApiError && error.status === status && error.code === code);
+    }
+  });
+});
+
+describe("couche cliente : paiement simulé de développement (devPayments)", () => {
+  test("confirm et fail : POST sans corps ni Content-Type sur /api/dev/fake-payments/{id}/…, issue et recharge relues", async () => {
+    const { client, calls } = harness(() => json(200, { contractVersion: "wallet/v1", outcome: "applied", topup: topupDto({ status: "succeeded" }) }));
+    const confirmed = await client.devPayments.confirm(TOPUP_ID);
+    const failed = await client.devPayments.fail(TOPUP_ID);
+    assert.equal(calls[0].url, `/api/dev/fake-payments/${TOPUP_ID}/confirm`);
+    assert.equal(calls[1].url, `/api/dev/fake-payments/${TOPUP_ID}/fail`);
+    for (const call of calls) {
+      assert.equal(call.init.method, "POST");
+      assert.equal(call.init.body, undefined);
+      assert.equal(headerOf(call, "Content-Type"), undefined);
+    }
+    assert.equal(confirmed.outcome, "applied");
+    assert.equal(confirmed.topup.status, "succeeded");
+    assert.equal(failed.outcome, "applied");
+  });
+
+  test("toutes les issues connues acceptées ; une issue inconnue ou une version de contrat inconnue = invalid_response", async () => {
+    for (const outcome of ["applied", "duplicate", "rejected_amount", "rejected_state", "rejected_unknown_intent", "replayed"]) {
+      const { client } = harness(() => json(200, { contractVersion: "wallet/v1", outcome, topup: topupDto() }));
+      assert.equal((await client.devPayments.confirm(TOPUP_ID)).outcome, outcome);
+    }
+    for (const body of [
+      { contractVersion: "wallet/v1", outcome: "ok", topup: topupDto() },
+      { contractVersion: "wallet/v1", topup: topupDto() },
+      { contractVersion: "wallet/v2", outcome: "applied", topup: topupDto() },
+      { contractVersion: "wallet/v1", outcome: "applied", topup: topupDto({ status: "x" }) },
+      { outcome: "applied", topup: topupDto() },
+    ]) {
+      const { client } = harness(() => json(200, body));
+      await assert.rejects(client.devPayments.confirm(TOPUP_ID), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE);
+      await assert.rejects(client.devPayments.fail(TOPUP_ID), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE);
+    }
+  });
+
+  test("identifiant non UUID refusé sans requête ; 404 (fictif inactif) transmis tel quel", async () => {
+    const { client, calls } = harness(() => json(404, { error: { code: "resource_not_found", message: "x" } }));
+    for (const bad of ["pas-un-uuid", "../x", `${TOPUP_ID}/../other`]) {
+      await assert.rejects(client.devPayments.confirm(bad), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ID, bad);
+      await assert.rejects(client.devPayments.fail(bad), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ID, bad);
+    }
+    assert.equal(calls.length, 0);
+    await assert.rejects(client.devPayments.confirm(TOPUP_ID), (error: unknown) => error instanceof ApiError && error.status === 404 && error.code === "resource_not_found");
+  });
+});
+
+describe("couche cliente : achat de boost (boostPurchases)", () => {
+  test("create : POST /api/offers/{id}/boost-purchases avec exactement { quoteId, idempotencyKey } ; 201 puis 200 (rejeu)", async () => {
+    const { client, calls } = harness((_request, index) =>
+      json(index === 0 ? 201 : 200, { contractVersion: "boost-purchase/v1", purchase: purchaseDto({ reused: index === 1 }), balanceXof: 700 }),
+    );
+    const created = await client.boostPurchases.create(ID, { quoteId: QUOTE_ID, idempotencyKey: KEY });
+    const replay = await client.boostPurchases.create(ID, { quoteId: QUOTE_ID, idempotencyKey: KEY });
+    assert.equal(calls[0].url, `/api/offers/${ID}/boost-purchases`);
+    assert.equal(calls[0].init.method, "POST");
+    assert.deepEqual(JSON.parse(String(calls[0].init.body)), { quoteId: QUOTE_ID, idempotencyKey: KEY });
+    assert.equal(headerOf(calls[0], "Content-Type"), "application/json");
+    assert.equal(calls[0].init.body, calls[1].init.body, "le rejeu envoie exactement la même requête");
+    assert.equal(created.balanceXof, 700);
+    assert.deepEqual(created.purchase, { ...purchaseDto(), reused: false });
+    assert.equal(replay.purchase.reused, true);
+  });
+
+  test("le prix ne vient JAMAIS du client : aucun montant dans le corps, même si l'appelant en passe un", async () => {
+    const { client, calls } = harness(() => json(201, { contractVersion: "boost-purchase/v1", purchase: purchaseDto(), balanceXof: 700 }));
+    await client.boostPurchases.create(ID, { quoteId: QUOTE_ID, idempotencyKey: KEY, amountXof: 1, price: 1 } as never);
+    assert.deepEqual(Object.keys(JSON.parse(String(calls[0].init.body))).sort(), ["idempotencyKey", "quoteId"]);
+  });
+
+  test("identifiants invalides refusés AVANT la requête (invalid_id pour l'annonce, invalid_argument pour le devis et la clé)", async () => {
+    const { client, calls } = harness(() => json(201, { contractVersion: "boost-purchase/v1", purchase: purchaseDto(), balanceXof: 700 }));
+    await assert.rejects(client.boostPurchases.create("pas-un-uuid", { quoteId: QUOTE_ID, idempotencyKey: KEY }), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ID);
+    await assert.rejects(client.boostPurchases.create("../x", { quoteId: QUOTE_ID, idempotencyKey: KEY }), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ID);
+    for (const bad of ["", "x", "pas-un-uuid", undefined as unknown as string]) {
+      await assert.rejects(client.boostPurchases.create(ID, { quoteId: bad, idempotencyKey: KEY }), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ARGUMENT, `quoteId ${String(bad)}`);
+      await assert.rejects(client.boostPurchases.create(ID, { quoteId: QUOTE_ID, idempotencyKey: bad }), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ARGUMENT, `clé ${String(bad)}`);
+    }
+    await assert.rejects(client.boostPurchases.create(ID, undefined as never), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ARGUMENT);
+    assert.equal(calls.length, 0);
+  });
+
+  test("réponse hors liste blanche = invalid_response (solde, durée, montant non sûr, dates, contrat)", async () => {
+    const wrap = (purchase: unknown, extra: Record<string, unknown> = {}) => json(201, { contractVersion: "boost-purchase/v1", purchase, balanceXof: 700, ...extra });
+    const bad: Response[] = [
+      wrap(purchaseDto({ durationCode: "30d" })),
+      wrap(purchaseDto({ amountXof: "1300" })),
+      wrap(purchaseDto({ amountXof: 1300.5 })),
+      wrap(purchaseDto({ amountXof: 0 })),
+      wrap(purchaseDto({ amountXof: 2 ** 53 })),
+      wrap(purchaseDto({ id: "pas-un-uuid" })),
+      wrap(purchaseDto({ quoteId: 5 })),
+      wrap(purchaseDto({ startsAt: "demain" })),
+      wrap(purchaseDto({ endsAt: null })),
+      wrap(purchaseDto({ reused: undefined })),
+      wrap(purchaseDto({ reused: "false" })),
+      wrap(purchaseDto(), { balanceXof: "700" }),
+      wrap(purchaseDto(), { balanceXof: -1 }),
+      wrap(purchaseDto(), { balanceXof: 0.5 }),
+      wrap(purchaseDto(), { balanceXof: undefined }),
+      wrap(purchaseDto(), { contractVersion: "boost-purchase/v2" }),
+      wrap(undefined),
+      new Response("<html>502</html>", { status: 201 }),
+    ];
+    for (const response of bad) {
+      const { client } = harness(() => response.clone());
+      await assert.rejects(client.boostPurchases.create(ID, { quoteId: QUOTE_ID, idempotencyKey: KEY }), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE);
+    }
+  });
+
+  test("le DTO ne laisse passer aucun champ inconnu (boost, transaction, vendeur, offre, clé d'idempotence)", async () => {
+    const { client } = harness(() =>
+      json(201, {
+        contractVersion: "boost-purchase/v1",
+        purchase: purchaseDto({ boostId: "boost-secret", transactionId: "tx-secret", sellerId: OWNER_ID, offerId: ID, idempotencyKey: KEY }),
+        balanceXof: 700,
+        walletAccountId: "acct-secret",
+      }),
+    );
+    const text = JSON.stringify(await client.boostPurchases.create(ID, { quoteId: QUOTE_ID, idempotencyKey: KEY }));
+    for (const leaked of ["boost-secret", "tx-secret", OWNER_ID, "sellerId", "offerId", "acct-secret", "boostId", "transactionId"]) assert.equal(text.includes(leaked), false, leaked);
+    assert.equal(text.includes(KEY), false);
+  });
+
+  test("list : GET avec limit seulement ; achats, remboursement éventuel ; limite et identifiant vérifiés avant la requête", async () => {
+    const item = (overrides: Record<string, unknown> = {}) => ({ ...purchaseDto(), reused: undefined, createdAt: "2031-01-01T10:05:01.000Z", refundedAt: null, ...overrides });
+    const { client, calls } = harness(() =>
+      json(200, { contractVersion: "boost-purchase/v1", purchases: [item({ refundedAt: "2031-01-02T08:00:00.000Z" }), item({ id: "99999999-9999-4999-8999-999999999990" })] }),
+    );
+    const purchases = await client.boostPurchases.list(ID, { limit: 10 });
+    assert.equal(calls[0].url, `/api/offers/${ID}/boost-purchases?limit=10`);
+    assert.equal(calls[0].init.method, "GET");
+    assert.deepEqual(purchases.map((entry) => entry.refundedAt), ["2031-01-02T08:00:00.000Z", null]);
+    assert.equal("reused" in purchases[0], false);
+    await client.boostPurchases.list(ID);
+    assert.equal(calls[1].url, `/api/offers/${ID}/boost-purchases`);
+    await assert.rejects(client.boostPurchases.list("../x"), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ID);
+    for (const limit of [0, 51, 2.5, Number.NaN]) {
+      await assert.rejects(client.boostPurchases.list(ID, { limit }), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ARGUMENT, String(limit));
+    }
+    assert.equal(calls.length, 2);
+  });
+
+  test("list : réponse hors liste blanche = invalid_response ; aucun identifiant interne ne passe", async () => {
+    for (const body of [
+      { contractVersion: "boost-purchase/v2", purchases: [] },
+      { contractVersion: "boost-purchase/v1", purchases: "non" },
+      { contractVersion: "boost-purchase/v1", purchases: [{ ...purchaseDto(), createdAt: "hier", refundedAt: null }] },
+      { contractVersion: "boost-purchase/v1", purchases: [{ ...purchaseDto(), createdAt: "2031-01-01T10:05:01.000Z", refundedAt: "jamais" }] },
+      { contractVersion: "boost-purchase/v1", purchases: [{ ...purchaseDto(), createdAt: "2031-01-01T10:05:01.000Z" }] },
+    ]) {
+      const { client } = harness(() => json(200, body));
+      await assert.rejects(client.boostPurchases.list(ID), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE);
+    }
+    const { client } = harness(() =>
+      json(200, { contractVersion: "boost-purchase/v1", purchases: [{ ...purchaseDto(), reused: undefined, createdAt: "2031-01-01T10:05:01.000Z", refundedAt: null, sellerId: OWNER_ID, boostId: "boost-secret" }] }),
+    );
+    const text = JSON.stringify(await client.boostPurchases.list(ID));
+    for (const leaked of [OWNER_ID, "boost-secret", "sellerId", "boostId"]) assert.equal(text.includes(leaked), false, leaked);
+  });
+
+  test("erreurs de l'achat (400, 401, 403, 404, 409 par code, 503) : statut et code viennent du corps seulement", async () => {
+    const cases: [number, string][] = [
+      [400, "invalid_request"], [401, "authentication_required"], [403, "invalid_origin"], [404, "resource_not_found"],
+      [409, "insufficient_balance"], [409, "quote_expired"], [409, "quote_unavailable"], [409, "quote_already_used"], [409, "offer_not_eligible"],
+      [409, "offer_already_boosted"], [409, "no_slot_available"], [409, "seller_boost_limit_reached"], [409, "idempotency_conflict"], [503, "boost_purchase_unavailable"],
+    ];
+    for (const [status, code] of cases) {
+      const { client } = harness(() => json(status, { error: { code, message: "ignoré" } }));
+      await assert.rejects(client.boostPurchases.create(ID, { quoteId: QUOTE_ID, idempotencyKey: KEY }), (error: unknown) => error instanceof ApiError && error.status === status && error.code === code);
+    }
+  });
+});
+
+describe("messages fixes : porte-monnaie et achat de boost (jamais le code brut)", () => {
+  const wallet = (status: number, code: string) => describeApiError(new ApiError(status, code, "ignoré"), "wallet");
+  const purchase = (status: number, code: string) => describeApiError(new ApiError(status, code, "ignoré"), "purchase");
+
+  test("recharge : 503 payment_unavailable → « La recharge n'est pas disponible pour le moment. »", () => {
+    assert.equal(wallet(503, "payment_unavailable"), "La recharge n'est pas disponible pour le moment.");
+    assert.equal(wallet(503, "wallet_unavailable"), "Le porte-monnaie est temporairement indisponible. Réessayez dans un instant.");
+    assert.match(wallet(409, "too_many_pending_topups"), /plusieurs recharges en attente/);
+    assert.match(wallet(409, "idempotency_conflict"), /autre montant/);
+    assert.match(wallet(400, "invalid_request"), /500 à 500\s000 FCFA, par multiples de 100/);
+    assert.equal(wallet(404, "resource_not_found"), "Cette recharge est introuvable.");
+    assert.equal(wallet(401, "authentication_required"), "Votre session a expiré. Reconnectez-vous pour continuer.");
+    assert.equal(wallet(403, "invalid_origin"), "Requête refusée. Rechargez la page et réessayez.");
+    assert.equal(wallet(503, "code_inconnu"), "Le service est temporairement indisponible. Réessayez dans un instant.");
+  });
+
+  test("achat : un message simple par code de boost-purchase/v1", () => {
+    assert.match(purchase(409, "insufficient_balance"), /^Solde insuffisant : rechargez votre porte-monnaie/);
+    assert.match(purchase(409, "quote_expired"), /^Ce devis a expiré\./);
+    assert.match(purchase(409, "quote_already_used"), /^Ce devis a déjà servi/);
+    assert.match(purchase(409, "quote_unavailable"), /pas de prix/);
+    assert.equal(purchase(409, "no_slot_available"), "Il n'y a plus de place de mise en avant disponible pour ce produit pour le moment.");
+    assert.equal(purchase(409, "seller_boost_limit_reached"), "Vous avez atteint votre plafond de boosts pour ce produit.");
+    assert.equal(purchase(409, "offer_already_boosted"), "Cette annonce est déjà boostée.");
+    assert.equal(purchase(409, "offer_not_eligible"), "Cette annonce ne peut pas être boostée : elle doit être en ligne et disponible.");
+    assert.match(purchase(409, "idempotency_conflict"), /conflit avec une demande précédente/);
+    assert.equal(purchase(503, "boost_purchase_unavailable"), "L'achat de boost est temporairement indisponible. Réessayez dans un instant.");
+    assert.match(purchase(404, "resource_not_found"), /introuvable/);
+    assert.match(purchase(400, "invalid_request"), /n'est pas valide/);
+  });
+
+  test("429 (limite de débit) : message propre au portefeuille et à l'achat, jamais celui des codes de connexion", () => {
+    for (const context of ["wallet", "purchase"] as const) {
+      for (const code of ["rate_limited", "too_many_requests", "otp_request_limited"]) {
+        assert.equal(describeApiError(new ApiError(429, code, "ignoré"), context), "Trop de tentatives, réessayez dans un instant.", `${context}/${code}`);
+      }
+    }
+    // Les autres contextes gardent leur message.
+    assert.equal(describeApiError(new ApiError(429, "otp_request_limited", "x"), "otp-request"), "Trop de demandes de code. Patientez quelques minutes avant de réessayer.");
+    assert.equal(describeApiError(new ApiError(429, "x", "x"), "catalog"), "Trop de demandes de code. Patientez quelques minutes avant de réessayer.");
+  });
+
+  test("tous les codes : message en français, distinct, sans le code brut ni le texte du serveur", () => {
+    const walletCodes: [number, string][] = [[400, "invalid_request"], [404, "resource_not_found"], [409, "too_many_pending_topups"], [409, "idempotency_conflict"], [503, "payment_unavailable"], [503, "wallet_unavailable"]];
+    const purchaseCodes: [number, string][] = [
+      [400, "invalid_request"], [404, "resource_not_found"], [409, "insufficient_balance"], [409, "quote_expired"], [409, "quote_already_used"], [409, "quote_unavailable"],
+      [409, "offer_not_eligible"], [409, "offer_already_boosted"], [409, "no_slot_available"], [409, "seller_boost_limit_reached"], [409, "idempotency_conflict"], [503, "boost_purchase_unavailable"],
+    ];
+    for (const [status, code] of walletCodes) {
+      const text = wallet(status, code);
+      assert.equal(text.includes(code), false, `wallet ${code}`);
+      assert.equal(/[a-z]+_[a-z]+/.test(text), false, `wallet ${code} : « ${text} »`);
+    }
+    const seen = new Set<string>();
+    for (const [status, code] of purchaseCodes) {
+      const text = purchase(status, code);
+      assert.equal(text.includes(code), false, `purchase ${code}`);
+      assert.equal(/[a-z]+_[a-z]+/.test(text), false, `purchase ${code} : « ${text} »`);
+      assert.notEqual(text, GENERIC_ERROR_MESSAGE, code);
+      if (code !== "invalid_request" && code !== "resource_not_found") seen.add(text);
+    }
+    assert.equal(seen.size, purchaseCodes.length - 2, "chaque code d'achat a son propre message");
+  });
+
+  test("code inconnu : jamais le code brut (messages génériques pour 400, 404 et 409, comme pour toute exception)", () => {
+    for (const context of ["wallet", "purchase"] as const) {
+      for (const status of [400, 404, 409]) {
+        assert.equal(describeApiError(new ApiError(status, "code_futur_inconnu", "ignoré"), context), GENERIC_ERROR_MESSAGE, `${context}/${status}`);
+      }
+      assert.equal(describeApiError(new ApiError(0, API_NETWORK_ERROR, "x"), context), "Connexion impossible. Vérifiez votre réseau et réessayez.");
+      assert.equal(describeApiError(new ApiError(0, API_INVALID_ARGUMENT, "x"), context), "Paramètre invalide. Rechargez la page.");
+      assert.equal(describeApiError(new ApiError(200, API_INVALID_RESPONSE, "x"), context), GENERIC_ERROR_MESSAGE);
+    }
   });
 });

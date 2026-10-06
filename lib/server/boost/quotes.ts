@@ -17,6 +17,7 @@ import {
 import {
   computeBoostPrice, validatePricingSettings, type BoostPriceFactors, type BoostPricingSettings,
 } from "./pricing";
+import { computeBoostReach } from "./reach";
 
 /**
  * Cotations vendeur du boost (lot 2I2) : un prix daté, conservé pendant sa courte validité. AUCUN paiement, achat, crédit ni
@@ -28,13 +29,20 @@ export type BoostQuoteUnavailableReason =
   | "offer_already_boosted"
   | "no_slot_available"
   | "seller_boost_limit_reached"
-  | "no_compatible_buyer";
+  | "no_compatible_buyer"
+  | "no_visible_effect";
 
 export interface BoostQuoteInputs {
   /** Vendeurs autres distincts ayant une offre éligible dans le périmètre (nombre daté, aucune identité). */
   competingSellers: number;
   /** Acheteurs compatibles distincts pour CETTE offre (nombre daté, aucune identité). */
   compatibleBuyers: number;
+  /**
+   * Acheteurs distincts pour lesquels le boost ferait réellement MONTER l'offre (même logique que la lecture des résultats : quota de places promues,
+   * seuil de pertinence, gain strict). `null` : non évalué (cotation d'avant la migration 0016, ou indisponible pour un motif antérieur dans
+   * l'ordre des motifs). Au-delà de `BOOST_REACH_COUNT_LIMIT` besoins évalués, c'est un minimum. Ne change jamais le prix.
+   */
+  reachableBuyers: number | null;
   slotsTotal: number;
   slotsUsed: number;
 }
@@ -219,6 +227,7 @@ interface QuoteRow {
   duration_milli: number | null;
   competing_sellers: number;
   compatible_buyers: number;
+  reachable_buyers: number | null;
   slots_total: number;
   slots_used: number;
   pricing_key: string;
@@ -229,7 +238,7 @@ interface QuoteRow {
 }
 
 const QUOTE_COLUMNS = `id, offer_id, duration_code, currency, status, unavailable_reason, amount, raw_amount::text AS raw_amount,
-  competition_milli, demand_milli, scarcity_milli, duration_milli, competing_sellers, compatible_buyers, slots_total, slots_used,
+  competition_milli, demand_milli, scarcity_milli, duration_milli, competing_sellers, compatible_buyers, reachable_buyers, slots_total, slots_used,
   pricing_key, pricing_version, computed_at, expires_at`;
 
 function mapQuote(row: QuoteRow): Omit<BoostQuote, "reused"> {
@@ -245,7 +254,10 @@ function mapQuote(row: QuoteRow): Omit<BoostQuote, "reused"> {
     factors: row.competition_milli === null ? null : {
       competitionMilli: row.competition_milli!, demandMilli: row.demand_milli!, scarcityMilli: row.scarcity_milli!, durationMilli: row.duration_milli!,
     },
-    inputs: { competingSellers: row.competing_sellers, compatibleBuyers: row.compatible_buyers, slotsTotal: row.slots_total, slotsUsed: row.slots_used },
+    inputs: {
+      competingSellers: row.competing_sellers, compatibleBuyers: row.compatible_buyers, reachableBuyers: row.reachable_buyers,
+      slotsTotal: row.slots_total, slotsUsed: row.slots_used,
+    },
     pricing: { key: row.pricing_key, version: row.pricing_version },
     computedAt: row.computed_at,
     expiresAt: row.expires_at,
@@ -260,8 +272,8 @@ function mapQuote(row: QuoteRow): Omit<BoostQuote, "reused"> {
  * cotation de cette offre, de même durée, même vendeur et même périmètre est encore valable, elle est renvoyée telle quelle
  * (`reused: true`, aucune écriture), même si les comptages ou la version tarifaire ont changé ; une cotation déjà achetée n'est jamais
  * réutilisée (lot P1b, migration 0015 requise). Sinon : comptages (une requête),
- * prix (pricing.ts) ou indisponibilité (ordre : offre déjà boostée, plus de place, plafond vendeur, aucun acheteur compatible),
- * puis INSERT. Aucune place n'est réservée.
+ * prix (pricing.ts) ou indisponibilité (ordre : offre déjà boostée, plus de place, plafond vendeur, aucun acheteur compatible, aucun effet
+ * visible : des acheteurs compatibles existent mais aucun ne verrait l'offre monter, voir reach.ts), puis INSERT. Aucune place n'est réservée.
  */
 export async function quoteOfferBoost(input: {
   pool: Pool;
@@ -314,6 +326,16 @@ export async function quoteOfferBoost(input: {
     else if (counts.seller_used >= computeSellerLimit(slotsTotal, settings)) reason = "seller_boost_limit_reached";
     else if (counts.compatible_buyers === 0) reason = "no_compatible_buyer";
 
+    // Portée visible (lot P2-bis), calculée seulement quand les motifs précédents n'ont rien exclu : le prix ne change pas (le facteur demande
+    // reste fondé sur les acheteurs compatibles), mais un devis « disponible » promet au moins UN acheteur qui verrait l'offre monter.
+    let reachableBuyers: number | null = counts.compatible_buyers === 0 && reason === "no_compatible_buyer" ? 0 : null;
+    if (reason === null) {
+      const reach = await computeBoostReach(client, { offerId });
+      // Les comptages sont lus à des instants légèrement différents (READ COMMITTED) : jamais plus d'atteignables que de compatibles.
+      reachableBuyers = Math.min(reach.reachableBuyers, counts.compatible_buyers);
+      if (reachableBuyers === 0) reason = "no_visible_effect";
+    }
+
     const price = reason === null
       ? computeBoostPrice({
         competingSellers: counts.competing_sellers, compatibleBuyers: counts.compatible_buyers, slotsUsed, slotsTotal, durationCode, settings: pricing,
@@ -328,17 +350,17 @@ export async function quoteOfferBoost(input: {
        INSERT INTO boost_quotes (
          id, offer_id, seller_id, scope_category, scope_brand, scope_model, duration_code, pricing_key, pricing_version, currency,
          status, unavailable_reason, amount, raw_amount, competition_milli, demand_milli, scarcity_milli, duration_milli,
-         competing_sellers, compatible_buyers, slots_total, slots_used, computed_at, expires_at)
+         competing_sellers, compatible_buyers, reachable_buyers, slots_total, slots_used, computed_at, expires_at)
        SELECT $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9::int, 'XOF',
               $10, $11, $12::int, $13::numeric, $14::int, $15::int, $16::int, $17::int,
-              $18::int, $19::int, $20::int, $21::int, t.now, t.now + make_interval(secs => $22::int)
+              $18::int, $19::int, $20::int, $21::int, $22::int, t.now, t.now + make_interval(secs => $23::int)
          FROM t
        RETURNING ${QUOTE_COLUMNS}`,
       [
         randomUUID(), offerId, ownerId, scope.category, scope.brand, scope.model, durationCode, pricing.key, pricing.version,
         price ? "available" : "unavailable", reason, price?.amount ?? null, price?.rawAmount ?? null,
         price?.factors.competitionMilli ?? null, price?.factors.demandMilli ?? null, price?.factors.scarcityMilli ?? null, price?.factors.durationMilli ?? null,
-        counts.competing_sellers, counts.compatible_buyers, slotsTotal, slotsUsed, validitySeconds,
+        counts.competing_sellers, counts.compatible_buyers, reachableBuyers, slotsTotal, slotsUsed, validitySeconds,
       ],
     );
     return { ...mapQuote(inserted.rows[0]), reused: false };

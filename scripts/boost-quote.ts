@@ -40,7 +40,7 @@ async function main(): Promise<number> {
   const owner = await pool.query<{ owner_id: string }>("SELECT owner_id FROM offers WHERE id = $1::uuid", [offerId]);
   if (!owner.rows[0]) throw new BoostError("offer_not_found");
   const quote = await quoteOfferBoost({ pool, ownerId: owner.rows[0].owner_id, offerId, durationCode });
-  const counts = `vendeurs concurrents ${quote.inputs.competingSellers}, acheteurs compatibles ${quote.inputs.compatibleBuyers}, places ${quote.inputs.slotsUsed}/${quote.inputs.slotsTotal}`;
+  const counts = `vendeurs concurrents ${quote.inputs.competingSellers}, acheteurs compatibles ${quote.inputs.compatibleBuyers}, acheteurs qui verraient l'offre monter ${quote.inputs.reachableBuyers ?? "non évalué"}, places ${quote.inputs.slotsUsed}/${quote.inputs.slotsTotal}`;
   const validity = `calculée le ${quote.computedAt.toISOString()}, valable jusqu'au ${quote.expiresAt.toISOString()}${quote.reused ? " (cotation réutilisée)" : ""}`;
   if (quote.status === "available" && quote.factors) {
     console.log(

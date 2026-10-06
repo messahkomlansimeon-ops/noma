@@ -142,3 +142,48 @@ export function grantBoostByAdministration(offerId: string, duration: "24h" | "3
     child.on("exit", (code) => (code === 0 ? resolve(out.trim()) : reject(new Error(`boost:grant a refusé (code ${code}) : ${out.trim().slice(0, 200)}`))));
   });
 }
+
+/**
+ * COMMANDE `dev:seed` (annonces concurrentes d'exemple, vendeurs fictifs +225 07 99 99 99 xx) sur la base noma_e2e. NODE_ENV vaut « development »
+ * pour l'enfant (la commande refuse tout autre NODE_ENV). Renvoie la sortie ; lève une erreur si refus.
+ */
+export function seedExamplesByAdministration(options: { category: string; brand: string; model: string; offers: number }): Promise<string> {
+  const databaseUrl = e2eDatabaseUrl();
+  return new Promise((resolve, reject) => {
+    const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: "development", DATABASE_URL: databaseUrl, NODE_OPTIONS: "--conditions=react-server" };
+    const child = spawn(
+      process.execPath,
+      [
+        "--import", "./poc/node_modules/tsx/dist/loader.mjs", "scripts/dev-seed.ts",
+        "--category", options.category, "--brand", options.brand, "--model", options.model, "--offers", String(options.offers),
+      ],
+      { cwd: process.cwd(), env, stdio: ["ignore", "pipe", "pipe"] },
+    );
+    let out = "";
+    child.stdout.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
+    child.stderr.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
+    child.on("error", () => reject(new Error("dev:seed : lancement impossible")));
+    child.on("exit", (code) => (code === 0 ? resolve(out.trim()) : reject(new Error(`dev:seed a refusé ou échoué (code ${code}) : ${out.trim().slice(0, 300)}`))));
+  });
+}
+
+/**
+ * COMMANDE D'ADMINISTRATION `wallet:check` (lecture seule) sur la base noma_e2e : réconciliation du grand livre, des intentions de
+ * recharge, des événements et des achats de boost. Renvoie sa sortie ; lève une erreur si elle signale un écart (code 1) ou échoue.
+ */
+export function walletCheckByAdministration(): Promise<string> {
+  const databaseUrl = e2eDatabaseUrl();
+  return new Promise((resolve, reject) => {
+    const env: NodeJS.ProcessEnv = { ...process.env, DATABASE_URL: databaseUrl, NODE_OPTIONS: "--conditions=react-server" };
+    const child = spawn(process.execPath, ["--import", "./poc/node_modules/tsx/dist/loader.mjs", "scripts/wallet-check.ts"], {
+      cwd: process.cwd(),
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let out = "";
+    child.stdout.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
+    child.stderr.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
+    child.on("error", () => reject(new Error("wallet:check : lancement impossible")));
+    child.on("exit", (code) => (code === 0 ? resolve(out.trim()) : reject(new Error(`wallet:check a signalé un écart ou échoué (code ${code}) : ${out.trim().slice(0, 600)}`))));
+  });
+}

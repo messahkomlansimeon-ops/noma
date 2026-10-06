@@ -740,6 +740,53 @@ async function readStored<TSource extends OfferRecord | DemandRecord, TCandidate
   return page;
 }
 
+// ───────────── classement organique d'une demande, pour la portée d'un boost (lot P2-bis) ─────────────
+
+export interface DemandOrganicEntry {
+  offerId: string;
+  /** Pertinence organique 0..100 (2 décimales) : exactement celle du tri par pertinence. */
+  relevance: number;
+}
+
+/**
+ * Nombre d'offres que la lecture des résultats d'une demande servirait (lignes confirmées et fraîches, plafonné à la fenêtre du tri par
+ * pertinence) : c'est le N du quota de places promues. Une seule requête, mêmes conditions que `fetchRows`.
+ */
+export async function countDemandOrganicList(client: SqlExecutor, demandId: string): Promise<number> {
+  const freshness = buildMatchingFreshnessPredicate(resolveMatchingFreshnessParams(), 2);
+  const result = await client.query<{ n: number }>(
+    `WITH ${MATCHING_CURRENT_CLOCK_CTE}
+     SELECT count(*)::int AS n
+       FROM ${MATCHING_FRESHNESS_FROM}
+      WHERE e.demand_id = $1::uuid AND e.is_confirmed_match = TRUE
+        AND ${freshness.conditions.join("\n        AND ")}`,
+    [demandId, ...freshness.values],
+  );
+  return Math.min(result.rows[0]?.n ?? 0, RELEVANCE_WINDOW);
+}
+
+/**
+ * Le classement ORGANIQUE (pertinence décroissante, départage de `compareByRelevance`) que le tri par pertinence servirait à l'acheteur de
+ * cette demande, avant tout boost : mêmes lignes (fenêtre `RELEVANCE_WINDOW`), mêmes indicateurs, même pertinence, calculés avec la même
+ * fonction que la lecture. `at` est l'horloge des indicateurs. Lecture seule.
+ */
+export async function readDemandOrganicRanking(
+  client: SqlExecutor,
+  input: { demandId: string; ownerId: string; at: Date },
+): Promise<DemandOrganicEntry[]> {
+  const demand = await loadSourceDemand(input.ownerId, input.demandId, client);
+  const rows = await fetchRows<OfferRow>(client, {
+    sourceKind: "demand", sourceId: input.demandId, freshness: resolveMatchingFreshnessParams(),
+    candidateColumns: SOURCE_OFFER_COLUMNS, rowLimit: RELEVANCE_WINDOW + 1, cursor: null,
+  });
+  const ranked = await buildItems<OfferRecord, OfferRow>(client, {
+    sourceKind: "demand", source: demand, rows: rows.length > RELEVANCE_WINDOW ? rows.slice(0, RELEVANCE_WINDOW) : rows,
+    mapCandidate: mapOffer, now: input.at,
+  });
+  ranked.sort(compareByRelevance);
+  return ranked.map((entry) => ({ offerId: entry.item.candidateId, relevance: entry.item.relevance }));
+}
+
 /**
  * Correspondances enregistrées d'une offre (demandes candidates). Mêmes validations et mêmes erreurs de source
  * que findEvaluatedDemandMatchesForOffer ; tout dans UN instantané de lecture. Sens offre : indicateurs `availability`

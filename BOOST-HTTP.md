@@ -77,7 +77,7 @@ les dates changent à chaque exécution).
     "amount": 2300,
     "unavailableReason": null,
     "factors": { "competitionMilli": 1060, "demandMilli": 1300, "scarcityMilli": 1333, "durationMilli": 2500 },
-    "inputs": { "competingSellers": 3, "compatibleBuyers": 4, "slotsTotal": 3, "slotsUsed": 1 },
+    "inputs": { "competingSellers": 3, "compatibleBuyers": 4, "slotsTotal": 3, "slotsUsed": 1, "reachableBuyers": 2 },
     "computedAt": "2026-10-05T17:01:29.061Z",
     "expiresAt": "2026-10-05T17:16:29.061Z",
     "reused": false
@@ -88,7 +88,9 @@ les dates changent à chaque exécution).
 **200 — même demande, cotation réutilisée** : le même corps, avec `"reused": true`.
 
 **201 — cotation indisponible** (offre sans acheteur compatible) : `status: "unavailable"`, `amount: null`, `factors: null`,
-`unavailableReason: "no_compatible_buyer"`, expiration 60 s après le calcul.
+`unavailableReason: "no_compatible_buyer"`, expiration 60 s après le calcul. Même forme avec `"no_visible_effect"` (lot P2-bis : des
+acheteurs compatibles existent mais le boost ne ferait monter l'offre dans aucune de leurs listes, par exemple moins de 7 offres
+comparables) : `inputs.reachableBuyers` vaut alors 0.
 
 **GET** : `{ "contractVersion": "boost-quote/v1", "quotes": [ … ] }`, chaque élément ayant les mêmes champs que ci-dessus, avec
 `expired` (booléen) à la place de `reused`.
@@ -96,10 +98,16 @@ les dates changent à chaque exécution).
 ### Champs (liste blanche exacte)
 
 `id`, `durationCode`, `currency` (`XOF`), `status` (`available` | `unavailable`), `amount` (entier XOF ou `null`),
-`unavailableReason` (`offer_already_boosted`, `no_slot_available`, `seller_boost_limit_reached`, `no_compatible_buyer`, ou
-`null`), `factors` (`competitionMilli`, `demandMilli`, `scarcityMilli`, `durationMilli`, ou `null`), `inputs` (`competingSellers`,
-`compatibleBuyers`, `slotsTotal`, `slotsUsed`), `computedAt` et `expiresAt` (ISO 8601 UTC), `reused` (POST seulement) ou `expired`
-(GET seulement).
+`unavailableReason` (`offer_already_boosted`, `no_slot_available`, `seller_boost_limit_reached`, `no_compatible_buyer`,
+`no_visible_effect`, ou `null`), `factors` (`competitionMilli`, `demandMilli`, `scarcityMilli`, `durationMilli`, ou `null`), `inputs`
+(`competingSellers`, `compatibleBuyers`, `slotsTotal`, `slotsUsed`, `reachableBuyers`), `computedAt` et `expiresAt` (ISO 8601 UTC),
+`reused` (POST seulement) ou `expired` (GET seulement).
+
+`inputs.reachableBuyers` (lot P2-bis) : nombre d'acheteurs **distincts** chez qui le boost ferait monter l'offre dans leurs résultats
+(entier ≥ 0, jamais d'identité), ou `null` quand il n'a pas été évalué (devis antérieur au lot, ou motif d'indisponibilité antérieur à
+ce calcul). Une cotation `available` créée depuis le lot porte toujours un entier ≥ 1 (une cotation antérieure à la migration 0016 reste `null`). Le champ est une clé **obligatoire** de `inputs` : la liste blanche du
+DTO est figée par les tests, et l'ajout d'une clé à `inputs` est une évolution **additive** de `boost-quote/v1` (les clients qui ignorent
+les clés inconnues ne sont pas touchés ; le client du dépôt exige désormais la clé).
 
 Le DTO est construit champ par champ : un champ ajouté plus tard à `BoostQuote` ne sort **jamais** tant qu'on ne l'ajoute pas ici.
 **Jamais exposés** : le prix brut (`rawAmount`), la configuration tarifaire (`pricing` : clé, version), l'identifiant de l'offre ou
@@ -140,7 +148,8 @@ requête ni un identifiant. Un journal qui lève est ignoré (la réponse ne cha
 
 - `NOMA_AUTH_ORIGIN` est obligatoire pour le POST (comme les routes du catalogue). Sans elle, tout POST répond 503.
 - La migration 0012 doit être appliquée : sans elle, le POST répond 503 (journal `42P01`). Depuis le lot P1b, la **migration 0015** l'est aussi
-  (la réutilisation d'une cotation exclut celles déjà achetées : `boost_purchases`). `MATCHING_REQUIRED_MIGRATION` reste 0010.
+  (la réutilisation d'une cotation exclut celles déjà achetées : `boost_purchases`), et depuis le lot P2-bis la **migration 0016**
+  (colonne `reachable_buyers`, motif `no_visible_effect`). `MATCHING_REQUIRED_MIGRATION` reste 0010.
 - Une cotation indisponible n'est pas une erreur : l'interface (lot suivant) devra lire `status` et `unavailableReason`.
 
 ## Limites

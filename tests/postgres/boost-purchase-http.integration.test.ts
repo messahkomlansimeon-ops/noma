@@ -23,6 +23,7 @@ import * as purchasesRoute from "../../app/api/offers/[id]/boost-purchases/route
 import {
   createTemporarySchemaName, openVerifiedIsolatedPool, openVerifiedTestDatabase, quoteTemporarySchema, type DedicatedTestDatabase,
 } from "./test-database";
+import { EVALUATION_SUMMARY_JSON, PREFERENCES_SUMMARY_JSON, REACHABLE_LIST_SIZE, SCORING_SUMMARY_JSON } from "./boost-fixtures";
 
 // ───────────── infrastructure ─────────────
 
@@ -158,12 +159,18 @@ async function makeOffer(input: { ownerId?: string; scope?: Scope; status?: "pub
 
 const HASH = computeScoringConfigHash(normalizeScoringConfig());
 
-/** Un acheteur distinct avec une demande active et une évaluation confirmée et fraîche sur l'offre (cotation réelle possible). */
-async function addBuyer(offer: OfferRecord): Promise<void> {
-  const buyerId = (await createUser({}, pool)).id;
-  const demand: DemandRecord = await createDemand({
-    ownerId: buyerId, rawText: "RAW_SECRET_TEXT demande", category: offer.category, brand: offer.brand, model: offer.model, status: "active",
-  }, pool);
+/**
+ * Offres « remplissage » : d'autres offres (autre périmètre : aucun effet sur les places, les vendeurs concurrents ni le prix) qui complètent la liste
+ * de l'acheteur à 7 offres. Sans elles, le quota de places promues est nul et la cotation réelle est `no_visible_effect` (lot P2-bis).
+ */
+const fillerOffers: OfferRecord[] = [];
+async function fillersFor(count: number): Promise<OfferRecord[]> {
+  const owner = fillerOffers[0]?.ownerId ?? (await createUser({}, pool)).id;
+  while (fillerOffers.length < count) fillerOffers.push(await makeOffer({ ownerId: owner }));
+  return fillerOffers.slice(0, count);
+}
+
+async function evaluate(offer: OfferRecord, demand: DemandRecord, score: number): Promise<void> {
   await pool.query(
     `INSERT INTO matching_evaluations (
        idempotency_key, attempt_hash, offer_id, demand_id, offer_owner_id, demand_owner_id,
@@ -172,12 +179,22 @@ async function addBuyer(offer: OfferRecord): Promise<void> {
        compatibility_status, score, coverage, evaluation_summary, scoring_summary, preferences_summary,
        evaluation_details, is_latest, is_stale, stale_reason, staled_at
      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, '{}'::jsonb, clock_timestamp(), NULL, 'eligible', '{}',
-       'compatible', 90, 80, '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, '{"criteria":[]}'::jsonb, TRUE, FALSE, NULL, NULL)`,
+       'compatible', $12::numeric, 80, '${EVALUATION_SUMMARY_JSON}'::jsonb, '${SCORING_SUMMARY_JSON}'::jsonb, '${PREFERENCES_SUMMARY_JSON}'::jsonb, '{"criteria":[]}'::jsonb, TRUE, FALSE, NULL, NULL)`,
     [
       randomUUID(), `ATTEMPT_${randomUUID()}`, offer.id, demand.id, offer.ownerId, demand.ownerId, offer.contentVersion, demand.contentVersion,
-      MATCHING_OFFLINE_CONTRACT_VERSION, MATCHING_SCORING_CONTRACT_VERSION, HASH,
+      MATCHING_OFFLINE_CONTRACT_VERSION, MATCHING_SCORING_CONTRACT_VERSION, HASH, score,
     ],
   );
+}
+
+/** Un acheteur distinct avec une demande active, une évaluation confirmée et fraîche sur l'offre, et une liste de 7 offres (cotation réelle possible, le boost ferait monter l'offre). */
+async function addBuyer(offer: OfferRecord): Promise<void> {
+  const buyerId = (await createUser({}, pool)).id;
+  const demand: DemandRecord = await createDemand({
+    ownerId: buyerId, rawText: "RAW_SECRET_TEXT demande", category: offer.category, brand: offer.brand, model: offer.model, status: "active",
+  }, pool);
+  await evaluate(offer, demand, 90);
+  for (const filler of await fillersFor(REACHABLE_LIST_SIZE - 1)) await evaluate(filler, demand, 100);
 }
 
 /** Borne une promesse : au-delà de `ms`, le test échoue vite (au lieu de pendre) ; la promesse en cours est laissée finir. */

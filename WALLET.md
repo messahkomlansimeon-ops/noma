@@ -137,7 +137,7 @@ d'idempotence ni de métadonnée.
 | `POST` | `/api/payments/fake/webhook` | prestataire actif (404), signature, forme | 200 `{ "received": true }` pour tout événement signé et bien formé (appliqué, doublon ou refusé : l'issue n'est jamais révélée) |
 | `POST` | `/api/dev/fake-payments/{id}/confirm` et `/fail` | prestataire actif (404), **origine**, session, identifiant, corps vide, propriétaire | 200 `{ contractVersion, outcome, topup }` |
 
-`checkoutPath` vaut `/paiement-simule/<id>` : la page viendra en P2. Corps de `POST /topups` : exactement
+`checkoutPath` vaut `/paiement-simule/<id>` : la page existe depuis le lot P2 (`ECRANS-P2.md`). Corps de `POST /topups` : exactement
 `{ "amountXof": entier, "idempotencyKey": uuid }`, `Content-Type: application/json`, 2 Kio au plus, JSON strict (un montant flottant,
 `1e3`, ou au-delà de 2^53 − 1 est un 400).
 
@@ -229,7 +229,8 @@ brut, de requête, de montant ni d'identifiant.
 
 - ~~Achat de boost~~ : **fait au lot P1b** (`BOOST-PURCHASE.md`), ainsi que le remboursement **intégral** d'administration d'un achat.
 - **Remboursement au prorata**, remboursement par une route HTTP, compensation automatique d'un boost interrompu : plus tard.
-- **Écrans** (recharge, page de paiement simulé, solde) : lot **P2**.
+- ~~**Écrans** (recharge, page de paiement simulé, solde)~~ : **faits au lot P2** (`ECRANS-P2.md` : `/compte/porte-monnaie`, `/paiement-simule/<id>`,
+  achat dans « Booster cette annonce » ; `dev:try` active le prestataire fictif).
 - **Vrai prestataire** (Mobile Money) : décision du propriétaire. Il faudra un adaptateur (signature réelle, identifiants réels,
   rapprochement quotidien avec le relevé du prestataire) qui réutilise `applyProviderEvent`.
 - **Traitement juridique et comptable des crédits** (nature des crédits, TVA, durée de validité, remboursabilité, crédits

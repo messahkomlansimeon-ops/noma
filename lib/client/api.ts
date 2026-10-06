@@ -10,9 +10,11 @@
  * - le texte montré à l'utilisateur vient de `describeApiError`, table de messages fixes en français.
  *
  * Les formes de corps et de réponses reprennent EXACTEMENT celles de lib/server/auth/http.ts,
- * lib/server/catalog/http.ts, lib/server/matching/http-dto.ts (`matching-stored-http/v1`) et lib/server/boost/http.ts
- * (`boost-quote/v1`), contrats documentés dans AUTH-SERVER.md, CATALOG-HTTP.md, MATCHING-STORED-READ.md et BOOST-HTTP.md.
+ * lib/server/catalog/http.ts, lib/server/matching/http-dto.ts (`matching-stored-http/v1`), lib/server/boost/http.ts
+ * (`boost-quote/v1`), lib/server/wallet/http.ts (`wallet/v1`) et lib/server/boost/purchase-http.ts (`boost-purchase/v1`), contrats
+ * documentés dans AUTH-SERVER.md, CATALOG-HTTP.md, MATCHING-STORED-READ.md, BOOST-HTTP.md, WALLET.md et BOOST-PURCHASE.md.
  * Les réponses sont relues champ par champ (liste blanche) : un champ que le serveur ajouterait un jour n'atteint jamais l'écran.
+ * Les montants du portefeuille sont des entiers sûrs (|n| ≤ 2^53 − 1), vérifiés à l'envoi comme à la lecture.
  */
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
@@ -179,17 +181,128 @@ export interface BoostQuote {
   status: "available" | "unavailable";
   /** Montant entier (XOF) ; null si la cotation est indisponible. */
   amount: number | null;
-  /** Code stable (`offer_already_boosted`, `no_slot_available`, `seller_boost_limit_reached`, `no_compatible_buyer`) ou null. */
+  /** Code stable (`offer_already_boosted`, `no_slot_available`, `seller_boost_limit_reached`, `no_compatible_buyer`, `no_visible_effect`) ou null. */
   unavailableReason: string | null;
   /** Facteurs en millièmes (1000 = ×1) ; null si la cotation est indisponible. */
   factors: { competitionMilli: number; demandMilli: number; scarcityMilli: number; durationMilli: number } | null;
-  inputs: { competingSellers: number; compatibleBuyers: number; slotsTotal: number; slotsUsed: number };
+  inputs: {
+    competingSellers: number;
+    compatibleBuyers: number;
+    /** Acheteurs pour lesquels le boost ferait réellement monter l'annonce ; `null` : non évalué (devis ancien ou indisponible plus tôt). */
+    reachableBuyers: number | null;
+    slotsTotal: number;
+    slotsUsed: number;
+  };
   computedAt: string;
   expiresAt: string;
   /** POST : cotation réutilisée (vrai) ou créée (faux). Null dans l'historique. */
   reused: boolean | null;
   /** Historique : cotation expirée à la lecture. Null dans la réponse du POST. */
   expired: boolean | null;
+  /**
+   * Heure du SERVEUR à l'émission de la réponse (en-tête HTTP `Date`, résolution 1 s), en millisecondes depuis 1970 ; `null` si l'en-tête
+   * manque ou n'est pas une date. Sert à ancrer le compte à rebours d'un devis réutilisé (son âge) sans l'horloge de l'appareil.
+   */
+  serverTime: number | null;
+}
+
+// ─── Portefeuille, recharge simulée et achat de boost (wallet/v1, boost-purchase/v1) ───────────────
+
+export const WALLET_TRANSACTION_KINDS = ["topup", "adjustment", "boost_purchase", "boost_refund"] as const;
+/**
+ * Types connus ; « unknown » = un type que cette version de l'écran ne connaît pas (ajouté un jour par le serveur) : la ligne s'affiche « Opération »,
+ * avec son montant (validé), au lieu de faire rejeter tout l'historique. Le code brut du serveur n'atteint jamais l'écran.
+ */
+export type WalletTransactionKind = (typeof WALLET_TRANSACTION_KINDS)[number] | "unknown";
+
+/** Une ligne de l'historique : `amountXof` est SIGNÉ du côté de l'utilisateur (positif = crédit, négatif = débit). */
+export interface WalletTransaction {
+  id: string;
+  kind: WalletTransactionKind;
+  amountXof: number;
+  createdAt: string;
+}
+
+export interface WalletOverview {
+  /** Solde en FCFA (entier, jamais négatif). */
+  balanceXof: number;
+  /** Du plus récent au plus ancien. */
+  transactions: WalletTransaction[];
+  nextCursor: string | null;
+}
+
+export interface WalletOverviewQuery {
+  /** Curseur opaque renvoyé par la page précédente (`nextCursor`). */
+  cursor?: string;
+  /** 1 à 50 (défaut serveur : 20). */
+  limit?: number;
+}
+
+export const TOPUP_STATUSES = ["pending", "succeeded", "failed", "expired"] as const;
+export type TopupStatus = (typeof TOPUP_STATUSES)[number];
+
+export interface WalletTopup {
+  id: string;
+  amountXof: number;
+  status: TopupStatus;
+  expiresAt: string;
+  /** Chemin de la page de paiement simulé (`/paiement-simule/<id>`) : à vérifier avant toute navigation. */
+  checkoutPath: string;
+}
+
+export interface TopupRequest {
+  /** Entier sûr strictement positif (les bornes métier sont vérifiées par l'écran et par le serveur). */
+  amountXof: number;
+  /** UUID généré UNE fois par tentative et réutilisé à chaque nouvel essai. */
+  idempotencyKey: string;
+}
+
+export const FAKE_PAYMENT_OUTCOMES = [
+  "applied",
+  "duplicate",
+  "rejected_amount",
+  "rejected_state",
+  "rejected_unknown_intent",
+  "replayed",
+] as const;
+export type FakePaymentOutcome = (typeof FAKE_PAYMENT_OUTCOMES)[number];
+
+export interface FakePaymentResult {
+  outcome: FakePaymentOutcome;
+  topup: WalletTopup;
+}
+
+export interface BoostPurchase {
+  id: string;
+  quoteId: string;
+  durationCode: BoostDurationCode;
+  amountXof: number;
+  startsAt: string;
+  endsAt: string;
+  /** Vrai si la même clé d'idempotence avait déjà servi (aucun nouveau débit). */
+  reused: boolean;
+}
+
+export interface BoostPurchaseResult {
+  purchase: BoostPurchase;
+  /** Solde après l'opération (le solde courant pour un rejeu). */
+  balanceXof: number;
+}
+
+export interface BoostPurchaseRequest {
+  quoteId: string;
+  idempotencyKey: string;
+}
+
+export interface BoostPurchaseHistoryItem {
+  id: string;
+  quoteId: string;
+  durationCode: BoostDurationCode;
+  amountXof: number;
+  startsAt: string;
+  endsAt: string;
+  createdAt: string;
+  refundedAt: string | null;
 }
 
 export interface OtpChallenge {
@@ -349,6 +462,8 @@ const FACTOR_CODE = /^[a-z][a-z0-9_]{0,63}$/;
 
 export const MATCHING_STORED_CONTRACT_VERSION = "matching-stored-http/v1";
 export const BOOST_QUOTE_CONTRACT_VERSION = "boost-quote/v1";
+export const WALLET_CONTRACT_VERSION = "wallet/v1";
+export const BOOST_PURCHASE_CONTRACT_VERSION = "boost-purchase/v1";
 
 function isNumberOrNull(value: unknown): value is number | null {
   return value === null || (typeof value === "number" && Number.isFinite(value));
@@ -511,7 +626,17 @@ function parseStoredMatchesPage(status: number, value: unknown): StoredMatchesPa
   };
 }
 
-function parseBoostQuote(status: number, value: unknown, flag: "reused" | "expired"): BoostQuote {
+/**
+ * En-tête HTTP `Date` d'une réponse → millisecondes depuis 1970 ; `null` s'il manque ou n'est pas une date. Seul le FORMAT est contrôlé ici ;
+ * la cohérence avec le devis (une heure du serveur antérieure au calcul du devis est absurde) est contrôlée par `anchorQuote` (wallet-view.ts).
+ */
+export function serverTimeFromDateHeader(value: string | null | undefined): number | null {
+  if (typeof value !== "string" || value.length === 0 || value.length > 64) return null;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : null;
+}
+
+function parseBoostQuote(status: number, value: unknown, flag: "reused" | "expired", serverTime: number | null): BoostQuote {
   if (
     !isObject(value) ||
     typeof value.id !== "string" ||
@@ -531,6 +656,7 @@ function parseBoostQuote(status: number, value: unknown, flag: "reused" | "expir
   if (
     typeof inputs.competingSellers !== "number" ||
     typeof inputs.compatibleBuyers !== "number" ||
+    !(inputs.reachableBuyers === null || (typeof inputs.reachableBuyers === "number" && Number.isSafeInteger(inputs.reachableBuyers) && inputs.reachableBuyers >= 0)) ||
     typeof inputs.slotsTotal !== "number" ||
     typeof inputs.slotsUsed !== "number"
   ) {
@@ -566,6 +692,7 @@ function parseBoostQuote(status: number, value: unknown, flag: "reused" | "expir
     inputs: {
       competingSellers: inputs.competingSellers,
       compatibleBuyers: inputs.compatibleBuyers,
+      reachableBuyers: inputs.reachableBuyers as number | null,
       slotsTotal: inputs.slotsTotal,
       slotsUsed: inputs.slotsUsed,
     },
@@ -573,7 +700,118 @@ function parseBoostQuote(status: number, value: unknown, flag: "reused" | "expir
     expiresAt: value.expiresAt,
     reused: flag === "reused" ? (value.reused as boolean) : null,
     expired: flag === "expired" ? (value.expired as boolean) : null,
+    serverTime,
   };
+}
+
+// ─── Lecture stricte du portefeuille et des achats de boost ─────────────────────────────────────────
+
+/** Entier sûr (|n| ≤ 2^53 − 1) : un montant ne passe JAMAIS par un flottant. */
+function isSafeAmount(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value);
+}
+
+function isIsoDate(value: unknown): value is string {
+  return typeof value === "string" && value.length >= 10 && value.length <= 40 && Number.isFinite(Date.parse(value));
+}
+
+function isCursor(value: unknown): value is string {
+  return typeof value === "string" && value.length >= 1 && value.length <= 512;
+}
+
+function parseWalletTransaction(status: number, value: unknown): WalletTransaction {
+  if (
+    !isObject(value) ||
+    !isUuid(value.id) ||
+    typeof value.kind !== "string" ||
+    value.kind.length < 1 ||
+    value.kind.length > 64 ||
+    !isSafeAmount(value.amountXof) ||
+    value.amountXof === 0 ||
+    !isIsoDate(value.createdAt)
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return {
+    id: value.id,
+    kind: (WALLET_TRANSACTION_KINDS as readonly string[]).includes(value.kind) ? (value.kind as WalletTransactionKind) : "unknown",
+    amountXof: value.amountXof,
+    createdAt: value.createdAt,
+  };
+}
+
+function parseWalletOverview(status: number, value: unknown): WalletOverview {
+  if (
+    !isObject(value) ||
+    value.contractVersion !== WALLET_CONTRACT_VERSION ||
+    !isSafeAmount(value.balanceXof) ||
+    value.balanceXof < 0 ||
+    !Array.isArray(value.transactions) ||
+    !(value.nextCursor === null || isCursor(value.nextCursor))
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return {
+    balanceXof: value.balanceXof,
+    transactions: value.transactions.map((entry) => parseWalletTransaction(status, entry)),
+    nextCursor: value.nextCursor,
+  };
+}
+
+function parseTopup(status: number, value: unknown): WalletTopup {
+  if (
+    !isObject(value) ||
+    !isUuid(value.id) ||
+    !isSafeAmount(value.amountXof) ||
+    value.amountXof <= 0 ||
+    !(TOPUP_STATUSES as readonly string[]).includes(String(value.status)) ||
+    !isIsoDate(value.expiresAt) ||
+    typeof value.checkoutPath !== "string" ||
+    value.checkoutPath.length > 200
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return {
+    id: value.id,
+    amountXof: value.amountXof,
+    status: value.status as TopupStatus,
+    expiresAt: value.expiresAt,
+    checkoutPath: value.checkoutPath,
+  };
+}
+
+function parseBoostPurchaseCore(status: number, value: Record<string, unknown>): Omit<BoostPurchaseHistoryItem, "createdAt" | "refundedAt"> {
+  if (
+    !isUuid(value.id) ||
+    !isUuid(value.quoteId) ||
+    !(BOOST_DURATION_CODES as readonly string[]).includes(String(value.durationCode)) ||
+    !isSafeAmount(value.amountXof) ||
+    value.amountXof <= 0 ||
+    !isIsoDate(value.startsAt) ||
+    !isIsoDate(value.endsAt)
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return {
+    id: value.id,
+    quoteId: value.quoteId,
+    durationCode: value.durationCode as BoostDurationCode,
+    amountXof: value.amountXof,
+    startsAt: value.startsAt,
+    endsAt: value.endsAt,
+  };
+}
+
+function parseBoostPurchase(status: number, value: unknown): BoostPurchase {
+  if (!isObject(value) || typeof value.reused !== "boolean") throw fixedError(status, API_INVALID_RESPONSE);
+  return { ...parseBoostPurchaseCore(status, value), reused: value.reused };
+}
+
+function parseBoostPurchaseHistoryItem(status: number, value: unknown): BoostPurchaseHistoryItem {
+  if (!isObject(value) || !isIsoDate(value.createdAt) || !(value.refundedAt === null || isIsoDate(value.refundedAt))) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return { ...parseBoostPurchaseCore(status, value), createdAt: value.createdAt, refundedAt: value.refundedAt };
 }
 
 export interface RequestOptions {
@@ -613,7 +851,7 @@ export function createApiClient(options: ApiClientOptions = {}) {
     path: string,
     body?: unknown,
     requestOptions: RequestOptions = {},
-  ): Promise<{ status: number; json: unknown }> {
+  ): Promise<{ status: number; json: unknown; serverTime: number | null }> {
     const headers: Record<string, string> = { Accept: "application/json" };
     const init: RequestInit = {
       method,
@@ -644,7 +882,7 @@ export function createApiClient(options: ApiClientOptions = {}) {
       }
     }
     if (!response.ok) throw errorFromBody(response.status, json);
-    return { status: response.status, json };
+    return { status: response.status, json, serverTime: serverTimeFromDateHeader(response.headers?.get?.("date")) };
   }
 
   /** Identifiant placé dans une URL : UUID uniquement, sinon `invalid_id` SANS requête (aucun chemin construit à la main). */
@@ -731,6 +969,23 @@ export function createApiClient(options: ApiClientOptions = {}) {
       demands: json.demands.map((demand) => parseDemand(status, demand)),
       pagination: parsePagination(status, json.pagination),
     };
+  }
+
+  /** Événement du prestataire FICTIF pour une recharge de l'utilisateur (routes de développement, corps vide). */
+  async function fakePayment(
+    action: "confirm" | "fail",
+    topupId: string,
+    requestOptions?: RequestOptions,
+  ): Promise<FakePaymentResult> {
+    const { status, json } = await send("POST", `/api/dev/fake-payments/${id(topupId)}/${action}`, undefined, requestOptions);
+    if (
+      !isObject(json) ||
+      json.contractVersion !== WALLET_CONTRACT_VERSION ||
+      !(FAKE_PAYMENT_OUTCOMES as readonly string[]).includes(String(json.outcome))
+    ) {
+      throw fixedError(status, API_INVALID_RESPONSE);
+    }
+    return { outcome: json.outcome as FakePaymentOutcome, topup: parseTopup(status, json.topup) };
   }
 
   return {
@@ -906,9 +1161,9 @@ export function createApiClient(options: ApiClientOptions = {}) {
       async create(offerId: string, durationCode: BoostDurationCode, requestOptions?: RequestOptions): Promise<BoostQuote> {
         const path = `/api/offers/${id(offerId)}/boost-quotes`;
         if (!(BOOST_DURATION_CODES as readonly string[]).includes(durationCode)) throw fixedError(0, API_INVALID_ARGUMENT);
-        const { status, json } = await send("POST", path, { durationCode }, requestOptions);
+        const { status, json, serverTime } = await send("POST", path, { durationCode }, requestOptions);
         if (!isObject(json) || json.contractVersion !== BOOST_QUOTE_CONTRACT_VERSION) throw fixedError(status, API_INVALID_RESPONSE);
-        return parseBoostQuote(status, json.quote, "reused");
+        return parseBoostQuote(status, json.quote, "reused", serverTime);
       },
 
       /** GET /api/offers/{id}/boost-quotes?limit : l'historique des cotations de l'offre, plus récentes d'abord (1 à 50). */
@@ -919,11 +1174,117 @@ export function createApiClient(options: ApiClientOptions = {}) {
           if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 50) throw fixedError(0, API_INVALID_ARGUMENT);
           path = `${base}?limit=${query.limit}`;
         }
-        const { status, json } = await send("GET", path, undefined, requestOptions);
+        const { status, json, serverTime } = await send("GET", path, undefined, requestOptions);
         if (!isObject(json) || json.contractVersion !== BOOST_QUOTE_CONTRACT_VERSION || !Array.isArray(json.quotes)) {
           throw fixedError(status, API_INVALID_RESPONSE);
         }
-        return json.quotes.map((quote) => parseBoostQuote(status, quote, "expired"));
+        return json.quotes.map((quote) => parseBoostQuote(status, quote, "expired", serverTime));
+      },
+    },
+
+    wallet: {
+      /**
+       * GET /api/wallet : solde et historique (du plus récent au plus ancien, 20 par page par défaut). `cursor` (1 à 512
+       * caractères) et `limit` (1 à 50) sont vérifiés AVANT la requête (`invalid_argument`, statut 0).
+       */
+      async overview(query: WalletOverviewQuery = {}, requestOptions?: RequestOptions): Promise<WalletOverview> {
+        const params = new URLSearchParams();
+        if (query.limit !== undefined) {
+          if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 50) throw fixedError(0, API_INVALID_ARGUMENT);
+          params.set("limit", String(query.limit));
+        }
+        if (query.cursor !== undefined) {
+          if (!isCursor(query.cursor)) throw fixedError(0, API_INVALID_ARGUMENT);
+          params.set("cursor", query.cursor);
+        }
+        const text = params.toString();
+        const { status, json } = await send("GET", `/api/wallet${text ? `?${text}` : ""}`, undefined, requestOptions);
+        return parseWalletOverview(status, json);
+      },
+
+      /**
+       * POST /api/wallet/topups `{ amountXof, idempotencyKey }` : crée l'intention de recharge (201) ou retrouve celle de la même
+       * clé et du même montant (200, `reused`). Le montant est un entier sûr strictement positif : tout autre nombre est refusé
+       * AVANT la requête (`invalid_argument`).
+       */
+      async createTopup(
+        request: TopupRequest,
+        requestOptions?: RequestOptions,
+      ): Promise<{ topup: WalletTopup; reused: boolean }> {
+        if (!isSafeAmount(request?.amountXof) || request.amountXof <= 0 || !isUuid(request.idempotencyKey)) {
+          throw fixedError(0, API_INVALID_ARGUMENT);
+        }
+        const { status, json } = await send(
+          "POST",
+          "/api/wallet/topups",
+          { amountXof: request.amountXof, idempotencyKey: request.idempotencyKey },
+          requestOptions,
+        );
+        if (!isObject(json) || json.contractVersion !== WALLET_CONTRACT_VERSION) throw fixedError(status, API_INVALID_RESPONSE);
+        return { topup: parseTopup(status, json.topup), reused: status === 200 };
+      },
+
+      /** GET /api/wallet/topups/{id} : état d'une recharge de l'utilisateur (404 si inconnue ou à un autre compte). */
+      async topup(topupId: string, requestOptions?: RequestOptions): Promise<WalletTopup> {
+        const { status, json } = await send("GET", `/api/wallet/topups/${id(topupId)}`, undefined, requestOptions);
+        if (!isObject(json) || json.contractVersion !== WALLET_CONTRACT_VERSION) throw fixedError(status, API_INVALID_RESPONSE);
+        return parseTopup(status, json.topup);
+      },
+    },
+
+    devPayments: {
+      /**
+       * POST /api/dev/fake-payments/{id}/confirm (sans corps) : simule un paiement RÉUSSI chez le prestataire fictif. N'existe que
+       * pendant le développement (404 sinon). La réponse donne l'issue de l'événement et l'état de la recharge.
+       */
+      confirm(topupId: string, requestOptions?: RequestOptions): Promise<FakePaymentResult> {
+        return fakePayment("confirm", topupId, requestOptions);
+      },
+
+      /** POST /api/dev/fake-payments/{id}/fail (sans corps) : simule un paiement ÉCHOUÉ. */
+      fail(topupId: string, requestOptions?: RequestOptions): Promise<FakePaymentResult> {
+        return fakePayment("fail", topupId, requestOptions);
+      },
+    },
+
+    boostPurchases: {
+      /**
+       * POST /api/offers/{id}/boost-purchases `{ quoteId, idempotencyKey }` : achète le boost d'un devis du vendeur avec son
+       * solde (201 créé, 200 rejeu de la même clé : `reused`, aucun second débit). Le prix ne vient JAMAIS du client : c'est
+       * celui du devis. Les trois identifiants sont des UUID, vérifiés avant l'envoi (`invalid_id`, `invalid_argument`).
+       */
+      async create(
+        offerId: string,
+        request: BoostPurchaseRequest,
+        requestOptions?: RequestOptions,
+      ): Promise<BoostPurchaseResult> {
+        const path = `/api/offers/${id(offerId)}/boost-purchases`;
+        if (!isUuid(request?.quoteId) || !isUuid(request.idempotencyKey)) throw fixedError(0, API_INVALID_ARGUMENT);
+        const { status, json } = await send(
+          "POST",
+          path,
+          { quoteId: request.quoteId, idempotencyKey: request.idempotencyKey },
+          requestOptions,
+        );
+        if (!isObject(json) || json.contractVersion !== BOOST_PURCHASE_CONTRACT_VERSION || !isSafeAmount(json.balanceXof) || json.balanceXof < 0) {
+          throw fixedError(status, API_INVALID_RESPONSE);
+        }
+        return { purchase: parseBoostPurchase(status, json.purchase), balanceXof: json.balanceXof };
+      },
+
+      /** GET /api/offers/{id}/boost-purchases?limit : les achats du vendeur pour SON annonce, plus récents d'abord (1 à 50). */
+      async list(offerId: string, query: { limit?: number } = {}, requestOptions?: RequestOptions): Promise<BoostPurchaseHistoryItem[]> {
+        const base = `/api/offers/${id(offerId)}/boost-purchases`;
+        let path = base;
+        if (query.limit !== undefined) {
+          if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 50) throw fixedError(0, API_INVALID_ARGUMENT);
+          path = `${base}?limit=${query.limit}`;
+        }
+        const { status, json } = await send("GET", path, undefined, requestOptions);
+        if (!isObject(json) || json.contractVersion !== BOOST_PURCHASE_CONTRACT_VERSION || !Array.isArray(json.purchases)) {
+          throw fixedError(status, API_INVALID_RESPONSE);
+        }
+        return json.purchases.map((entry) => parseBoostPurchaseHistoryItem(status, entry));
       },
     },
   };
@@ -934,9 +1295,43 @@ export type ApiClient = ReturnType<typeof createApiClient>;
 /** Client du navigateur : fetch global, même origine. */
 export const api: ApiClient = createApiClient();
 
-export type ApiErrorContext = "otp-request" | "otp-verify" | "catalog" | "matches" | "boost" | "default";
+export type ApiErrorContext = "otp-request" | "otp-verify" | "catalog" | "matches" | "boost" | "wallet" | "purchase" | "default";
 
 export const GENERIC_ERROR_MESSAGE = "Une erreur est survenue. Réessayez dans un instant.";
+/** 429 d'une recharge, d'une lecture du porte-monnaie ou d'un achat. */
+export const TOO_MANY_ATTEMPTS_MESSAGE = "Trop de tentatives, réessayez dans un instant.";
+
+/** Messages fixes des refus du portefeuille et de la recharge (`wallet`) : jamais le code brut, jamais le texte du serveur. */
+export const WALLET_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
+  invalid_request:
+    "Cette demande n'est pas valide. Le montant d'une recharge va de 500 à 500 000 FCFA, par multiples de 100.",
+  resource_not_found: "Cette recharge est introuvable.",
+  too_many_pending_topups:
+    "Vous avez déjà plusieurs recharges en attente. Terminez-en une, ou patientez : elles expirent au bout de 30 minutes.",
+  idempotency_conflict: "Cette recharge a déjà été demandée avec un autre montant. Rechargez la page, puis recommencez.",
+  payment_unavailable: "La recharge n'est pas disponible pour le moment.",
+  wallet_unavailable: "Le porte-monnaie est temporairement indisponible. Réessayez dans un instant.",
+});
+
+/** Messages fixes des refus d'un achat de boost (`purchase`), un par code de `boost-purchase/v1`. */
+export const PURCHASE_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
+  invalid_request: "Cette demande d'achat n'est pas valide. Actualisez la page, puis réessayez.",
+  resource_not_found: "Annonce ou devis introuvable : actualisez la page et demandez un nouveau prix.",
+  insufficient_balance: "Solde insuffisant : rechargez votre porte-monnaie, puis réessayez.",
+  quote_expired: "Ce devis a expiré. Demandez un nouveau prix pour acheter.",
+  quote_already_used: "Ce devis a déjà servi : demandez un nouveau prix si vous souhaitez acheter à nouveau.",
+  quote_unavailable: "Ce devis n'a pas de prix : le boost n'est pas disponible pour le moment.",
+  offer_not_eligible: "Cette annonce ne peut pas être boostée : elle doit être en ligne et disponible.",
+  offer_already_boosted: "Cette annonce est déjà boostée.",
+  no_slot_available: "Il n'y a plus de place de mise en avant disponible pour ce produit pour le moment.",
+  seller_boost_limit_reached: "Vous avez atteint votre plafond de boosts pour ce produit.",
+  idempotency_conflict: "Cet achat est en conflit avec une demande précédente. Demandez un nouveau prix, puis réessayez.",
+  boost_purchase_unavailable: "L'achat de boost est temporairement indisponible. Réessayez dans un instant.",
+});
+
+function fixedMessage(table: Readonly<Record<string, string>>, code: string): string | null {
+  return Object.prototype.hasOwnProperty.call(table, code) ? table[code] : null;
+}
 
 /**
  * Message FIXE en français pour l'utilisateur, choisi d'après (contexte, statut, code). Ne reprend jamais le texte
@@ -967,6 +1362,16 @@ export function describeApiError(error: unknown, context: ApiErrorContext = "def
     }
     if (error.status === 503) return "Le boost est temporairement indisponible. Réessayez plus tard.";
   }
+  if (context === "wallet" || context === "purchase") {
+    // Un code connu (avec un statut de refus cohérent) a son message fixe ; un code inconnu ne montre JAMAIS le code brut :
+    // message générique pour 400, 404 et 409 (les messages communs parlent d'une « liste » qui n'existe pas ici).
+    const known = fixedMessage(context === "wallet" ? WALLET_ERROR_MESSAGES : PURCHASE_ERROR_MESSAGES, error.code);
+    if (known !== null && [400, 404, 409, 503].includes(error.status)) return known;
+    if ([400, 404, 409].includes(error.status)) return GENERIC_ERROR_MESSAGE;
+  }
+
+  // Limite de débit (429) propre au portefeuille et à l'achat : le message des codes de connexion ne convient pas ici.
+  if ((context === "wallet" || context === "purchase") && error.status === 429) return TOO_MANY_ATTEMPTS_MESSAGE;
 
   switch (error.status) {
     case 400:

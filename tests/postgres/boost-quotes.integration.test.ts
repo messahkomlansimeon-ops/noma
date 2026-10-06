@@ -9,10 +9,13 @@ import { BoostError, grantOfferBoost, readBoostSlots, type BoostErrorCode } from
 import {
   listOfferBoostQuotes, quoteOfferBoost, readBoostPricingSettings, readScopeBoostPriceHistory, type BoostQuote,
 } from "../../lib/server/boost/quotes";
+import { BOOST_REACH_COUNT_LIMIT, BOOST_REACH_SEARCH_LIMIT, computeBoostReach } from "../../lib/server/boost/reach";
+import { listStoredOfferMatchesForDemand, readDemandOrganicRanking } from "../../lib/server/matching/stored-matches";
 import { computeScoringConfigHash, normalizeScoringConfig } from "../../lib/server/matching/persistence";
 import { MATCHING_SCORING_CONTRACT_VERSION } from "../../lib/server/matching/scoring-types";
 import { MATCHING_OFFLINE_CONTRACT_VERSION } from "../../lib/server/matching/types";
 import { runMigrations } from "../../lib/server/postgres/migrations";
+import { EVALUATION_SUMMARY_JSON, PREFERENCES_SUMMARY_JSON, REACHABLE_LIST_SIZE, SCORING_SUMMARY_JSON } from "./boost-fixtures";
 import { runScript } from "./run-script";
 import {
   createTemporarySchemaName, openVerifiedIsolatedPool, openVerifiedTestDatabase, quoteTemporarySchema, type DedicatedTestDatabase,
@@ -79,7 +82,7 @@ const makeDemand = (ownerId: string, status: "active" | "satisfied" = "active"):
   ownerId, rawText: "RAW_SECRET_TEXT demande", category: "smartphones", brand: "Apple", model: "iPhone 13", status,
 }, pool);
 
-interface EvalOptions { compatibility?: "compatible" | "incompatible" | "unknown"; eligibility?: "eligible" | "ineligible"; isStale?: boolean }
+interface EvalOptions { compatibility?: "compatible" | "incompatible" | "unknown"; eligibility?: "eligible" | "ineligible"; isStale?: boolean; score?: number }
 
 async function evaluate(offer: OfferRecord, demand: DemandRecord, options: EvalOptions = {}): Promise<string> {
   const stale = options.isStale === true;
@@ -90,26 +93,57 @@ async function evaluate(offer: OfferRecord, demand: DemandRecord, options: EvalO
        scoring_config_hash, scoring_config, evaluated_at, expires_at, eligibility_status, eligibility_reasons,
        compatibility_status, score, coverage, evaluation_summary, scoring_summary, preferences_summary,
        evaluation_details, is_latest, is_stale, stale_reason, staled_at
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, '{}'::jsonb, clock_timestamp(), NULL, $12, '{}', $13, 90, 80,
-       '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, '{"criteria":[]}'::jsonb, TRUE, $14, $15, CASE WHEN $14 THEN clock_timestamp() END)
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, '{}'::jsonb, clock_timestamp(), NULL, $12, '{}', $13, $16::numeric, 80,
+       '${EVALUATION_SUMMARY_JSON}'::jsonb, '${SCORING_SUMMARY_JSON}'::jsonb, '${PREFERENCES_SUMMARY_JSON}'::jsonb, '{"criteria":[]}'::jsonb, TRUE, $14, $15, CASE WHEN $14 THEN clock_timestamp() END)
      RETURNING id`,
     [
       randomUUID(), `ATTEMPT_${randomUUID()}`, offer.id, demand.id, offer.ownerId, demand.ownerId, offer.contentVersion, demand.contentVersion,
       MATCHING_OFFLINE_CONTRACT_VERSION, MATCHING_SCORING_CONTRACT_VERSION, HASH,
-      options.eligibility ?? "eligible", options.compatibility ?? "compatible", stale, stale ? "engine_superseded" : null,
+      options.eligibility ?? "eligible", options.compatibility ?? "compatible", stale, stale ? "engine_superseded" : null, options.score ?? 90,
     ],
   );
   return result.rows[0].id;
 }
 
-/** Un acheteur distinct avec une demande active et une évaluation confirmée et fraîche sur l'offre. */
-async function addBuyer(offer: OfferRecord, options: EvalOptions = {}): Promise<{ buyerId: string; demand: DemandRecord; evaluationId: string }> {
-  const buyerId = await makeUser();
-  const demand = await makeDemand(buyerId);
-  return { buyerId, demand, evaluationId: await evaluate(offer, demand, options) };
+/**
+ * Offres « remplissage » : d'AUTRES offres (autre modèle : hors périmètre du boost, aucun effet sur les places, les vendeurs concurrents ni le
+ * prix) qui complètent la liste de résultats d'un acheteur. Sans elles, une liste de moins de 7 offres a un quota de places promues nul
+ * (floor(0,15 × N)) et un boost n'y ferait rien monter (lot P2-bis : cotation `no_visible_effect`).
+ */
+let fillerOffers: OfferRecord[] = [];
+async function fillersFor(count: number): Promise<OfferRecord[]> {
+  const owner = fillerOffers[0]?.ownerId ?? await makeUser();
+  while (fillerOffers.length < count) fillerOffers.push(await makeOffer({ ownerId: owner, model: "FILLER-MODEL" }));
+  return fillerOffers.slice(0, count);
 }
 
-const wipe = () => pool.query("TRUNCATE boost_quotes, offer_boosts, matching_evaluations, matching_jobs, matching_outbox_events, demands, offers CASCADE");
+/**
+ * Un acheteur distinct avec une demande active et une évaluation confirmée et fraîche sur l'offre. La liste de l'acheteur compte `listSize`
+ * offres (7 par défaut : quota 1, l'offre y est évaluée EN PREMIER donc classée après les remplissages de même pertinence : un boost la ferait
+ * monter) ; `listSize: 1` donne une liste où le boost ne ferait rien monter.
+ */
+async function addBuyer(offer: OfferRecord, options: EvalOptions & { listSize?: number; targetFirst?: boolean } = {}): Promise<{ buyerId: string; demand: DemandRecord; evaluationId: string }> {
+  const buyerId = await makeUser();
+  return { buyerId, ...(await addDemand(offer, buyerId, options)) };
+}
+
+/** Un besoin de plus pour un acheteur existant ; `targetFirst` : l'offre est évaluée EN DERNIER, donc classée première à pertinence égale. */
+async function addDemand(offer: OfferRecord, buyerId: string, options: EvalOptions & { listSize?: number; targetFirst?: boolean } = {}): Promise<{ demand: DemandRecord; evaluationId: string }> {
+  const demand = await makeDemand(buyerId);
+  const others = await fillersFor((options.listSize ?? REACHABLE_LIST_SIZE) - 1);
+  // Compatibilité des remplissages : plus haute que celle de l'offre cotée (elle est classée après eux), ou plus basse (`targetFirst` : elle est première).
+  const fillerScore = options.targetFirst ? 40 : 100;
+  if (options.targetFirst) {
+    for (const filler of others) await evaluate(filler, demand, { score: fillerScore });
+    return { demand, evaluationId: await evaluate(offer, demand, options) };
+  }
+  const evaluationId = await evaluate(offer, demand, options);
+  for (const filler of others) await evaluate(filler, demand, { score: fillerScore });
+  return { demand, evaluationId };
+}
+
+const wipe = () => { fillerOffers = []; return wipeTables(); };
+const wipeTables = () => pool.query("TRUNCATE boost_quotes, offer_boosts, matching_evaluations, matching_jobs, matching_outbox_events, demands, offers CASCADE");
 const sqlRow = async <T extends Record<string, unknown>>(text: string, values: unknown[] = []): Promise<T> => (await pool.query<T>(text, values)).rows[0];
 const quote = (offer: OfferRecord, durationCode: "24h" | "3d" | "7d" = "24h", db: Pool = pool, hooks?: { beforeInsert?: () => Promise<void> | void }) =>
   quoteOfferBoost({ pool: db, ownerId: offer.ownerId, offerId: offer.id, durationCode, hooks });
@@ -162,13 +196,13 @@ async function controlWorld() {
 
 // ═════════════ 1. Migration 0012 ═════════════
 
-test("migration 0012 : 13 appliquées (dont 0012), la relance n'en applique aucune, ligne default v1 exacte, index présents", async () => {
-  assert.equal(firstMigration.applied.length, 15);
-  assert.equal(firstMigration.applied.at(-1), "0015_boost_purchases");
+test("migration 0012 : 16 appliquées (dont 0012 et 0016), la relance n'en applique aucune, ligne default v1 exacte, index présents", async () => {
+  assert.equal(firstMigration.applied.length, 16);
+  assert.equal(firstMigration.applied.at(-1), "0016_boost_quote_reach");
   assert.ok(firstMigration.applied.includes("0012_boost_pricing"));
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 15);
+  assert.equal(rerun.skipped.length, 16);
   const rows = (await pool.query("SELECT * FROM boost_pricing_settings")).rows;
   assert.equal(rows.length, 1);
   const { created_at: createdAt, ...rest } = rows[0];
@@ -227,7 +261,7 @@ interface QuoteFields {
   offerId: string; sellerId: string; category?: string; brand?: string; model?: string; duration?: string; pricingKey?: string; pricingVersion?: number;
   currency?: string; status?: string; reason?: string | null; amount?: number | null; raw?: string | null;
   competition?: number | null; demand?: number | null; scarcity?: number | null; durationMilli?: number | null;
-  sellers?: number; buyers?: number; total?: number; used?: number; computedAt?: string; expiresAt?: string;
+  sellers?: number; buyers?: number; reachable?: number | null; total?: number; used?: number; computedAt?: string; expiresAt?: string;
 }
 
 function insertQuote(fields: QuoteFields) {
@@ -236,14 +270,14 @@ function insertQuote(fields: QuoteFields) {
   return pool.query(
     `INSERT INTO boost_quotes (id, offer_id, seller_id, scope_category, scope_brand, scope_model, duration_code, pricing_key, pricing_version, currency,
        status, unavailable_reason, amount, raw_amount, competition_milli, demand_milli, scarcity_milli, duration_milli,
-       competing_sellers, compatible_buyers, slots_total, slots_used, computed_at, expires_at)
+       competing_sellers, compatible_buyers, slots_total, slots_used, computed_at, expires_at, reachable_buyers)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
-       COALESCE($23::timestamptz, clock_timestamp()), COALESCE($24::timestamptz, clock_timestamp() + interval '15 minutes'))`,
+       COALESCE($23::timestamptz, clock_timestamp()), COALESCE($24::timestamptz, clock_timestamp() + interval '15 minutes'), $25::int)`,
     [randomUUID(), fields.offerId, fields.sellerId, fields.category ?? "smartphones", fields.brand ?? "apple", fields.model ?? "iphone 13", fields.duration ?? "24h",
       fields.pricingKey ?? "default", fields.pricingVersion ?? 1, fields.currency ?? "XOF", fields.status ?? "available",
       pick(fields.reason, available ? null : "no_slot_available"), pick(fields.amount, available ? 500 : null), pick(fields.raw, available ? "500.000000000000" : null),
       pick(fields.competition, available ? 1000 : null), pick(fields.demand, available ? 1000 : null), pick(fields.scarcity, available ? 1000 : null), pick(fields.durationMilli, available ? 1000 : null),
-      fields.sellers ?? 0, fields.buyers ?? 0, fields.total ?? 1, fields.used ?? 0, fields.computedAt ?? null, fields.expiresAt ?? null]);
+      fields.sellers ?? 0, fields.buyers ?? 0, fields.total ?? 1, fields.used ?? 0, fields.computedAt ?? null, fields.expiresAt ?? null, fields.reachable ?? null]);
 }
 
 test("migration 0012 : boost_quotes, chaque CHECK, clés étrangères (dont la version tarifaire) et CASCADE", async () => {
@@ -308,7 +342,7 @@ test("exemple de contrôle de bout en bout : S = 3, D = 4, 1 place utilisée sur
   assert.equal(result.rawAmount, "2296.092500000000");
   assert.equal(result.currency, "XOF");
   assert.deepEqual(result.factors, { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 });
-  assert.deepEqual(result.inputs, { competingSellers: 3, compatibleBuyers: 4, slotsTotal: 3, slotsUsed: 1 });
+  assert.deepEqual(result.inputs, { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, slotsTotal: 3, slotsUsed: 1 });
   assert.deepEqual(result.pricing, { key: "default", version: 1 });
   assert.equal(result.unavailableReason, null);
   assert.equal(result.durationCode, "3d");
@@ -320,7 +354,7 @@ test("exemple de contrôle de bout en bout : S = 3, D = 4, 1 place utilisée sur
   assert.equal(stored.amount, 2300);
   assert.equal(stored.raw_amount, "2296.092500000000");
   assert.deepEqual([stored.competition_milli, stored.demand_milli, stored.scarcity_milli, stored.duration_milli], [1060, 1300, 1333, 2500]);
-  assert.deepEqual([stored.competing_sellers, stored.compatible_buyers, stored.slots_total, stored.slots_used], [3, 4, 3, 1]);
+  assert.deepEqual([stored.competing_sellers, stored.compatible_buyers, stored.reachable_buyers, stored.slots_total, stored.slots_used], [3, 4, 4, 3, 1]);
   assert.equal(stored.status, "available");
   // Les deux autres durées sur le même monde : brut = 500 × 1,060 × 1,300 × 1,333 × durée.
   assert.equal((await quote(offer, "24h")).rawAmount, "918.437000000000");
@@ -403,7 +437,7 @@ test("indisponibilités : chaque motif, comptages renseignés, aucun prix ni fac
   const boosted = await quote(world.offer);
   assert.deepEqual({ status: boosted.status, reason: boosted.unavailableReason, amount: boosted.amount, raw: boosted.rawAmount, factors: boosted.factors },
     { status: "unavailable", reason: "offer_already_boosted", amount: null, raw: null, factors: null });
-  assert.deepEqual(boosted.inputs, { competingSellers: 3, compatibleBuyers: 4, slotsTotal: 3, slotsUsed: 2 });
+  assert.deepEqual(boosted.inputs, { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: null, slotsTotal: 3, slotsUsed: 2 });
   assert.equal(boosted.expiresAt.getTime() - boosted.computedAt.getTime(), 60_000, "validité de 60 s");
   assert.equal(boosted.reused, false);
   const row = await sqlRow<Record<string, unknown>>("SELECT * FROM boost_quotes WHERE id = $1", [boosted.id]);
@@ -419,7 +453,7 @@ test("indisponibilités : chaque motif, comptages renseignés, aucun prix ni fac
   await addBuyer(lone);
   const noSlot = await quote(lone);
   assert.equal(noSlot.unavailableReason, "no_slot_available");
-  assert.deepEqual(noSlot.inputs, { competingSellers: 1, compatibleBuyers: 1, slotsTotal: 1, slotsUsed: 1 });
+  assert.deepEqual(noSlot.inputs, { competingSellers: 1, compatibleBuyers: 1, reachableBuyers: null, slotsTotal: 1, slotsUsed: 1 });
 
   // total = 0 (min_slots = max_slots = 0) : indisponible, jamais un prix infini.
   await setBoostSettings("smartphones", { min_slots: 0, max_slots: 0 });
@@ -440,14 +474,14 @@ test("indisponibilités : chaque motif, comptages renseignés, aucun prix ni fac
   await addBuyer(b);
   const limit = await quote(b);
   assert.equal(limit.unavailableReason, "seller_boost_limit_reached");
-  assert.deepEqual(limit.inputs, { competingSellers: 5, compatibleBuyers: 1, slotsTotal: 2, slotsUsed: 1 });
+  assert.deepEqual(limit.inputs, { competingSellers: 5, compatibleBuyers: 1, reachableBuyers: null, slotsTotal: 2, slotsUsed: 1 });
 
   // no_compatible_buyer : aucune évaluation → pas de vente sans exposition possible.
   await wipe();
   const unseen = await makeOffer();
   const noBuyer = await quote(unseen);
   assert.equal(noBuyer.unavailableReason, "no_compatible_buyer");
-  assert.deepEqual(noBuyer.inputs, { competingSellers: 0, compatibleBuyers: 0, slotsTotal: 1, slotsUsed: 0 });
+  assert.deepEqual(noBuyer.inputs, { competingSellers: 0, compatibleBuyers: 0, reachableBuyers: 0, slotsTotal: 1, slotsUsed: 0 });
   assert.equal(noBuyer.factors, null);
 });
 
@@ -839,6 +873,232 @@ test("validation avant tout SQL : pool exigé, UUID, durée, limites, textes (z�
   assert.deepEqual(await readScopeBoostPriceHistory({ ...history, limit: 1 }), []);
 });
 
+// ═════════════ 13. Portée visible d'un boost (lot P2-bis, migration 0016) ═════════════
+
+/** Une transaction de lecture, comme celle de la cotation (le calcul de portée utilise des SAVEPOINT). */
+async function inTransaction<T>(operation: (client: import("pg").PoolClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await operation(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally { client.release(); }
+}
+
+/** Ce que l'acheteur verrait réellement : l'offre est-elle « sponsorisée » dans SA liste, une fois l'offre boostée (attribution d'administration) ? */
+async function seenSponsored(offer: OfferRecord, buyer: { buyerId: string; demand: DemandRecord }): Promise<boolean> {
+  const page = await listStoredOfferMatchesForDemand(buyer.buyerId, buyer.demand.id, { sort: "relevance", limit: 100 }, pool);
+  return page.items.some((item) => item.candidateId === offer.id && item.sponsored);
+}
+
+test("portée visible : listes de 1, 6, 7, 8 et 14 offres — quota nul sous 7 offres → no_visible_effect ; dès 7, disponible ; et l'acheteur voit « sponsorisé » exactement quand le devis le promet", async () => {
+  const cases: Array<[number, boolean]> = [[1, false], [2, false], [6, false], [7, true], [8, true], [14, true]];
+  for (const [listSize, reachable] of cases) {
+    await wipe();
+    const offer = await makeOffer();
+    const buyer = await addBuyer(offer, { listSize });
+    const result = await quote(offer, "24h");
+    assert.equal(result.inputs.compatibleBuyers, 1, `liste de ${listSize} : un acheteur compatible`);
+    assert.equal(result.inputs.reachableBuyers, reachable ? 1 : 0, `liste de ${listSize} : acheteurs atteignables`);
+    if (reachable) {
+      assert.equal(result.status, "available", `liste de ${listSize}`);
+      assert.equal(result.unavailableReason, null);
+      assert.ok(result.amount !== null && result.amount >= 500);
+      assert.equal(result.expiresAt.getTime() - result.computedAt.getTime(), 900_000);
+    } else {
+      assert.deepEqual({ status: result.status, reason: result.unavailableReason, amount: result.amount, raw: result.rawAmount, factors: result.factors },
+        { status: "unavailable", reason: "no_visible_effect", amount: null, raw: null, factors: null }, `liste de ${listSize}`);
+      assert.equal(result.expiresAt.getTime() - result.computedAt.getTime(), 60_000, "indisponibilité : 60 s");
+    }
+    const row = await sqlRow<{ reachable_buyers: number | null; status: string; unavailable_reason: string | null }>("SELECT reachable_buyers, status, unavailable_reason FROM boost_quotes WHERE id = $1", [result.id]);
+    assert.deepEqual([row.reachable_buyers, row.status, row.unavailable_reason], [reachable ? 1 : 0, reachable ? "available" : "unavailable", reachable ? null : "no_visible_effect"]);
+    // Différentiel avec la lecture des résultats : mêmes fonctions de placement, donc le même verdict.
+    await grant(offer);
+    assert.equal(await seenSponsored(offer, buyer), reachable, `liste de ${listSize} : « sponsorisé » côté acheteur`);
+  }
+});
+
+test("portée visible : seuil de pertinence — atteignable seulement si la pertinence organique atteint min_relevance (borne incluse)", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  const buyer = await addBuyer(offer);
+  const ranking = await readDemandOrganicRanking(pool, { demandId: buyer.demand.id, ownerId: buyer.buyerId, at: new Date() });
+  const mine = ranking.find((entry) => entry.offerId === offer.id)?.relevance;
+  assert.ok(mine !== undefined && mine > 0 && mine < 100, `pertinence de l'offre : ${String(mine)}`);
+  assert.equal(ranking.at(-1)?.offerId, offer.id, "l'offre est classée dernière (les remplissages, plus compatibles, passent devant)");
+  try {
+    await setBoostSettings("smartphones", { min_relevance: mine });
+    const atThreshold = await freshQuote(offer);
+    assert.equal(atThreshold.status, "available", "seuil = pertinence : atteignable (borne incluse)");
+    assert.equal(atThreshold.inputs.reachableBuyers, 1);
+    await setBoostSettings("smartphones", { min_relevance: mine + 0.01 });
+    const above = await freshQuote(offer);
+    assert.deepEqual([above.status, above.unavailableReason, above.inputs.reachableBuyers], ["unavailable", "no_visible_effect", 0], "seuil juste au-dessus : aucun effet visible");
+    assert.equal(above.inputs.compatibleBuyers, 1, "l'acheteur reste compatible");
+    await setBoostSettings("smartphones", { min_relevance: 0 });
+    assert.equal((await freshQuote(offer)).status, "available");
+  } finally { await resetBoostSettings(); }
+});
+
+test("portée visible : une offre déjà première dans la liste de l'acheteur ne monte pas — no_visible_effect, et l'acheteur ne la voit pas sponsorisée", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  const buyer = await addBuyer(offer, { targetFirst: true });
+  const ranking = await readDemandOrganicRanking(pool, { demandId: buyer.demand.id, ownerId: buyer.buyerId, at: new Date() });
+  assert.equal(ranking[0].offerId, offer.id, "l'offre est déjà première");
+  const result = await quote(offer);
+  assert.deepEqual([result.status, result.unavailableReason, result.inputs.compatibleBuyers, result.inputs.reachableBuyers], ["unavailable", "no_visible_effect", 1, 0]);
+  await grant(offer);
+  assert.equal(await seenSponsored(offer, buyer), false);
+});
+
+test("portée visible : acheteurs distincts — un acheteur à deux besoins atteignables compte une fois ; les listes courtes ne comptent pas ; compatibles ≥ atteignables", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  const a = await addBuyer(offer, { listSize: 7 });
+  await addDemand(offer, a.buyerId, { listSize: 8 });
+  await addBuyer(offer, { listSize: 1 });
+  await addBuyer(offer, { listSize: 14 });
+  const result = await quote(offer);
+  assert.equal(result.inputs.compatibleBuyers, 3, "trois acheteurs compatibles");
+  assert.equal(result.inputs.reachableBuyers, 2, "deux acheteurs atteignables");
+  assert.equal(result.status, "available");
+  // Le PRIX ne dépend que des acheteurs COMPATIBLES : même prix avec 1 ou 2 acheteurs atteignables.
+  await wipe();
+  const same = await makeOffer();
+  await addBuyer(same, { listSize: 7 });
+  await addBuyer(same, { listSize: 1 });
+  await addBuyer(same, { listSize: 1 });
+  const fewer = await quote(same);
+  assert.equal(fewer.inputs.compatibleBuyers, 3);
+  assert.equal(fewer.inputs.reachableBuyers, 1);
+  assert.equal(fewer.amount, result.amount, "le prix est celui de 3 acheteurs compatibles, quel que soit le nombre d'acheteurs atteignables");
+  assert.deepEqual(fewer.factors, result.factors);
+});
+
+test("portée visible : un autre boost déjà actif dans la liste consomme le quota — quota 1 pris par une offre boostée mieux classée → aucun effet ; quota 2 → l'offre monte", async () => {
+  for (const [listSize, reachable] of [[7, false], [14, true]] as const) {
+    await wipe();
+    const offer = await makeOffer();
+    const buyer = await addBuyer(offer, { listSize });
+    const ranking = await readDemandOrganicRanking(pool, { demandId: buyer.demand.id, ownerId: buyer.buyerId, at: new Date() });
+    const head = ranking[0];
+    assert.notEqual(head.offerId, offer.id);
+    const headOwner = (await sqlRow<{ owner_id: string }>("SELECT owner_id FROM offers WHERE id = $1", [head.offerId])).owner_id;
+    await grantOfferBoost({ pool, offerId: head.offerId, ownerId: headOwner, durationCode: "24h", source: "admin_grant" });
+    const result = await quote(offer);
+    assert.equal(result.inputs.reachableBuyers, reachable ? 1 : 0, `liste de ${listSize}, une offre mieux classée est déjà boostée`);
+    assert.equal(result.status, reachable ? "available" : "unavailable");
+    await grant(offer);
+    assert.equal(await seenSponsored(offer, buyer), reachable, `liste de ${listSize} : verdict identique à la lecture des résultats`);
+  }
+});
+
+test("portée visible : ordre des motifs — aucun effet visible est le DERNIER (déjà boostée, plus de place, plafond vendeur et aucun acheteur compatible passent avant)", async () => {
+  // Liste courte (aucun effet) mais l'offre est déjà boostée → offer_already_boosted ; reachable non évalué (null).
+  await wipe();
+  const boosted = await makeOffer();
+  await addBuyer(boosted, { listSize: 1 });
+  await grant(boosted);
+  const first = await quote(boosted);
+  assert.deepEqual([first.unavailableReason, first.inputs.reachableBuyers], ["offer_already_boosted", null]);
+  // Plus de place (1 place prise par un autre vendeur) → no_slot_available, reachable non évalué.
+  await wipe();
+  const lone = await makeOffer();
+  const rival = await makeOffer();
+  await grant(rival);
+  await addBuyer(lone, { listSize: 1 });
+  const second = await quote(lone);
+  assert.deepEqual([second.unavailableReason, second.inputs.reachableBuyers], ["no_slot_available", null]);
+  // Aucun acheteur compatible → no_compatible_buyer (et non no_visible_effect), reachable = 0.
+  await wipe();
+  const unseen = await makeOffer();
+  const third = await quote(unseen);
+  assert.deepEqual([third.unavailableReason, third.inputs.compatibleBuyers, third.inputs.reachableBuyers], ["no_compatible_buyer", 0, 0]);
+  // Des acheteurs compatibles mais aucun effet → no_visible_effect.
+  await addBuyer(unseen, { listSize: 3 });
+  await pool.query("DELETE FROM boost_quotes");
+  const fourth = await quote(unseen);
+  assert.deepEqual([fourth.unavailableReason, fourth.inputs.compatibleBuyers, fourth.inputs.reachableBuyers], ["no_visible_effect", 1, 0]);
+});
+
+test("portée visible : bornes — au-delà de 200 besoins évalués on cherche seulement un premier acheteur atteignable (et on s'arrête dès qu'il est trouvé) ; sinon on s'arrête à 200", async () => {
+  assert.equal(BOOST_REACH_COUNT_LIMIT, 200);
+  assert.equal(BOOST_REACH_SEARCH_LIMIT, 1000);
+  // Le seul besoin atteignable est le PLUS ANCIEN, derrière 203 besoins à liste courte : trouvé quand même au-delà de 200.
+  await wipe();
+  const offer = await makeOffer();
+  await addBuyer(offer, { listSize: 7 });
+  for (let index = 0; index < 203; index++) await addBuyer(offer, { listSize: 1 });
+  const found = await inTransaction((client) => computeBoostReach(client, { offerId: offer.id }));
+  assert.equal(found.reachableBuyers, 1);
+  assert.equal(found.evaluatedDemands, 204, "204 besoins examinés : on a continué au-delà de 200 tant que rien n'était atteignable");
+  assert.equal(found.truncated, false);
+  assert.equal((await freshQuote(offer)).status, "available");
+  // Trois acheteurs atteignables parmi les 200 plus récents : le comptage s'arrête à 200 besoins évalués (minimum).
+  await wipe();
+  const crowded = await makeOffer();
+  for (let index = 0; index < 205; index++) await addBuyer(crowded, { listSize: index >= 202 ? 7 : 1 });
+  const capped = await inTransaction((client) => computeBoostReach(client, { offerId: crowded.id }));
+  assert.equal(capped.reachableBuyers, 3);
+  assert.equal(capped.evaluatedDemands, 200);
+  assert.equal(capped.truncated, true, "plus de besoins compatibles que ceux examinés : minimum");
+});
+
+test("portée visible : une évaluation illisible n'empêche pas la cotation — ce besoin est écarté, les autres comptent ; si tous sont illisibles, aucun effet visible (jamais une erreur)", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  const bad = await addBuyer(offer, { listSize: 7 });
+  await pool.query("UPDATE matching_evaluations SET evaluation_summary = '{}'::jsonb WHERE id = $1", [bad.evaluationId]);
+  const silenced = console.error;
+  const messages: string[] = [];
+  console.error = (...args: unknown[]) => { messages.push(args.join(" ")); };
+  try {
+    const onlyBad = await quote(offer);
+    assert.deepEqual([onlyBad.status, onlyBad.unavailableReason, onlyBad.inputs.reachableBuyers], ["unavailable", "no_visible_effect", 0]);
+    assert.ok(messages.some((message) => /portée ignorée pour un besoin \(stored_match_corrupt_evaluation_summary\)/.test(message)), messages.join("|"));
+    assert.equal(messages.join("|").includes(bad.buyerId), false, "aucun identifiant dans le journal");
+    await addBuyer(offer, { listSize: 7 });
+    await pool.query("DELETE FROM boost_quotes");
+    const mixed = await quote(offer);
+    assert.deepEqual([mixed.status, mixed.inputs.compatibleBuyers, mixed.inputs.reachableBuyers], ["available", 2, 1]);
+  } finally { console.error = silenced; }
+});
+
+test("migration 0016 : reachable_buyers (entier, NULL permis), motif no_visible_effect accepté, bornes et cohérence imposées par la base", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  const base = { offerId: offer.id, sellerId: offer.ownerId };
+  const column = await sqlRow<{ data_type: string; is_nullable: string }>(
+    "SELECT data_type, is_nullable FROM information_schema.columns WHERE table_schema = $1 AND table_name = 'boost_quotes' AND column_name = 'reachable_buyers'", [schema]);
+  assert.deepEqual(column, { data_type: "integer", is_nullable: "YES" });
+  const refuse = (constraint: string, fields: Partial<QuoteFields>) =>
+    assert.rejects(insertQuote({ ...base, ...fields }), new RegExp(constraint), `${constraint} ${JSON.stringify(fields)}`);
+  await refuse("chk_boost_quotes_reachable_range", { buyers: 1, reachable: 2 });
+  await refuse("chk_boost_quotes_reachable_range", { status: "unavailable", reason: "no_slot_available", buyers: 1, reachable: -1 });
+  await refuse("chk_boost_quotes_reachable_available", { buyers: 1, reachable: 0 });
+  await refuse("chk_boost_quotes_reachable_no_effect", { status: "unavailable", reason: "no_visible_effect", buyers: 1, reachable: 1 });
+  await refuse("chk_boost_quotes_reachable_no_effect", { status: "unavailable", reason: "no_visible_effect", buyers: 1, reachable: null });
+  await refuse("chk_boost_quotes_reason", { status: "unavailable", reason: "no_effect" });
+  // Cas acceptés : NULL (devis d'avant 0016 ou non évalué), borne haute, aucun effet visible avec 0 atteignable.
+  await insertQuote({ ...base });
+  await insertQuote({ ...base, buyers: 3, reachable: 3 });
+  await insertQuote({ ...base, buyers: 3, reachable: 1 });
+  await insertQuote({ ...base, status: "unavailable", reason: "no_visible_effect", buyers: 2, reachable: 0 });
+  await insertQuote({ ...base, status: "unavailable", reason: "no_compatible_buyer", reachable: 0 });
+  await insertQuote({ ...base, status: "unavailable", reason: "no_slot_available", buyers: 2, reachable: null });
+  assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes WHERE reachable_buyers IS NULL")).n, 2);
+  // L'historique relit un devis ancien (NULL) comme « non évalué ».
+  const history = await listOfferBoostQuotes({ pool, ownerId: offer.ownerId, offerId: offer.id, limit: 10 });
+  assert.equal(history.length, 6);
+  assert.ok(history.some((entry) => entry.inputs.reachableBuyers === null));
+  assert.ok(history.some((entry) => entry.inputs.reachableBuyers === 3));
+});
+
 // ═════════════ 12. Script boost:quote ═════════════
 
 const QUOTE = "scripts/boost-quote.ts";
@@ -848,7 +1108,7 @@ test("script boost:quote : 0 pour une cotation disponible ou indisponible, 1 pou
   const first = await runScript(QUOTE, ["--offer", offer.id, "--duration", "3d"], schema);
   assert.equal(first.code, 0, first.output);
   assert.equal(first.output.trim().split("\n").length, 1);
-  assert.match(first.output.trim(), /^Cotation \(administration\) : [0-9a-f-]{36}, durée 3d, DISPONIBLE 2300 XOF \(brut 2296\.092500000000\)\. Facteurs \(millièmes\) : concurrence 1060, demande 1300, rareté 1333, durée 2500\. Comptages : vendeurs concurrents 3, acheteurs compatibles 4, places 1\/3\. Réglages default v1\. Cotation calculée le \d{4}-.*, valable jusqu'au \d{4}-.*\.$/);
+  assert.match(first.output.trim(), /^Cotation \(administration\) : [0-9a-f-]{36}, durée 3d, DISPONIBLE 2300 XOF \(brut 2296\.092500000000\)\. Facteurs \(millièmes\) : concurrence 1060, demande 1300, rareté 1333, durée 2500\. Comptages : vendeurs concurrents 3, acheteurs compatibles 4, acheteurs qui verraient l'offre monter 4, places 1\/3\. Réglages default v1\. Cotation calculée le \d{4}-.*, valable jusqu'au \d{4}-.*\.$/);
   const again = await runScript(QUOTE, ["--offer", offer.id, "--duration", "3d"], schema);
   assert.equal(again.code, 0);
   assert.match(again.output, /\(cotation réutilisée\)/);
@@ -857,7 +1117,7 @@ test("script boost:quote : 0 pour une cotation disponible ou indisponible, 1 pou
   // Indisponible : code 0 aussi (une cotation est renvoyée).
   const unavailable = await runScript(QUOTE, ["--offer", own[1].id, "--duration", "24h"], schema);
   assert.equal(unavailable.code, 0, unavailable.output);
-  assert.match(unavailable.output, /INDISPONIBLE \(no_compatible_buyer\)\. Comptages : vendeurs concurrents 3, acheteurs compatibles 0, places 1\/3/);
+  assert.match(unavailable.output, /INDISPONIBLE \(no_compatible_buyer\)\. Comptages : vendeurs concurrents 3, acheteurs compatibles 0, acheteurs qui verraient l'offre monter 0, places 1\/3/);
 
   // Refus de domaine : code 1, texte fixe.
   const unknown = await runScript(QUOTE, ["--offer", randomUUID(), "--duration", "24h"], schema);
