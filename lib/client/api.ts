@@ -9,8 +9,10 @@
  *   message fixe : le texte d'une exception brute n'est jamais repris ni affiché ;
  * - le texte montré à l'utilisateur vient de `describeApiError`, table de messages fixes en français.
  *
- * Les formes de corps et de réponses reprennent EXACTEMENT celles de lib/server/auth/http.ts et
- * lib/server/catalog/http.ts (contrats documentés dans AUTH-SERVER.md et CATALOG-HTTP.md).
+ * Les formes de corps et de réponses reprennent EXACTEMENT celles de lib/server/auth/http.ts,
+ * lib/server/catalog/http.ts, lib/server/matching/http-dto.ts (`matching-stored-http/v1`) et lib/server/boost/http.ts
+ * (`boost-quote/v1`), contrats documentés dans AUTH-SERVER.md, CATALOG-HTTP.md, MATCHING-STORED-READ.md et BOOST-HTTP.md.
+ * Les réponses sont relues champ par champ (liste blanche) : un champ que le serveur ajouterait un jour n'atteint jamais l'écran.
  */
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
@@ -94,6 +96,102 @@ export interface Pagination {
   offset: number;
 }
 
+// ─── Correspondances enregistrées (matching-stored-http/v1) ───────────────────────────────────────
+
+export type MatchSort = "score" | "relevance";
+export type AvailabilityLevel = "confirmed_recent" | "confirmed" | "unconfirmed" | "reserved" | "unavailable" | "unknown";
+export type PricePosition = "below_market" | "in_market" | "above_market" | "insufficient_data";
+export type ConfidenceLevel = "high" | "medium" | "low";
+export type AccountAgeBand = "lt_7d" | "7d_30d" | "gte_30d";
+
+/** Fiche produit épurée d'une correspondance : jamais de propriétaire, de texte brut ni de téléphone. */
+export interface MatchProduct {
+  category: string | null;
+  brand: string | null;
+  model: string | null;
+  variant: string | null;
+  condition: string | null;
+  quantity: number | null;
+  unit: string | null;
+  location: string | null;
+  deadlineAt: string | null;
+  /** Offre : prix demandé. Absent (null) pour une demande. */
+  price: Money | null;
+  /** Demande : budget maximal. Absent (null) pour une offre. */
+  budget: Money | null;
+  availabilityStatus: AvailabilityStatus | null;
+}
+
+export interface MatchIndicators {
+  /** Null dans le sens offre (le vendeur voit des besoins). */
+  availability: { level: AvailabilityLevel; score: number | null; confirmedAgeHours: number | null; factors: string[] } | null;
+  /** Null dans le sens offre. */
+  price: { position: PricePosition; score: number | null; deltaPercent: number | null; sampleSize: number; factors: string[] } | null;
+  confidence: { level: ConfidenceLevel; score: number; accountAgeBand: AccountAgeBand; factors: string[] };
+}
+
+export interface StoredMatch {
+  /** Identifiant de l'offre (sens besoin) ou du besoin (sens offre) : sert de clé de liste, jamais affiché. */
+  candidateId: string;
+  candidate: MatchProduct;
+  compatibilityStatus: string;
+  /** Compatibilité 0 à 100, ou null. */
+  score: number | null;
+  coverage: number | null;
+  evaluatedAt: string;
+  indicators: MatchIndicators;
+  /** Pertinence organique 0 à 100 (sans boost). */
+  relevance: number;
+  /** Vrai seulement pour un élément qui a gagné des places grâce à un boost (tri `relevance`, sens besoin). */
+  sponsored: boolean;
+}
+
+export interface StoredMatchesPage {
+  source: MatchProduct;
+  items: StoredMatch[];
+  /** La version courante de la source est encore en cours de traitement par le worker. */
+  processing: boolean;
+  readAt: string;
+  nextCursor: string | null;
+  hasMore: boolean;
+  limit: number;
+  /** Plus de 200 correspondances existent : seules les meilleures ont été triées par pertinence. */
+  truncated: boolean;
+}
+
+export interface StoredMatchesQuery {
+  sort?: MatchSort;
+  /** Curseur opaque renvoyé par la page précédente (`nextCursor`). */
+  cursor?: string;
+  /** 1 à 100 (défaut serveur : 20). */
+  limit?: number;
+}
+
+// ─── Cotations de boost (boost-quote/v1) ──────────────────────────────────────────────────────────
+
+export const BOOST_DURATION_CODES = ["24h", "3d", "7d"] as const;
+export type BoostDurationCode = (typeof BOOST_DURATION_CODES)[number];
+
+export interface BoostQuote {
+  id: string;
+  durationCode: BoostDurationCode;
+  currency: string;
+  status: "available" | "unavailable";
+  /** Montant entier (XOF) ; null si la cotation est indisponible. */
+  amount: number | null;
+  /** Code stable (`offer_already_boosted`, `no_slot_available`, `seller_boost_limit_reached`, `no_compatible_buyer`) ou null. */
+  unavailableReason: string | null;
+  /** Facteurs en millièmes (1000 = ×1) ; null si la cotation est indisponible. */
+  factors: { competitionMilli: number; demandMilli: number; scarcityMilli: number; durationMilli: number } | null;
+  inputs: { competingSellers: number; compatibleBuyers: number; slotsTotal: number; slotsUsed: number };
+  computedAt: string;
+  expiresAt: string;
+  /** POST : cotation réutilisée (vrai) ou créée (faux). Null dans l'historique. */
+  reused: boolean | null;
+  /** Historique : cotation expirée à la lecture. Null dans la réponse du POST. */
+  expired: boolean | null;
+}
+
 export interface OtpChallenge {
   challengeId: string;
   expiresAt: string;
@@ -109,6 +207,7 @@ export const API_NETWORK_ERROR = "network_error";
 export const API_INVALID_RESPONSE = "invalid_response";
 export const API_ABORTED = "aborted";
 export const API_INVALID_ID = "invalid_id";
+export const API_INVALID_ARGUMENT = "invalid_argument";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -122,6 +221,7 @@ const FIXED_ERROR_MESSAGES: Record<string, string> = {
   [API_INVALID_RESPONSE]: "Réponse du serveur inattendue.",
   [API_ABORTED]: "Requête interrompue.",
   [API_INVALID_ID]: "Identifiant invalide.",
+  [API_INVALID_ARGUMENT]: "Paramètre invalide.",
 };
 
 /** Erreur d'API : `status` HTTP (0 = pas de réponse) et `code` du serveur ; jamais de texte d'exception brute. */
@@ -238,6 +338,244 @@ function parsePagination(status: number, value: unknown): Pagination {
   return { limit: value.limit, offset: value.offset };
 }
 
+// ─── Lecture stricte des correspondances et des cotations ───────────────────────────────────────
+
+const AVAILABILITY_LEVELS: readonly string[] = ["confirmed_recent", "confirmed", "unconfirmed", "reserved", "unavailable", "unknown"];
+const PRICE_POSITIONS: readonly string[] = ["below_market", "in_market", "above_market", "insufficient_data"];
+const CONFIDENCE_LEVELS: readonly string[] = ["high", "medium", "low"];
+const ACCOUNT_AGE_BANDS: readonly string[] = ["lt_7d", "7d_30d", "gte_30d"];
+const AVAILABILITY_STATUSES: readonly string[] = ["available", "reserved", "unavailable"];
+const FACTOR_CODE = /^[a-z][a-z0-9_]{0,63}$/;
+
+export const MATCHING_STORED_CONTRACT_VERSION = "matching-stored-http/v1";
+export const BOOST_QUOTE_CONTRACT_VERSION = "boost-quote/v1";
+
+function isNumberOrNull(value: unknown): value is number | null {
+  return value === null || (typeof value === "number" && Number.isFinite(value));
+}
+
+function isCodeList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string" && FACTOR_CODE.test(entry));
+}
+
+function moneyOrNull(status: number, value: unknown): Money | null {
+  if (value === undefined || value === null) return null;
+  if (!isMoneyOrNull(value)) throw fixedError(status, API_INVALID_RESPONSE);
+  const money = value as Money;
+  return { amount: money.amount, currency: money.currency };
+}
+
+/** Fiche produit d'une correspondance : liste blanche, champ par champ (jamais de propriétaire ni de texte brut). */
+function parseMatchProduct(status: number, value: unknown): MatchProduct {
+  if (
+    !isObject(value) ||
+    !isStringOrNull(value.category) ||
+    !isStringOrNull(value.brand) ||
+    !isStringOrNull(value.model) ||
+    !isStringOrNull(value.variant) ||
+    !isStringOrNull(value.condition) ||
+    !isNumberOrNull(value.quantity) ||
+    !isStringOrNull(value.unit) ||
+    !isStringOrNull(value.location) ||
+    !isStringOrNull(value.deadlineAt) ||
+    !(value.availabilityStatus === undefined || value.availabilityStatus === null || AVAILABILITY_STATUSES.includes(String(value.availabilityStatus)))
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return {
+    category: value.category,
+    brand: value.brand,
+    model: value.model,
+    variant: value.variant,
+    condition: value.condition,
+    quantity: value.quantity,
+    unit: value.unit,
+    location: value.location,
+    deadlineAt: value.deadlineAt,
+    price: moneyOrNull(status, value.price),
+    budget: moneyOrNull(status, value.budget),
+    availabilityStatus: (value.availabilityStatus ?? null) as AvailabilityStatus | null,
+  };
+}
+
+function parseIndicators(status: number, value: unknown): MatchIndicators {
+  if (!isObject(value) || !isObject(value.confidence)) throw fixedError(status, API_INVALID_RESPONSE);
+  const { availability, price, confidence } = value;
+  const parsed: MatchIndicators = {
+    availability: null,
+    price: null,
+    confidence: undefined as unknown as MatchIndicators["confidence"],
+  };
+  if (availability !== null) {
+    if (
+      !isObject(availability) ||
+      !AVAILABILITY_LEVELS.includes(String(availability.level)) ||
+      !isNumberOrNull(availability.score) ||
+      !isNumberOrNull(availability.confirmedAgeHours) ||
+      !isCodeList(availability.factors)
+    ) {
+      throw fixedError(status, API_INVALID_RESPONSE);
+    }
+    parsed.availability = {
+      level: availability.level as AvailabilityLevel,
+      score: availability.score,
+      confirmedAgeHours: availability.confirmedAgeHours,
+      factors: availability.factors,
+    };
+  }
+  if (price !== null) {
+    if (
+      !isObject(price) ||
+      !PRICE_POSITIONS.includes(String(price.position)) ||
+      !isNumberOrNull(price.score) ||
+      !isNumberOrNull(price.deltaPercent) ||
+      typeof price.sampleSize !== "number" ||
+      !isCodeList(price.factors)
+    ) {
+      throw fixedError(status, API_INVALID_RESPONSE);
+    }
+    parsed.price = {
+      position: price.position as PricePosition,
+      score: price.score,
+      deltaPercent: price.deltaPercent,
+      sampleSize: price.sampleSize,
+      factors: price.factors,
+    };
+  }
+  if (
+    !CONFIDENCE_LEVELS.includes(String(confidence.level)) ||
+    typeof confidence.score !== "number" ||
+    !ACCOUNT_AGE_BANDS.includes(String(confidence.accountAgeBand)) ||
+    !isCodeList(confidence.factors)
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  parsed.confidence = {
+    level: confidence.level as ConfidenceLevel,
+    score: confidence.score,
+    accountAgeBand: confidence.accountAgeBand as AccountAgeBand,
+    factors: confidence.factors,
+  };
+  return parsed;
+}
+
+function parseStoredMatch(status: number, value: unknown): StoredMatch {
+  if (
+    !isObject(value) ||
+    typeof value.candidateId !== "string" ||
+    typeof value.compatibilityStatus !== "string" ||
+    !isNumberOrNull(value.score) ||
+    !isNumberOrNull(value.coverage) ||
+    typeof value.evaluatedAt !== "string" ||
+    typeof value.relevance !== "number" ||
+    typeof value.sponsored !== "boolean"
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return {
+    candidateId: value.candidateId,
+    candidate: parseMatchProduct(status, value.candidate),
+    compatibilityStatus: value.compatibilityStatus,
+    score: value.score,
+    coverage: value.coverage,
+    evaluatedAt: value.evaluatedAt,
+    indicators: parseIndicators(status, value.indicators),
+    relevance: value.relevance,
+    sponsored: value.sponsored,
+  };
+}
+
+function parseStoredMatchesPage(status: number, value: unknown): StoredMatchesPage {
+  if (
+    !isObject(value) ||
+    value.contractVersion !== MATCHING_STORED_CONTRACT_VERSION ||
+    !Array.isArray(value.items) ||
+    typeof value.processing !== "boolean" ||
+    typeof value.readAt !== "string" ||
+    !isStringOrNull(value.nextCursor) ||
+    typeof value.hasMore !== "boolean" ||
+    typeof value.limit !== "number" ||
+    typeof value.truncated !== "boolean"
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return {
+    source: parseMatchProduct(status, value.source),
+    items: value.items.map((item) => parseStoredMatch(status, item)),
+    processing: value.processing,
+    readAt: value.readAt,
+    nextCursor: value.nextCursor,
+    hasMore: value.hasMore,
+    limit: value.limit,
+    truncated: value.truncated,
+  };
+}
+
+function parseBoostQuote(status: number, value: unknown, flag: "reused" | "expired"): BoostQuote {
+  if (
+    !isObject(value) ||
+    typeof value.id !== "string" ||
+    !(BOOST_DURATION_CODES as readonly string[]).includes(String(value.durationCode)) ||
+    typeof value.currency !== "string" ||
+    (value.status !== "available" && value.status !== "unavailable") ||
+    !(value.amount === null || (typeof value.amount === "number" && Number.isSafeInteger(value.amount))) ||
+    !(value.unavailableReason === null || (typeof value.unavailableReason === "string" && FACTOR_CODE.test(value.unavailableReason))) ||
+    typeof value[flag] !== "boolean" ||
+    typeof value.computedAt !== "string" ||
+    typeof value.expiresAt !== "string" ||
+    !isObject(value.inputs)
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  const { inputs } = value;
+  if (
+    typeof inputs.competingSellers !== "number" ||
+    typeof inputs.compatibleBuyers !== "number" ||
+    typeof inputs.slotsTotal !== "number" ||
+    typeof inputs.slotsUsed !== "number"
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  let factors: BoostQuote["factors"] = null;
+  if (value.factors !== null) {
+    const raw = value.factors;
+    if (
+      !isObject(raw) ||
+      typeof raw.competitionMilli !== "number" ||
+      typeof raw.demandMilli !== "number" ||
+      typeof raw.scarcityMilli !== "number" ||
+      typeof raw.durationMilli !== "number"
+    ) {
+      throw fixedError(status, API_INVALID_RESPONSE);
+    }
+    factors = {
+      competitionMilli: raw.competitionMilli,
+      demandMilli: raw.demandMilli,
+      scarcityMilli: raw.scarcityMilli,
+      durationMilli: raw.durationMilli,
+    };
+  }
+  return {
+    id: value.id,
+    durationCode: value.durationCode as BoostDurationCode,
+    currency: value.currency,
+    status: value.status,
+    amount: value.amount as number | null,
+    unavailableReason: value.unavailableReason as string | null,
+    factors,
+    inputs: {
+      competingSellers: inputs.competingSellers,
+      compatibleBuyers: inputs.compatibleBuyers,
+      slotsTotal: inputs.slotsTotal,
+      slotsUsed: inputs.slotsUsed,
+    },
+    computedAt: value.computedAt,
+    expiresAt: value.expiresAt,
+    reused: flag === "reused" ? (value.reused as boolean) : null,
+    expired: flag === "expired" ? (value.expired as boolean) : null,
+  };
+}
+
 export interface RequestOptions {
   signal?: AbortSignal;
 }
@@ -338,6 +676,39 @@ export function createApiClient(options: ApiClientOptions = {}) {
 
   const versionBody = (expectedContentVersion: number) => ({ expectedContentVersion });
 
+  /** Paramètres de lecture des correspondances : valeurs vérifiées AVANT toute requête (sinon `invalid_argument`). */
+  function matchesQuery(query: StoredMatchesQuery): string {
+    const params = new URLSearchParams();
+    if (query.sort !== undefined) {
+      if (query.sort !== "score" && query.sort !== "relevance") throw fixedError(0, API_INVALID_ARGUMENT);
+      params.set("sort", query.sort);
+    }
+    if (query.cursor !== undefined) {
+      if (typeof query.cursor !== "string" || query.cursor.length === 0 || query.cursor.length > 512) {
+        throw fixedError(0, API_INVALID_ARGUMENT);
+      }
+      params.set("cursor", query.cursor);
+    }
+    if (query.limit !== undefined) {
+      if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > PAGE_LIMIT) throw fixedError(0, API_INVALID_ARGUMENT);
+      params.set("limit", String(query.limit));
+    }
+    const text = params.toString();
+    return text ? `?${text}` : "";
+  }
+
+  async function storedMatches(
+    kind: "offers" | "demands",
+    sourceId: string,
+    query: StoredMatchesQuery = {},
+    requestOptions?: RequestOptions,
+  ): Promise<StoredMatchesPage> {
+    // Les contrôles (identifiant puis paramètres) précèdent toute requête.
+    const path = `/api/${kind}/${id(sourceId)}/stored-matches${matchesQuery(query)}`;
+    const { status, json } = await send("GET", path, undefined, requestOptions);
+    return parseStoredMatchesPage(status, json);
+  }
+
   async function session(requestOptions?: RequestOptions): Promise<{ userId: string }> {
     const { status, json } = await send("GET", "/api/auth/session", undefined, requestOptions);
     if (!isObject(json) || typeof json.userId !== "string") throw fixedError(status, API_INVALID_RESPONSE);
@@ -426,6 +797,14 @@ export function createApiClient(options: ApiClientOptions = {}) {
         return collectAll(async (pagination) => (await listOffers(pagination, requestOptions)).offers);
       },
 
+      /**
+       * GET /api/offers/{id}/stored-matches : les besoins d'acheteurs compatibles avec CETTE offre (404 si l'offre est
+       * inconnue ou à un autre compte ; 400 si elle n'est pas en ligne). Aucune identité d'acheteur dans la réponse.
+       */
+      storedMatches(offerId: string, query?: StoredMatchesQuery, requestOptions?: RequestOptions): Promise<StoredMatchesPage> {
+        return storedMatches("offers", offerId, query, requestOptions);
+      },
+
       /** POST /api/offers → 201 `{ offer }` (statut brouillon). */
       create(input: OfferInput, requestOptions?: RequestOptions): Promise<OfferRecord> {
         return offerResult(send("POST", "/api/offers", input, requestOptions));
@@ -484,6 +863,14 @@ export function createApiClient(options: ApiClientOptions = {}) {
         return demandResult(send("POST", "/api/demands", input, requestOptions));
       },
 
+      /**
+       * GET /api/demands/{id}/stored-matches : les offres compatibles avec CE besoin (404 si le besoin est inconnu ou à un
+       * autre compte ; 400 s'il n'est pas actif). `sort=relevance` applique, le cas échéant, la mise en avant (`sponsored`).
+       */
+      storedMatches(demandId: string, query?: StoredMatchesQuery, requestOptions?: RequestOptions): Promise<StoredMatchesPage> {
+        return storedMatches("demands", demandId, query, requestOptions);
+      },
+
       async get(demandId: string, requestOptions?: RequestOptions): Promise<DemandRecord> {
         return demandResult(send("GET", `/api/demands/${id(demandId)}`, undefined, requestOptions));
       },
@@ -509,6 +896,36 @@ export function createApiClient(options: ApiClientOptions = {}) {
         );
       },
     },
+
+    boostQuotes: {
+      /**
+       * POST /api/offers/{id}/boost-quotes `{ durationCode }` : demande une cotation (201 créée, 200 réutilisée tant qu'elle est
+       * valable). Une cotation INDISPONIBLE est un succès (`status: "unavailable"` et son motif), jamais une erreur HTTP.
+       * Aucun paiement : une cotation n'engage à rien.
+       */
+      async create(offerId: string, durationCode: BoostDurationCode, requestOptions?: RequestOptions): Promise<BoostQuote> {
+        const path = `/api/offers/${id(offerId)}/boost-quotes`;
+        if (!(BOOST_DURATION_CODES as readonly string[]).includes(durationCode)) throw fixedError(0, API_INVALID_ARGUMENT);
+        const { status, json } = await send("POST", path, { durationCode }, requestOptions);
+        if (!isObject(json) || json.contractVersion !== BOOST_QUOTE_CONTRACT_VERSION) throw fixedError(status, API_INVALID_RESPONSE);
+        return parseBoostQuote(status, json.quote, "reused");
+      },
+
+      /** GET /api/offers/{id}/boost-quotes?limit : l'historique des cotations de l'offre, plus récentes d'abord (1 à 50). */
+      async list(offerId: string, query: { limit?: number } = {}, requestOptions?: RequestOptions): Promise<BoostQuote[]> {
+        const base = `/api/offers/${id(offerId)}/boost-quotes`;
+        let path = base;
+        if (query.limit !== undefined) {
+          if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 50) throw fixedError(0, API_INVALID_ARGUMENT);
+          path = `${base}?limit=${query.limit}`;
+        }
+        const { status, json } = await send("GET", path, undefined, requestOptions);
+        if (!isObject(json) || json.contractVersion !== BOOST_QUOTE_CONTRACT_VERSION || !Array.isArray(json.quotes)) {
+          throw fixedError(status, API_INVALID_RESPONSE);
+        }
+        return json.quotes.map((quote) => parseBoostQuote(status, quote, "expired"));
+      },
+    },
   };
 }
 
@@ -517,7 +934,7 @@ export type ApiClient = ReturnType<typeof createApiClient>;
 /** Client du navigateur : fetch global, même origine. */
 export const api: ApiClient = createApiClient();
 
-export type ApiErrorContext = "otp-request" | "otp-verify" | "catalog" | "default";
+export type ApiErrorContext = "otp-request" | "otp-verify" | "catalog" | "matches" | "boost" | "default";
 
 export const GENERIC_ERROR_MESSAGE = "Une erreur est survenue. Réessayez dans un instant.";
 
@@ -533,6 +950,23 @@ export function describeApiError(error: unknown, context: ApiErrorContext = "def
   }
   if (error.code === API_ABORTED) return "Requête interrompue.";
   if (error.code === API_INVALID_ID) return "Identifiant invalide. Rechargez la page.";
+  if (error.code === API_INVALID_ARGUMENT) return "Paramètre invalide. Rechargez la page.";
+
+  if (context === "matches") {
+    if (error.status === 400) return "Les résultats ne peuvent pas être affichés pour le moment. Actualisez la page.";
+    if (error.status === 404) return "Introuvable : cet élément a peut-être été archivé ou n'existe plus.";
+    if (error.status === 503) return "Les correspondances sont temporairement indisponibles. Réessayez dans un instant.";
+  }
+  if (context === "boost") {
+    if (error.status === 404) return "Annonce introuvable : elle a peut-être été archivée ou n'existe plus.";
+    if (error.status === 409 && error.code === "offer_not_eligible") {
+      return "Cette annonce ne peut pas être boostée : elle doit être en ligne et disponible.";
+    }
+    if (error.status === 409 && error.code === "offer_not_boostable") {
+      return "Pour booster cette annonce, indiquez sa catégorie, sa marque et son modèle.";
+    }
+    if (error.status === 503) return "Le boost est temporairement indisponible. Réessayez plus tard.";
+  }
 
   switch (error.status) {
     case 400:

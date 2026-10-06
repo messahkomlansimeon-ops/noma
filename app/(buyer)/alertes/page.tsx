@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { Thumb } from "@/components/thumb";
 import { Badge, BtnOutline } from "@/components/ui";
@@ -162,7 +162,11 @@ function MesBesoins() {
               const busy = busyId === demand.id;
               return (
                 <div key={demand.id} className="rounded-2xl border border-line bg-white p-3.5">
-                  <div className="flex items-center gap-3">
+                  <Link
+                    href={`/besoins/${demand.id}`}
+                    aria-label={`Voir les offres pour : ${recordTitle(demand)}`}
+                    className="flex items-center gap-3"
+                  >
                     <Thumb art={artForCategory(demand.category)} className="size-12" iconClassName="size-6" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[15px] font-bold text-ink">
@@ -170,9 +174,13 @@ function MesBesoins() {
                       </div>
                       {summary && <div className="text-[12px] text-ink-soft">{summary}</div>}
                     </div>
-                  </div>
-                  <div className="mt-2">
+                    <ChevronRight className="size-4 shrink-0 text-ink-soft" aria-hidden />
+                  </Link>
+                  <div className="mt-2 flex items-center justify-between gap-2">
                     <Badge tone={status.tone}>{status.label}</Badge>
+                    <Link href={`/besoins/${demand.id}`} className="text-[13px] font-bold text-forest">
+                      {demand.status === "active" ? "Voir les offres" : "Détails"}
+                    </Link>
                   </div>
                   {demandActions(demand.status).length > 0 && (
                     <div className="mt-2.5 flex border-t border-line pt-2.5">

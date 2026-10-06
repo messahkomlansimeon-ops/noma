@@ -45,7 +45,8 @@ uniquement dans les dépendances par défaut des gestionnaires HTTP
 La demande d'OTP exige toujours les en-têtes du proxy de confiance
 (`X-Noma-Proxy-Secret`, `X-Forwarded-For`) : un navigateur qui parle directement à
 `next dev` reçoit `503`. En développement il faut donc un proxy qui les ajoute
-(les scripts `e2e:core` et `e2e:ui` jouent ce rôle, voir `ECRANS-E1A.md`).
+(le relais de développement `scripts/dev-proxy.ts` joue ce rôle en local, voir `ECRANS-E1B.md` et `ESSAYER.md` ; il est lancé par
+`npm run dev:try`, et les scripts `e2e:core` et `e2e:ui` passent par lui).
 
 ```shell
 export TEST_DATABASE_URL='postgresql://noma_local:noma_local_only@127.0.0.1:55432/noma_test'

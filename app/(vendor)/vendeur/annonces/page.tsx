@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Plus, Search } from "lucide-react";
+import { ChevronRight, Plus, Search } from "lucide-react";
 import { TopBar } from "@/components/top-bar";
 import { Sheet } from "@/components/modal";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
@@ -216,6 +217,14 @@ function MesAnnonces() {
                     </div>
                   </div>
                   {summary && <div className="mt-1.5 text-[12px] text-ink-soft">{summary}</div>}
+                  <Link
+                    href={`/vendeur/annonces/${offer.id}`}
+                    aria-label={`Acheteurs intéressés et boost : ${recordTitle(offer)}`}
+                    className="mt-2 flex items-center justify-between border-t border-line pt-2.5 text-[13px] font-bold text-forest"
+                  >
+                    Acheteurs intéressés et boost
+                    <ChevronRight className="size-4" aria-hidden />
+                  </Link>
                   {offerActions(offer.status).length > 0 && (
                     <div className="mt-2.5 flex border-t border-line pt-2.5">
                       {offerActions(offer.status).map((a, index) => (

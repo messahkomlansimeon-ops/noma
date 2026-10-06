@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   API_ABORTED,
+  API_INVALID_ARGUMENT,
+  API_INVALID_ID,
   API_INVALID_RESPONSE,
   API_NETWORK_ERROR,
   ApiError,
@@ -454,7 +456,7 @@ describe("couche cliente : ApiError construite uniquement depuis le corps du ser
 });
 
 describe("messages fixes en français pour l'utilisateur", () => {
-  const contexts: ApiErrorContext[] = ["otp-request", "otp-verify", "catalog", "default"];
+  const contexts: ApiErrorContext[] = ["otp-request", "otp-verify", "catalog", "matches", "boost", "default"];
 
   test("les statuts d'authentification 400, 401, 429 et 503 ont chacun un message fixe distinct", () => {
     const message = (status: number, context: ApiErrorContext) =>
@@ -498,5 +500,379 @@ describe("messages fixes en français pour l'utilisateur", () => {
     assert.equal(isUnauthorized(new ApiError(403, "invalid_origin", "x")), false);
     assert.equal(isUnauthorized(new Error("401")), false);
     assert.equal(isUnauthorized(null), false);
+  });
+});
+
+// ─── Correspondances enregistrées et cotations de boost (lot E1b) ───────────────────────────────────
+
+const BUYER_ID = "22222222-2222-4222-8222-222222222222";
+const OWNER_ID = "11111111-1111-4111-8111-111111111111";
+const PHONE = "+2250700000042";
+const CURSOR = "eyJ2IjoxLCJzb3VyY2VLaW5kIjoiZGVtYW5kIn0";
+
+function matchDto(overrides: Record<string, unknown> = {}) {
+  return {
+    candidateId: ID,
+    candidateContentVersion: 2,
+    candidate: {
+      id: ID,
+      contentVersion: 2,
+      category: "Téléphones",
+      brand: "Apple",
+      model: "iPhone 12",
+      variant: "128 Go",
+      condition: "Occasion",
+      quantity: null,
+      unit: null,
+      location: "Abidjan",
+      deadlineAt: null,
+      price: { amount: 150000, currency: "XOF" },
+      availabilityStatus: "available",
+    },
+    compatibilityStatus: "compatible",
+    score: 92.4,
+    coverage: 1,
+    evaluation: { status: "compatible", summary: { matchedCount: 3, mismatchedCount: 0, unknownCount: 0, totalExploitableCriteria: 3 } },
+    scoring: { score: 92.4, coverage: 1, summary: {}, preferences: {} },
+    evaluatedAt: "2031-01-01T10:00:00.000Z",
+    indicators: {
+      availability: { level: "confirmed_recent", score: 100, confirmedAgeHours: 3, factors: [] },
+      price: { position: "below_market", score: 100, deltaPercent: -12, sampleSize: 8, factors: [] },
+      confidence: { level: "high", score: 91, accountAgeBand: "gte_30d", factors: ["phone_verified"] },
+    },
+    relevance: 88.5,
+    sponsored: false,
+    ...overrides,
+  };
+}
+
+function matchesPageDto(items: unknown[], overrides: Record<string, unknown> = {}) {
+  return {
+    contractVersion: "matching-stored-http/v1",
+    source: { id: BUYER_ID, contentVersion: 1, category: "Téléphones", brand: "Apple", model: "iPhone 12", variant: null, condition: null, quantity: null, unit: null, location: null, deadlineAt: null, budget: { amount: 200000, currency: "XOF" } },
+    items,
+    processing: false,
+    readAt: "2031-01-01T10:00:05.000Z",
+    nextCursor: null,
+    hasMore: false,
+    limit: 20,
+    truncated: false,
+    ...overrides,
+  };
+}
+
+describe("couche cliente : correspondances enregistrées (storedMatches)", () => {
+  test("besoin : GET /api/demands/{id}/stored-matches avec sort et curseur, paramètres encodés", async () => {
+    const { client, calls } = harness(() => json(200, matchesPageDto([matchDto()], { nextCursor: CURSOR, hasMore: true })));
+    const page = await client.demands.storedMatches(BUYER_ID, { sort: "relevance", cursor: CURSOR, limit: 20 });
+    assert.equal(calls[0].url, `/api/demands/${BUYER_ID}/stored-matches?sort=relevance&cursor=${CURSOR}&limit=20`);
+    assert.equal(calls[0].init.method, "GET");
+    assert.equal(calls[0].init.credentials, "same-origin");
+    assert.equal(calls[0].init.body, undefined);
+    assert.equal(page.items.length, 1);
+    assert.equal(page.nextCursor, CURSOR);
+    assert.equal(page.hasMore, true);
+    assert.equal(page.processing, false);
+    await client.demands.storedMatches(BUYER_ID);
+    assert.equal(calls[1].url, `/api/demands/${BUYER_ID}/stored-matches`);
+  });
+
+  test("offre : GET /api/offers/{id}/stored-matches", async () => {
+    const { client, calls } = harness(() => json(200, matchesPageDto([])));
+    await client.offers.storedMatches(ID, { sort: "score" });
+    assert.equal(calls[0].url, `/api/offers/${ID}/stored-matches?sort=score`);
+  });
+
+  test("un curseur à caractères spéciaux est encodé dans l'URL", async () => {
+    const { client, calls } = harness(() => json(200, matchesPageDto([])));
+    await client.demands.storedMatches(BUYER_ID, { cursor: "a+b/c=d&e" });
+    assert.equal(calls[0].url, `/api/demands/${BUYER_ID}/stored-matches?cursor=a%2Bb%2Fc%3Dd%26e`);
+  });
+
+  test("identifiant non UUID ou paramètre invalide : ApiError sans AUCUNE requête", async () => {
+    const { client, calls } = harness(() => json(200, matchesPageDto([])));
+    for (const bad of ["", "../auth/session", `${ID}/extra`, "pas-un-uuid", `${ID}?x=1`]) {
+      await assert.rejects(client.demands.storedMatches(bad), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ID && error.status === 0);
+      await assert.rejects(client.offers.storedMatches(bad), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ID);
+    }
+    for (const query of [
+      { sort: "price" },
+      { sort: "" },
+      { cursor: "" },
+      { cursor: "x".repeat(513) },
+      { limit: 0 },
+      { limit: 101 },
+      { limit: 1.5 },
+      { limit: Number.NaN },
+    ]) {
+      await assert.rejects(
+        client.demands.storedMatches(BUYER_ID, query as never),
+        (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ARGUMENT && error.status === 0,
+        JSON.stringify(query),
+      );
+    }
+    assert.equal(calls.length, 0);
+  });
+
+  test("lecture en liste blanche : ni identité du propriétaire, ni texte brut, ni champ inconnu n'atteint l'écran", async () => {
+    const hostile = matchDto({
+      ownerId: OWNER_ID,
+      owner: { id: OWNER_ID, phone: PHONE },
+      sellerPhone: PHONE,
+      rawText: "texte brut du vendeur",
+      candidate: { ...matchDto().candidate, ownerId: OWNER_ID, phone: PHONE, rawText: "texte brut" },
+    });
+    const { client } = harness(() => json(200, matchesPageDto([hostile], { ownerId: OWNER_ID })));
+    const page = await client.demands.storedMatches(BUYER_ID);
+    const text = JSON.stringify(page);
+    for (const secret of [OWNER_ID, PHONE, "texte brut"]) assert.equal(text.includes(secret), false, secret);
+    assert.deepEqual(Object.keys(page.items[0]).sort(), [
+      "candidate", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "indicators", "relevance", "score", "sponsored",
+    ]);
+    assert.deepEqual(Object.keys(page.items[0].candidate).sort(), [
+      "availabilityStatus", "brand", "budget", "category", "condition", "deadlineAt", "location", "model", "price", "quantity", "unit", "variant",
+    ]);
+    assert.equal(page.items[0].candidate.price?.amount, 150000);
+    assert.equal(page.items[0].candidate.budget, null);
+    assert.equal(page.items[0].indicators.price?.position, "below_market");
+    assert.equal(page.items[0].sponsored, false);
+    assert.equal(page.source.budget?.amount, 200000);
+  });
+
+  test("disponibilité de l'offre en liste blanche : seules available, reserved, unavailable (ou absente) sont acceptées", async () => {
+    for (const status of ["available", "reserved", "unavailable", null]) {
+      const { client } = harness(() => json(200, matchesPageDto([matchDto({ candidate: { ...matchDto().candidate, availabilityStatus: status } })])));
+      const page = await client.demands.storedMatches(BUYER_ID);
+      assert.equal(page.items[0].candidate.availabilityStatus, status);
+    }
+    for (const bad of ["bizarre", "", "AVAILABLE", 42, true, {}, []]) {
+      const inCandidate = harness(() => json(200, matchesPageDto([matchDto({ candidate: { ...matchDto().candidate, availabilityStatus: bad } })])));
+      await assert.rejects(
+        inCandidate.client.demands.storedMatches(BUYER_ID),
+        (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE,
+        `candidat : ${JSON.stringify(bad)}`,
+      );
+      const inSource = harness(() =>
+        json(200, { ...matchesPageDto([]), source: { ...matchesPageDto([]).source, availabilityStatus: bad } }),
+      );
+      await assert.rejects(
+        inSource.client.offers.storedMatches(ID),
+        (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE,
+        `source : ${JSON.stringify(bad)}`,
+      );
+    }
+  });
+
+  test("sens offre : indicateurs de disponibilité et de prix absents (null), confiance seule", async () => {
+    const demandItem = matchDto({
+      candidateId: BUYER_ID,
+      candidate: { ...matchDto().candidate, price: undefined, availabilityStatus: undefined, budget: { amount: 200000, currency: "XOF" } },
+      indicators: { availability: null, price: null, confidence: { level: "medium", score: 55, accountAgeBand: "7d_30d", factors: [] } },
+    });
+    const { client } = harness(() => json(200, matchesPageDto([demandItem])));
+    const page = await client.offers.storedMatches(ID);
+    assert.equal(page.items[0].indicators.availability, null);
+    assert.equal(page.items[0].indicators.price, null);
+    assert.equal(page.items[0].indicators.confidence.level, "medium");
+    assert.equal(page.items[0].candidate.budget?.amount, 200000);
+    assert.equal(page.items[0].candidate.price, null);
+  });
+
+  test("sponsored conservé tel quel (vrai uniquement si le serveur le dit)", async () => {
+    const { client } = harness(() => json(200, matchesPageDto([matchDto({ sponsored: true }), matchDto({ candidateId: BUYER_ID })])));
+    const page = await client.demands.storedMatches(BUYER_ID, { sort: "relevance" });
+    assert.deepEqual(page.items.map((item) => item.sponsored), [true, false]);
+  });
+
+  test("erreurs : ApiError construite depuis le corps seulement ; corps inattendu ou version de contrat inconnue = invalid_response", async () => {
+    for (const status of [400, 401, 404, 503]) {
+      const { client } = harness(() => json(status, { error: { code: "resource_not_found", message: "Ressource introuvable." } }));
+      await assert.rejects(
+        client.demands.storedMatches(BUYER_ID),
+        (error: unknown) => error instanceof ApiError && error.status === status && error.code === "resource_not_found",
+      );
+    }
+    const bad: Response[] = [
+      json(200, { ...matchesPageDto([]), contractVersion: "matching-stored-http/v2" }),
+      json(200, { ...matchesPageDto([]), items: "non" }),
+      json(200, { ...matchesPageDto([]), processing: "oui" }),
+      json(200, matchesPageDto([matchDto({ sponsored: "oui" })])),
+      json(200, matchesPageDto([matchDto({ relevance: "88" })])),
+      json(200, matchesPageDto([matchDto({ indicators: { availability: null, price: null } })])),
+      json(200, matchesPageDto([matchDto({ indicators: { availability: null, price: { position: "cher", score: null, deltaPercent: null, sampleSize: 1, factors: [] }, confidence: matchDto().indicators.confidence } })])),
+      json(200, matchesPageDto([matchDto({ candidate: { ...matchDto().candidate, price: { amount: "150" } } })])),
+      new Response("<html>502</html>", { status: 200 }),
+    ];
+    for (const response of bad) {
+      const { client } = harness(() => response.clone());
+      await assert.rejects(
+        client.demands.storedMatches(BUYER_ID),
+        (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE,
+      );
+    }
+    const { client } = harness(() => {
+      throw new TypeError("fetch failed ECONNREFUSED 127.0.0.1:3211");
+    });
+    await assert.rejects(
+      client.demands.storedMatches(BUYER_ID),
+      (error: unknown) => error instanceof ApiError && error.code === API_NETWORK_ERROR && !error.message.includes("ECONNREFUSED"),
+    );
+  });
+});
+
+function quoteDto(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "44444444-4444-4444-8444-444444444444",
+    durationCode: "3d",
+    currency: "XOF",
+    status: "available",
+    amount: 2300,
+    unavailableReason: null,
+    factors: { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 },
+    inputs: { competingSellers: 3, compatibleBuyers: 4, slotsTotal: 3, slotsUsed: 1 },
+    computedAt: "2031-01-01T10:00:00.000Z",
+    expiresAt: "2031-01-01T10:15:00.000Z",
+    reused: false,
+    ...overrides,
+  };
+}
+
+describe("couche cliente : cotations de boost (boostQuotes)", () => {
+  test("create : POST /api/offers/{id}/boost-quotes avec exactement { durationCode }, 201 puis 200 réutilisée", async () => {
+    const { client, calls } = harness((_request, index) =>
+      json(index === 0 ? 201 : 200, { contractVersion: "boost-quote/v1", quote: quoteDto({ reused: index === 1 }) }),
+    );
+    const created = await client.boostQuotes.create(ID, "3d");
+    const reused = await client.boostQuotes.create(ID, "3d");
+    assert.equal(calls[0].url, `/api/offers/${ID}/boost-quotes`);
+    assert.equal(calls[0].init.method, "POST");
+    assert.equal(calls[0].init.body, JSON.stringify({ durationCode: "3d" }));
+    assert.equal(headerOf(calls[0], "Content-Type"), "application/json");
+    assert.equal(created.amount, 2300);
+    assert.equal(created.reused, false);
+    assert.equal(created.expired, null);
+    assert.equal(reused.reused, true);
+    assert.deepEqual(created.factors, { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 });
+    assert.deepEqual(created.inputs, { competingSellers: 3, compatibleBuyers: 4, slotsTotal: 3, slotsUsed: 1 });
+  });
+
+  test("un devis indisponible est un SUCCÈS (jamais une erreur) avec son motif", async () => {
+    const { client } = harness(() =>
+      json(201, {
+        contractVersion: "boost-quote/v1",
+        quote: quoteDto({ status: "unavailable", amount: null, factors: null, unavailableReason: "no_compatible_buyer" }),
+      }),
+    );
+    const quote = await client.boostQuotes.create(ID, "24h");
+    assert.equal(quote.status, "unavailable");
+    assert.equal(quote.amount, null);
+    assert.equal(quote.factors, null);
+    assert.equal(quote.unavailableReason, "no_compatible_buyer");
+  });
+
+  test("list : GET avec limit seulement, plus récentes d'abord ; chaque devis porte `expired`", async () => {
+    const { client, calls } = harness(() =>
+      json(200, {
+        contractVersion: "boost-quote/v1",
+        quotes: [
+          { ...quoteDto({ id: "55555555-5555-4555-8555-555555555555" }), reused: undefined, expired: false },
+          { ...quoteDto(), reused: undefined, expired: true },
+        ],
+      }),
+    );
+    const quotes = await client.boostQuotes.list(ID, { limit: 10 });
+    assert.equal(calls[0].url, `/api/offers/${ID}/boost-quotes?limit=10`);
+    assert.equal(calls[0].init.method, "GET");
+    assert.deepEqual(quotes.map((quote) => quote.expired), [false, true]);
+    assert.deepEqual(quotes.map((quote) => quote.reused), [null, null]);
+    await client.boostQuotes.list(ID);
+    assert.equal(calls[1].url, `/api/offers/${ID}/boost-quotes`);
+  });
+
+  test("identifiant non UUID, durée ou limite invalide : ApiError sans AUCUNE requête", async () => {
+    const { client, calls } = harness(() => json(200, { contractVersion: "boost-quote/v1", quote: quoteDto() }));
+    await assert.rejects(client.boostQuotes.create("pas-un-uuid", "3d"), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ID);
+    await assert.rejects(client.boostQuotes.list("../x"), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ID);
+    for (const duration of ["1h", "", "3D", "24h; DROP"]) {
+      await assert.rejects(
+        client.boostQuotes.create(ID, duration as never),
+        (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ARGUMENT,
+        duration,
+      );
+    }
+    for (const limit of [0, 51, 2.5, Number.NaN]) {
+      await assert.rejects(client.boostQuotes.list(ID, { limit }), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ARGUMENT, String(limit));
+    }
+    assert.equal(calls.length, 0);
+  });
+
+  test("erreurs du serveur (403, 404, 409, 503) : code et statut venant du corps seulement", async () => {
+    for (const [status, code] of [[403, "invalid_origin"], [404, "resource_not_found"], [409, "offer_not_eligible"], [409, "offer_not_boostable"], [503, "boost_unavailable"]] as const) {
+      const { client } = harness(() => json(status, { error: { code, message: "ignoré" } }));
+      await assert.rejects(
+        client.boostQuotes.create(ID, "3d"),
+        (error: unknown) => error instanceof ApiError && error.status === status && error.code === code,
+      );
+    }
+  });
+
+  test("réponse inattendue : invalid_response (champ manquant, durée ou état inconnus, version de contrat)", async () => {
+    const wrap = (quote: unknown, extra: Record<string, unknown> = {}) => json(201, { contractVersion: "boost-quote/v1", quote, ...extra });
+    const bad: Response[] = [
+      wrap(quoteDto({ durationCode: "30d" })),
+      wrap(quoteDto({ status: "pending" })),
+      wrap(quoteDto({ amount: "2300" })),
+      wrap(quoteDto({ amount: 2300.5 })),
+      wrap(quoteDto({ unavailableReason: "Motif Brut!" })),
+      wrap(quoteDto({ reused: undefined })),
+      wrap(quoteDto({ factors: { competitionMilli: 1060 } })),
+      wrap(quoteDto({ inputs: null })),
+      wrap(quoteDto({ expiresAt: 5 })),
+      wrap(quoteDto(), { contractVersion: "boost-quote/v2" }),
+      json(201, { contractVersion: "boost-quote/v1" }),
+      new Response("pas du json", { status: 201 }),
+    ];
+    for (const response of bad) {
+      const { client } = harness(() => response.clone());
+      await assert.rejects(
+        client.boostQuotes.create(ID, "3d"),
+        (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE,
+      );
+    }
+    const { client } = harness(() => json(200, { contractVersion: "boost-quote/v1", quotes: "non" }));
+    await assert.rejects(client.boostQuotes.list(ID), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE);
+  });
+
+  test("le DTO ne laisse passer aucun champ inconnu (prix brut, configuration tarifaire, identifiants)", async () => {
+    const { client } = harness(() =>
+      json(201, {
+        contractVersion: "boost-quote/v1",
+        quote: quoteDto({ rawAmount: "2296.0925", pricing: { key: "default", version: 1 }, offerId: ID, sellerId: OWNER_ID }),
+      }),
+    );
+    const quote = await client.boostQuotes.create(ID, "3d");
+    const text = JSON.stringify(quote);
+    for (const leaked of ["rawAmount", "2296.0925", "pricing", OWNER_ID, "offerId", "sellerId"]) assert.equal(text.includes(leaked), false, leaked);
+  });
+});
+
+describe("messages fixes : correspondances et boost", () => {
+  test("correspondances : 400, 404, 503 ont un message propre ; le reste retombe sur les messages communs", () => {
+    const message = (status: number, code = "x_code") => describeApiError(new ApiError(status, code, "ignoré"), "matches");
+    assert.equal(message(400), "Les résultats ne peuvent pas être affichés pour le moment. Actualisez la page.");
+    assert.equal(message(404), "Introuvable : cet élément a peut-être été archivé ou n'existe plus.");
+    assert.equal(message(503), "Les correspondances sont temporairement indisponibles. Réessayez dans un instant.");
+    assert.equal(message(401), "Votre session a expiré. Reconnectez-vous pour continuer.");
+    assert.equal(describeApiError(new ApiError(0, API_INVALID_ARGUMENT, "x"), "matches"), "Paramètre invalide. Rechargez la page.");
+  });
+
+  test("boost : 404, 409 par code, 503 ont un message propre", () => {
+    const message = (status: number, code: string) => describeApiError(new ApiError(status, code, "ignoré"), "boost");
+    assert.equal(message(404, "resource_not_found"), "Annonce introuvable : elle a peut-être été archivée ou n'existe plus.");
+    assert.equal(message(409, "offer_not_eligible"), "Cette annonce ne peut pas être boostée : elle doit être en ligne et disponible.");
+    assert.equal(message(409, "offer_not_boostable"), "Pour booster cette annonce, indiquez sa catégorie, sa marque et son modèle.");
+    assert.equal(message(503, "boost_unavailable"), "Le boost est temporairement indisponible. Réessayez plus tard.");
+    assert.equal(message(409, "autre"), GENERIC_ERROR_MESSAGE);
+    assert.equal(message(403, "invalid_origin"), "Requête refusée. Rechargez la page et réessayez.");
   });
 });

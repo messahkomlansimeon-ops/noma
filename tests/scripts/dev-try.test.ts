@@ -1,0 +1,465 @@
+import assert from "node:assert/strict";
+import { spawn, type ChildProcess } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import net from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { after, describe, test } from "node:test";
+import { checkDevelopmentNodeEnv } from "../../scripts/dev-proxy";
+import {
+  DEV_TRY_NEXT_PORT,
+  DEV_TRY_PROXY_PORT,
+  checkLocalDatabaseUrl,
+  devLockMessage,
+  isPortFree,
+  isValidAuthSecret,
+  prepareDevTry,
+  readNextDevLock,
+} from "../../scripts/dev-try";
+
+/**
+ * `npm run dev:try` : préparation de l'environnement, refus (hors développement, base distante, DATABASE_URL absent), verrou
+ * de `next dev`, ports, arrêt si Next échoue au démarrage. AUCUN vrai Next ni worker n'est lancé ici : les essais en
+ * processus enfant tournent dans un dossier temporaire vide (chemins absolus vers le script et le chargeur), et le seul qui
+ * va jusqu'à `dev:full` utilise un FAUX Next (NOMA_DEV_FULL_NEXT_SCRIPT) qui sort aussitôt.
+ */
+
+const DATABASE_URL = "postgresql://noma_local:noma_local_only@127.0.0.1:55432/noma_essai";
+const GOOD_AUTH_SECRET = Buffer.alloc(32, 7).toString("base64");
+const GOOD_PROXY_SECRET = "p".repeat(40);
+const SCRIPT = fileURLToPath(new URL("../../scripts/dev-try.ts", import.meta.url));
+const LOADER = fileURLToPath(new URL("../../poc/node_modules/tsx/dist/loader.mjs", import.meta.url));
+
+const temporaryDirectories: string[] = [];
+/** Processus lancés par les tests (chacun dans son groupe) : tués à la fin même si une assertion a échoué avant leur arrêt normal. */
+const spawned: ChildProcess[] = [];
+function killGroup(child: ChildProcess): void {
+  if (child.pid === undefined) return;
+  try {
+    process.kill(-child.pid, "SIGKILL");
+  } catch {
+    // groupe déjà terminé
+  }
+}
+after(() => {
+  for (const child of spawned) killGroup(child);
+  for (const directory of temporaryDirectories) rmSync(directory, { recursive: true, force: true });
+});
+
+function fixedRandom(byte: number) {
+  return (size: number) => Buffer.alloc(size, byte);
+}
+
+function temporaryDirectory(prefix: string): string {
+  const directory = mkdtempSync(join(tmpdir(), prefix));
+  temporaryDirectories.push(directory);
+  return directory;
+}
+
+describe("dev:try : préparation de l'environnement", () => {
+  test("DATABASE_URL est obligatoire dans l'environnement de lancement : aucune valeur par défaut", () => {
+    for (const value of [undefined, "", "   "]) {
+      const prepared = prepareDevTry({ DATABASE_URL: value });
+      assert.equal(prepared.ok, false);
+      assert.match((prepared as { reason: string }).reason, /DATABASE_URL est obligatoire dans l'environnement de lancement/);
+      assert.match((prepared as { reason: string }).reason, /\.env\* ne sont pas lus/);
+    }
+  });
+
+  test("réglages posés : développement, code OTP en console, drapeau du relais, origine 3212, Next sur 3211", () => {
+    const prepared = prepareDevTry({ DATABASE_URL, PATH: "/usr/bin" }, fixedRandom(1));
+    assert.ok(prepared.ok);
+    const { env, nextPort, proxyPort, publicOrigin } = prepared.plan;
+    assert.equal(DEV_TRY_NEXT_PORT, 3211);
+    assert.equal(DEV_TRY_PROXY_PORT, 3212);
+    assert.equal(nextPort, 3211);
+    assert.equal(proxyPort, 3212);
+    assert.equal(publicOrigin, "http://localhost:3212");
+    assert.equal(env.NODE_ENV, "development");
+    assert.equal(env.NOMA_DEV_OTP_CONSOLE, "1");
+    assert.equal(env.NOMA_DEV_PROXY, "1");
+    assert.equal(env.NOMA_AUTH_ORIGIN, "http://localhost:3212");
+    assert.equal(env.PORT, "3211");
+    assert.equal(env.DATABASE_URL, DATABASE_URL);
+    assert.equal(env.PATH, "/usr/bin");
+  });
+
+  test("hors développement : REFUS (production, test, autre valeur), jamais d'écrasement silencieux de NODE_ENV", () => {
+    for (const value of ["production", " production", "Production", "PRODUCTION", "production\t", "prod", "test", "staging", "Development", "DEVELOPMENT", "dev"]) {
+      const prepared = prepareDevTry({ DATABASE_URL, NODE_ENV: value });
+      assert.equal(prepared.ok, false, `NODE_ENV=${JSON.stringify(value)} doit être refusé`);
+      const reason = (prepared as { reason: string }).reason;
+      assert.match(reason, /ne démarre jamais hors développement/);
+      assert.ok(reason.includes(value.trim()), "le message dit quelle valeur a été reçue");
+      assert.equal(reason.includes(DATABASE_URL), false);
+    }
+    // Absent, vide ou « development » (espaces autour ignorés) : accepté ; NODE_ENV est alors posé à « development ».
+    for (const value of [undefined, "", "   ", "development", " development "]) {
+      const prepared = prepareDevTry({ DATABASE_URL, NODE_ENV: value });
+      assert.ok(prepared.ok, `NODE_ENV=${String(value)} doit être accepté`);
+      assert.equal(prepared.plan.env.NODE_ENV, "development");
+    }
+  });
+
+  test("règle NODE_ENV partagée avec le relais : absent, vide ou exactement « development » après nettoyage, rien d'autre", () => {
+    for (const value of [undefined, "", " ", "\t", "development", "  development\n"]) {
+      assert.deepEqual(checkDevelopmentNodeEnv(value), { ok: true }, JSON.stringify(value));
+    }
+    for (const value of ["production", " production", "Production", "PRODUCTION", "prod", "test", "staging", "Development", "developmentx", "dev elopment"]) {
+      const checked = checkDevelopmentNodeEnv(value);
+      assert.equal(checked.ok, false, JSON.stringify(value));
+      assert.equal((checked as { received: string }).received, value.trim());
+    }
+    // La valeur reçue est tronquée dans le message (jamais un texte arbitrairement long).
+    assert.equal((checkDevelopmentNodeEnv("x".repeat(100)) as { received: string }).received.length, 20);
+  });
+
+  test("montage entièrement simulé : fausses sources, IA et captcha désactivés, quoi que dise l'environnement", () => {
+    const prepared = prepareDevTry({ DATABASE_URL, NOMA_FAKE_SOURCES: "0", NOMA_AI_DISABLED: "0", NOMA_TURNSTILE_DISABLED: "0" });
+    assert.ok(prepared.ok);
+    assert.equal(prepared.plan.env.NOMA_FAKE_SOURCES, "1");
+    assert.equal(prepared.plan.env.NOMA_AI_DISABLED, "1");
+    assert.equal(prepared.plan.env.NOMA_TURNSTILE_DISABLED, "1");
+    const bare = prepareDevTry({ DATABASE_URL });
+    assert.ok(bare.ok);
+    assert.equal(bare.plan.env.NOMA_FAKE_SOURCES, "1");
+    assert.equal(bare.plan.env.NOMA_AI_DISABLED, "1");
+    assert.equal(bare.plan.env.NOMA_TURNSTILE_DISABLED, "1");
+  });
+
+  test("base de données : seulement CE poste (127.0.0.1, localhost, ::1), y compris par le paramètre host", () => {
+    const accepted = [
+      DATABASE_URL,
+      "postgresql://u:p@localhost:5432/noma_essai",
+      "postgres://u:p@LOCALHOST/noma_essai",
+      "postgresql://u:p@[::1]:5432/noma_essai",
+      "postgresql:///noma_essai?host=/var/run/postgresql",
+      "postgresql://u:p@127.0.0.1/noma_essai?host=localhost",
+      "postgresql://u:p@127.0.0.1/noma_essai?sslmode=disable",
+      // Plusieurs occurrences, toutes locales.
+      "postgresql://u:p@127.0.0.1/noma_essai?host=127.0.0.1&host=localhost",
+      "postgresql://u:p@localhost/noma_essai?host=/var/run/postgresql&host=127.0.0.1&hostaddr=127.0.0.1&hostaddr=::1",
+    ];
+    for (const url of accepted) assert.deepEqual(checkLocalDatabaseUrl(url), { ok: true }, url);
+    const refused = [
+      "postgresql://u:secret-pw@db.example.com:5432/noma",
+      "postgresql://u:secret-pw@192.168.1.20:5432/noma",
+      "postgresql://u:secret-pw@10.0.0.2/noma",
+      "postgresql://u:secret-pw@127.0.0.1.evil.example/noma",
+      "postgresql://u:secret-pw@127.0.0.1/noma?host=db.example.com",
+      "postgresql://u:secret-pw@localhost/noma?hostaddr=8.8.8.8",
+      "postgresql:///noma?host=db.example.com",
+      "postgresql:///noma",
+      // pg-connection-string garde la DERNIÈRE occurrence : toutes doivent être locales (une seule distante suffit à refuser).
+      "postgresql://u:secret-pw@127.0.0.1:55432/db?host=127.0.0.1&host=db.example.com",
+      "postgresql://u:secret-pw@127.0.0.1:55432/db?host=db.example.com&host=127.0.0.1",
+      "postgresql:///db?host=/var/run/postgresql&host=db.example.com",
+      "postgresql://u:secret-pw@127.0.0.1/db?hostaddr=127.0.0.1&hostaddr=8.8.8.8",
+      "postgresql://u:secret-pw@127.0.0.1/db?hostaddr=8.8.8.8&hostaddr=127.0.0.1",
+      "postgresql://u:secret-pw@127.0.0.1/db?host=localhost&hostaddr=127.0.0.1&hostaddr=8.8.8.8",
+      "postgresql://u:secret-pw@127.0.0.1/db?host=",
+      "postgresql://u:secret-pw@127.0.0.1/db?host=127.0.0.1&host=",
+      "postgresql://u:secret-pw@127.0.0.1:5432,db.example.com:5432/noma",
+      "mysql://u:secret-pw@127.0.0.1/noma",
+      "http://127.0.0.1/noma",
+      "pas une adresse",
+    ];
+    for (const url of refused) {
+      const checked = checkLocalDatabaseUrl(url);
+      assert.equal(checked.ok, false, url);
+      assert.equal(JSON.stringify(checked).includes("secret-pw"), false, "le mot de passe n'apparaît jamais dans le refus");
+      const prepared = prepareDevTry({ DATABASE_URL: url });
+      assert.equal(prepared.ok, false, url);
+      assert.match((prepared as { reason: string }).reason, /base de CE poste/);
+      assert.equal(JSON.stringify(prepared).includes("secret-pw"), false);
+    }
+  });
+
+  test("secrets absents : générés au hasard (valides), avertissements sans valeur secrète ; les deux noms du secret de proxy sont égaux", () => {
+    const prepared = prepareDevTry({ DATABASE_URL }, fixedRandom(9));
+    assert.ok(prepared.ok);
+    const { env, warnings } = prepared.plan;
+    assert.ok(isValidAuthSecret(env.NOMA_AUTH_SECRET as string));
+    assert.ok(Buffer.byteLength(env.NOMA_AUTH_PROXY_SECRET as string, "utf8") >= 32);
+    assert.equal(env.NOMA_PROXY_SECRET, env.NOMA_AUTH_PROXY_SECRET);
+    assert.equal(warnings.length, 2);
+    assert.match(warnings.join(" "), /sessions ne survivent pas à un redémarrage/);
+    for (const warning of warnings) {
+      assert.equal(warning.includes(env.NOMA_AUTH_SECRET as string), false);
+      assert.equal(warning.includes(env.NOMA_AUTH_PROXY_SECRET as string), false);
+    }
+    // Deux démarrages indépendants ne partagent pas de secret.
+    const other = prepareDevTry({ DATABASE_URL });
+    const another = prepareDevTry({ DATABASE_URL });
+    assert.ok(other.ok && another.ok);
+    assert.notEqual(other.plan.env.NOMA_AUTH_SECRET, another.plan.env.NOMA_AUTH_SECRET);
+    assert.notEqual(other.plan.env.NOMA_AUTH_PROXY_SECRET, another.plan.env.NOMA_AUTH_PROXY_SECRET);
+  });
+
+  test("secrets fournis : conservés tels quels, sans avertissement", () => {
+    const prepared = prepareDevTry({ DATABASE_URL, NOMA_AUTH_SECRET: GOOD_AUTH_SECRET, NOMA_AUTH_PROXY_SECRET: GOOD_PROXY_SECRET });
+    assert.ok(prepared.ok);
+    assert.equal(prepared.plan.env.NOMA_AUTH_SECRET, GOOD_AUTH_SECRET);
+    assert.equal(prepared.plan.env.NOMA_AUTH_PROXY_SECRET, GOOD_PROXY_SECRET);
+    assert.equal(prepared.plan.env.NOMA_PROXY_SECRET, GOOD_PROXY_SECRET);
+    assert.deepEqual(prepared.plan.warnings, []);
+  });
+
+  test("secrets fournis mais invalides : refus sans afficher la valeur", () => {
+    for (const secret of ["pas-du-base64!", Buffer.alloc(16, 1).toString("base64"), "QUJD"]) {
+      const prepared = prepareDevTry({ DATABASE_URL, NOMA_AUTH_SECRET: secret });
+      assert.equal(prepared.ok, false, secret);
+      assert.equal(JSON.stringify(prepared).includes(secret), false);
+    }
+    const shortProxy = prepareDevTry({ DATABASE_URL, NOMA_AUTH_PROXY_SECRET: "trop-court" });
+    assert.equal(shortProxy.ok, false);
+    assert.equal(JSON.stringify(shortProxy).includes("trop-court"), false);
+  });
+
+  test("ports : réglables pour la mise au point, jamais identiques ni invalides ; l'origine publique suit le port du relais", () => {
+    const custom = prepareDevTry({ DATABASE_URL, NOMA_DEV_TRY_PORT: "4012", NOMA_DEV_TRY_NEXT_PORT: "4011" });
+    assert.ok(custom.ok);
+    assert.equal(custom.plan.publicOrigin, "http://localhost:4012");
+    assert.equal(custom.plan.env.NOMA_AUTH_ORIGIN, "http://localhost:4012");
+    assert.equal(custom.plan.env.PORT, "4011");
+    assert.equal(prepareDevTry({ DATABASE_URL, NOMA_DEV_TRY_PORT: "3211" }).ok, false, "même port que Next");
+    assert.equal(prepareDevTry({ DATABASE_URL, NOMA_DEV_TRY_PORT: "abc" }).ok, false);
+    assert.equal(prepareDevTry({ DATABASE_URL, NOMA_DEV_TRY_NEXT_PORT: "70000" }).ok, false);
+  });
+});
+
+describe("dev:try : verrou d'un autre next dev", () => {
+  function projectWithLock(content: string | null): string {
+    const directory = temporaryDirectory("noma-dev-try-lock-");
+    if (content !== null) {
+      mkdirSync(join(directory, ".next", "dev"), { recursive: true });
+      writeFileSync(join(directory, ".next", "dev", "lock"), content);
+    }
+    return directory;
+  }
+
+  test("pas de verrou : on peut démarrer", () => {
+    assert.equal(readNextDevLock(projectWithLock(null)), null);
+    assert.equal(devLockMessage(null), null);
+  });
+
+  test("verrou d'un processus vivant : message clair en français avec le port, et on refuse", () => {
+    const directory = projectWithLock(JSON.stringify({ pid: process.pid, port: 3210, hostname: "localhost" }));
+    const lock = readNextDevLock(directory);
+    assert.deepEqual(lock, { pid: process.pid, port: 3210 });
+    assert.equal(
+      devLockMessage(lock),
+      "Un serveur next dev tourne déjà dans ce dossier (port 3210) : arrêtez-le ou utilisez une copie.",
+    );
+  });
+
+  test("verrou d'un processus disparu : périmé, on peut démarrer ; verrou illisible : par prudence, on refuse", () => {
+    assert.equal(devLockMessage({ pid: 4_000_000, port: 3210 }, () => false), null);
+    const unreadable = readNextDevLock(projectWithLock("{pas du json"));
+    assert.deepEqual(unreadable, { pid: null, port: null });
+    assert.equal(
+      devLockMessage(unreadable),
+      "Un serveur next dev tourne déjà dans ce dossier : arrêtez-le ou utilisez une copie.",
+    );
+  });
+});
+
+interface Outcome {
+  code: number | null;
+  output: string;
+  elapsedMs: number;
+  timedOut: boolean;
+}
+
+/**
+ * Lance `scripts/dev-try.ts` en processus enfant : cwd = dossier temporaire VIDE, chemins absolus vers le script et le chargeur,
+ * environnement minimal, groupe de processus à part (tué en fin de test, même en cas d'échec) et délai maximal.
+ */
+function runDevTry(options: { cwd: string; env: Record<string, string | undefined>; maxMs: number }): Promise<Outcome> {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const child = spawn(process.execPath, ["--import", LOADER, SCRIPT], {
+      cwd: options.cwd,
+      env: { PATH: process.env.PATH, HOME: process.env.HOME, ...options.env } as unknown as NodeJS.ProcessEnv,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
+    });
+    spawned.push(child);
+    let output = "";
+    let timedOut = false;
+    child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString("utf8")));
+    child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString("utf8")));
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killGroup(child);
+    }, options.maxMs);
+    child.on("exit", (code) => {
+      clearTimeout(timer);
+      killGroup(child);
+      resolve({ code, output, elapsedMs: Date.now() - startedAt, timedOut });
+    });
+  });
+}
+
+async function freePort(): Promise<number> {
+  return new Promise((resolve) => {
+    const probe = net.createServer();
+    probe.listen(0, "127.0.0.1", () => {
+      const { port } = probe.address() as net.AddressInfo;
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
+describe("dev:try lancé comme programme : refus clairs, rien n'est démarré", () => {
+  const NOTHING_STARTED = (output: string) => {
+    assert.equal(output.includes("Démarrage de Next"), false, "aucun démarrage");
+    assert.equal(output.includes("noma est prêt"), false);
+    assert.equal(output.includes("[auth:dev]"), false);
+    assert.equal(output.includes("[dev:full]"), false);
+  };
+
+  test("DATABASE_URL absent → code 1, message en français", async () => {
+    const result = await runDevTry({ cwd: temporaryDirectory("noma-dev-try-cwd-"), env: {}, maxMs: 40_000 });
+    assert.equal(result.timedOut, false, "doit se terminer seul");
+    assert.equal(result.code, 1);
+    assert.match(result.output, /DATABASE_URL est obligatoire/);
+    NOTHING_STARTED(result.output);
+  });
+
+  test("un .env.local (et un .env) avec DATABASE_URL dans le dossier courant NE SUFFIT PAS : refus, rien n'est démarré", async () => {
+    const cwd = temporaryDirectory("noma-dev-try-envfile-");
+    const fileContent = "DATABASE_URL=postgresql://noma_local:noma_local_only@127.0.0.1:1/noma_fichier\n";
+    writeFileSync(join(cwd, ".env.local"), fileContent);
+    writeFileSync(join(cwd, ".env"), fileContent);
+    writeFileSync(join(cwd, ".env.development.local"), fileContent);
+    const result = await runDevTry({ cwd, env: {}, maxMs: 40_000 });
+    assert.equal(result.timedOut, false, "ne doit ni démarrer Next ni rester bloqué");
+    assert.equal(result.code, 1);
+    assert.match(result.output, /DATABASE_URL est obligatoire dans l'environnement de lancement/);
+    NOTHING_STARTED(result.output);
+  });
+
+  test("NODE_ENV=production (ou test) avec une bonne base locale → refus, rien n'est démarré", async () => {
+    for (const value of ["production", "test"]) {
+      const result = await runDevTry({ cwd: temporaryDirectory("noma-dev-try-prod-"), env: { DATABASE_URL, NODE_ENV: value }, maxMs: 40_000 });
+      assert.equal(result.timedOut, false, value);
+      assert.equal(result.code, 1, value);
+      assert.match(result.output, /ne démarre jamais hors développement/);
+      NOTHING_STARTED(result.output);
+    }
+  });
+
+  test("base de données distante → refus, rien n'est démarré, le mot de passe n'est pas affiché", async () => {
+    const result = await runDevTry({
+      cwd: temporaryDirectory("noma-dev-try-remote-"),
+      env: { DATABASE_URL: "postgresql://noma:secret-pw@db.example.com:5432/noma_essai" },
+      maxMs: 40_000,
+    });
+    assert.equal(result.timedOut, false);
+    assert.equal(result.code, 1);
+    assert.match(result.output, /base de CE poste/);
+    assert.equal(result.output.includes("secret-pw"), false);
+    NOTHING_STARTED(result.output);
+  });
+});
+
+describe("dev:try : arrêt immédiat si dev:full se termine pendant le démarrage", () => {
+  async function withFakeNext(source: string): Promise<Record<string, string>> {
+    const directory = temporaryDirectory("noma-dev-try-fake-");
+    const script = join(directory, "faux-next.js");
+    writeFileSync(script, source);
+    return {
+      DATABASE_URL: "postgresql://noma_local:noma_local_only@127.0.0.1:1/noma_essai",
+      // Faux Next (réservé aux tests, voir dev-full.ts) ; aucun verrou à contrôler dans ce dossier ; ports libres choisis.
+      NOMA_DEV_FULL_NEXT_SCRIPT: script,
+      NOMA_DEV_TRY_LOCK_DIR: directory,
+      NOMA_DEV_TRY_NEXT_PORT: String(await freePort()),
+      NOMA_DEV_TRY_PORT: String(await freePort()),
+    };
+  }
+
+  test("un faux Next qui sort en code 1 : tout s'arrête en moins de 10 s, code 1, message clair (pas d'attente de 180 s)", async () => {
+    const env = await withFakeNext('console.log("faux next : échec au démarrage"); process.exit(1);');
+    const result = await runDevTry({ cwd: temporaryDirectory("noma-dev-try-cwd-"), env, maxMs: 60_000 });
+    assert.equal(result.timedOut, false, "le processus doit se terminer seul");
+    assert.equal(result.code, 1);
+    assert.ok(result.elapsedMs < 10_000, `sortie en ${result.elapsedMs} ms (attendu < 10 s)`);
+    assert.match(result.output, /Le serveur s'est arrêté de façon inattendue \(code 1\)/);
+    assert.match(result.output, /Tout a été arrêté/);
+    assert.equal(result.output.includes("noma est prêt"), false);
+  });
+
+  test("un faux Next qui sort en code 0 sans qu'on le demande : c'est aussi un échec (code 1), arrêt immédiat", async () => {
+    const env = await withFakeNext("process.exit(0);");
+    const result = await runDevTry({ cwd: temporaryDirectory("noma-dev-try-cwd-"), env, maxMs: 60_000 });
+    assert.equal(result.timedOut, false);
+    assert.equal(result.code, 1);
+    assert.ok(result.elapsedMs < 10_000, `sortie en ${result.elapsedMs} ms (attendu < 10 s)`);
+    assert.match(result.output, /s'est arrêté de façon inattendue/);
+  });
+});
+
+describe("dev:try : ports", () => {
+  test("isPortFree : vrai pour un port libre, faux pour un port occupé en IPv4", async () => {
+    const holder = net.createServer();
+    await new Promise<void>((resolve) => holder.listen(0, "127.0.0.1", resolve));
+    const { port } = holder.address() as net.AddressInfo;
+    assert.equal(await isPortFree(port), false);
+    await new Promise<void>((resolve) => holder.close(() => resolve()));
+    assert.equal(await isPortFree(port), true);
+  });
+
+  test("isPortFree : un port occupé en IPv6 SEULEMENT (::1) est aussi refusé", async (t) => {
+    const holder = net.createServer();
+    const listening = await new Promise<boolean>((resolve) => {
+      holder.once("error", () => resolve(false));
+      holder.listen({ port: 0, host: "::1", ipv6Only: true }, () => resolve(true));
+    });
+    if (!listening) {
+      t.skip("IPv6 indisponible sur ce poste");
+      return;
+    }
+    try {
+      const { port } = holder.address() as net.AddressInfo;
+      // Côté IPv4 le port est libre : seul le contrôle IPv6 peut le voir occupé.
+      const ipv4Free = await new Promise<boolean>((resolve) => {
+        const probe = net.createServer();
+        probe.once("error", () => resolve(false));
+        probe.listen(port, "127.0.0.1", () => probe.close(() => resolve(true)));
+      });
+      assert.equal(ipv4Free, true, "précondition : le port est libre en IPv4");
+      assert.equal(await isPortFree(port), false);
+    } finally {
+      await new Promise<void>((resolve) => holder.close(() => resolve()));
+    }
+  });
+});
+
+describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
+  const guide = readFileSync(fileURLToPath(new URL("../../ESSAYER.md", import.meta.url)), "utf8");
+  const normalized = guide.replace(/\s+/g, " ");
+
+  test("le guide dit : base indiquée dans la commande, base de CE poste, NODE_ENV, recherche simulée, besoins, port jamais exposé", () => {
+    for (const expected of [
+      "DATABASE_URL=…",
+      "ne lit aucun fichier `.env`",
+      "votre ordinateur",
+      "NODE_ENV",
+      "development",
+      "jamais en production",
+      "résultats d'exemple",
+      "aucun vrai site n'est contacté",
+      "n'exposez jamais le port 3212 par un tunnel",
+      "loca.lt",
+      "ngrok",
+      "besoins",
+      "un même acheteur peut avoir plusieurs besoins",
+    ]) {
+      assert.ok(normalized.includes(expected), `ESSAYER.md doit contenir « ${expected} »`);
+    }
+    // Le guide ne promet plus un « nombre d'acheteurs ».
+    assert.equal(/combien d'acheteurs sont intéressés/.test(normalized), false);
+  });
+});

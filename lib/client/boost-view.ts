@@ -1,0 +1,246 @@
+/**
+ * Présentation du devis de boost (écran « Booster cette annonce », côté vendeur) : libellés et règles en fonctions
+ * PURES, sans React, testées isolément.
+ *
+ * Règles de présentation :
+ *  - le montant est affiché en FCFA, les facteurs du prix sont expliqués en clair (concurrence, acheteurs compatibles, rareté
+ *    des places, durée), jamais en millièmes ni en codes ;
+ *  - un devis INDISPONIBLE affiche son motif en clair ; un motif inconnu donne un texte générique, jamais le code brut ;
+ *  - un devis est valable un court moment (compte à rebours) ; il n'engage à rien et ne réserve aucune place ;
+ *  - AUCUN paiement : le bouton « Acheter » est toujours désactivé, avec la mention « Paiement bientôt disponible ».
+ */
+
+import { BOOST_DURATION_CODES, type BoostDurationCode, type BoostQuote, type OfferRecord } from "./api";
+import { formatAmount } from "./catalog-view";
+
+export const BOOST_DURATIONS: readonly { code: BoostDurationCode; label: string }[] = [
+  { code: "24h", label: "24 h" },
+  { code: "3d", label: "3 jours" },
+  { code: "7d", label: "7 jours" },
+];
+
+export const BOOST_INTRO =
+  "Un boost fait monter votre annonce dans les résultats des acheteurs, parmi des offres déjà pertinentes. " +
+  "Ce n'est pas une garantie de vente et le prix ci-dessous n'engage à rien tant que vous n'achetez pas.";
+
+export function durationLabel(code: BoostDurationCode): string {
+  return BOOST_DURATIONS.find((duration) => duration.code === code)?.label ?? "Durée inconnue";
+}
+
+/** Vrai pour un code de durée que le serveur accepte. */
+export function isBoostDuration(value: unknown): value is BoostDurationCode {
+  return typeof value === "string" && (BOOST_DURATION_CODES as readonly string[]).includes(value);
+}
+
+export type BoostEligibility = { eligible: true } | { eligible: false; message: string };
+
+/**
+ * Le devis n'est proposé que pour une annonce en ligne, disponible, avec catégorie, marque et modèle (les mêmes règles que le
+ * serveur, qui reste l'autorité : 409 `offer_not_eligible` / `offer_not_boostable`).
+ */
+export function boostEligibility(
+  offer: Pick<OfferRecord, "status" | "availabilityStatus" | "category" | "brand" | "model">,
+): BoostEligibility {
+  if (offer.status !== "published") {
+    const hint =
+      offer.status === "draft"
+        ? "Publiez-la d'abord."
+        : offer.status === "paused"
+          ? "Remettez-la en ligne d'abord."
+          : "Une annonce archivée ne peut plus être boostée.";
+    return { eligible: false, message: `Le devis n'est proposé que pour une annonce en ligne. ${hint}` };
+  }
+  if (offer.availabilityStatus === "unavailable") {
+    return { eligible: false, message: "Une annonce marquée indisponible ne peut pas être boostée." };
+  }
+  const missing = [offer.category, offer.brand, offer.model].some((part) => !part || part.trim().length === 0);
+  if (missing) {
+    return { eligible: false, message: "Pour booster cette annonce, indiquez sa catégorie, sa marque et son modèle." };
+  }
+  return { eligible: true };
+}
+
+export const UNAVAILABLE_REASON_TEXT: Readonly<Record<string, string>> = Object.freeze({
+  offer_already_boosted: "Cette annonce est déjà boostée.",
+  no_slot_available: "Il n'y a plus de place disponible pour ce produit pour le moment.",
+  seller_boost_limit_reached: "Vous avez atteint votre plafond de boosts pour ce produit.",
+  no_compatible_buyer: "Aucun acheteur compatible pour le moment : un boost ne serait pas utile.",
+});
+
+export const UNAVAILABLE_FALLBACK_TEXT = "Le boost n'est pas disponible pour cette annonce pour le moment.";
+
+/** Motif d'indisponibilité en clair ; un code inconnu (ou absent) ne s'affiche jamais tel quel. */
+export function unavailableReasonText(code: string | null): string {
+  if (code !== null && Object.prototype.hasOwnProperty.call(UNAVAILABLE_REASON_TEXT, code)) return UNAVAILABLE_REASON_TEXT[code];
+  return UNAVAILABLE_FALLBACK_TEXT;
+}
+
+/** « 2 300 FCFA », ou null pour un devis indisponible. */
+export function quoteAmountText(quote: Pick<BoostQuote, "amount" | "currency">): string | null {
+  if (quote.amount === null) return null;
+  return `${formatAmount(quote.amount)} ${quote.currency === "XOF" ? "FCFA" : quote.currency}`;
+}
+
+/** 1,06 → « 1,06 » : virgule décimale, sans zéros inutiles. */
+function frenchNumber(value: number): string {
+  return String(Math.round(value * 1000) / 1000).replace(".", ",");
+}
+
+/** Effet d'un facteur en millièmes sur le prix : « +6 % », « sans effet », « −5 % ». */
+export function factorEffectText(milli: number): string {
+  if (milli === 1000) return "sans effet sur le prix";
+  const percent = (milli - 1000) / 10;
+  return percent > 0 ? `+${frenchNumber(percent)} % sur le prix` : `−${frenchNumber(Math.abs(percent))} % sur le prix`;
+}
+
+export interface FactorLine {
+  key: "competition" | "demand" | "scarcity" | "duration";
+  title: string;
+  text: string;
+  effect: string;
+}
+
+const plural = (count: number, singular: string, pluralForm: string) => (count > 1 ? pluralForm : singular);
+
+/** Explication du prix en clair : une ligne par facteur ; vide si le devis est indisponible. */
+export function explainFactors(quote: Pick<BoostQuote, "factors" | "inputs" | "durationCode">): FactorLine[] {
+  if (quote.factors === null) return [];
+  const { competingSellers, compatibleBuyers, slotsTotal, slotsUsed } = quote.inputs;
+  const durationEffect =
+    quote.factors.durationMilli === 1000
+      ? "durée de référence (prix de base)"
+      : `prix × ${frenchNumber(quote.factors.durationMilli / 1000)} selon la durée`;
+  return [
+    {
+      key: "competition",
+      title: "Concurrence",
+      text:
+        competingSellers === 0
+          ? "Aucun autre vendeur ne propose ce produit."
+          : `${competingSellers} autre${plural(competingSellers, "", "s")} vendeur${plural(competingSellers, "", "s")} ${plural(competingSellers, "propose", "proposent")} ce produit.`,
+      effect: factorEffectText(quote.factors.competitionMilli),
+    },
+    {
+      key: "demand",
+      title: "Acheteurs compatibles",
+      text: `${compatibleBuyers} acheteur${plural(compatibleBuyers, "", "s")} compatible${plural(compatibleBuyers, "", "s")} avec votre annonce.`,
+      effect: factorEffectText(quote.factors.demandMilli),
+    },
+    {
+      key: "scarcity",
+      title: "Places disponibles",
+      text: `${slotsUsed} place${plural(slotsUsed, "", "s")} de mise en avant utilisée${plural(slotsUsed, "", "s")} sur ${slotsTotal}.`,
+      effect: factorEffectText(quote.factors.scarcityMilli),
+    },
+    {
+      key: "duration",
+      title: "Durée",
+      text: `Mise en avant pendant ${durationLabel(quote.durationCode)}.`,
+      effect: durationEffect,
+    },
+  ];
+}
+
+/** Millisecondes de validité restantes (0 si expiré ou si la date est illisible). */
+export function remainingMs(expiresAt: string, now: number): number {
+  const end = Date.parse(expiresAt);
+  if (!Number.isFinite(end)) return 0;
+  return Math.max(0, end - now);
+}
+
+/** Durée de validité totale d'un devis (expiresAt − computedAt, en ms), ou null si les dates sont illisibles. */
+export function validityWindowMs(quote: Pick<BoostQuote, "computedAt" | "expiresAt">): number | null {
+  const start = Date.parse(quote.computedAt);
+  const end = Date.parse(quote.expiresAt);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+  return end - start;
+}
+
+/**
+ * Validité restante, JAMAIS au-delà de la durée de validité du devis : une horloge d'écran en retard (page ouverte depuis
+ * longtemps, appareil à l'heure en retard) ne peut pas afficher « 15 min 31 s » pour un prix valable 15 min.
+ */
+export function remainingValidityMs(quote: Pick<BoostQuote, "computedAt" | "expiresAt">, now: number): number {
+  const left = remainingMs(quote.expiresAt, now);
+  const window = validityWindowMs(quote);
+  return window === null ? left : Math.min(left, window);
+}
+
+/** « 14 min 59 s », « 45 s » ; « 0 s » à l'échéance. Arrondi par excès : on ne dit jamais « 0 s » avant l'expiration. */
+export function formatCountdown(ms: number): string {
+  const seconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return minutes > 0 ? `${minutes} min ${rest} s` : `${rest} s`;
+}
+
+export interface QuoteValidity {
+  expired: boolean;
+  text: string;
+}
+
+export function quoteValidity(quote: Pick<BoostQuote, "computedAt" | "expiresAt" | "status">, now: number): QuoteValidity {
+  const left = remainingValidityMs(quote, now);
+  if (left <= 0) return { expired: true, text: "Ce devis a expiré. Demandez-en un nouveau." };
+  const prefix = quote.status === "available" ? "Prix valable encore" : "Résultat valable encore";
+  return { expired: false, text: `${prefix} ${formatCountdown(left)}` };
+}
+
+/** Bouton d'achat : TOUJOURS désactivé tant que le paiement n'existe pas. */
+export interface BuyButtonState {
+  label: string;
+  disabled: true;
+  note: string;
+}
+
+export const BUY_BUTTON: BuyButtonState = Object.freeze({
+  label: "Acheter",
+  disabled: true as const,
+  note: "Paiement bientôt disponible",
+});
+
+export function buyButtonState(): BuyButtonState {
+  return BUY_BUTTON;
+}
+
+/** Date courte d'un devis de l'historique : « 05/10 17:01 » (fuseau local, ou celui qu'on lui donne en test). */
+export function formatQuoteTime(iso: string, timeZone?: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "date inconnue";
+  const parts = new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
+  return `${part("day")}/${part("month")} ${part("hour")}:${part("minute")}`;
+}
+
+export interface QuoteHistoryRow {
+  key: string;
+  /** « 3 jours · 2 300 FCFA » ou « 3 jours · indisponible ». */
+  title: string;
+  /** Motif en clair pour un devis indisponible, « En cours de validité » ou « Expiré ». */
+  status: string;
+  detail: string;
+  tone: "good" | "neutral" | "warn";
+}
+
+export function quoteHistoryRow(quote: BoostQuote, now: number, timeZone?: string): QuoteHistoryRow {
+  const amount = quoteAmountText(quote);
+  const expired = quote.expired === true || remainingMs(quote.expiresAt, now) <= 0;
+  const base = {
+    key: quote.id,
+    title: `${durationLabel(quote.durationCode)} · ${amount ?? "indisponible"}`,
+    detail: `Demandé le ${formatQuoteTime(quote.computedAt, timeZone)}`,
+  };
+  if (quote.status === "unavailable") {
+    return { ...base, status: unavailableReasonText(quote.unavailableReason), tone: "warn" };
+  }
+  return expired
+    ? { ...base, status: "Expiré", tone: "neutral" }
+    : { ...base, status: "En cours de validité", tone: "good" };
+}

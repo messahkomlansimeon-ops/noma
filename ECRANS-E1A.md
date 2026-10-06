@@ -1,5 +1,9 @@
 # ECRANS-E1A.md — Premiers écrans branchés sur le vrai serveur (lot E1a)
 
+> **Mise à jour (lot E1b)** : les correspondances, « Sponsorisé » et les devis de boost sont branchés (voir `ECRANS-E1B.md`) ; les
+> scripts `e2e:core` et `e2e:ui` n'ajoutent plus eux-mêmes les en-têtes du proxy de confiance : ils passent par le relais de
+> développement (port 3212, `scripts/dev-proxy.ts`). Les paragraphes ci-dessous décrivent l'état du lot E1a.
+
 Écrans branchés : connexion et vérification OTP, annonces du vendeur (liste, création, publication, pause, archivage),
 besoins de l'acheteur (création, activation, liste, satisfait, archivage), déconnexion. Les autres écrans restent sur les
 données de démonstration (`lib/data.ts`, `lib/store.ts`) ; le store ne sert plus ici qu'aux messages (toasts). Pas encore :
