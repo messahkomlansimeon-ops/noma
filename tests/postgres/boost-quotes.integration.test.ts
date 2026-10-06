@@ -163,12 +163,12 @@ async function controlWorld() {
 // ═════════════ 1. Migration 0012 ═════════════
 
 test("migration 0012 : 13 appliquées (dont 0012), la relance n'en applique aucune, ligne default v1 exacte, index présents", async () => {
-  assert.equal(firstMigration.applied.length, 13);
-  assert.equal(firstMigration.applied.at(-1), "0013_boost_exposures");
+  assert.equal(firstMigration.applied.length, 14);
+  assert.equal(firstMigration.applied.at(-1), "0014_wallet_ledger");
   assert.ok(firstMigration.applied.includes("0012_boost_pricing"));
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 13);
+  assert.equal(rerun.skipped.length, 14);
   const rows = (await pool.query("SELECT * FROM boost_pricing_settings")).rows;
   assert.equal(rows.length, 1);
   const { created_at: createdAt, ...rest } = rows[0];

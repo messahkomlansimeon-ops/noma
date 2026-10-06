@@ -94,14 +94,33 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   };
 }
 
-/** Production : la configuration anti-bot doit être complète, sinon l'app
- *  refuse de démarrer (fail closed). */
-export function assertProductionConfig(cfg: GuardConfig): void {
-  if (process.env.NODE_ENV !== "production") return;
+/**
+ * Variables d'environnement INTERDITES en production (contournements de développement). Liste reprise dans la section
+ * « INTERDIT en production » de deploy/env.production.example (un test vérifie qu'elles y figurent toutes).
+ */
+export const PRODUCTION_FORBIDDEN_ENV: readonly string[] = Object.freeze([
+  "NOMA_FAKE_PAYMENTS",
+  "NOMA_FAKE_PAYMENT_SECRET",
+  "NOMA_DEV_OTP_CONSOLE",
+  "NOMA_DEV_PROXY",
+  "NOMA_FAKE_SOURCES",
+  "NOMA_TURNSTILE_DISABLED",
+]);
+
+/** Production : la configuration anti-bot doit être complète et aucune variable de développement ne doit être définie,
+ *  sinon l'app refuse de démarrer (fail closed). Exécutée à la création du singleton de `guard()` (premier appel de
+ *  /api/search dans le processus), seulement quand NODE_ENV vaut exactement « production ». Les messages sont fixes : ils
+ *  nomment la variable (texte de la liste ci-dessus), jamais sa valeur. */
+export function assertProductionConfig(cfg: GuardConfig, env: Record<string, string | undefined> = process.env): void {
+  if (env.NODE_ENV !== "production") return;
   if (!cfg.turnstile.secret) {
     throw new Error("NOMA_TURNSTILE_SECRET requis en production");
   }
   if (!cfg.ipSecret) {
     throw new Error("NOMA_IP_SECRET requis en production");
+  }
+  for (const name of PRODUCTION_FORBIDDEN_ENV) {
+    const value = env[name];
+    if (value !== undefined && value !== "") throw new Error(`${name} interdit en production`);
   }
 }

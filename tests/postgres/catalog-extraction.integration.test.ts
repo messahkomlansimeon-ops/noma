@@ -88,6 +88,7 @@ if (!configuredUrl?.trim()) {
         "0011_offer_boosts",
         "0012_boost_pricing",
         "0013_boost_exposures",
+        "0014_wallet_ledger",
       ]);
     });
 
