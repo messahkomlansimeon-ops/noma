@@ -668,11 +668,15 @@ test("contenu : jamais le téléphone du vendeur, son identifiant ni le texte li
   const buyer = await makePerson(pool);
   await enableExternal(buyer.id);
   const demand = await makeDemand(pool, buyer.id);
-  const offer = await createOffer({
+  // Lot D1 : le catalogue refuse désormais une variante ou un attribut qui ressemble à un numéro : l'annonce est créée sans, puis la variante et l'attribut sont écrits
+  // directement en base (une annonce plus ancienne que la règle) ; ce que l'essai vérifie, c'est que la notification ne les reprend jamais.
+  const created = await createOffer({
     ownerId: seller.id, rawText: "RAW_SECRET_TEXT appelez le 07 07 07 07 07", category: PRODUCT.category, brand: PRODUCT.brand, model: PRODUCT.model,
-    variant: "0707070707", attributes: { note: "RAW_SECRET_ATTRIBUTE 0707070707" }, price: { amount: 250_000, currency: "XOF" },
-    status: "published", availabilityStatus: "available",
+    price: { amount: 250_000, currency: "XOF" }, status: "published", availabilityStatus: "available",
   }, pool);
+  const legacyAttributes = { note: "RAW_SECRET_ATTRIBUTE 0707070707" };
+  await pool.query("UPDATE offers SET variant = '0707070707', attributes = $2::jsonb WHERE id = $1", [created.id, JSON.stringify(legacyAttributes)]);
+  const offer = { ...created, variant: "0707070707", attributes: legacyAttributes };
   const evaluationId = await insertEvaluation(pool, { offer, demand });
   assert.equal((await directOutcome(offer, demand, evaluationId)).kind, "created");
   const stored = JSON.stringify({ notifications: await notificationRows(), deliveries: await deliveryRows() });

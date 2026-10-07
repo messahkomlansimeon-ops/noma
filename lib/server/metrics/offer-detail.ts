@@ -16,7 +16,7 @@ export const OFFER_DETAIL_CONTRACT_VERSION = "demand-offer/v1" as const;
 export const PUBLIC_ATTRIBUTE_LIMIT = 12;
 const ATTRIBUTE_KEY = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
 const ATTRIBUTE_VALUE_MAX = 80;
-// Contrôle du texte (caractères refusés, neuf chiffres ou plus) : fonctions partagées avec les notifications (`public-text.ts`), NFKC et chiffres de tous les systèmes d'écriture.
+// Contrôle du texte (caractères refusés, huit chiffres ou plus à moins de quatre caractères les uns des autres) : fonctions partagées avec les notifications (`public-text.ts`), NFKC et chiffres de tous les systèmes d'écriture.
 
 export interface PublicAttribute {
   key: string;
@@ -40,7 +40,7 @@ export function publicAttributes(attributes: JsonObject | null): PublicAttribute
   if (attributes === null || typeof attributes !== "object" || Array.isArray(attributes)) return [];
   const result: PublicAttribute[] = [];
   for (const key of Object.keys(attributes).sort()) {
-    if (!ATTRIBUTE_KEY.test(key)) continue;
+    if (!ATTRIBUTE_KEY.test(key) || looksLikePhoneNumber(key)) continue;
     const raw = attributes[key];
     let text: string | null;
     if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {

@@ -6,6 +6,8 @@ porte-monnaie et acheter un boost**, puis **ouvrir la fiche d'une annonce, conta
 votre annonce**, et enfin **être prévenu des nouvelles annonces qui correspondent à votre besoin** (notifications). **Aucun SMS n'est envoyé, aucun vrai site n'est contacté et aucun argent réel n'est
 utilisé** (la recharge du porte-monnaie passe par une page de paiement SIMULÉ) : c'est un essai local, entièrement simulé.
 
+> **Pour présenter noma à quelqu'un** (investisseur, partenaire) : `DEMO.md` donne un marché de démonstration prêt à l'emploi (`npm run demo:seed`, trois comptes aux numéros fixes), un parcours de 10 minutes et ce qu'il faut dire à chaque écran.
+
 ## Ce qu'il faut avoir avant
 
 1. Le dossier du projet (celui qui contient ce fichier) et Node.js, déjà installés.

@@ -154,7 +154,7 @@ function Notifications() {
               <h1 className="font-display text-[22px] font-extrabold text-ink" data-testid="notifications-heading">
                 {unreadTotal > 0 ? `${unreadTotal} non lue${unreadTotal > 1 ? "s" : ""}` : "Tout est lu"}
               </h1>
-              {/* Sous le titre : le sélecteur de rôle du prototype est fixé en haut à droite et recouvrirait un bouton placé sur la ligne du titre. */}
+              {/* Sous le titre : le bouton a toute la largeur utile à 390 px. */}
               <button
                 onClick={() => void markAll()}
                 disabled={marking || unreadTotal === 0}

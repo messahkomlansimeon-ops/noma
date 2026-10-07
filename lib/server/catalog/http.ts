@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Pool } from "pg";
+import { PHONE_IN_OFFER_MESSAGE } from "../../phone-text";
 import { AUTH_SESSION_COOKIE } from "../auth/http";
 import { resolveSession } from "../auth/sessions";
 import type { AuthClock } from "../auth/types";
@@ -14,6 +15,7 @@ import {
   ArchivedCatalogResourceError,
   CatalogNotFoundError,
   CatalogOwnershipError,
+  CatalogPhoneNumberError,
   CatalogStatusTransitionError,
   CatalogValidationError,
   StaleContentVersionError,
@@ -131,6 +133,8 @@ function serviceUnavailable(): Response {
 }
 
 function mapCatalogError(error: unknown): Response {
+  // Message FIXE et clair (jamais le texte saisi) : un numéro de téléphone dans l'annonce est refusé (lot D1).
+  if (error instanceof CatalogPhoneNumberError) return catalogError(400, "phone_number_in_offer", PHONE_IN_OFFER_MESSAGE);
   if (error instanceof CatalogValidationError) return invalidRequest();
   if (error instanceof CatalogNotFoundError || error instanceof CatalogOwnershipError) {
     return catalogError(404, "resource_not_found", "Ressource introuvable.");

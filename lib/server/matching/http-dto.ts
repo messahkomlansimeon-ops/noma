@@ -1,5 +1,6 @@
 import "server-only";
 
+import { publicFieldText } from "../../phone-text";
 import type { AvailabilityStatus, DemandRecord, Money, OfferRecord } from "../catalog/types";
 import type { EvaluatedMatchItem, EvaluatedMatchPage } from "./service-types";
 import type { AvailabilityLevel, ConfidenceLevel, PricePosition, AccountAgeBand } from "./indicators";
@@ -118,20 +119,22 @@ export interface StoredMatchesResponseDto {
 /**
  * Mappe un enregistrement catalogue vers sa représentation produit exposée.
  * Exclut strictement le propriétaire tiers, le texte brut, les métadonnées d'extraction,
- * et toute structure de règles/attributs arbitraires.
+ * et toute structure de règles/attributs arbitraires. Les champs de texte libre saisis par le vendeur (marque, modèle, variante, état, localisation) ne sont
+ * JAMAIS servis bruts : un champ qui porte un numéro de téléphone caché (« WhatsApp 0708091011 », « 07/08/09/10/11 », chiffres de tout système d'écriture) est
+ * omis (`null`), le numéro ne se révèle que par le contact (lot D1, `lib/phone-text.ts`).
  */
 function mapProductRecord(record: OfferRecord | DemandRecord): EvaluatedMatchProductDto {
   const common = {
     id: record.id,
     contentVersion: record.contentVersion,
-    category: record.category ?? null,
-    brand: record.brand ?? null,
-    model: record.model ?? null,
-    variant: record.variant ?? null,
-    condition: record.condition ?? null,
+    category: publicFieldText(record.category),
+    brand: publicFieldText(record.brand),
+    model: publicFieldText(record.model),
+    variant: publicFieldText(record.variant),
+    condition: publicFieldText(record.condition),
     quantity: record.quantity ?? null,
-    unit: record.unit ?? null,
-    location: record.location ?? null,
+    unit: publicFieldText(record.unit),
+    location: publicFieldText(record.location),
     deadlineAt: record.deadlineAt ? record.deadlineAt.toISOString() : null,
   };
 

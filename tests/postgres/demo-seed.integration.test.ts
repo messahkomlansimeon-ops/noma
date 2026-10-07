@@ -1,0 +1,172 @@
+import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
+import { after, before, test } from "node:test";
+import { Pool } from "pg";
+import { readBuyerHome, readVendorHome } from "../../lib/server/home/reads";
+import { readOfferStats } from "../../lib/server/metrics/stats";
+import { runMigrations } from "../../lib/server/postgres/migrations";
+import { readWalletBalance } from "../../lib/server/wallet/ledger";
+import { DEMO_ADMIN_PHONE, DEMO_BUYER_PHONE, DEMO_CONTACTERS, DEMO_EXTRA_BUYER_COUNT, DEMO_OFFERS, DEMO_OPENERS, DEMO_VENDOR_CREDIT_XOF, DEMO_VENDOR_PHONE, demoMarker } from "../../scripts/demo-seed-plan";
+import { runScript } from "./run-script";
+import { openVerifiedTestDatabase } from "./test-database";
+
+/**
+ * `npm run demo:seed` (lot D1) sur une base jetable `noma_essai_*` créée à côté de la base de test : vrais services (catalogue, worker du matching jusqu'au repos, boost,
+ * journal des ouvertures et des contacts, grand livre), trois comptes aux numéros fixes, REJOUABLE à l'identique. Le script est lancé en processus enfant avec NODE_ENV=development.
+ */
+
+const suffix = `${process.pid}_${randomBytes(4).toString("hex")}`;
+const mainDb = `noma_essai_${suffix}`;
+let admin: Pool, pool: Pool;
+let baseUrl: string;
+const urlFor = (database: string): string => {
+  const url = new URL(baseUrl);
+  url.pathname = `/${database}`;
+  return url.toString();
+};
+
+before(async () => {
+  const opened = await openVerifiedTestDatabase(process.env.TEST_DATABASE_URL);
+  admin = opened.pool;
+  baseUrl = opened.target.connectionString;
+  await admin.query(`CREATE DATABASE "${mainDb}"`);
+  pool = new Pool({ connectionString: urlFor(mainDb), max: 4 });
+  assert.equal((await runMigrations(pool)).applied.length, 19);
+});
+
+after(async () => {
+  if (pool) await pool.end().catch(() => {});
+  if (admin) {
+    await admin.query(`DROP DATABASE IF EXISTS "${mainDb}" WITH (FORCE)`).catch(() => {});
+    await admin.end();
+  }
+});
+
+const seed = (env: Record<string, string> = {}) => runScript("scripts/demo-seed.ts", [], "public", { NODE_ENV: "development", DATABASE_URL: urlFor(mainDb), ...env });
+
+async function snapshot() {
+  const read = async (sql: string) => (await pool.query<{ n: string }>(sql)).rows[0].n;
+  return {
+    users: await read("SELECT count(*)::text AS n FROM users"),
+    identities: await read("SELECT count(*)::text AS n FROM phone_identities"),
+    offers: await read("SELECT count(*)::text AS n FROM offers"),
+    published: await read("SELECT count(*)::text AS n FROM offers WHERE status = 'published'"),
+    demands: await read("SELECT count(*)::text AS n FROM demands WHERE status = 'active'"),
+    evaluations: await read("SELECT count(*)::text AS n FROM matching_evaluations"),
+    notifications: await read("SELECT count(*)::text AS n FROM notifications"),
+    views: await read("SELECT coalesce(sum(views), 0)::text AS n FROM offer_views"),
+    contacts: await read("SELECT coalesce(sum(reveals), 0)::text AS n FROM offer_contacts"),
+    boosts: await read("SELECT count(*)::text AS n FROM offer_boosts"),
+    walletTransactions: await read("SELECT count(*)::text AS n FROM wallet_transactions"),
+    outbox: await read("SELECT count(*)::text AS n FROM matching_outbox_events"),
+  };
+}
+
+const userOf = async (phone: string): Promise<string> => (await pool.query<{ user_id: string }>("SELECT user_id FROM phone_identities WHERE phone_e164 = $1", [phone])).rows[0].user_id;
+
+test("premier passage : comptes aux numéros fixes, 30 annonces publiées, besoins actifs, boost, crédits, ouvertures et contacts, notifications", async () => {
+  const result = await seed();
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.output, new RegExp(`base « ${mainDb} » : 30 annonce\\(s\\) publiée\\(s\\) \\(0 déjà présente\\(s\\)\\), 14 besoin\\(s\\) activé\\(s\\)`));
+  assert.match(result.output, /Acheteur démo : \+225 07 00 00 01 01/);
+  assert.match(result.output, /Vendeur démo {2}: \+225 07 00 00 02 02/);
+  assert.match(result.output, /Admin démo {4}: \+225 07 00 00 03 03/);
+
+  const snap = await snapshot();
+  assert.equal(snap.users, String(3 + 7 + DEMO_EXTRA_BUYER_COUNT));
+  assert.equal(snap.identities, snap.users);
+  assert.equal(snap.offers, "30");
+  assert.equal(snap.published, "30");
+  assert.equal(snap.demands, String(3 + DEMO_EXTRA_BUYER_COUNT));
+  assert.equal(snap.views, String(DEMO_OPENERS));
+  assert.equal(snap.contacts, String(DEMO_CONTACTERS));
+  assert.equal(snap.boosts, "1");
+  assert.equal(snap.walletTransactions, "1");
+  // Aucune écriture directe d'une correspondance ou d'une notification : tout vient du worker, par l'outbox du catalogue.
+  assert.ok(Number(snap.outbox) >= 30 + 14, `outbox : ${snap.outbox}`);
+  assert.ok(Number(snap.evaluations) > 30);
+
+  // Comptes de démonstration : numéros fixes, identité vérifiée, compte actif.
+  for (const phone of [DEMO_BUYER_PHONE, DEMO_VENDOR_PHONE, DEMO_ADMIN_PHONE]) {
+    const identity = (await pool.query<{ verified_at: Date | null; status: string }>(
+      "SELECT i.verified_at, u.status FROM phone_identities i JOIN users u ON u.id = i.user_id WHERE i.phone_e164 = $1", [phone])).rows[0];
+    assert.notEqual(identity.verified_at, null, phone);
+    assert.equal(identity.status, "active");
+  }
+
+  // Les 30 annonces portent leur repère, ont un prix en francs CFA et sont disponibles.
+  for (const offer of DEMO_OFFERS) {
+    const row = (await pool.query<{ status: string; price_amount: string; price_currency: string; availability_status: string }>(
+      "SELECT status, price_amount::text, price_currency, availability_status FROM offers WHERE position($1::text in raw_text) > 0", [demoMarker(offer.key)])).rows;
+    assert.equal(row.length, 1, offer.key);
+    assert.deepEqual(row[0], { status: "published", price_amount: String(offer.priceXof), price_currency: "XOF", availability_status: "available" });
+  }
+});
+
+test("acheteur démo : 3 besoins actifs qui ont des correspondances, 3 notifications non lues (annonces publiées APRÈS ses besoins)", async () => {
+  const home = await readBuyerHome({ pool, userId: await userOf(DEMO_BUYER_PHONE) });
+  assert.equal(home.activeDemandCount, 3);
+  assert.equal(home.demands.length, 3);
+  for (const demand of home.demands) assert.ok(demand.matchCount >= 4, `${demand.title} : ${demand.matchCount} correspondance(s)`);
+  const iphone = home.demands.find((demand) => demand.model === "iPhone 12");
+  assert.equal(iphone?.matchCount, 9, "huit annonces avant le besoin, une après : neuf correspondances (assez pour qu'un boost fasse monter l'annonce)");
+  assert.equal(home.demands.find((demand) => demand.model === "Galaxy S21")?.matchCount, 8, "sept annonces avant le besoin, une après : le vendeur démo peut acheter un boost du Galaxy S21");
+  assert.deepEqual(home.demands.map((demand) => demand.model), ["iPhone 12", "MacBook Air M1", "Galaxy S21"], "le besoin de la démonstration (iPhone 12) s'affiche en premier");
+  assert.equal(home.unreadNotifications, 3);
+  assert.equal(home.notifications.length, 3);
+  assert.ok(home.notifications.every((item) => item.kind === "new_match" && item.unread && item.price !== null));
+});
+
+test("vendeur démo : 4 annonces en ligne dont une boostée, solde de crédits, statistiques « environ 10 » ouvreurs et « environ 5 » contacts", async () => {
+  const vendorId = await userOf(DEMO_VENDOR_PHONE);
+  const home = await readVendorHome({ pool, userId: vendorId });
+  assert.deepEqual(home.counts, { published: 4, paused: 0, draft: 0 });
+  assert.equal(home.balance, DEMO_VENDOR_CREDIT_XOF);
+  assert.equal(await readWalletBalance(pool, vendorId), BigInt(DEMO_VENDOR_CREDIT_XOF));
+  assert.equal(home.activeBoosts.length, 1);
+  const boosted = home.offers.find((offer) => offer.boostEndsAt !== null);
+  assert.equal(boosted?.model, "iPhone 12");
+  assert.deepEqual(boosted?.needs, { kind: "approx", value: 10 }, "12 besoins correspondent à l'annonce boostée");
+
+  const stats = await readOfferStats({ pool, ownerId: vendorId, offerId: boosted?.id as string });
+  assert.deepEqual(stats.activeMatches.needs, { kind: "approx", value: 10 });
+  const all = stats.periods.find((period) => period.period === "all");
+  assert.deepEqual(all?.opens.uniqueBuyers, { kind: "approx", value: 10 }, "11 acheteurs ont ouvert la fiche : « environ 10 »");
+  assert.deepEqual(all?.contacts.uniqueBuyers, { kind: "approx", value: 5 }, "6 acheteurs ont contacté : « environ 5 »");
+  const values = [...JSON.stringify(stats).matchAll(/"value":(\d+)/g)].map((match) => Number(match[1]));
+  assert.ok(values.length > 0 && values.every((value) => value % 5 === 0), `tous les comptes publiés sont arrondis à 5 : ${values.join(", ")}`);
+});
+
+test("rejeu à l'identique : aucun doublon, aucune ouverture ni aucun contact de plus, un seul crédit, un seul boost", async () => {
+  const before = await snapshot();
+  const result = await seed();
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.output, /0 annonce\(s\) publiée\(s\) \(30 déjà présente\(s\)\), 0 besoin\(s\) activé\(s\) \(14 déjà présent\(s\)\), 0 compte\(s\) créé\(s\) \(21 déjà présent\(s\)\)/);
+  assert.match(result.output, /0 ouverture\(s\) et 0 contact\(s\) fictifs écrits, crédits déjà présents, boost déjà actif/);
+  assert.deepEqual(await snapshot(), before, "l'état de la base est identique au premier passage");
+});
+
+test("un boost échu est renouvelé au rejeu (jamais un second boost actif)", async () => {
+  await pool.query("UPDATE offer_boosts SET status = 'expired', starts_at = clock_timestamp() - interval '9 days', ends_at = clock_timestamp() - interval '2 days'");
+  const result = await seed();
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.output, /boost attribué/);
+  const active = await pool.query("SELECT 1 FROM offer_boosts WHERE status = 'active' AND ends_at > clock_timestamp()");
+  assert.equal(active.rowCount, 1);
+});
+
+test("refus sans écriture : noma_dev, noma_test, NODE_ENV=production (la base jetable n'est pas touchée)", async () => {
+  const before = await snapshot();
+  const refusals: Array<Record<string, string>> = [
+    { DATABASE_URL: urlFor("noma_dev") },
+    { DATABASE_URL: urlFor("noma_test") },
+    { NODE_ENV: "production" },
+    { NODE_ENV: "test" },
+  ];
+  for (const env of refusals) {
+    const refused = await seed(env);
+    assert.equal(refused.code, 1, JSON.stringify(env));
+    assert.match(refused.output, /demo:seed : refus/);
+  }
+  assert.deepEqual(await snapshot(), before);
+});

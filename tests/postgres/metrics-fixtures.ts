@@ -36,7 +36,19 @@ export interface OfferOptions {
   rawText?: string;
 }
 
-export function makeOffer(pool: Pool, ownerId: string, options: OfferOptions = {}): Promise<OfferRecord> {
+/**
+ * Lot D1 : le catalogue refuse désormais une annonce dont un attribut ressemble à un numéro de téléphone. Les attributs demandés par un essai sont donc écrits APRÈS la
+ * création, directement en base (des données plus anciennes que la règle) : les essais de l'affichage vérifient que le texte du vendeur n'est jamais servi brut, quoi
+ * qu'il y ait en base.
+ */
+export async function makeOffer(pool: Pool, ownerId: string, options: OfferOptions = {}): Promise<OfferRecord> {
+  const offer = await createFixtureOffer(pool, ownerId, { ...options, attributes: null });
+  if (options.attributes === undefined || options.attributes === null) return offer;
+  await pool.query("UPDATE offers SET attributes = $2::jsonb WHERE id = $1", [offer.id, JSON.stringify(options.attributes)]);
+  return { ...offer, attributes: options.attributes };
+}
+
+function createFixtureOffer(pool: Pool, ownerId: string, options: OfferOptions = {}): Promise<OfferRecord> {
   return createOffer({
     ownerId,
     rawText: options.rawText ?? "RAW_SECRET_TEXT offre iPhone 13",

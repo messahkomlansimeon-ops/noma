@@ -18,6 +18,8 @@
  * Les montants du portefeuille sont des entiers sûrs (|n| ≤ 2^53 − 1), vérifiés à l'envoi comme à la lecture.
  */
 
+import { PHONE_IN_OFFER_MESSAGE } from "../phone-text";
+
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 export type JsonObject = { [key: string]: JsonValue };
 
@@ -466,6 +468,67 @@ export interface BoostPurchaseHistoryItem {
   endsAt: string;
   createdAt: string;
   refundedAt: string | null;
+}
+
+// ─── Accueils de l'acheteur et du vendeur (lot D1) ──────────────────────────────────────────────────
+
+export const BUYER_HOME_CONTRACT_VERSION = "home-buyer/v1";
+export const VENDOR_HOME_CONTRACT_VERSION = "home-vendor/v1";
+
+export interface BuyerHomeDemand {
+  id: string;
+  title: string;
+  category: string | null;
+  brand: string | null;
+  model: string | null;
+  variant: string | null;
+  location: string | null;
+  budget: Money | null;
+  /** Nombre d'annonces servies par la page de résultats du besoin. */
+  matchCount: number;
+  createdAt: string;
+}
+
+export interface BuyerHomeNotification {
+  id: string;
+  kind: NotificationKind;
+  title: string | null;
+  price: Money | null;
+  count: number | null;
+  link: string;
+  createdAt: string;
+  unread: boolean;
+}
+
+export interface BuyerHome {
+  activeDemandCount: number;
+  demands: BuyerHomeDemand[];
+  unreadNotifications: number;
+  notifications: BuyerHomeNotification[];
+}
+
+export type VendorOfferStatus = "draft" | "published" | "paused";
+
+export interface VendorHomeOffer {
+  id: string;
+  title: string;
+  status: VendorOfferStatus;
+  category: string | null;
+  brand: string | null;
+  model: string | null;
+  variant: string | null;
+  price: Money | null;
+  /** Besoins correspondants, ARRONDIS (« moins de 5 », « environ N »). */
+  needs: StatCount;
+  boostEndsAt: string | null;
+}
+
+export interface VendorHome {
+  counts: { published: number; paused: number; draft: number };
+  needs: StatCount;
+  balance: number;
+  activeBoosts: { offerId: string; endsAt: string }[];
+  offers: VendorHomeOffer[];
 }
 
 export interface OtpChallenge {
@@ -1316,6 +1379,135 @@ function parseDemandTracking(status: number, value: unknown): DemandTracking {
   };
 }
 
+// ─── Lecture stricte des accueils (lot D1) ──────────────────────────────────────────────────────────
+
+const HOME_TEXT_MAX = 200;
+const NOTIFICATION_LINK = /^\/besoins\/[0-9a-f-]{36}(\/offres\/[0-9a-f-]{36})?$/i;
+
+function homeText(status: number, value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string" || value.length > HOME_TEXT_MAX || UNSAFE_NOTIFICATION_TEXT.test(value)) throw fixedError(status, API_INVALID_RESPONSE);
+  return value;
+}
+
+function homeTitle(status: number, value: unknown): string {
+  const text = homeText(status, value);
+  if (text === null || text.trim() === "") throw fixedError(status, API_INVALID_RESPONSE);
+  return text;
+}
+
+function homeMoney(status: number, value: unknown): Money | null {
+  if (value === null) return null;
+  if (!isObject(value) || !isSafeAmount(value.amount) || value.amount < 0 || typeof value.currency !== "string" || !/^[A-Z]{3}$/.test(value.currency)) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return { amount: value.amount, currency: value.currency };
+}
+
+function parseBuyerHome(status: number, value: unknown): BuyerHome {
+  if (
+    !isObject(value) ||
+    value.contractVersion !== BUYER_HOME_CONTRACT_VERSION ||
+    !isSafeAmount(value.activeDemandCount) ||
+    !Array.isArray(value.demands) ||
+    !isSafeAmount(value.unreadNotifications) ||
+    !Array.isArray(value.notifications)
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  const demands = value.demands.map((entry): BuyerHomeDemand => {
+    if (!isObject(entry) || !isUuid(entry.id) || !isSafeAmount(entry.matchCount) || entry.matchCount < 0 || !isIsoDate(entry.createdAt)) throw fixedError(status, API_INVALID_RESPONSE);
+    return {
+      id: entry.id,
+      title: homeTitle(status, entry.title),
+      category: homeText(status, entry.category),
+      brand: homeText(status, entry.brand),
+      model: homeText(status, entry.model),
+      variant: homeText(status, entry.variant),
+      location: homeText(status, entry.location),
+      budget: homeMoney(status, entry.budget),
+      matchCount: entry.matchCount,
+      createdAt: entry.createdAt,
+    };
+  });
+  const notifications = value.notifications.map((entry): BuyerHomeNotification => {
+    if (
+      !isObject(entry) ||
+      !isUuid(entry.id) ||
+      !(NOTIFICATION_KINDS as readonly string[]).includes(String(entry.kind)) ||
+      typeof entry.link !== "string" ||
+      !NOTIFICATION_LINK.test(entry.link) ||
+      !isIsoDate(entry.createdAt) ||
+      typeof entry.unread !== "boolean" ||
+      !(entry.count === null || (isSafeAmount(entry.count) && entry.count >= 1))
+    ) {
+      throw fixedError(status, API_INVALID_RESPONSE);
+    }
+    return {
+      id: entry.id,
+      kind: entry.kind as NotificationKind,
+      title: homeText(status, entry.title),
+      price: homeMoney(status, entry.price),
+      count: entry.count,
+      link: entry.link,
+      createdAt: entry.createdAt,
+      unread: entry.unread,
+    };
+  });
+  return { activeDemandCount: value.activeDemandCount, demands, unreadNotifications: value.unreadNotifications, notifications };
+}
+
+function parseVendorHome(status: number, value: unknown): VendorHome {
+  if (
+    !isObject(value) ||
+    value.contractVersion !== VENDOR_HOME_CONTRACT_VERSION ||
+    !isObject(value.counts) ||
+    !isSafeAmount(value.counts.published) ||
+    !isSafeAmount(value.counts.paused) ||
+    !isSafeAmount(value.counts.draft) ||
+    !isStatCount(value.needs) ||
+    !isSafeAmount(value.balance) ||
+    !Array.isArray(value.activeBoosts) ||
+    !Array.isArray(value.offers)
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  const offers = value.offers.map((entry): VendorHomeOffer => {
+    if (
+      !isObject(entry) ||
+      !isUuid(entry.id) ||
+      !["draft", "published", "paused"].includes(String(entry.status)) ||
+      !isStatCount(entry.needs) ||
+      !(entry.boostEndsAt === null || isIsoDate(entry.boostEndsAt))
+    ) {
+      throw fixedError(status, API_INVALID_RESPONSE);
+    }
+    return {
+      id: entry.id,
+      title: homeTitle(status, entry.title),
+      status: entry.status as VendorOfferStatus,
+      category: homeText(status, entry.category),
+      brand: homeText(status, entry.brand),
+      model: homeText(status, entry.model),
+      variant: homeText(status, entry.variant),
+      price: homeMoney(status, entry.price),
+      needs: toStatCount(entry.needs),
+      boostEndsAt: entry.boostEndsAt,
+    };
+  });
+  const activeBoosts = value.activeBoosts.map((entry) => {
+    if (!isObject(entry) || !isUuid(entry.offerId) || !isIsoDate(entry.endsAt)) throw fixedError(status, API_INVALID_RESPONSE);
+    return { offerId: entry.offerId, endsAt: entry.endsAt };
+  });
+  return {
+    counts: { published: value.counts.published, paused: value.counts.paused, draft: value.counts.draft },
+    needs: toStatCount(value.needs),
+    balance: value.balance,
+    activeBoosts,
+    offers,
+  };
+}
+
 export interface RequestOptions {
   signal?: AbortSignal;
 }
@@ -1698,6 +1890,19 @@ export function createApiClient(options: ApiClientOptions = {}) {
       },
     },
 
+    home: {
+      /** GET /api/home/buyer : besoins actifs de l'acheteur (avec leur nombre de correspondances) et ses notifications. */
+      async buyer(requestOptions?: RequestOptions): Promise<BuyerHome> {
+        const { status, json } = await send("GET", "/api/home/buyer", undefined, requestOptions);
+        return parseBuyerHome(status, json);
+      },
+      /** GET /api/home/vendor : annonces du vendeur par statut, besoins correspondants (arrondis), solde et boosts actifs. */
+      async vendor(requestOptions?: RequestOptions): Promise<VendorHome> {
+        const { status, json } = await send("GET", "/api/home/vendor", undefined, requestOptions);
+        return parseVendorHome(status, json);
+      },
+    },
+
     notifications: {
       /**
        * GET /api/notifications : les notifications de l'utilisateur (plus récentes d'abord, curseur) et le nombre TOTAL de non-lues. `limit` (1 à 50) et `cursor`
@@ -1959,6 +2164,8 @@ export function describeApiError(error: unknown, context: ApiErrorContext = "def
   if (error.code === API_ABORTED) return "Requête interrompue.";
   if (error.code === API_INVALID_ID) return "Identifiant invalide. Rechargez la page.";
   if (error.code === API_INVALID_ARGUMENT) return "Paramètre invalide. Rechargez la page.";
+  // Annonce refusée parce qu'elle porte un numéro de téléphone (lot D1) : message fixe et clair, quel que soit le contexte.
+  if (error.status === 400 && error.code === "phone_number_in_offer") return PHONE_IN_OFFER_MESSAGE;
 
   if (context === "matches") {
     if (error.status === 400) return "Les résultats ne peuvent pas être affichés pour le moment. Actualisez la page.";

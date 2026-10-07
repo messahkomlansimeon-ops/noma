@@ -8,7 +8,7 @@ import {
   Sofa,
   type LucideIcon,
 } from "lucide-react";
-import type { ArtKey } from "@/lib/data";
+import type { ArtKey } from "@/lib/client/catalog-view";
 
 const artIcon: Record<ArtKey, LucideIcon> = {
   phone: Smartphone,

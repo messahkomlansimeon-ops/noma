@@ -9,7 +9,6 @@ import {
   LogOut,
   MessageCircle,
   Package,
-  Pencil,
   Search,
   Settings,
   ShieldCheck,
@@ -20,11 +19,7 @@ import { LogoMark } from "@/components/logo";
 import { NotificationPreferencesCard } from "@/components/notification-preferences-card";
 import { useLogout } from "@/components/session-gate";
 import { useUnreadCount } from "@/components/unread-badge";
-import {
-  Avatar,
-  Badge,
-  MenuRow,
-} from "@/components/ui";
+import { Badge, MenuRow } from "@/components/ui";
 import { useNoma } from "@/lib/store";
 
 export default function MonCompte() {
@@ -34,7 +29,7 @@ export default function MonCompte() {
   const { logout, pending: loggingOut } = useLogout();
   const unread = useUnreadCount();
 
-  const soon = () => showToast("Prototype : écran non maquetté");
+  const soon = () => showToast("Bientôt disponible");
 
   return (
     <main>
@@ -55,27 +50,22 @@ export default function MonCompte() {
         </h1>
 
         <div className="mt-3 flex items-center gap-3.5 rounded-2xl border border-line bg-white p-4">
-          <Avatar initials="AO" className="size-14 text-[16px]" />
+          <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-sage text-forest">
+            <CircleUser className="size-7" strokeWidth={1.7} aria-hidden />
+          </span>
           <div className="min-w-0 flex-1">
-            <div className="text-[16px] font-extrabold text-ink">Alex O.</div>
-            <div className="text-[13px] text-ink-soft">+225 07 •• •••• 42</div>
+            <div className="text-[16px] font-extrabold text-ink">Votre compte noma</div>
+            <div className="text-[13px] text-ink-soft">Connecté avec votre numéro de téléphone</div>
             <Badge tone="sage" className="mt-1">
               <ShieldCheck className="size-3" />
               Téléphone confirmé
             </Badge>
           </div>
-          <button
-            onClick={soon}
-            className="flex size-8 items-center justify-center rounded-full text-ink-soft transition hover:bg-wash"
-            aria-label="Modifier"
-          >
-            <Pencil className="size-4" />
-          </button>
         </div>
 
         <div className="mt-4 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">
-          <MenuRow icon={MessageCircle} label="Messages" badge={2} href="/messages" />
-          <MenuRow icon={Package} label="Mes commandes" badge={3} href="/commandes" />
+          <MenuRow icon={MessageCircle} label="Messages" href="/messages" />
+          <MenuRow icon={Package} label="Mes commandes" href="/commandes" />
           <MenuRow icon={Wallet} label="Mon porte-monnaie" href="/compte/porte-monnaie" />
           <MenuRow icon={Search} label="Mes recherches suivies" href="/alertes" />
           <MenuRow icon={Heart} label="Mes favoris" href="/favoris" />

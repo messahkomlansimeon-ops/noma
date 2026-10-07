@@ -1,18 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect } from "react";
-import { ChevronDown, LoaderCircle, OctagonAlert, SlidersHorizontal } from "lucide-react";
+import { LoaderCircle, OctagonAlert } from "lucide-react";
 import { TopBar } from "@/components/top-bar";
 import { RealOfferCard } from "@/components/real-offer-card";
-import { Chip } from "@/components/ui";
 import { parseBudgetFcfa } from "@/lib/contracts";
-import { useNoma } from "@/lib/store";
 import { sourcesAllUnavailable, useRealSearch } from "@/lib/real-search";
 
 export default function Recherche() {
-  const compare = useNoma((s) => s.compare);
-  const toggleCompare = useNoma((s) => s.toggleCompare);
   const offers = useRealSearch((s) => s.offers);
   const need = useRealSearch((s) => s.need);
   const status = useRealSearch((s) => s.status);
@@ -33,9 +28,6 @@ export default function Recherche() {
   }, [hydrate]);
 
   const loading = status === "loading";
-  // la comparaison ne porte que sur des offres réellement affichées (jamais
-  // les offres fictives de démonstration)
-  const selectedIds = compare.filter((id) => offers.some((o) => o.id === id));
   // chip budget : montant normalisé (« 150 000 FCFA » → « 150 000 F max »)
   const budgetParsed = parseBudgetFcfa(need.budgetFcfa);
   const budgetChip =
@@ -71,6 +63,9 @@ export default function Recherche() {
       />
 
       <div className="px-4">
+        <div className="text-[12px] font-extrabold uppercase tracking-wider text-sage-ink">
+          Recherche sur d&apos;autres sites (démonstration)
+        </div>
         <h1 className="font-display text-[24px] font-extrabold text-ink">
           {status === "loading"
             ? "Recherche en cours…"
@@ -120,17 +115,6 @@ export default function Recherche() {
             </div>
           </section>
         ) : null}
-
-        <div className="mt-3 flex items-center gap-2">
-          <Chip active>
-            Pertinence
-            <ChevronDown className="size-3.5 opacity-70" />
-          </Chip>
-          <Chip className="cursor-pointer">
-            <SlidersHorizontal className="size-3.5" />
-            Filtres
-          </Chip>
-        </div>
 
         {error ? (
           <div className="mt-3 flex items-start gap-2 rounded-2xl bg-carrot-soft p-3.5 text-[13px] font-semibold text-carrot-ink">
@@ -183,9 +167,6 @@ export default function Recherche() {
             <RealOfferCard
               key={offer.id}
               offer={offer}
-              selectable
-              selected={selectedIds.includes(offer.id)}
-              onToggle={() => toggleCompare(offer.id)}
               showJustification
             />
           ))}
@@ -198,19 +179,6 @@ export default function Recherche() {
         ) : null}
       </div>
 
-      {selectedIds.length > 0 && (
-        <div className="fixed inset-x-0 bottom-[57px] z-20 mx-auto w-full max-w-[480px] border-t border-line bg-white/95 p-3 backdrop-blur">
-          <Link
-            href="/comparer"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-forest py-3 text-[15px] font-bold text-white transition active:scale-[0.99]"
-          >
-            Comparer les {selectedIds.length} offre{selectedIds.length > 1 ? "s" : ""}
-            <span className="flex size-5 items-center justify-center rounded-full bg-white/20 text-[11px] font-extrabold">
-              {selectedIds.length}
-            </span>
-          </Link>
-        </div>
-      )}
     </main>
   );
 }

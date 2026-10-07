@@ -1,7 +1,17 @@
+import { PHONE_IN_OFFER_MESSAGE } from "../../phone-text";
+
 export class CatalogValidationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "CatalogValidationError";
+  }
+}
+
+/** Une annonce porte un numéro de téléphone caché (marque, modèle, variante, attribut…) : refusée avec un message clair (lot D1). */
+export class CatalogPhoneNumberError extends CatalogValidationError {
+  constructor() {
+    super(PHONE_IN_OFFER_MESSAGE);
+    this.name = "CatalogPhoneNumberError";
   }
 }
 

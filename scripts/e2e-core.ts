@@ -1698,6 +1698,36 @@ async function main(): Promise<void> {
     });
   }
 
+  await step("Lot D1 : numéro de téléphone refusé dans une annonce (400, message clair) ; accueils de l'acheteur et du vendeur lus sur le serveur", async () => {
+    const before = (await sellerApi.offers.listAll()).items.length;
+    for (const variant of ["WhatsApp 0708091011", "07/08/09/10/11", "07:08:09:10:11"]) {
+      const refusal = await sellerApi.offers
+        .create({ rawText: "iPhone 12 avec numéro caché", category: "Téléphones", brand: "Apple", model: "iPhone 12", variant, price: { amount: 150_000, currency: "XOF" } })
+        .then(() => null, (error: unknown) => error);
+      assert.ok(refusal instanceof ApiError && refusal.status === 400 && refusal.code === "phone_number_in_offer", `variante « ${variant} » refusée en 400 phone_number_in_offer`);
+      assert.equal(describeApiError(refusal, "catalog"), "Pas de numéro de téléphone dans l'annonce : l'acheteur vous contactera par noma.");
+    }
+    ok("POST /api/offers avec un numéro caché (« WhatsApp 0708091011 », « 07/08/09/10/11 », « 07:08:09:10:11 ») : 400 phone_number_in_offer, message clair");
+    assert.equal((await sellerApi.offers.listAll()).items.length, before, "rien n'a été écrit");
+    ok("aucune annonce écrite par les refus");
+
+    assert.equal((await new RelaySession("sans session").fetch("/api/home/buyer")).status, 401);
+    assert.equal((await new RelaySession("sans session").fetch("/api/home/vendor")).status, 401);
+    ok("GET /api/home/buyer et /api/home/vendor sans session : 401");
+    const buyerHome = await buyerApi.home.buyer();
+    assert.ok(buyerHome.demands.length >= 1 && buyerHome.demands.every((demand) => demand.matchCount >= 0), "besoins actifs de B avec leur nombre de correspondances");
+    assert.ok(buyerHome.demands.some((demand) => demand.matchCount >= 1), "au moins un besoin de B a des correspondances");
+    ok(`accueil de B : ${buyerHome.demands.length} besoin(s) actif(s) avec leurs correspondances, ${buyerHome.unreadNotifications} notification(s) non lue(s)`);
+    const sellerHome = await sellerApi.home.vendor();
+    assert.ok(sellerHome.counts.published >= 1);
+    assert.ok(sellerHome.needs.kind === "below" || (sellerHome.needs.kind === "approx" && sellerHome.needs.value % 5 === 0), "besoins correspondants arrondis");
+    assert.ok(sellerHome.offers.every((offer) => offer.needs.kind === "below" || offer.needs.value % 5 === 0));
+    ok(`tableau de bord de A : ${sellerHome.counts.published} annonce(s) en ligne, besoins arrondis (${sellerHome.needs.kind}), solde ${sellerHome.balance} FCFA, ${sellerHome.activeBoosts.length} boost(s) actif(s)`);
+    const crossText = JSON.stringify([buyerHome, sellerHome]);
+    const leak = /phone_e164|"phone"|\+225|\b0[0-9]{9}\b/.exec(crossText);
+    assert.equal(leak, null, `aucun téléphone dans les accueils (trouvé : ${leak?.[0]})`);
+  });
+
   await step("Déconnexion : 401 partout, y compris le rejeu de l'ancien cookie", async () => {
     for (const [session, api, label] of [
       [seller, sellerApi, "A"],

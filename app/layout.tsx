@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Manrope } from "next/font/google";
 import "./globals.css";
-import { RoleSwitcher } from "@/components/role-switcher";
 import { Toast } from "@/components/toast";
 
 const bricolage = Bricolage_Grotesque({
@@ -37,7 +36,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-dvh bg-cream font-sans text-ink">
         {children}
-        <RoleSwitcher />
         <Toast />
       </body>
     </html>

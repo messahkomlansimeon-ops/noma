@@ -8,7 +8,8 @@ import {
   NOTIFICATIONS_PAGE_MAX_LIMIT,
   NOTIFICATIONS_READ_MAX_IDS,
 } from "./config";
-import { demandLink, offerLink, type NotificationPrice } from "./content";
+import { looksLikePhoneNumber } from "../../phone-text";
+import { TITLE_FALLBACK, demandLink, offerLink, type NotificationPrice } from "./content";
 
 /**
  * Lecture des notifications DANS l'application (lot N1) : pagination par curseur (plus récentes d'abord), compteur de non-lues, « marquer comme lu ».
@@ -77,7 +78,8 @@ function mapRow(row: NotificationRow): NotificationItem {
   return {
     id: row.id,
     kind: row.kind,
-    title: isMatch ? row.title : null,
+    // Défense à la lecture : un titre déjà enregistré qui ressemble à un numéro (écrit sous une règle plus ancienne) n'est jamais servi.
+    title: isMatch ? (row.title !== null && looksLikePhoneNumber(row.title) ? TITLE_FALLBACK : row.title) : null,
     price: amount !== null && Number.isSafeInteger(amount) && row.price_currency !== null ? { amount, currency: row.price_currency } : null,
     count: row.kind === "new_matches_digest" ? row.item_count : null,
     demandId: row.demand_id,

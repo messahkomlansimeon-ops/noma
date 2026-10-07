@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import { getPostgresPool } from "../postgres/client";
-import { CatalogValidationError } from "./errors";
+import { looksLikePhoneNumber } from "../../phone-text";
+import { CatalogPhoneNumberError, CatalogValidationError } from "./errors";
 import type {
   CatalogContentInput,
   CatalogPagination,
@@ -150,4 +151,35 @@ export function normalizeCatalogContent(input: CatalogContentInput) {
     extractionMetadata: optionalJsonObject(input.extractionMetadata, "extractionMetadata"),
     extractedAt: optionalDate(input.extractedAt, "extractedAt"),
   };
+}
+
+/** Tout texte (clés et valeurs, à toute profondeur) et tout nombre d'un objet JSON : un seul qui ressemble à un numéro de téléphone suffit. */
+function jsonCarriesPhoneNumber(value: JsonValue | undefined, depth = 0): boolean {
+  if (value === null || value === undefined || typeof value === "boolean" || depth > 8) return false;
+  if (typeof value === "string") return looksLikePhoneNumber(value);
+  if (typeof value === "number") return looksLikePhoneNumber(String(value));
+  if (Array.isArray(value)) return value.some((item) => jsonCarriesPhoneNumber(item, depth + 1));
+  return Object.entries(value).some(([key, inner]) => looksLikePhoneNumber(key) || jsonCarriesPhoneNumber(inner, depth + 1));
+}
+
+/**
+ * Une annonce (offre) ne porte jamais de numéro de téléphone dans les champs que l'acheteur voit : catégorie, marque, modèle, variante, état, unité,
+ * localisation et attributs (lot D1). L'acheteur contacte le vendeur par noma, le numéro ne se révèle que par ce contact. Lève `CatalogPhoneNumberError`
+ * (message clair : « Pas de numéro de téléphone dans l'annonce : l'acheteur vous contactera par noma. »). Le texte brut de l'annonce n'est pas contrôlé : il n'est
+ * jamais servi à un acheteur.
+ */
+export function requireNoPhoneInOfferFields(fields: {
+  category?: string | null;
+  brand?: string | null;
+  model?: string | null;
+  variant?: string | null;
+  condition?: string | null;
+  unit?: string | null;
+  location?: string | null;
+  attributes?: JsonObject | null;
+}): void {
+  const texts = [fields.category, fields.brand, fields.model, fields.variant, fields.condition, fields.unit, fields.location];
+  if (texts.some((text) => typeof text === "string" && looksLikePhoneNumber(text)) || jsonCarriesPhoneNumber(fields.attributes ?? null)) {
+    throw new CatalogPhoneNumberError();
+  }
 }

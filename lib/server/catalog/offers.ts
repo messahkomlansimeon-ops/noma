@@ -24,6 +24,7 @@ import type {
   AvailabilityStatus,
   CatalogPagination,
   CreateOfferInput,
+  JsonObject,
   OfferRecord,
   OfferStatus,
   UpdateOfferInput,
@@ -38,6 +39,7 @@ import {
   optionalText,
   requiredText,
   requireCatalogPagination,
+  requireNoPhoneInOfferFields,
   requireTransactionPool,
   requireUuid,
   requireVersion,
@@ -68,6 +70,7 @@ export async function createOffer(
   db: SqlExecutor = getPostgresPool(),
 ): Promise<OfferRecord> {
   const content = normalizeCatalogContent(input);
+  requireNoPhoneInOfferFields(content);
   const id = requireUuid(input.id ?? randomUUID(), "id");
   const ownerId = requireUuid(input.ownerId, "ownerId");
   const status = requireOfferStatus(input.status ?? "draft");
@@ -174,6 +177,11 @@ export async function updateOffer(
     add("availability_confirmed_at", optionalDate(changes.availabilityConfirmedAt, "availabilityConfirmedAt"));
   }
   if (assignments.length === 0) throw new CatalogValidationError("Aucune modification d'offre fournie.");
+  // Aucun numéro de téléphone dans les champs que l'acheteur voit (lot D1) : contrôle des seules modifications fournies.
+  requireNoPhoneInOfferFields({
+    category: changes.category, brand: changes.brand, model: changes.model, variant: changes.variant,
+    condition: changes.condition, unit: changes.unit, location: changes.location, attributes: changes.attributes,
+  });
 
   return executeInTransactionScope(db, async (tx) => {
     const previousResult = await tx.query<OfferRow>(
@@ -262,6 +270,13 @@ async function transitionOfferStatus(
     }
     if (row.status === targetStatus) {
       return mapOffer(row);
+    }
+    // Une annonce enregistrée avant la règle (ou par un chemin qui ne la contrôlait pas) ne peut pas être mise en ligne avec un numéro caché (lot D1).
+    if (targetStatus === "published") {
+      requireNoPhoneInOfferFields({
+        category: row.category, brand: row.brand, model: row.model, variant: row.variant,
+        condition: row.condition_text, unit: row.unit, location: row.location_text, attributes: row.attributes as JsonObject | null,
+      });
     }
     if (!allowedSources.includes(row.status)) {
       throw new CatalogStatusTransitionError("offre", row.status, targetStatus);

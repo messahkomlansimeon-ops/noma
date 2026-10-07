@@ -1,8 +1,10 @@
+import { RoleSwitcher } from "@/components/role-switcher";
 import { BuyerTabBar } from "@/components/tab-bar";
 
 export default function BuyerLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-cream sm:border-x sm:border-line">
+      <RoleSwitcher />
       <div className="flex-1 pb-28">{children}</div>
       <BuyerTabBar />
     </div>
