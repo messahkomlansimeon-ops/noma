@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import {
   Bell,
   FolderOpen,
@@ -15,12 +16,15 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react";
+import { UnreadBadge, unreadRefresher } from "@/components/unread-badge";
 
 interface TabItem {
   href: string;
   label: string;
   icon: LucideIcon;
   match: string[];
+  /** Pastille de notifications non lues sur cet onglet (acheteur : « Alertes »). */
+  unread?: boolean;
 }
 
 function TabBar({ items }: { items: TabItem[] }) {
@@ -40,7 +44,10 @@ function TabBar({ items }: { items: TabItem[] }) {
                 active ? "text-forest" : "text-ink-soft"
               }`}
             >
-              <it.icon className="size-5" strokeWidth={active ? 2.3 : 1.8} />
+              <span className="relative">
+                <it.icon className="size-5" strokeWidth={active ? 2.3 : 1.8} />
+                {it.unread ? <UnreadBadge className="absolute -right-2.5 -top-1.5" /> : null}
+              </span>
               {it.label}
             </Link>
           );
@@ -50,13 +57,28 @@ function TabBar({ items }: { items: TabItem[] }) {
   );
 }
 
+/**
+ * Navigation de l'acheteur : la pastille des notifications non lues est sur « Alertes ». Une fois le compteur connu (une page gardée l'a lu, donc la
+ * session est confirmée), il est relu à l'arrivée sur chaque page et au retour au premier plan, JAMAIS plus d'une fois par minute.
+ */
 export function BuyerTabBar() {
+  const pathname = usePathname();
+  useEffect(() => {
+    if (unreadRefresher.get() !== null) void unreadRefresher.refresh();
+  }, [pathname]);
+  useEffect(() => {
+    const onForeground = () => {
+      if (document.visibilityState === "visible" && unreadRefresher.get() !== null) void unreadRefresher.refresh();
+    };
+    document.addEventListener("visibilitychange", onForeground);
+    return () => document.removeEventListener("visibilitychange", onForeground);
+  }, []);
   return (
     <TabBar
       items={[
         { href: "/", label: "Explorer", icon: Search, match: ["/", "/recherche", "/offre", "/comparer", "/partager"] },
         { href: "/favoris", label: "Favoris", icon: Heart, match: ["/favoris"] },
-        { href: "/alertes", label: "Alertes", icon: Bell, match: ["/alertes", "/alerte"] },
+        { href: "/alertes", label: "Alertes", icon: Bell, match: ["/alertes", "/alerte", "/notifications"], unread: true },
         { href: "/compte", label: "Compte", icon: User, match: ["/compte", "/messages", "/commandes", "/signaler", "/propositions", "/inviter"] },
       ]}
     />

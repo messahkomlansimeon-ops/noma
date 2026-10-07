@@ -24,6 +24,14 @@ async function main(): Promise<void> {
       `${result.maintenance.deadLettered} job(s) en dead_letter, ${result.jobs.length} job(s) exécuté(s).`,
     );
     if (result.boost.expired > 0) console.log(`Matching worker : ${result.boost.expired} boost(s) échu(s) marqué(s) expiré(s).`);
+    // Étape « notify » (lot N1) : une ligne seulement si elle a travaillé (jamais le contenu d'une notification ni un numéro).
+    if (result.notify.users > 0 || result.notify.expired > 0) {
+      console.log(
+        `Matching worker : notifications, ${result.notify.messages} message(s) simulé(s) envoyé(s) (${result.notify.delivered} envoi(s)), ` +
+        `${result.notify.skippedDeliveries} écarté(s), ${result.notify.deferred} reporté(s), ${result.notify.retried} à réessayer, ` +
+        `${result.notify.failed} en échec, ${result.notify.expired} expiré(s).`,
+      );
+    }
     // Un code stable par ligne (jamais de message brut) ; une étape en échec donne le code de sortie 1.
     for (const code of result.errors) console.error(`Matching worker : ${code}`);
     if (result.errors.length > 0) process.exitCode = 1;

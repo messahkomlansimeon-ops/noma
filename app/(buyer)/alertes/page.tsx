@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ChevronRight, Plus } from "lucide-react";
+import { Bell, ChevronRight, Plus } from "lucide-react";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { Thumb } from "@/components/thumb";
 import { Badge, BtnOutline } from "@/components/ui";
+import { UnreadBadge, UnreadSync } from "@/components/unread-badge";
 import { ApiError, api, describeApiError, type DemandRecord } from "@/lib/client/api";
 import {
   DEMAND_FILTERS,
@@ -97,6 +98,14 @@ function MesBesoins() {
           <span className="font-display text-[20px] font-extrabold text-forest">
             noma
           </span>
+        </Link>
+        <Link
+          href="/notifications"
+          className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[13px] font-semibold text-ink"
+        >
+          <Bell className="size-4" aria-hidden />
+          Notifications
+          <UnreadBadge />
         </Link>
       </div>
 
@@ -222,6 +231,7 @@ function MesBesoins() {
 export default function RecherchesSuivies() {
   return (
     <SessionGate>
+      <UnreadSync />
       <MesBesoins />
     </SessionGate>
   );

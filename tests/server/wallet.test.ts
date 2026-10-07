@@ -273,7 +273,7 @@ test("activation du prestataire fictif : liste d'AUTORISATION (NODE_ENV exacteme
 
 // ═════════════ défense de déploiement : variables interdites en production ═════════════
 
-const FORBIDDEN = ["NOMA_FAKE_PAYMENTS", "NOMA_FAKE_PAYMENT_SECRET", "NOMA_DEV_OTP_CONSOLE", "NOMA_DEV_PROXY", "NOMA_FAKE_SOURCES", "NOMA_TURNSTILE_DISABLED"];
+const FORBIDDEN = ["NOMA_FAKE_PAYMENTS", "NOMA_FAKE_PAYMENT_SECRET", "NOMA_DEV_OTP_CONSOLE", "NOMA_DEV_NOTIFY_CONSOLE", "NOMA_DEV_PROXY", "NOMA_FAKE_SOURCES", "NOMA_TURNSTILE_DISABLED"];
 const productionEnv = { NODE_ENV: "production", NOMA_TURNSTILE_SECRET: "turnstile-secret-test", NOMA_IP_SECRET: "ip-secret-test" };
 
 test("validation de production : la liste des variables interdites est exactement celle attendue", () => {

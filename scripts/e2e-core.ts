@@ -33,6 +33,7 @@
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import {
   ApiError,
   createApiClient,
@@ -50,8 +51,11 @@ import {
   awaitOtpLine,
   e2eDatabaseUrl,
   grantBoostByAdministration,
+  isQuietHourNow,
   logSize,
   loginWithOtp,
+  notificationsPurgeSimulationByAdministration,
+  notifyConsoleLinesSince,
   pollUntil,
   seedExamplesByAdministration,
   uniquePhone,
@@ -1335,6 +1339,327 @@ async function main(): Promise<void> {
     const report = await walletCheckByAdministration();
     assert.match(report, /Portefeuille : aucun écart\./);
     ok(`solde ${wallet.balanceXof} ; wallet:check après ces recharges : aucun écart`);
+  });
+
+  // ───────────── Lot N1 : notifications de nouvelles correspondances et suivi des besoins ─────────────
+  const notifyConsole = process.env.NOMA_E2E_NOTIFY_CONSOLE === "1";
+  const nTag = (Date.now() + 7).toString(36).slice(-5);
+  const nProduct = { category: "Téléphones", brand: "Nokia", model: `Banane ${nTag}` };
+  const nTitle = `${nProduct.brand} ${nProduct.model}`;
+  const nBuyer = new RelaySession("acheteur N1");
+  const nSeller = new RelaySession("vendeur N1");
+  const nOther = new RelaySession("autre acheteur N1");
+  const nBuyerApi = nBuyer.client();
+  const nSellerApi = nSeller.client();
+  const nOtherApi = nOther.client();
+  const nSellerPhone = uniquePhone("61");
+  const nBuyerPhone = uniquePhone("62");
+  let nBuyerId = "";
+  let nSellerId = "";
+  let nDemand: DemandRecord = undefined as unknown as DemandRecord;
+  const nOffers: OfferRecord[] = [];
+  const nPublish = async (label: string, price: string): Promise<OfferRecord> => {
+    const built = buildOfferInput({
+      title: `${nTitle} · ${label}`, description: `Annonce ${label}. Appelez le ${nSellerPhone.slice(4)} pour la voir.`, category: nProduct.category, brand: nProduct.brand,
+      model: nProduct.model, variant: "", condition: "Occasion", location: "Abidjan", price, available: true,
+    });
+    assert.ok(built.ok);
+    const created = await nSellerApi.offers.create(built.input);
+    const published = await nSellerApi.offers.publish(created.id, created.contentVersion);
+    nOffers.push(published);
+    return published;
+  };
+  /** Attend que l'offre figure dans les correspondances du besoin : l'évaluation est alors validée (et, dans la même transaction, sa notification éventuelle). */
+  const nAwaitMatch = (offer: OfferRecord) =>
+    pollUntil(`l'offre ${offer.id} dans les correspondances du besoin N1`, async () => ((await allMatches(nBuyer, nDemand.id, "score")).some((item) => item.candidateId === offer.id) ? true : null), WORKER_TIMEOUT_MS);
+  const nUnread = async (): Promise<number> => (await nBuyerApi.notifications.list({ limit: 50 })).unreadCount;
+
+  await step("Notifications (lot N1) : comptes, besoin actif ; aucune notification avant la première annonce ; suivi par défaut 30 jours ; envoi externe désactivé par défaut", async () => {
+    await loginWithOtp(nSeller, nSellerPhone);
+    nBuyerId = await loginWithOtp(nBuyer, nBuyerPhone);
+    nSellerId = (await nSellerApi.auth.session()).userId;
+    await loginWithOtp(nOther, uniquePhone("63"));
+    const built = buildDemandInput(
+      { text: `Je cherche un ${nTitle}`, category: nProduct.category, brand: nProduct.brand, model: nProduct.model, variant: "", condition: "Occasion", location: "Abidjan", budget: "100 000", deadline: "" },
+      new Date().toISOString().slice(0, 10),
+    );
+    assert.ok(built.ok);
+    const created = await nBuyerApi.demands.create(built.input);
+    nDemand = await nBuyerApi.demands.activate(created.id, created.contentVersion);
+    const first = await nBuyerApi.notifications.list();
+    assert.deepEqual({ items: first.items.length, unread: first.unreadCount, cursor: first.nextCursor }, { items: 0, unread: 0, cursor: null });
+    ok("GET /api/notifications avant toute annonce : liste vide, 0 non lue");
+    const tracking = await nBuyerApi.demands.tracking(nDemand.id);
+    assert.deepEqual({ status: tracking.demandStatus, paused: tracking.paused, active: tracking.active }, { status: "active", paused: false, active: true });
+    const days = (Date.parse(tracking.until) - Date.parse(nDemand.createdAt)) / 86_400_000;
+    assert.ok(Math.abs(days - 30) < 0.01, `suivi par défaut : création + 30 jours (${days})`);
+    ok("GET /api/demands/{id}/tracking : suivi actif, jusqu'à la création + 30 jours");
+    const preferences = await nBuyerApi.notifications.preferences();
+    assert.equal(preferences.externalEnabled, false, "envoi externe désactivé par défaut");
+    assert.equal(preferences.notice, "Les envois par SMS ne sont pas encore disponibles : ils sont simulés en développement.");
+    assert.equal(preferences.externalAvailable, notifyConsole, "un transport simulé n'existe que si le serveur a NOMA_DEV_NOTIFY_CONSOLE=1");
+    ok(`GET /api/notifications/preferences : désactivé par défaut, texte « pas encore disponibles », transport simulé ${notifyConsole ? "présent" : "absent"}`);
+  });
+
+  await step("Notifications (lot N1) : le vendeur publie une annonce correspondante ; après le worker l'acheteur a UNE notification (titre, prix, lien vers la fiche), le vendeur et un tiers aucune", async () => {
+    const offer = await nPublish("A1", "60 000");
+    const found = await pollUntil("la notification de l'acheteur", async () => {
+      const page = await nBuyerApi.notifications.list({ limit: 50 });
+      return page.items.length >= 1 ? page : null;
+    }, WORKER_TIMEOUT_MS);
+    assert.equal(found.items.length, 1);
+    assert.equal(found.unreadCount, 1);
+    const [item] = found.items;
+    assert.equal(item.kind, "new_match");
+    assert.equal(item.title, nTitle, "titre = marque, modèle (variante vide)");
+    assert.deepEqual(item.price, { amount: 60_000, currency: "XOF" });
+    assert.equal(item.demandId, nDemand.id);
+    assert.equal(item.offerId, offer.id);
+    assert.equal(item.link, `/besoins/${nDemand.id}/offres/${offer.id}`);
+    assert.equal(item.readAt, null);
+    const raw = await rawGet(nBuyer, "/api/notifications");
+    assert.equal(raw.status, 200);
+    for (const secret of [nSellerId, nSellerPhone, nSellerPhone.slice(4), nBuyerId, nBuyerPhone, "Appelez", "rawText"]) assert.equal(raw.text.includes(secret), false, `la réponse ne contient pas « ${secret} »`);
+    ok(`GET /api/notifications : 1 non lue « ${item.title} », 60 000 XOF, lien ${item.link} ; aucun téléphone, identifiant ni texte libre du vendeur`);
+    const sheet = await nBuyerApi.demands.offer(nDemand.id, offer.id);
+    assert.equal(sheet.item.candidateId, offer.id);
+    const page = await nBuyer.fetch(item.link);
+    assert.equal(page.status, 200);
+    ok("le lien de la notification mène à la fiche (M1) de l'annonce dans le contexte du besoin : l'API répond 200 et la page est servie");
+    assert.equal((await nSellerApi.notifications.list()).items.length, 0, "le vendeur n'est jamais notifié");
+    assert.equal((await nOtherApi.notifications.list()).items.length, 0);
+    assert.equal((await nSellerApi.notifications.list()).unreadCount, 0);
+    ok("le vendeur et un autre acheteur n'ont aucune notification");
+    // Pas de doublon : rejouer la lecture après un nouveau cycle du worker ne change rien.
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    assert.equal((await nBuyerApi.notifications.list({ limit: 50 })).items.length, 1);
+    ok("après un nouveau cycle du worker : toujours UNE notification (aucun doublon)");
+  });
+
+  await step("Notifications (lot N1) : accès d'autrui = 404 indiscernable, aucune notification touchée ; marquer comme lu ; « tout » ; idempotence", async () => {
+    const page = await nBuyerApi.notifications.list();
+    const id = page.items[0].id;
+    const strange = await rejects(nOtherApi.notifications.markRead([id]));
+    expectApiError(strange, 404, "resource_not_found");
+    const unknown = await rejects(nOtherApi.notifications.markRead([randomUUID()]));
+    expectApiError(unknown, 404, "resource_not_found");
+    assert.equal((strange as ApiError).message, (unknown as ApiError).message, "même réponse pour une notification d'autrui et une notification inconnue");
+    const foreignRaw = await nOther.fetch("/api/notifications/read", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ids: [id] }) });
+    const unknownRaw = await nOther.fetch("/api/notifications/read", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ids: [randomUUID()] }) });
+    assert.equal(await foreignRaw.text(), await unknownRaw.text(), "corps identiques octet pour octet");
+    assert.equal(foreignRaw.headers.get("cache-control"), "no-store");
+    assert.equal(await nUnread(), 1, "la notification de l'acheteur n'a pas bougé");
+    const newest = page.items[0].createdAt;
+    const refusedOrigin = await nBuyer.fetch("/api/notifications/read", { method: "POST", origin: "https://evil.example", headers: { "content-type": "application/json" }, body: JSON.stringify({ all: true, upTo: newest }) });
+    assert.equal(refusedOrigin.status, 403);
+    assert.equal(await nUnread(), 1, "origine refusée : rien n'est marqué");
+    const marked = await nBuyerApi.notifications.markRead([id]);
+    assert.deepEqual(marked, { marked: 1, unreadCount: 0 });
+    assert.deepEqual(await nBuyerApi.notifications.markRead([id]), { marked: 0, unreadCount: 0 });
+    assert.deepEqual(await nBuyerApi.notifications.markAllRead(newest), { marked: 0, unreadCount: 0 });
+    const after = await nBuyerApi.notifications.list();
+    assert.notEqual(after.items[0].readAt, null);
+    assert.equal(after.unreadCount, 0);
+    ok("notification d'autrui ou inconnue : 404 au corps identique ; origine refusée : 403 ; POST /api/notifications/read marque comme lu (idempotent, aucune date de lecture réécrite)");
+    const unauthenticated = await nBuyer.fetch("/api/notifications", { noCookies: true });
+    assert.equal(unauthenticated.status, 401);
+    ok("GET /api/notifications sans session : 401");
+  });
+
+  await step("Notifications (lot N1) : suivi en PAUSE ; une nouvelle annonce ne notifie pas (le matching continue : elle est dans les résultats) ; prolonger ; reprendre", async () => {
+    const paused = await nBuyerApi.demands.trackingAction(nDemand.id, "pause");
+    assert.deepEqual({ paused: paused.paused, active: paused.active }, { paused: true, active: false });
+    const offer = await nPublish("A2", "55 000");
+    await nAwaitMatch(offer);
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    const list = await nBuyerApi.notifications.list({ limit: 50 });
+    assert.equal(list.items.length, 1, "pendant la pause : aucune notification pour la nouvelle annonce");
+    assert.equal(list.unreadCount, 0);
+    assert.ok(list.items.every((entry) => entry.offerId !== offer.id));
+    ok("pause : la nouvelle annonce est dans les résultats du besoin (le matching continue) mais n'a produit AUCUNE notification");
+    const extended = await nBuyerApi.demands.trackingAction(nDemand.id, "extend");
+    assert.equal(extended.paused, true, "prolonger ne reprend pas");
+    assert.ok(Date.parse(extended.until) > Date.parse(paused.until), "l'échéance avance");
+    let current = extended;
+    for (let index = 0; index < 4; index += 1) current = await nBuyerApi.demands.trackingAction(nDemand.id, "extend");
+    assert.ok(Date.parse(current.until) <= Date.parse(current.maxUntil), "jamais au-delà de maintenant + 90 jours");
+    assert.ok(Date.parse(current.until) - Date.now() <= 90 * 86_400_000 + 60_000);
+    ok("prolonger : +30 jours, puis plafonné à 90 jours à partir de maintenant");
+    const stranger = await rejects(nOtherApi.demands.trackingAction(nDemand.id, "resume"));
+    expectApiError(stranger, 404, "resource_not_found");
+    const unknownDemand = await rejects(nOtherApi.demands.tracking(randomUUID()));
+    expectApiError(unknownDemand, 404, "resource_not_found");
+    assert.equal((await nBuyerApi.demands.tracking(nDemand.id)).paused, true, "l'accès d'autrui n'a rien changé");
+    ok("suivi d'un besoin d'autrui ou inconnu : 404 resource_not_found, rien n'est changé");
+    const resumed = await nBuyerApi.demands.trackingAction(nDemand.id, "resume");
+    assert.deepEqual({ paused: resumed.paused, active: resumed.active }, { paused: false, active: true });
+    const third = await nPublish("A3", "58 000");
+    const afterResume = await pollUntil("la notification après la reprise", async () => {
+      const page = await nBuyerApi.notifications.list({ limit: 50 });
+      return page.unreadCount === 1 ? page : null;
+    }, WORKER_TIMEOUT_MS);
+    assert.equal(afterResume.items.length, 2);
+    assert.equal(afterResume.items[0].offerId, third.id, "la plus récente d'abord : l'annonce de la reprise");
+    assert.equal(afterResume.items.some((entry) => entry.offerId === offer.id), false, "l'annonce de la pause n'est jamais notifiée après coup");
+    ok("reprise : l'annonce suivante notifie (1 non lue) ; celle de la pause ne notifie jamais");
+  });
+
+  await step("Notifications (lot N1-bis) : « Tout marquer comme lu » ne marque que ce qui a été VU (`{ all: true, upTo }`) : une notification arrivée après le chargement reste non lue", async () => {
+    const loaded = await nBuyerApi.notifications.list({ limit: 50 });
+    assert.equal(loaded.unreadCount, 1, "l'annonce de la reprise est non lue");
+    const upTo = loaded.items[0].createdAt;
+    const arrival = await nPublish("A3b", "59 000");
+    await pollUntil("la notification arrivée après le chargement", async () => {
+      const page = await nBuyerApi.notifications.list({ limit: 50 });
+      return page.items.some((entry) => entry.offerId === arrival.id) ? page : null;
+    }, WORKER_TIMEOUT_MS);
+    const bare = await nBuyer.fetch("/api/notifications/read", { method: "POST", headers: { "content-type": "application/json" }, body: '{"all":true}' });
+    assert.equal(bare.status, 400, "« tout » sans la date de la plus récente notification affichée est refusé");
+    assert.equal(await nUnread(), 2, "refusé : rien n'est marqué");
+    const result = await nBuyerApi.notifications.markAllRead(upTo);
+    assert.deepEqual(result, { marked: 1, unreadCount: 1 }, "seule la notification affichée est marquée");
+    const after = await nBuyerApi.notifications.list({ limit: 50 });
+    assert.equal(after.items.find((entry) => entry.offerId === arrival.id)?.readAt, null, "l'arrivée tardive reste non lue");
+    assert.deepEqual(await nBuyerApi.notifications.markAllRead(after.items[0].createdAt), { marked: 1, unreadCount: 0 });
+    ok("« Tout marquer comme lu » avec la date de la plus récente notification affichée : 1 marquée, l'arrivée tardive reste non lue (1 non lue) ; sans date : 400 ; puis tout est lu");
+  });
+
+  await step("Notifications (lot N1) : envoi externe SIMULÉ (opt-in) : un message regroupé par la console du serveur (identifiant tronqué, nombre d'annonces, lien), jamais la nuit", async () => {
+    await rejects(nBuyerApi.notifications.setPreferences("oui" as never));
+    const enabled = await nBuyerApi.notifications.setPreferences(true);
+    assert.equal(enabled.externalEnabled, true);
+    assert.equal((await nBuyerApi.notifications.preferences()).externalEnabled, true);
+    assert.equal((await nOtherApi.notifications.preferences()).externalEnabled, false, "le choix d'un autre compte n'est pas touché");
+    const refusedOrigin = await nBuyer.fetch("/api/notifications/preferences", { method: "PUT", origin: "https://evil.example", headers: { "content-type": "application/json" }, body: '{"externalEnabled":false}' });
+    assert.equal(refusedOrigin.status, 403);
+    assert.equal((await nBuyerApi.notifications.preferences()).externalEnabled, true);
+    ok("PUT /api/notifications/preferences : opt-in enregistré pour ce compte seulement ; origine refusée : 403");
+    const offset = logSize();
+    const fourth = await nPublish("A4", "57 000");
+    await pollUntil("la notification de la quatrième annonce", async () => {
+      const page = await nBuyerApi.notifications.list({ limit: 50 });
+      return page.items.some((entry) => entry.offerId === fourth.id) ? page : null;
+    }, WORKER_TIMEOUT_MS);
+    const mask = nBuyerId.replace(/-/g, "").slice(0, 8);
+    const { Client } = await import("pg");
+    const windowDb = new Client({ connectionString: e2eDatabaseUrl() });
+    await windowDb.connect();
+    try {
+      const row = (await windowDb.query<{ window_seconds: number }>(
+        "SELECT extract(epoch FROM next_attempt_at - created_at)::int AS window_seconds FROM notification_deliveries WHERE demand_id = $1 AND offer_id = $2", [nDemand.id, fourth.id])).rows[0];
+      assert.equal(row?.window_seconds, 900, "la ligne d'envoi n'est envoyable que 15 minutes après sa création (fenêtre de collecte)");
+      ok("la ligne d'envoi de la quatrième annonce est créée avec la fenêtre de collecte : next_attempt_at = created_at + 15 minutes");
+      if (notifyConsole && !isQuietHourNow()) {
+        await new Promise((resolve) => setTimeout(resolve, 8_000));
+        assert.deepEqual(notifyConsoleLinesSince(offset), [], "fenêtre de collecte de 15 minutes : rien ne part tout de suite");
+        ok("fenêtre de collecte : 8 secondes après la notification, aucun message simulé n'est parti");
+        // L'essai ne peut pas attendre 15 minutes : la ligne est VIEILLIE d'une heure (créée et échéance reculées), comme si le temps avait passé.
+        await windowDb.query("UPDATE notification_deliveries SET created_at = created_at - interval '1 hour', next_attempt_at = next_attempt_at - interval '1 hour' WHERE demand_id = $1 AND status = 'pending'", [nDemand.id]);
+      }
+    } finally {
+      await windowDb.end();
+    }
+    if (!notifyConsole) {
+      await new Promise((resolve) => setTimeout(resolve, 6_000));
+      assert.deepEqual(notifyConsoleLinesSince(offset), [], "sans transport (NOMA_DEV_NOTIFY_CONSOLE absent) : aucun envoi externe");
+      ok("serveur lancé SANS NOMA_DEV_NOTIFY_CONSOLE=1 : aucun envoi externe, l'opt-in est enregistré seulement");
+    } else if (isQuietHourNow()) {
+      await new Promise((resolve) => setTimeout(resolve, 8_000));
+      assert.deepEqual(notifyConsoleLinesSince(offset), [], "heures calmes (22 h – 7 h UTC) : rien n'est envoyé");
+      ok(`heures calmes en cours (${new Date().toISOString().slice(11, 16)} UTC, 22 h – 7 h) : aucun message simulé n'est parti, l'envoi est reporté à 7 h`);
+    } else {
+      const lines = await pollUntil("la ligne du transport simulé", async () => {
+        const found = notifyConsoleLinesSince(offset);
+        return found.length > 0 ? found : null;
+      }, 60_000, "le serveur a-t-il été lancé avec NOMA_DEV_NOTIFY_CONSOLE=1 ?");
+      await new Promise((resolve) => setTimeout(resolve, 4_000));
+      const all = notifyConsoleLinesSince(offset);
+      assert.equal(all.length, 1, `UN seul message : ${JSON.stringify(all)}`);
+      assert.deepEqual(all[0], { user: mask, count: 1, link: "/notifications" });
+      const text = readFileSync(E2E_SERVER_LOG).subarray(offset).toString("utf8");
+      for (const secret of [nBuyerId, nBuyerPhone, nBuyerPhone.slice(4), nSellerPhone, nTitle, "57 000", "57000"]) assert.equal(text.includes(secret), false, `la console ne montre pas « ${secret} »`);
+      assert.equal(lines.length >= 1, true);
+      ok(`console du serveur : un message simulé « ${all[0].count} annonce, lien ${all[0].link} » pour l'identifiant tronqué ${mask}… ; ni titre, ni prix, ni numéro, ni identifiant entier`);
+    }
+    // Plus aucun message pour une annonce qui n'est plus correspondante : l'annonce passe en pause avant l'envoi (heures calmes) ou après (jour) : rien de plus ne part.
+    const afterLines = notifyConsoleLinesSince(offset).length;
+    await nSellerApi.offers.pause(fourth.id, fourth.contentVersion);
+    await new Promise((resolve) => setTimeout(resolve, 4_000));
+    assert.equal(notifyConsoleLinesSince(offset).length, afterLines, "mettre l'annonce en pause n'envoie rien de plus");
+    ok("mettre l'annonce en pause n'envoie aucun message de plus");
+  });
+
+  await step("Notifications (lot N1-bis) : un NOUVEAU besoin alors que des annonces correspondent déjà : AUCUNE notification, aucun envoi ; budget relevé : toujours aucune ; une annonce publiée ensuite : une", async () => {
+    const { Client } = await import("pg");
+    const db = new Client({ connectionString: e2eDatabaseUrl() });
+    await db.connect();
+    try {
+      const built = buildDemandInput(
+        { text: `Je cherche un ${nTitle} (bis)`, category: nProduct.category, brand: nProduct.brand, model: nProduct.model, variant: "", condition: "Occasion", location: "Abidjan", budget: "100 000", deadline: "" },
+        new Date().toISOString().slice(0, 10),
+      );
+      assert.ok(built.ok);
+      const created = await nBuyerApi.demands.create(built.input);
+      const second = await nBuyerApi.demands.activate(created.id, created.contentVersion);
+      const matches = await pollUntil("les résultats du second besoin", async () => {
+        const found = await allMatches(nBuyer, second.id, "score");
+        return found.length >= 3 ? found : null;
+      }, WORKER_TIMEOUT_MS);
+      await new Promise((resolve) => setTimeout(resolve, 4_000));
+      const forSecond = async (): Promise<number> => (await nBuyerApi.notifications.list({ limit: 50 })).items.filter((entry) => entry.demandId === second.id).length;
+      const deliveriesFor = async (): Promise<number> => Number((await db.query("SELECT count(*)::int AS n FROM notification_deliveries WHERE demand_id = $1", [second.id])).rows[0].n);
+      assert.equal(await forSecond(), 0, "créer un besoin ne notifie jamais, même si des annonces correspondent déjà");
+      assert.equal(await deliveriesFor(), 0, "aucun envoi externe non plus");
+      ok(`nouveau besoin avec ${matches.length} annonces qui correspondent déjà : les résultats sont visibles, 0 notification, 0 envoi`);
+      const patched = await nBuyer.fetch(`/api/demands/${second.id}`, {
+        method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ expectedContentVersion: second.contentVersion, budget: { amount: 400_000, currency: "XOF" } }),
+      });
+      assert.equal(patched.status, 200, await patched.clone().text());
+      await new Promise((resolve) => setTimeout(resolve, 5_000));
+      assert.equal(await forSecond(), 0, "relever le budget ne notifie pas non plus");
+      assert.equal(await deliveriesFor(), 0);
+      ok("budget relevé de 100 000 à 400 000 : le besoin est réévalué, toujours 0 notification, 0 envoi");
+      const fresh = await nPublish("A6", "56 000");
+      const found = await pollUntil("la notification de la nouvelle annonce pour le second besoin", async () => {
+        const page = await nBuyerApi.notifications.list({ limit: 50 });
+        const mine = page.items.filter((entry) => entry.demandId === second.id);
+        return mine.length >= 1 ? mine : null;
+      }, WORKER_TIMEOUT_MS);
+      assert.equal(found.length, 1);
+      assert.equal(found[0].offerId, fresh.id, "seule l'annonce publiée APRÈS notifie");
+      ok("une annonce publiée ensuite : UNE notification pour le second besoin (celle de la nouvelle annonce)");
+    } finally {
+      await db.end();
+    }
+  });
+
+  await step("Notifications (lot N1) : besoin SATISFAIT : le suivi s'arrête (409), les envois en attente sont annulés ; purge simulée", async () => {
+    const { Client } = await import("pg");
+    const db = new Client({ connectionString: e2eDatabaseUrl() });
+    await db.connect();
+    try {
+      const statuses = async () => (await db.query<{ status: string; reason: string | null; n: number }>(
+        "SELECT status, reason, count(*)::int AS n FROM notification_deliveries WHERE demand_id = $1 GROUP BY status, reason ORDER BY status, reason", [nDemand.id])).rows;
+      const before = await statuses();
+      const pendingBefore = before.filter((row) => row.status === "pending").reduce((sum, row) => sum + row.n, 0);
+      await nBuyerApi.demands.satisfy(nDemand.id, (await nBuyerApi.demands.get(nDemand.id)).contentVersion);
+      const after = await statuses();
+      assert.equal(after.some((row) => row.status === "pending"), false, "plus aucun envoi en attente");
+      const cancelled = after.filter((row) => row.status === "cancelled").reduce((sum, row) => sum + row.n, 0);
+      assert.equal(cancelled, before.filter((row) => row.status === "cancelled").reduce((sum, row) => sum + row.n, 0) + pendingBefore, "tous les envois en attente sont devenus « cancelled »");
+      assert.ok(after.filter((row) => row.status === "cancelled").every((row) => row.reason === "demand_satisfied"));
+      ok(`satisfait : ${pendingBefore} envoi(s) en attente → cancelled (demand_satisfied), plus aucun pending`);
+    } finally {
+      await db.end();
+    }
+    const refused = await rejects(nBuyerApi.demands.trackingAction(nDemand.id, "extend"));
+    expectApiError(refused, 409, "demand_not_active");
+    const tracking = await nBuyerApi.demands.tracking(nDemand.id);
+    assert.deepEqual({ status: tracking.demandStatus, active: tracking.active }, { status: "satisfied", active: false });
+    ok("suivi d'un besoin satisfait : 409 demand_not_active ; GET /tracking : satisfait, inactif");
+    const purge = await notificationsPurgeSimulationByAdministration();
+    assert.match(purge, /Notifications : simulation, 0 notification\(s\) .* et 0 envoi\(s\) externe\(s\) de plus de 180 jours seraient supprimé\(s\)\. Rien n'a été supprimé/);
+    ok("notifications:purge (simulation) : rien d'ancien à supprimer, rien supprimé");
   });
 
   if (process.env.NOMA_E2E_SEARCH_STREAM === "1") {

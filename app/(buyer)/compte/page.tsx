@@ -17,7 +17,9 @@ import {
   Wallet,
 } from "lucide-react";
 import { LogoMark } from "@/components/logo";
+import { NotificationPreferencesCard } from "@/components/notification-preferences-card";
 import { useLogout } from "@/components/session-gate";
+import { useUnreadCount } from "@/components/unread-badge";
 import {
   Avatar,
   Badge,
@@ -30,6 +32,7 @@ export default function MonCompte() {
   const setRole = useNoma((s) => s.setRole);
   const showToast = useNoma((s) => s.showToast);
   const { logout, pending: loggingOut } = useLogout();
+  const unread = useUnreadCount();
 
   const soon = () => showToast("Prototype : écran non maquetté");
 
@@ -77,9 +80,11 @@ export default function MonCompte() {
           <MenuRow icon={Search} label="Mes recherches suivies" href="/alertes" />
           <MenuRow icon={Heart} label="Mes favoris" href="/favoris" />
           <MenuRow icon={CircleUser} label="Informations personnelles" onClick={soon} />
-          <MenuRow icon={Bell} label="Notifications" onClick={soon} />
+          <MenuRow icon={Bell} label="Notifications" badge={unread !== null && unread > 0 ? unread : undefined} href="/notifications" />
           <MenuRow icon={CircleHelp} label="Aide et signalements" onClick={soon} />
         </div>
+
+        <NotificationPreferencesCard />
 
         <div className="mt-4 rounded-2xl bg-sage p-4">
           <div className="flex items-center gap-2.5">

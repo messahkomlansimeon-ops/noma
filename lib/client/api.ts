@@ -11,8 +11,9 @@
  *
  * Les formes de corps et de réponses reprennent EXACTEMENT celles de lib/server/auth/http.ts,
  * lib/server/catalog/http.ts, lib/server/matching/http-dto.ts (`matching-stored-http/v1`), lib/server/boost/http.ts
- * (`boost-quote/v2`), lib/server/metrics/http.ts (`demand-offer/v1`, `offer-contact/v1`, `offer-stats/v1`), lib/server/wallet/http.ts (`wallet/v1`) et lib/server/boost/purchase-http.ts (`boost-purchase/v1`), contrats
- * documentés dans AUTH-SERVER.md, CATALOG-HTTP.md, MATCHING-STORED-READ.md, BOOST-HTTP.md, WALLET.md et BOOST-PURCHASE.md.
+ * (`boost-quote/v2`), lib/server/metrics/http.ts (`demand-offer/v1`, `offer-contact/v1`, `offer-stats/v1`), lib/server/wallet/http.ts (`wallet/v1`) et lib/server/boost/purchase-http.ts (`boost-purchase/v1`), et
+ * lib/server/notifications/http.ts (`notifications/v1`, `notification-preferences/v1`, `demand-tracking/v1`), contrats
+ * documentés dans AUTH-SERVER.md, CATALOG-HTTP.md, MATCHING-STORED-READ.md, BOOST-HTTP.md, WALLET.md, BOOST-PURCHASE.md et NOTIFICATIONS.md.
  * Les réponses sont relues champ par champ (liste blanche) : un champ que le serveur ajouterait un jour n'atteint jamais l'écran.
  * Les montants du portefeuille sont des entiers sûrs (|n| ≤ 2^53 − 1), vérifiés à l'envoi comme à la lecture.
  */
@@ -260,6 +261,72 @@ export interface OfferContact {
   whatsappUrl: string;
   /** Vrai la première fois que ce besoin contacte cette annonce. */
   firstContact: boolean;
+}
+
+// ─── Notifications et suivi des besoins (notifications/v1, notification-preferences/v1, demand-tracking/v1) ───
+
+export type NotificationKind = "new_match" | "new_matches_digest";
+export const NOTIFICATION_KINDS: readonly NotificationKind[] = ["new_match", "new_matches_digest"];
+
+/** Une notification DANS l'application : liste blanche (titre, prix, lien interne) ; jamais de téléphone, d'identifiant du vendeur ni de texte libre. */
+export interface NotificationItem {
+  id: string;
+  kind: NotificationKind;
+  /** Titre de l'annonce (new_match) ; null pour un résumé. */
+  title: string | null;
+  price: Money | null;
+  /** Résumé : nombre d'annonces au-delà du plafond du jour ; null sinon. */
+  count: number | null;
+  demandId: string;
+  /** new_match : l'annonce, dans le contexte du besoin ; null pour un résumé. */
+  offerId: string | null;
+  /** Lien INTERNE vers la fiche (new_match) ou le besoin (résumé). */
+  link: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface NotificationsPage {
+  items: NotificationItem[];
+  nextCursor: string | null;
+  /** Nombre TOTAL de notifications non lues (pas seulement celles de la page). */
+  unreadCount: number;
+}
+
+export interface NotificationsQuery {
+  /** 1 à 50 (20 par défaut). */
+  limit?: number;
+  cursor?: string;
+}
+
+export interface MarkReadResult {
+  marked: number;
+  unreadCount: number;
+}
+
+export interface NotificationPreferences {
+  /** Envoi externe simulé demandé par l'utilisateur (désactivé par défaut). */
+  externalEnabled: boolean;
+  /** Un transport (simulé) existe dans l'environnement du serveur. */
+  externalAvailable: boolean;
+  /** Texte fixe du serveur : « Les envois par SMS ne sont pas encore disponibles : ils sont simulés en développement. » */
+  notice: string;
+}
+
+export type TrackingAction = "extend" | "pause" | "resume";
+export const TRACKING_ACTIONS: readonly TrackingAction[] = ["extend", "pause", "resume"];
+
+/** Suivi d'un besoin : le matching continue pendant une pause ou après la fin ; seules les notifications s'arrêtent. */
+export interface DemandTracking {
+  demandId: string;
+  demandStatus: DemandStatus;
+  until: string;
+  paused: boolean;
+  /** Les notifications partent pour ce besoin : actif, pas en pause, échéance dans le futur. */
+  active: boolean;
+  /** Échéance maximale d'une prolongation (maintenant + 90 jours). */
+  maxUntil: string;
+  readAt: string;
 }
 
 // ─── Cotations de boost (boost-quote/v2) ──────────────────────────────────────────────────────────
@@ -563,6 +630,9 @@ export const OFFER_CONTACT_CONTRACT_VERSION = "offer-contact/v1";
 export const OFFER_STATS_CONTRACT_VERSION = "offer-stats/v1";
 export const WALLET_CONTRACT_VERSION = "wallet/v1";
 export const BOOST_PURCHASE_CONTRACT_VERSION = "boost-purchase/v1";
+export const NOTIFICATIONS_CONTRACT_VERSION = "notifications/v1";
+export const NOTIFICATION_PREFERENCES_CONTRACT_VERSION = "notification-preferences/v1";
+export const DEMAND_TRACKING_CONTRACT_VERSION = "demand-tracking/v1";
 
 function isNumberOrNull(value: unknown): value is number | null {
   return value === null || (typeof value === "number" && Number.isFinite(value));
@@ -1110,6 +1180,142 @@ function parseBoostPurchaseHistoryItem(status: number, value: unknown): BoostPur
   return { ...parseBoostPurchaseCore(status, value), createdAt: value.createdAt, refundedAt: value.refundedAt };
 }
 
+// ─── Lecture stricte des notifications, des préférences et du suivi ─────────────────────────────────
+
+/** Texte d'une notification : sans caractère de contrôle ni de direction (le serveur le nettoie déjà ; lecture défensive). */
+const UNSAFE_NOTIFICATION_TEXT = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+
+function parseNotificationItem(status: number, value: unknown): NotificationItem {
+  if (
+    !isObject(value) ||
+    !isUuid(value.id) ||
+    !(NOTIFICATION_KINDS as readonly string[]).includes(String(value.kind)) ||
+    !isUuid(value.demandId) ||
+    !isIsoDate(value.createdAt) ||
+    !(value.readAt === null || isIsoDate(value.readAt)) ||
+    typeof value.link !== "string"
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  const kind = value.kind as NotificationKind;
+  let price: Money | null = null;
+  if (value.price !== null) {
+    if (
+      !isObject(value.price) ||
+      !isSafeAmount(value.price.amount) ||
+      value.price.amount < 0 ||
+      typeof value.price.currency !== "string" ||
+      !/^[A-Z]{3}$/.test(value.price.currency)
+    ) {
+      throw fixedError(status, API_INVALID_RESPONSE);
+    }
+    price = { amount: value.price.amount, currency: value.price.currency };
+  }
+  if (kind === "new_match") {
+    // Une annonce : titre, annonce et lien INTERNE exact ; jamais de résumé déguisé.
+    if (
+      typeof value.title !== "string" ||
+      value.title.length < 1 ||
+      value.title.length > 160 ||
+      UNSAFE_NOTIFICATION_TEXT.test(value.title) ||
+      !isUuid(value.offerId) ||
+      value.count !== null ||
+      value.link !== `/besoins/${value.demandId}/offres/${value.offerId}`
+    ) {
+      throw fixedError(status, API_INVALID_RESPONSE);
+    }
+    return { id: value.id, kind, title: value.title, price, count: null, demandId: value.demandId, offerId: value.offerId, link: value.link, createdAt: value.createdAt, readAt: value.readAt };
+  }
+  if (
+    value.title !== null ||
+    value.price !== null ||
+    value.offerId !== null ||
+    typeof value.count !== "number" ||
+    !Number.isSafeInteger(value.count) ||
+    value.count < 1 ||
+    value.link !== `/besoins/${value.demandId}`
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return { id: value.id, kind, title: null, price: null, count: value.count, demandId: value.demandId, offerId: null, link: value.link, createdAt: value.createdAt, readAt: value.readAt };
+}
+
+function parseNotificationsPage(status: number, value: unknown): NotificationsPage {
+  if (
+    !isObject(value) ||
+    value.contractVersion !== NOTIFICATIONS_CONTRACT_VERSION ||
+    !Array.isArray(value.items) ||
+    !(value.nextCursor === null || isCursor(value.nextCursor)) ||
+    !isSafeAmount(value.unreadCount) ||
+    value.unreadCount < 0
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return {
+    items: value.items.map((item) => parseNotificationItem(status, item)),
+    nextCursor: value.nextCursor,
+    unreadCount: value.unreadCount,
+  };
+}
+
+function parseMarkReadResult(status: number, value: unknown): MarkReadResult {
+  if (
+    !isObject(value) ||
+    value.contractVersion !== NOTIFICATIONS_CONTRACT_VERSION ||
+    !isSafeAmount(value.marked) ||
+    value.marked < 0 ||
+    !isSafeAmount(value.unreadCount) ||
+    value.unreadCount < 0
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return { marked: value.marked, unreadCount: value.unreadCount };
+}
+
+function parseNotificationPreferences(status: number, value: unknown): NotificationPreferences {
+  if (
+    !isObject(value) ||
+    value.contractVersion !== NOTIFICATION_PREFERENCES_CONTRACT_VERSION ||
+    !isObject(value.preferences) ||
+    typeof value.preferences.externalEnabled !== "boolean" ||
+    !isObject(value.external) ||
+    typeof value.external.available !== "boolean" ||
+    typeof value.external.notice !== "string" ||
+    value.external.notice.length < 1 ||
+    value.external.notice.length > 300
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return { externalEnabled: value.preferences.externalEnabled, externalAvailable: value.external.available, notice: value.external.notice };
+}
+
+function parseDemandTracking(status: number, value: unknown): DemandTracking {
+  if (!isObject(value) || value.contractVersion !== DEMAND_TRACKING_CONTRACT_VERSION || !isObject(value.tracking)) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  const tracking = value.tracking;
+  if (
+    !isUuid(tracking.demandId) ||
+    !DEMAND_STATUSES.includes(String(tracking.demandStatus)) ||
+    !isIsoDate(tracking.until) ||
+    typeof tracking.paused !== "boolean" ||
+    typeof tracking.active !== "boolean" ||
+    !isIsoDate(tracking.maxUntil) ||
+    !isIsoDate(tracking.readAt)
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return {
+    demandId: tracking.demandId,
+    demandStatus: tracking.demandStatus as DemandStatus,
+    until: tracking.until,
+    paused: tracking.paused,
+    active: tracking.active,
+    maxUntil: tracking.maxUntil,
+    readAt: tracking.readAt,
+  };
+}
+
 export interface RequestOptions {
   signal?: AbortSignal;
 }
@@ -1143,7 +1349,7 @@ async function collectAll<T>(fetchPage: (pagination: Pagination) => Promise<T[]>
 
 export function createApiClient(options: ApiClientOptions = {}) {
   async function send(
-    method: "GET" | "POST" | "PATCH",
+    method: "GET" | "POST" | "PATCH" | "PUT",
     path: string,
     body?: unknown,
     requestOptions: RequestOptions = {},
@@ -1453,6 +1659,23 @@ export function createApiClient(options: ApiClientOptions = {}) {
         return parseOfferContact(status, json);
       },
 
+      /**
+       * GET /api/demands/{id}/tracking : le suivi de CE besoin (404 identique si le besoin est inconnu ou à un autre compte). Le matching continue pendant une
+       * pause ou après la fin du suivi ; seules les notifications s'arrêtent.
+       */
+      async tracking(demandId: string, requestOptions?: RequestOptions): Promise<DemandTracking> {
+        const { status, json } = await send("GET", `/api/demands/${id(demandId)}/tracking`, undefined, requestOptions);
+        return parseDemandTracking(status, json);
+      },
+
+      /** POST /api/demands/{id}/tracking `{ action }` : prolonger de 30 jours (plafonné à 90 jours à partir de maintenant), mettre en pause, reprendre. 409 si le besoin n'est pas actif. */
+      async trackingAction(demandId: string, action: TrackingAction, requestOptions?: RequestOptions): Promise<DemandTracking> {
+        const path = `/api/demands/${id(demandId)}/tracking`;
+        if (!(TRACKING_ACTIONS as readonly string[]).includes(action)) throw fixedError(0, API_INVALID_ARGUMENT);
+        const { status, json } = await send("POST", path, { action }, requestOptions);
+        return parseDemandTracking(status, json);
+      },
+
       /** POST /api/demands/{id}/activate : brouillon ou satisfait → actif. */
       async activate(demandId: string, expectedContentVersion: number, requestOptions?: RequestOptions): Promise<DemandRecord> {
         return demandResult(
@@ -1472,6 +1695,59 @@ export function createApiClient(options: ApiClientOptions = {}) {
         return demandResult(
           send("POST", `/api/demands/${id(demandId)}/satisfy`, versionBody(expectedContentVersion), requestOptions),
         );
+      },
+    },
+
+    notifications: {
+      /**
+       * GET /api/notifications : les notifications de l'utilisateur (plus récentes d'abord, curseur) et le nombre TOTAL de non-lues. `limit` (1 à 50) et `cursor`
+       * (1 à 512 caractères) sont vérifiés AVANT la requête (`invalid_argument`).
+       */
+      async list(query: NotificationsQuery = {}, requestOptions?: RequestOptions): Promise<NotificationsPage> {
+        const params = new URLSearchParams();
+        if (query.limit !== undefined) {
+          if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 50) throw fixedError(0, API_INVALID_ARGUMENT);
+          params.set("limit", String(query.limit));
+        }
+        if (query.cursor !== undefined) {
+          if (!isCursor(query.cursor)) throw fixedError(0, API_INVALID_ARGUMENT);
+          params.set("cursor", query.cursor);
+        }
+        const text = params.toString();
+        const { status, json } = await send("GET", `/api/notifications${text ? `?${text}` : ""}`, undefined, requestOptions);
+        return parseNotificationsPage(status, json);
+      },
+
+      /** POST /api/notifications/read `{ ids }` : marque ces notifications (1 à 100 UUID, toutes à vous, sinon 404 et aucune n'est touchée). */
+      async markRead(ids: readonly string[], requestOptions?: RequestOptions): Promise<MarkReadResult> {
+        if (!Array.isArray(ids) || ids.length < 1 || ids.length > 100 || ids.some((entry) => !isUuid(entry))) throw fixedError(0, API_INVALID_ARGUMENT);
+        const { status, json } = await send("POST", "/api/notifications/read", { ids: [...ids] }, requestOptions);
+        return parseMarkReadResult(status, json);
+      },
+
+      /**
+       * POST /api/notifications/read `{ all: true, upTo }` : marque comme lues les notifications créées avant ou à `upTo` (la date de la plus récente notification AFFICHÉE,
+       * `YYYY-MM-DDTHH:MM:SS.mmmZ`, vérifiée AVANT la requête : `invalid_argument`). Celles arrivées après le chargement de l'écran restent non lues.
+       */
+      async markAllRead(upTo: string, requestOptions?: RequestOptions): Promise<MarkReadResult> {
+        if (typeof upTo !== "string" || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/.test(upTo) || !Number.isFinite(Date.parse(upTo))) {
+          throw fixedError(0, API_INVALID_ARGUMENT);
+        }
+        const { status, json } = await send("POST", "/api/notifications/read", { all: true, upTo }, requestOptions);
+        return parseMarkReadResult(status, json);
+      },
+
+      /** GET /api/notifications/preferences : l'envoi externe simulé (désactivé par défaut) et le texte fixe « pas encore disponible ». */
+      async preferences(requestOptions?: RequestOptions): Promise<NotificationPreferences> {
+        const { status, json } = await send("GET", "/api/notifications/preferences", undefined, requestOptions);
+        return parseNotificationPreferences(status, json);
+      },
+
+      /** PUT /api/notifications/preferences `{ externalEnabled }` : active ou désactive l'envoi externe simulé. */
+      async setPreferences(externalEnabled: boolean, requestOptions?: RequestOptions): Promise<NotificationPreferences> {
+        if (typeof externalEnabled !== "boolean") throw fixedError(0, API_INVALID_ARGUMENT);
+        const { status, json } = await send("PUT", "/api/notifications/preferences", { externalEnabled }, requestOptions);
+        return parseNotificationPreferences(status, json);
       },
     },
 
@@ -1618,7 +1894,8 @@ export type ApiClient = ReturnType<typeof createApiClient>;
 /** Client du navigateur : fetch global, même origine. */
 export const api: ApiClient = createApiClient();
 
-export type ApiErrorContext = "otp-request" | "otp-verify" | "catalog" | "matches" | "boost" | "wallet" | "purchase" | "offer" | "contact" | "stats" | "default";
+export type ApiErrorContext =
+  | "otp-request" | "otp-verify" | "catalog" | "matches" | "boost" | "wallet" | "purchase" | "offer" | "contact" | "stats" | "notifications" | "tracking" | "default";
 
 export const GENERIC_ERROR_MESSAGE = "Une erreur est survenue. Réessayez dans un instant.";
 /** 429 d'une demande de devis (limite de débit par vendeur, lot P3). */
@@ -1700,6 +1977,16 @@ export function describeApiError(error: unknown, context: ApiErrorContext = "def
     if (error.status === 429) return CONTACT_RATE_LIMITED_MESSAGE;
     if (error.status === 503) return "Le contact est temporairement indisponible. Réessayez dans un instant.";
     if (error.status === 400) return "Cette demande de contact n'est pas valide. Rechargez la page.";
+  }
+  if (context === "notifications") {
+    if (error.status === 400) return "Cette demande n'est pas valide. Rechargez la page.";
+    if (error.status === 404) return "Cette notification est introuvable. La liste va être actualisée.";
+    if (error.status === 503) return "Les notifications sont temporairement indisponibles. Réessayez dans un instant.";
+  }
+  if (context === "tracking") {
+    if (error.status === 404) return "Besoin introuvable : il a peut-être été archivé ou n'existe plus.";
+    if (error.status === 409 && error.code === "demand_not_active") return "Le suivi n'est disponible que pour un besoin actif.";
+    if (error.status === 503) return "Le suivi est temporairement indisponible. Réessayez dans un instant.";
   }
   if (context === "stats") {
     if (error.status === 404) return "Annonce introuvable : elle n'existe pas ou n'est pas à vous.";

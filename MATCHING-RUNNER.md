@@ -23,8 +23,13 @@ Code : `lib/server/matching/runner.ts` (`runMatchingCycle`, `runMatchingWorkerLo
    `user_reactivation_sweep`, puis l'exécuteur du type (`runMatchingJob` ou `runUserReactivationSweep`). Arrêt dès qu'aucun job n'est réservé. **Un seul job à
    la fois** : une réservation en lot laisserait expirer les baux des jobs en attente.
 
-`idle` = rien périmé (`temporal.expired` = 0), aucun boost expiré (`boost.expired` = 0), rien lu par la projection, rien en maintenance, aucun job exécuté
-(erreurs ou non). `scoring_config_sweep` n'est jamais réservé : il reste `pending`. L'option `signal` (non prévue
+4. **Étape notify** (lot N1, exécutée **en dernier** : une notification née dans le cycle part dans le cycle) : `runNotificationStep` envoie les messages externes SIMULÉS des utilisateurs qui l'ont demandé
+   (un message regroupé par utilisateur : fenêtre de collecte de 15 min, 4 h au moins entre deux messages, 3 messages par jour, heures calmes 22 h – 7 h, ce qui ne peut pas partir est reporté ; tout revérifié à l'envoi, lot figé avant l'envoi, 3 tentatives). Isolée comme l'étape boost : exécutée seulement si les tables de la migration 0019
+   existent (sinon `notify: { skipped: true }`, **sans erreur**) et seulement s'il existe un transport (`NODE_ENV=development` **et** `NOMA_DEV_NOTIFY_CONSOLE=1`, sinon `notify: { noTransport: true }`, aucun envoi).
+   Résultat `notify { skipped, noTransport, users, messages, delivered, skippedDeliveries, deferred, failed, retried, expired, busy, errors }`. Voir `NOTIFICATIONS.md`.
+
+`idle` = rien périmé (`temporal.expired` = 0), aucun boost expiré (`boost.expired` = 0), rien lu par la projection, rien en maintenance, aucun job exécuté, aucun envoi externe traité
+(`notify.users` = utilisateurs laissés à un autre processus ou **en erreur** : une erreur de l'étape notify compte comme « au repos », les tentatives des lignes de l'utilisateur sont incrémentées avec une attente croissante, puis `failed` après 3 ; `notify.expired` = 0). `scoring_config_sweep` n'est jamais réservé : il reste `pending`. L'option `signal` (non prévue
 par le plan, nécessaire à l'arrêt propre) empêche toute nouvelle réservation une fois déclenchée.
 
 Toutes les entrées sont validées avant la moindre requête (`MatchingJobValidationError`).
@@ -34,7 +39,7 @@ Toutes les entrées sont validées avant la moindre requête (`MatchingJobValida
 Balayage temporel, étape boost, projection, maintenance et exécution des jobs sont isolés : l'échec de l'une n'empêche pas les
 suivantes (un événement empoisonné ne doit pas empêcher d'exécuter les jobs sains). Le résultat
 porte `errors: string[]` : codes stables `temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`,
-`job_error_<code>` (`<code>` : SQLSTATE ou code d'erreur en minuscules, `validation` ou `unknown` ;
+`job_error_<code>`, `notify_error_user_<code>` (`<code>` : SQLSTATE ou code d'erreur en minuscules, `validation` ou `unknown` ;
 jamais de message, de requête ni d'identifiant). Si l'exécution d'un job lève une exception
 (base indisponible pendant l'enregistrement d'un échec…), `job_error_…` est enregistré, **aucun
 autre job** n'est exécuté dans ce cycle (la base est probablement malade) et son bail expirera

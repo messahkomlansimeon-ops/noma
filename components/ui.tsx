@@ -197,14 +197,18 @@ export function FieldLabel({ children }: { children: ReactNode }) {
 export function Switch({
   checked,
   onChange,
+  label,
 }: {
   checked: boolean;
   onChange?: (v: boolean) => void;
+  /** Nom accessible du commutateur (lecteurs d'écran). */
+  label?: string;
 }) {
   return (
     <button
       role="switch"
       aria-checked={checked}
+      aria-label={label}
       onClick={() => onChange?.(!checked)}
       className={`relative h-[26px] w-11 shrink-0 rounded-full transition ${
         checked ? "bg-forest" : "bg-line"

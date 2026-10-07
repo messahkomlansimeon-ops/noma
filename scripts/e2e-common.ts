@@ -7,6 +7,8 @@
  *   NOMA_E2E_BASE_URL           origine du RELAIS (défaut http://localhost:3212) ; DOIT être NOMA_AUTH_ORIGIN du serveur
  *   NOMA_E2E_SERVER_LOG         fichier où la sortie du serveur est enregistrée (les lignes `[auth:dev]` y sont lues)
  *   NOMA_E2E_DATABASE_URL       base du serveur testé (pour la commande d'administration boost:grant) ; DOIT se terminer par /noma_e2e
+ *   NOMA_E2E_NOTIFY_CONSOLE     « 1 » quand le serveur a été lancé avec NOMA_DEV_NOTIFY_CONSOLE=1 (transport de notification de développement : les lignes
+ *                               `[notify:dev]` du journal sont alors vérifiées ; sans cela, aucun envoi simulé n'est attendu)
  * Les codes OTP lus dans le journal ne sont jamais affichés.
  */
 import assert from "node:assert/strict";
@@ -206,5 +208,49 @@ export function walletCheckByAdministration(): Promise<string> {
     child.stderr.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
     child.on("error", () => reject(new Error("wallet:check : lancement impossible")));
     child.on("exit", (code) => (code === 0 ? resolve(out.trim()) : reject(new Error(`wallet:check a signalé un écart ou échoué (code ${code}) : ${out.trim().slice(0, 600)}`))));
+  });
+}
+
+/** Ligne du transport de notification de développement (le worker de dev:full préfixe ses lignes par `[matching] `). */
+const NOTIFY_LINE = /\[notify:dev\] envoi simulé à ([0-9a-f]{1,8})… : (\d+) annonces?, lien (\S+)/g;
+
+export interface NotifyConsoleLine {
+  /** Identifiant tronqué (8 caractères hexadécimaux au plus), jamais l'identifiant entier. */
+  user: string;
+  count: number;
+  link: string;
+}
+
+/** Lignes `[notify:dev]` écrites dans le journal du serveur après `offset` octets. */
+export function notifyConsoleLinesSince(offset: number): NotifyConsoleLine[] {
+  const text = readFileSync(E2E_SERVER_LOG).subarray(offset).toString("utf8");
+  return [...text.matchAll(NOTIFY_LINE)].map((match) => ({ user: match[1], count: Number(match[2]), link: match[3] }));
+}
+
+/** Vrai quand les heures calmes (22 h – 7 h UTC) sont en cours : aucun envoi externe n'est alors permis. */
+export function isQuietHourNow(now: Date = new Date()): boolean {
+  const hour = now.getUTCHours();
+  return hour >= 22 || hour < 7;
+}
+
+/**
+ * COMMANDE D'ADMINISTRATION `notifications:purge` (SIMULATION seulement, jamais --apply) sur la base noma_e2e. Renvoie sa sortie ; lève une erreur si elle échoue.
+ */
+export function notificationsPurgeSimulationByAdministration(): Promise<string> {
+  const databaseUrl = e2eDatabaseUrl();
+  return new Promise((resolve, reject) => {
+    // NODE_ENV absent : la commande s'exécute (absent, development ou test seulement), jamais hérité d'un environnement de production.
+    const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== "NODE_ENV"));
+    const env = { ...inherited, DATABASE_URL: databaseUrl, NODE_OPTIONS: "--conditions=react-server" } as unknown as NodeJS.ProcessEnv;
+    const child = spawn(process.execPath, ["--import", "./poc/node_modules/tsx/dist/loader.mjs", "scripts/notifications-purge.ts"], {
+      cwd: process.cwd(),
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let out = "";
+    child.stdout.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
+    child.stderr.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
+    child.on("error", () => reject(new Error("notifications:purge : lancement impossible")));
+    child.on("exit", (code) => (code === 0 ? resolve(out.trim()) : reject(new Error(`notifications:purge a échoué (code ${code}) : ${out.trim().slice(0, 300)}`))));
   });
 }

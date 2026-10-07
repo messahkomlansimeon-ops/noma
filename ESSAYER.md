@@ -3,7 +3,7 @@
 Ce guide est écrit pour quelqu'un qui n'est pas développeur. Il explique comment ouvrir l'application dans votre
 navigateur, vous connecter, publier une annonce, exprimer un besoin, voir les correspondances, **recharger un
 porte-monnaie et acheter un boost**, puis **ouvrir la fiche d'une annonce, contacter le vendeur et voir ce que produit
-votre annonce**. **Aucun SMS n'est envoyé, aucun vrai site n'est contacté et aucun argent réel n'est
+votre annonce**, et enfin **être prévenu des nouvelles annonces qui correspondent à votre besoin** (notifications). **Aucun SMS n'est envoyé, aucun vrai site n'est contacté et aucun argent réel n'est
 utilisé** (la recharge du porte-monnaie passe par une page de paiement SIMULÉ) : c'est un essai local, entièrement simulé.
 
 ## Ce qu'il faut avoir avant
@@ -21,11 +21,11 @@ utilisé** (la recharge du porte-monnaie passe par une page de paiement SIMULÉ)
    `npm run dev:try`, voir ci-dessous). La commande ne lit aucun fichier `.env` pour la deviner, et elle refuse de démarrer
    si la base n'est pas sur **votre ordinateur** (`127.0.0.1`, `localhost` ou `::1`).
 
-   **La base d'essai doit être migrée jusqu'au bout : 18 migrations** (de `0001` à `0018`, dont le porte-monnaie `0014`,
-   l'achat de boost `0015`, la portée visible d'un devis de boost `0016`, son estimation bornée `0017` et les mesures d'efficacité
-   `0018` : ouvertures de la fiche et contacts). Si votre base d'essai a
+   **La base d'essai doit être migrée jusqu'au bout : 19 migrations** (de `0001` à `0019`, dont le porte-monnaie `0014`,
+   l'achat de boost `0015`, la portée visible d'un devis de boost `0016`, son estimation bornée `0017`, les mesures d'efficacité
+   `0018` : ouvertures de la fiche et contacts, et les notifications et le suivi des besoins `0019`). Si votre base d'essai a
    été créée avant ces lots, relancez simplement la deuxième commande ci-dessus (elle n'applique que ce qui manque). Contrôle : la
-   commande suivante doit afficher `18`.
+   commande suivante doit afficher `19`.
 
    ```
    docker exec deploy-postgres-1 psql -U noma_local -d noma_essai -tAc "select count(*) from noma_schema_migrations"
@@ -130,6 +130,30 @@ second compte (deux numéros différents, par exemple `07 00 00 00 42` et `07 00
     détaillés. » Pour voir des « environ N », créez **cinq comptes acheteurs** (autres fenêtres de navigation privée) qui activent un besoin pour le même produit, ouvrent la fiche et contactent le vendeur, puis appuyez sur
     « Actualiser » sous « Ce que produit votre annonce » : avec un à quatre acheteurs, tout reste « moins de 5 » ; à partir de cinq, « environ 5 » apparaît (`MESURES.md`).
     « Ouverture » veut dire que la page de l'annonce a été servie, pas qu'elle a été lue ; aucune vente n'est mesurée (`MESURES.md`).
+11. **Acheteur** : **voir une notification** (`NOTIFICATIONS.md`). Quand une **annonce nouvelle pour votre besoin** (publiée ou modifiée après son activation) correspond pour la première fois à ce besoin, le worker écrit une notification : une
+    **pastille** avec le nombre de notifications non lues apparaît sur l'onglet « Alertes » de la navigation (appuyez sur « Alertes » ou rechargez la page ; la pastille est relue à
+    l'arrivée sur une page et au retour au premier plan, jamais plus d'une fois par minute) et sur le lien « Notifications » de la page « Mes besoins ». Ouvrez-le : la page
+    **Notifications** montre la liste (les non lues en gras), le prix de l'annonce et « Voir l'annonce » (la fiche de l'étape 9). « Tout marquer comme lu » éteint la pastille. Pour en
+    voir plusieurs d'un coup, lancez `dev:seed` (étape 4) *après* avoir activé le besoin : au plus **20 notifications par besoin et par jour**, puis une seule notification de résumé
+    (« N nouvelles annonces pour ce besoin »). Sur la page d'un besoin actif, « **Suivi actif jusqu'au …** » (30 jours par défaut) : « Prolonger de 30 jours » (90 jours au plus à partir
+    d'aujourd'hui), « Mettre en pause » et « Reprendre ». **Pendant une pause ou après la fin du suivi, les résultats restent à jour : seules les notifications s'arrêtent** ; une
+    nouvelle annonce publiée pendant une pause n'est jamais notifiée. **Créer ou modifier un besoin ne notifie jamais** les annonces déjà en ligne (relever un budget non plus) : vous les avez déjà sous
+    les yeux dans vos résultats ; seules les annonces publiées (ou modifiées) ensuite notifient. « Tout marquer comme lu » ne marque que les notifications affichées : celles arrivées depuis le
+    chargement de la page restent non lues. Au plus **50 notifications par jour** pour tous vos besoins ensemble ; au-delà, elles vont dans le résumé de leur besoin (qui redevient non lu à chaque ajout).
+12. **Acheteur** : **activer l'envoi par SMS simulé** (facultatif). Sur la page « Compte », la carte « Notifications par SMS » a un interrupteur « Me prévenir par SMS (simulé) »,
+    **désactivé par défaut**, et dit « Les envois par SMS ne sont pas encore disponibles : ils sont simulés en développement. » **Aucun vrai SMS n'existe** : le seul « envoi » écrit une ligne dans le
+    terminal du worker, et **seulement** si vous lancez l'essai avec la variable `NOMA_DEV_NOTIFY_CONSOLE=1` (avec `dev:try`, qui transmet votre environnement au worker) :
+
+    ```
+    NOMA_DEV_NOTIFY_CONSOLE=1 DATABASE_URL='postgresql://noma_local:noma_local_only@127.0.0.1:55432/noma_essai' npm run dev:try
+    ```
+
+    Activez l'interrupteur, puis faites publier une annonce correspondante par le vendeur : une ligne `[notify:dev] envoi simulé à 0f1e2d3c… : 1 annonce, lien /notifications` apparaît (identifiant
+    tronqué, nombre d'annonces et lien, rien d'autre). Les notifications en attente d'un même compte partent en **un seul message** (la rafale de 12 annonces de `dev:seed` donne un message, pas douze) :
+    le premier envoi attend **quinze minutes** (fenêtre de collecte), puis **4 heures au moins** séparent deux messages, **3 messages par jour au plus**, **jamais entre 22 h et 7 h** (heure UTC, celle d'Abidjan : le message
+    attend alors 7 h). Ce qui ne peut pas partir est **reporté**, jamais perdu pour cause de plafond ; un envoi en attente depuis plus de 48 h sort du canal externe (la notification reste dans l'application).
+    Enfin, tout est revérifié au moment d'envoyer (besoin encore actif et suivi, annonce encore en ligne et toujours correspondante, choix encore actif). Un besoin satisfait ou
+    archivé annule les envois en attente. Sans `NOMA_DEV_NOTIFY_CONSOLE=1`, ou hors développement, **aucun envoi n'a lieu** (le choix est enregistré, rien n'est envoyé).
 
 ## La recherche rapide de la page d'accueil
 
@@ -151,7 +175,8 @@ n'appelle aucune intelligence artificielle et ne demande aucun contrôle anti-ro
 
 Dans le terminal : **Ctrl+C**. Tout s'arrête (le serveur, le worker et le relais). Vos données restent dans la base d'essai.
 Les mesures (ouvertures, contacts, apparitions) sont conservées 400 jours ; `npm run metrics:purge` (simulation par défaut,
-`-- --apply` pour supprimer) retire les lignes plus anciennes (`MESURES.md`).
+`-- --apply` pour supprimer) retire les lignes plus anciennes (`MESURES.md`). Les notifications sont conservées 90 jours après leur lecture et 180 jours au plus ;
+`npm run notifications:purge` (simulation par défaut, `-- --apply` pour supprimer) retire les plus anciennes (`NOTIFICATIONS.md`).
 
 ## Si quelque chose ne marche pas
 
@@ -169,6 +194,8 @@ Les mesures (ouvertures, contacts, apparitions) sont conservées 400 jours ; `np
 | « Trop de devis demandés en peu de temps » | Au plus 20 prix calculés par minute pour un même vendeur : patientez une minute. |
 | « Cette annonce n'est plus disponible pour votre besoin, ou elle n'existe pas. » | La fiche n'est servie que pour une annonce de vos correspondances actuelles : retournez aux résultats de votre besoin et « Actualiser ». |
 | « Cette annonce n'est plus disponible : le vendeur l'a mise en pause, retirée ou vendue. Aucun contact n'a été enregistré. » | Rien n'a été révélé : revenez plus tard ou choisissez une autre annonce. |
+| Aucune notification alors qu'une annonce correspond | Le besoin doit être **actif**, son suivi ni en pause ni terminé (« Suivi actif jusqu'au … » sur la page du besoin), et l'annonce doit correspondre **pour la première fois** et être **nouvelle pour le besoin** (publiée ou modifiée après son activation ou sa dernière modification : les annonces déjà en ligne quand vous créez ou modifiez un besoin sont dans vos résultats, sans notification). Patientez quelques secondes (le worker compare les annonces), puis rechargez la page. |
+| La ligne `[notify:dev]` n'apparaît pas | L'essai doit être lancé avec `NOMA_DEV_NOTIFY_CONSOLE=1` (étape 12), l'interrupteur « Me prévenir par SMS (simulé) » doit être activé **avant** la naissance de la notification, et le message ne part qu'après la fenêtre de collecte de quinze minutes (puis 4 heures au moins entre deux messages), jamais entre 22 h et 7 h UTC (il attend alors 7 h). Chercher dans le terminal du worker (lignes `[matching]`). |
 | « Vous avez déjà contacté 20 vendeurs aujourd'hui. Réessayez demain. » | Limite de 20 vendeurs différents par jour et par acheteur (jour UTC) ; un vendeur déjà contacté reste joignable. |
 | « moins de 5 » à la place d'un nombre d'acheteurs, « pas assez d'acheteurs pour un pourcentage » | Normal : un compte exact n'est jamais publié (protection des acheteurs) : « moins de 5 » de 0 à 4, « environ N » ensuite (arrondi à 5 près). Il faut au moins 5 acheteurs distincts pour voir « environ 5 », et des nombres affichés d'au moins 10 pour voir un pourcentage. |
 | « Solde insuffisant » sous « Acheter » | Rechargez votre porte-monnaie (« Recharger »), puis revenez à l'annonce. |
@@ -187,4 +214,5 @@ vous-même (`NOMA_AUTH_SECRET`, `NOMA_AUTH_PROXY_SECRET`). Les sources de recher
 `NOMA_AI_DISABLED=1`, `NOMA_TURNSTILE_DISABLED=1` sont posées par la commande, quoi que dise votre environnement). Le paiement l'est
 aussi : `NOMA_FAKE_PAYMENTS=1` est posée par la commande, avec un secret `NOMA_FAKE_PAYMENT_SECRET` créé au hasard à chaque lancement
 (32 octets au moins, jamais affiché ; vous pouvez en fournir un vous-même, jamais plus court que 32 octets). Ce prestataire fictif
-n'existe qu'en développement : **ne définissez jamais ces variables en production**.
+n'existe qu'en développement : **ne définissez jamais ces variables en production**. Le transport de notification simulé suit la même règle : `NOMA_DEV_NOTIFY_CONSOLE=1` n'est
+honorée qu'avec `NODE_ENV=development` (comme `NOMA_DEV_OTP_CONSOLE`) ; avec toute autre valeur de `NODE_ENV`, elle est refusée (un avertissement, aucun envoi).

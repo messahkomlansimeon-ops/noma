@@ -61,8 +61,8 @@ before(async () => {
   txPool = await openNamed("tx");
   dirtyPool = await openNamed("dirty", dirtySchema);
   holderPool = await openNamed("holder");
-  assert.equal((await runMigrations(pool)).applied.length, 18);
-  assert.equal((await runMigrations(dirtyPool)).applied.length, 18);
+  assert.equal((await runMigrations(pool)).applied.length, 19);
+  assert.equal((await runMigrations(dirtyPool)).applied.length, 19);
 });
 
 after(async () => {
@@ -259,8 +259,8 @@ const insertEntry = (client: PoolClient, transactionId: string, accountId: strin
 test("migration 0014 : 14 appliquées, la relance n'en applique aucune, comptes système créés, tables et index présents", async () => {
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 18);
-  assert.equal(rerun.skipped.at(-1), "0018_offer_metrics");
+  assert.equal(rerun.skipped.length, 19);
+  assert.equal(rerun.skipped.at(-1), "0019_notifications");
   const accounts = (await pool.query("SELECT kind, owner_id, balance::text AS balance FROM wallet_accounts ORDER BY kind")).rows;
   assert.deepEqual(accounts, [
     { kind: "boost_revenue", owner_id: null, balance: "0" },

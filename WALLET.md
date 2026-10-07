@@ -213,7 +213,7 @@ brut, de requête, de montant ni d'identifiant.
   tel quel ; après toute restauration, lancer `npm run wallet:check`.
 - Activer le fictif en développement : `NODE_ENV=development` (ou `test`), `NOMA_FAKE_PAYMENTS=1` et
   `NOMA_FAKE_PAYMENT_SECRET=<32 octets au moins>`. Ne **jamais** les définir en production.
-- **Défense de déploiement** : `NOMA_FAKE_PAYMENTS`, `NOMA_FAKE_PAYMENT_SECRET`, `NOMA_DEV_OTP_CONSOLE`, `NOMA_DEV_PROXY`,
+- **Défense de déploiement** : `NOMA_FAKE_PAYMENTS`, `NOMA_FAKE_PAYMENT_SECRET`, `NOMA_DEV_OTP_CONSOLE`, `NOMA_DEV_NOTIFY_CONSOLE` (lot N1, `NOTIFICATIONS.md`), `NOMA_DEV_PROXY`,
   `NOMA_FAKE_SOURCES` et `NOMA_TURNSTILE_DISABLED` sont listées « INTERDIT en production » dans `deploy/env.production.example`
   (un test vérifie que la liste est complète). `assertProductionConfig` (`lib/server/config.ts`) refuse, quand `NODE_ENV` vaut
   exactement `production`, de créer le singleton de protection si l'une d'elles est définie et non vide (message fixe

@@ -128,6 +128,19 @@ describe("dev:try : préparation de l'environnement", () => {
     assert.equal(bare.plan.env.NOMA_TURNSTILE_DISABLED, "1");
   });
 
+  test("notifications simulées (lot N1) : NOMA_DEV_NOTIFY_CONSOLE est transmise telle quelle au worker, jamais posée à votre place, et n'autorise pas un NODE_ENV hors développement", () => {
+    const bare = prepareDevTry({ DATABASE_URL });
+    assert.ok(bare.ok);
+    assert.equal(bare.plan.env.NOMA_DEV_NOTIFY_CONSOLE, undefined, "jamais posée par défaut : aucun envoi simulé sans demande explicite");
+    const asked = prepareDevTry({ DATABASE_URL, NOMA_DEV_NOTIFY_CONSOLE: "1" });
+    assert.ok(asked.ok);
+    assert.equal(asked.plan.env.NOMA_DEV_NOTIFY_CONSOLE, "1", "transmise au worker (dev:full lui passe l'environnement)");
+    assert.equal(asked.plan.env.NODE_ENV, "development", "le verrou du transport exige NODE_ENV=development : dev:try le pose toujours");
+    for (const nodeEnv of ["production", "test", "Production"]) {
+      assert.equal(prepareDevTry({ DATABASE_URL, NODE_ENV: nodeEnv, NOMA_DEV_NOTIFY_CONSOLE: "1" }).ok, false, `NODE_ENV=${nodeEnv} : dev:try refuse de démarrer`);
+    }
+  });
+
   test("paiement simulé : NOMA_FAKE_PAYMENTS=1 toujours posé, secret généré (32 octets au moins) sans jamais être affiché", () => {
     const bare = prepareDevTry({ DATABASE_URL }, fixedRandom(5));
     assert.ok(bare.ok);
@@ -496,9 +509,10 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
   const guide = readFileSync(fileURLToPath(new URL("../../ESSAYER.md", import.meta.url)), "utf8");
   const normalized = guide.replace(/\s+/g, " ");
 
-  test("le guide dit (lots P2, P2-bis, P3 et M1) : base à 18 migrations, recharge simulée, achat de boost, « aucun argent réel », « Sponsorisé »", () => {
+  test("le guide dit (lots P2, P2-bis, P3, M1 et N1) : base à 19 migrations, recharge simulée, achat de boost, « aucun argent réel », « Sponsorisé »", () => {
     for (const expected of [
-      "18 migrations",
+      "19 migrations",
+      "0019",
       "0018",
       "0017",
       "0016",
@@ -575,6 +589,53 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
     const contactStep = normalized.indexOf("Contacter le vendeur");
     const boostPurchase = normalized.indexOf("acheter un boost");
     assert.ok(contactStep !== -1 && boostPurchase !== -1 && boostPurchase < contactStep, "le parcours de contact vient après l'achat du boost");
+  });
+
+  test("le guide dit (lot N1) : notifications, pastille, suivi du besoin, SMS simulé verrouillé (NOMA_DEV_NOTIFY_CONSOLE=1), jamais la nuit, 3 par jour, annulation, purge", () => {
+    for (const expected of [
+      "voir une notification",
+      "pastille",
+      "Tout marquer comme lu",
+      "Voir l'annonce",
+      "au plus **20 notifications par besoin et par jour**",
+      "N nouvelles annonces pour ce besoin",
+      "Suivi actif jusqu'au",
+      "Prolonger de 30 jours",
+      "Mettre en pause",
+      "Reprendre",
+      "les résultats restent à jour : seules les notifications s'arrêtent",
+      "Notifications par SMS",
+      "Me prévenir par SMS (simulé)",
+      "désactivé par défaut",
+      "Les envois par SMS ne sont pas encore disponibles : ils sont simulés en développement.",
+      "Aucun vrai SMS n'existe",
+      "NOMA_DEV_NOTIFY_CONSOLE=1",
+      "dev:try",
+      "[notify:dev] envoi simulé à",
+      "identifiant tronqué",
+      "un seul message",
+      "jamais entre 22 h et 7 h",
+      "3 messages par jour au plus",
+      "quinze minutes",
+      "4 heures au moins",
+      "Créer ou modifier un besoin ne notifie jamais",
+      "annonce nouvelle pour votre besoin",
+      "ne marque que les notifications affichées",
+      "tout est revérifié au moment d'envoyer",
+      "annule les envois en attente",
+      "aucun envoi n'a lieu",
+      "npm run notifications:purge",
+      "NOTIFICATIONS.md",
+      "NODE_ENV=development",
+    ]) {
+      assert.ok(normalized.includes(expected), `ESSAYER.md doit contenir « ${expected} »`);
+    }
+    const seedStep = normalized.indexOf("npm run dev:seed");
+    const notificationStep = normalized.indexOf("voir une notification");
+    const smsStep = normalized.indexOf("activer l'envoi par SMS simulé");
+    assert.ok(seedStep !== -1 && notificationStep > seedStep && smsStep > notificationStep, "les notifications viennent après les annonces d'exemple, l'envoi simulé après les notifications");
+    assert.equal(/19 migrations/.test(normalized), true);
+    assert.equal(/\b18 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations (18)");
   });
 
   test("le guide dit : base indiquée dans la commande, base de CE poste, NODE_ENV, recherche simulée, besoins, port jamais exposé", () => {

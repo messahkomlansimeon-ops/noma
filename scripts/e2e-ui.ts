@@ -1783,6 +1783,239 @@ async function main(): Promise<void> {
     await mSellerContext.close();
     await mBuyerContext.close();
 
+    // ─────────────────────────── Partie 7 (lot N1) : notifications, pastille, suivi du besoin, préférences ───────────────────────────
+    step("Notifications (lot N1) : un acheteur (navigateur) a un besoin, un vendeur (API) publie une annonce correspondante ; après le worker : pastille, page /notifications, lien vers la fiche");
+    const nTag = (Date.now() + 13).toString(36).slice(-5);
+    const nProduct = { category: "Téléphones", brand: "Sagem", model: `Mobi ${nTag}` };
+    const nTitle = `${nProduct.brand} ${nProduct.model}`;
+    const nSeller = new RelaySession("vendeur N1 (UI)");
+    await loginWithOtp(nSeller, uniquePhone("71"));
+    const nSellerApi = nSeller.client();
+    const nPublish = async (label: string, price: string): Promise<{ id: string }> => {
+      const built = buildOfferInput({
+        title: `${nTitle} · ${label}`, description: `Annonce ${label}.`, category: nProduct.category, brand: nProduct.brand, model: nProduct.model, variant: "", condition: "Occasion",
+        location: "Abidjan", price, available: true,
+      });
+      assert.ok(built.ok);
+      const created = await nSellerApi.offers.create(built.input);
+      return nSellerApi.offers.publish(created.id, created.contentVersion);
+    };
+    const nBuyerContext = await browser.newContext({ ...VIEWPORT });
+    const nPage = await nBuyerContext.newPage();
+    nPage.setDefaultTimeout(60_000);
+    watch(nPage);
+    openPages.push(nPage);
+    const nCountRequests: string[] = [];
+    nPage.on("request", (request) => {
+      if (/\/api\/notifications\?limit=1$/.test(request.url())) nCountRequests.push(request.url());
+    });
+    await loginViaUi(nPage, localPhone(701), "/alerte/nouvelle", (url) => url.pathname === "/alerte/nouvelle");
+    await nPage.getByPlaceholder(/Un iPhone 12 en bon état/).fill(`Je cherche un ${nTitle}`);
+    await nPage.getByRole("button", { name: "Téléphones", exact: true }).click();
+    await nPage.getByPlaceholder("Apple", { exact: true }).fill(nProduct.brand);
+    await nPage.getByPlaceholder("iPhone 12", { exact: true }).fill(nProduct.model);
+    await nPage.getByPlaceholder("200 000").fill("100 000");
+    await nPage.getByRole("button", { name: "Activer le besoin" }).click();
+    await nPage.waitForURL("**/alertes");
+    await nPage.getByRole("link", { name: /Notifications/ }).first().waitFor();
+    assert.equal(await nPage.getByTestId("unread-badge").count(), 0, "aucune notification : aucune pastille");
+    ok("acheteur N1 : besoin activé, page « Mes besoins » avec le lien « Notifications » et AUCUNE pastille (0 non lue)");
+    await nPage.locator("div.rounded-2xl", { hasText: `Je cherche un ${nTitle}` }).first().getByRole("link", { name: "Voir les offres", exact: true }).click();
+    await nPage.waitForURL(/\/besoins\/[0-9a-f-]{36}$/);
+    const nDemandId = nPage.url().split("/").pop() as string;
+    const nPanel = nPage.getByTestId("tracking-panel");
+    await nPanel.waitFor();
+    const nHeadline = async () => norm(await nPage.getByTestId("tracking-headline").textContent());
+    assert.match(await nHeadline(), /^Suivi actif jusqu'au \d{2}\/\d{2}\/\d{4}$/);
+    const nUntilBefore = await nHeadline();
+    ok(`page du besoin : « ${nUntilBefore} », boutons Prolonger de 30 jours et Mettre en pause`);
+    assert.equal(await nPanel.getByRole("button", { name: "Prolonger de 30 jours" }).count(), 1);
+    assert.equal(await nPanel.getByRole("button", { name: "Mettre en pause" }).count(), 1);
+    assert.equal(await nPanel.getByRole("button", { name: "Reprendre" }).count(), 0);
+    assert.ok(norm(await nPanel.textContent()).includes("les résultats restent à jour : seules les notifications s'arrêtent"), "la note dit que le matching continue");
+    await shot(nPage, "50-besoin-suivi-actif");
+
+    const nFirst = await nPublish("A1", "60 000");
+    await pollUntil("la pastille de notifications de l'acheteur", async () => {
+      await nPage.goto(`${BASE}/alertes`);
+      try {
+        await nPage.getByTestId("unread-badge").first().waitFor({ timeout: 3_000 });
+        return true as const;
+      } catch {
+        return null;
+      }
+    }, WORKER_TIMEOUT_MS, "le worker de matching tourne-t-il sur la même base ?");
+    const badges = nPage.getByTestId("unread-badge");
+    assert.equal(await badges.count(), 2, "la pastille est dans l'en-tête de la page et sur l'onglet « Alertes »");
+    for (let index = 0; index < 2; index += 1) assert.equal(norm(await badges.nth(index).textContent()), "1");
+    assert.equal(await nPage.locator('nav a[href="/alertes"] [data-testid="unread-badge"]').count(), 1, "pastille dans la navigation basse");
+    ok("après le worker : pastille « 1 » dans la navigation basse (onglet Alertes) et sur le lien « Notifications »");
+    await shot(nPage, "51-alertes-pastille");
+
+    step("Pastille : rafraîchie à l'arrivée sur une page et au retour au premier plan, JAMAIS plus d'une fois par minute (pas de sondage serré)");
+    nCountRequests.length = 0;
+    // (l'onglet « Explorer » est recouvert par l'indicateur de développement de Next : il n'est pas cliqué ici)
+    for (const tab of ["Compte", "Alertes", "Favoris", "Compte", "Alertes"]) {
+      await nPage.locator("nav").getByRole("link", { name: new RegExp(tab) }).first().click();
+      await sleep(500);
+    }
+    await nPage.evaluate(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      window.dispatchEvent(new Event("pageshow"));
+    });
+    await sleep(1_500);
+    assert.equal(nCountRequests.length, 0, `5 arrivées sur une page et un retour au premier plan en moins d'une minute : aucune lecture de plus (${nCountRequests.length})`);
+    ok("5 changements de page et un retour au premier plan en moins d'une minute : AUCUNE requête de compteur de plus");
+    await sleep(61_000);
+    await nPage.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await pollUntil("la relecture du compteur après une minute", async () => (nCountRequests.length >= 1 ? true : null), 10_000, "la page ne relit pas le compteur au retour au premier plan");
+    await nPage.locator("nav").getByRole("link", { name: /Compte/ }).first().click();
+    await sleep(1_500);
+    assert.equal(nCountRequests.length, 1, `une minute plus tard : UNE lecture au retour au premier plan, puis plus rien (${nCountRequests.length})`);
+    ok("une minute plus tard : exactement UNE relecture au retour au premier plan, aucune de plus à l'arrivée sur la page suivante");
+
+    step("Page /notifications : liste, non-lues en gras, lien vers la fiche, « Tout marquer comme lu », pastille disparue");
+    await nPage.goto(`${BASE}/alertes`);
+    await nPage.getByRole("link", { name: /Notifications/ }).first().click();
+    await nPage.waitForURL("**/notifications");
+    const nRows = nPage.getByTestId("notification-row");
+    await nRows.first().waitFor();
+    assert.equal(await nRows.count(), 1);
+    assert.equal(await nRows.first().getAttribute("data-unread"), "true");
+    assert.equal(await nRows.first().getAttribute("data-kind"), "new_match");
+    const nRowText = norm(await nRows.first().innerText());
+    assert.ok(nRowText.includes(nTitle), nRowText);
+    assert.match(nRowText, /60\s000 FCFA/);
+    assert.ok(nRowText.includes("Voir l'annonce"));
+    const nWeight = await nRows.first().locator(".font-extrabold").first().evaluate((node) => Number(getComputedStyle(node).fontWeight));
+    assert.ok(nWeight >= 700, `non lue en gras (${nWeight})`);
+    assert.equal(norm(await nPage.getByTestId("notifications-heading").textContent()), "1 non lue");
+    const nHref = (await nRows.first().getByRole("link").getAttribute("href")) as string;
+    assert.equal(nHref, `/besoins/${nDemandId}/offres/${nFirst.id}`);
+    assert.equal(/\d{9,}/.test(nRowText.replace(/\s/g, "")), false, "aucun numéro ni identifiant à l'écran");
+    ok(`un seul élément non lu en gras : « ${nTitle} », 60 000 FCFA, lien ${nHref}`);
+    await shot(nPage, "52-notifications-non-lue");
+    // Lot N1-bis : une notification ARRIVE après le chargement de la page ; « Tout marquer comme lu » ne marque que ce qui est affiché (`{ all: true, upTo }`).
+    const nArrival = await nPublish("A1b", "59 000");
+    await pollUntil("la notification arrivée après le chargement de la page", async () => {
+      const total = await nPage.evaluate(async () => ((await (await fetch("/api/notifications?limit=50")).json()) as { items: unknown[] }).items.length);
+      return total >= 2 ? true : null;
+    }, WORKER_TIMEOUT_MS, "le worker de matching tourne-t-il sur la même base ?");
+    assert.equal(await nRows.count(), 1, "la page n'a pas rechargé sa liste : une seule ligne est affichée");
+    await nPage.getByRole("button", { name: "Tout marquer comme lu" }).click();
+    await nPage.getByText("Les notifications affichées sont marquées comme lues. D'autres sont arrivées depuis.").waitFor();
+    assert.equal(await nRows.first().getAttribute("data-unread"), "false", "la notification affichée est lue");
+    assert.equal(norm(await nPage.getByTestId("notifications-heading").textContent()), "1 non lue", "l'arrivée tardive reste non lue");
+    assert.equal(await nPage.getByRole("button", { name: "Tout marquer comme lu" }).isDisabled(), false, "il reste une notification non lue");
+    ok("« Tout marquer comme lu » : la notification affichée est lue, celle arrivée après le chargement reste non lue (« 1 non lue »), message « D'autres sont arrivées depuis »");
+    await nPage.reload();
+    await nRows.nth(1).waitFor();
+    assert.equal(await nRows.count(), 2);
+    assert.equal(await nRows.first().getAttribute("data-unread"), "true", "la plus récente (arrivée tardive) est non lue");
+    assert.equal(await nRows.nth(1).getAttribute("data-unread"), "false");
+    assert.equal(await nRows.first().getAttribute("data-kind"), "new_match");
+    assert.equal(((await nRows.first().getByRole("link").getAttribute("href")) as string).endsWith(`/offres/${nArrival.id}`), true);
+    await nPage.getByRole("button", { name: "Tout marquer comme lu" }).click();
+    await nPage.getByText("Toutes vos notifications sont marquées comme lues.").waitFor();
+    await nPage.locator('[data-testid="notification-row"][data-unread="false"]').first().waitFor();
+    assert.equal(norm(await nPage.getByTestId("notifications-heading").textContent()), "Tout est lu");
+    assert.equal(await nPage.getByRole("button", { name: "Tout marquer comme lu" }).isDisabled(), true);
+    assert.equal(await nPage.getByTestId("unread-badge").count(), 0, "plus de pastille");
+    const nWeightRead = await nRows.first().locator(".font-medium").first().evaluate((node) => Number(getComputedStyle(node).fontWeight));
+    assert.ok(nWeightRead < 700, `lue : plus en gras (${nWeightRead})`);
+    ok("« Tout marquer comme lu » : élément lu (plus en gras), « Tout est lu », bouton éteint, pastille disparue");
+    await nPage.reload();
+    await nRows.first().waitFor();
+    assert.equal(await nRows.first().getAttribute("data-unread"), "false", "le marquage est enregistré côté serveur");
+    assert.equal(await nPage.getByTestId("unread-badge").count(), 0);
+    ok("après rechargement : toujours lue (enregistré côté serveur), toujours aucune pastille");
+    await nRows.nth(1).getByRole("link").click();
+    await nPage.waitForURL(new RegExp(`/besoins/${nDemandId}/offres/${nFirst.id}$`));
+    await nPage.getByTestId("offer-detail").waitFor();
+    assert.equal(norm(await nPage.getByTestId("offer-title").textContent()), nTitle);
+    ok("le lien de la notification ouvre la fiche (M1) de l'annonce dans le contexte du besoin");
+    await shot(nPage, "53-notification-fiche");
+
+    step("Suivi du besoin : Pause → une nouvelle annonce ne notifie pas (elle est dans les résultats) ; Reprendre ; Prolonger ; la suivante notifie");
+    await nPage.goto(`${BASE}/besoins/${nDemandId}`);
+    await nPanel.waitFor();
+    await nPanel.getByRole("button", { name: "Mettre en pause" }).click();
+    await nPage.getByText("Suivi mis en pause").waitFor();
+    await pollUntil("« Suivi en pause »", async () => ((await nHeadline()) === "Suivi en pause" ? true : null), 10_000, "le titre du suivi n'a pas changé");
+    assert.equal(await nPage.getByTestId("tracking-panel").getAttribute("data-tone"), "paused");
+    assert.equal(await nPanel.getByRole("button", { name: "Reprendre" }).count(), 1);
+    assert.equal(await nPanel.getByRole("button", { name: "Mettre en pause" }).count(), 0);
+    assert.ok(norm(await nPanel.textContent()).includes("Vos résultats restent à jour, mais vous ne recevez plus de notification pour ce besoin."));
+    ok("« Mettre en pause » : « Suivi en pause », bouton « Reprendre », et la phrase « Vos résultats restent à jour, mais vous ne recevez plus de notification pour ce besoin. »");
+    await shot(nPage, "54-suivi-en-pause");
+    const nSecond = await nPublish("A2", "55 000");
+    await refreshUntil(nPage, "la deuxième annonce dans les résultats du besoin (le matching continue pendant la pause)", async () => (await nPage.getByTestId("match-card").count()) >= 2);
+    ok("pendant la pause, la nouvelle annonce apparaît dans les résultats : le matching continue");
+    await sleep(2_000);
+    await nPage.goto(`${BASE}/alertes`);
+    await nPage.getByRole("link", { name: /Notifications/ }).first().waitFor();
+    assert.equal(await nPage.getByTestId("unread-badge").count(), 0, "pause : la nouvelle annonce ne produit aucune pastille");
+    await nPage.getByRole("link", { name: /Notifications/ }).first().click();
+    await nPage.getByTestId("notification-row").first().waitFor();
+    assert.equal(await nPage.getByTestId("notification-row").count(), 2, "toujours les deux notifications d'avant la pause (A1 et A1b)");
+    ok("pause : aucune pastille, toujours les DEUX mêmes notifications dans la liste (une nouvelle annonce ne notifie pas)");
+    await nPage.goto(`${BASE}/besoins/${nDemandId}`);
+    await nPanel.waitFor();
+    await nPanel.getByRole("button", { name: "Reprendre" }).click();
+    await nPage.getByText("Suivi repris").waitFor();
+    await pollUntil("« Suivi actif jusqu'au… »", async () => (/^Suivi actif jusqu'au \d{2}\/\d{2}\/\d{4}$/.test(await nHeadline()) ? true : null), 10_000, "le titre du suivi n'a pas changé");
+    assert.equal(await nPage.getByTestId("tracking-panel").getAttribute("data-tone"), "active");
+    const nUntilResumed = await nHeadline();
+    await nPanel.getByRole("button", { name: "Prolonger de 30 jours" }).click();
+    await nPage.getByText("Suivi prolongé").waitFor();
+    await pollUntil("la nouvelle échéance affichée", async () => ((await nHeadline()) !== nUntilResumed ? true : null), 10_000, "l'échéance n'a pas changé");
+    assert.match(await nHeadline(), /^Suivi actif jusqu'au \d{2}\/\d{2}\/\d{4}$/);
+    ok(`« Reprendre » : « ${nUntilResumed} » ; « Prolonger de 30 jours » : « ${await nHeadline()} »`);
+    const nThird = await nPublish("A3", "58 000");
+    await pollUntil("la pastille après la reprise", async () => {
+      await nPage.goto(`${BASE}/alertes`);
+      try {
+        await nPage.getByTestId("unread-badge").first().waitFor({ timeout: 3_000 });
+        return true as const;
+      } catch {
+        return null;
+      }
+    }, WORKER_TIMEOUT_MS);
+    assert.equal(norm(await nPage.getByTestId("unread-badge").first().textContent()), "1");
+    await nPage.getByRole("link", { name: /Notifications/ }).first().click();
+    await nPage.getByTestId("notification-row").nth(2).waitFor();
+    const nListText = norm(await nPage.locator("main").innerText());
+    assert.equal(await nPage.getByTestId("notification-row").count(), 3);
+    assert.match(nListText, /58\s000 FCFA/);
+    assert.equal(/55\s000 FCFA/.test(nListText), false, "l'annonce de la pause n'est jamais notifiée après coup");
+    assert.equal(await nPage.locator('[data-testid="notification-row"][data-unread="true"]').count(), 1);
+    assert.equal(nSecond.id === nThird.id, false);
+    ok("après la reprise : l'annonce suivante (58 000 FCFA) notifie, pastille « 1 » ; celle de la pause (55 000 FCFA) n'est jamais notifiée");
+    await shot(nPage, "55-notifications-apres-reprise");
+
+    step("Compte : préférences d'envoi (désactivé par défaut, texte « pas encore disponibles », opt-in enregistré) et lien « Notifications » avec la pastille");
+    await nPage.goto(`${BASE}/compte`);
+    const nPrefs = nPage.getByTestId("notification-preferences");
+    await nPrefs.waitFor();
+    const nSwitch = nPrefs.getByRole("switch");
+    assert.equal(await nSwitch.getAttribute("aria-checked"), "false", "désactivé par défaut");
+    assert.equal(norm(await nPage.getByTestId("external-notice").textContent()), "Les envois par SMS ne sont pas encore disponibles : ils sont simulés en développement.");
+    const nMenuLink = nPage.locator('a[href="/notifications"]').filter({ hasText: "Notifications" });
+    await nMenuLink.first().waitFor();
+    await pollUntil("la pastille de la ligne « Notifications »", async () => (norm(await nMenuLink.first().innerText()) === "Notifications 1" ? true : null), 15_000, "la ligne n'a pas reçu la pastille");
+    ok("la ligne « Notifications » de la page Compte porte la pastille « 1 » et mène à /notifications");
+    await nSwitch.click();
+    await nPage.getByText("Envoi par SMS (simulé) activé").waitFor();
+    await pollUntil("l'interrupteur activé", async () => ((await nSwitch.getAttribute("aria-checked")) === "true" ? true : null), 10_000);
+    await nPage.reload();
+    await nPrefs.waitFor();
+    assert.equal(await nPrefs.getByRole("switch").getAttribute("aria-checked"), "true", "l'opt-in est enregistré côté serveur");
+    ok("page Compte : envoi par SMS (simulé) désactivé par défaut, texte fixe affiché, activé puis conservé après rechargement ; ligne « Notifications » avec la pastille");
+    await shot(nPage, "56-compte-preferences");
+    await nPrefs.getByRole("switch").click();
+    await nPage.getByText("Envoi par SMS (simulé) désactivé").waitFor();
+    await nBuyerContext.close();
+
     await sellerContext.close();
     await buyerContext.close();
 

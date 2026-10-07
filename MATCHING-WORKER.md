@@ -60,6 +60,14 @@ sentinelle EOF, aucun recomptage. Les évaluations sont persistées, jamais clas
 Réserve `limit` jobs (1 à 10) avec `jobTypes` = `MATCHING_EVALUATION_JOB_TYPES` (les deux types d'évaluation et
 `reevaluate_pair_temporal` ; un `user_reactivation_sweep` n'est jamais réservé), les exécute séquentiellement, retourne les résumés. Aucune boucle ni planificateur.
 
+## Notification de première correspondance (lot N1)
+
+`persistEvaluatedMatch` accepte le crochet `inTransaction` (réservé à l'usage interne), exécuté **dans** la transaction de l'évaluation, après l'INSERT et avant le COMMIT ; une erreur levée annule
+l'évaluation. Le worker le branche sur `recordNewMatchNotification` (`lib/server/notifications/creation.ts`) : la notification d'un couple qui devient pour la première fois une correspondance confirmée et
+fraîche d'un besoin actif, suivi et non en pause, est écrite avec l'évaluation, ou annulée avec elle ; le worker lui passe le **type du job** : un job côté besoin (`evaluate_demand_candidates`, ou issu de
+`demand.created` / `activated` / `updated`) ne notifie jamais, et un job côté annonce ne notifie que si l'annonce est postérieure à l'activation du besoin (lot N1-bis). Un rejeu (`isReplayed`) n'appelle pas le crochet. Le crochet de test `insideTransaction`
+(`"before_notification"`, `"after_notification"`) permet de lever ou d'abandonner à l'intérieur de la transaction. Les règles exactes sont dans `NOTIFICATIONS.md` ; sans la migration 0019 le crochet ne fait rien.
+
 ## Job de paire `reevaluate_pair_temporal` (lot 2E4C2)
 
 Le pivot est l'offre (`kind` « offer »). Le job réévalue UNE paire dont l'évaluation vient d'être périmée par le

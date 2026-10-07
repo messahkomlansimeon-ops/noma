@@ -659,8 +659,12 @@ export async function persistEvaluatedMatch(
       ],
     );
 
+    const persisted = mapMatchingEvaluationRow(insertResult.rows[0]);
+    // Lot N1 : le crochet écrit DANS cette transaction (notification de première correspondance) ; validé avec l'évaluation, annulé avec elle.
+    if (options.inTransaction) await options.inTransaction(client, persisted);
+
     await client.query("COMMIT");
-    return mapMatchingEvaluationRow(insertResult.rows[0]);
+    return persisted;
   } catch (error) {
     try {
       await client.query("ROLLBACK");

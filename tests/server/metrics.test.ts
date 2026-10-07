@@ -313,6 +313,22 @@ describe("fiche : attributs publics en liste blanche (offer-detail.ts)", () => {
     assert.equal(JSON.stringify(result).includes("0700000042"), false);
   });
 
+  test("chiffres NON ASCII : pleine chasse, arabes-indiens, dévanagari, exposants, mélangés ne contournent pas la liste blanche (NFKC et \\p{Nd}) ; valeur + unité contrôlées assemblées", () => {
+    const fullWidth = "０７０８１２３４５６";
+    const arabicIndic = "٠٧٠٨١٢٣٤٥٦";
+    const devanagari = "०७०८१२३४५६";
+    const superscript = "⁰⁷⁰⁸¹²³⁴⁵⁶";
+    const mixed = "0७٠8１2٣4५6";
+    const result = publicAttributes({
+      a: fullWidth, b: arabicIndic, c: devanagari, d: superscript, e: mixed, f: `Appelez le ${fullWidth.slice(0, 3)} ${arabicIndic.slice(3)}`,
+      g: { value: "12345 6789", unit: "x" }, h: { value: "1234", unit: "56789" },
+      ok: "128 Go", okFull: "１２８ Go", okArabic: "٢٥٦ Go",
+    });
+    assert.deepEqual(result.map((entry) => entry.key), ["ok", "okArabic", "okFull"], "seuls les textes à moins de 9 chiffres survivent");
+    const text = JSON.stringify(result);
+    for (const forbidden of [fullWidth, arabicIndic, devanagari, superscript, mixed]) assert.equal(text.includes(forbidden), false);
+  });
+
   test("clés invalides, caractères de contrôle ou de direction, texte trop long écartés ; 12 attributs au plus, ordre alphabétique", () => {
     const result = publicAttributes({
       "mauvaise cle": "x", "1abc": "x", ok: "bon", bidi: "abc\u202edef", zero: "a\u200bb", long: "x".repeat(81), nl: "a\nb", __proto__x: "y",

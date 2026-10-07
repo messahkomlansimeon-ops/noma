@@ -11,6 +11,8 @@ import {
   requireWorkerId,
   runMatchingJobMaintenance,
 } from "./jobs";
+import { runNotificationStep, type NotifyHooks, type NotifyStepResult } from "../notifications/deliveries";
+import { resolveNotificationTransport, type NotificationTransport } from "../notifications/transport";
 import { projectOutboxBatch, type ProjectOutboxBatchResult } from "./projection";
 import { runTemporalExpirySweep } from "./temporal";
 import { runUserReactivationSweep, type UserReactivationSweepResult } from "./sweeps";
@@ -47,9 +49,14 @@ export interface MatchingCycleResult {
   projected: ProjectOutboxBatchResult;
   maintenance: { deadLettered: number };
   jobs: MatchingCycleJobSummary[];
-  /** Aucun progrès : rien périmé, aucun boost expiré, rien lu par la projection, rien en maintenance, aucun job exécuté (erreurs ou non). */
+  /**
+   * Étape « notify » (lot N1, exécutée en dernier) : envois externes SIMULÉS des notifications de nouvelles correspondances. `skipped: true` : la migration 0019
+   * n'est pas appliquée (étape ignorée sans erreur) ; `noTransport: true` : aucun transport, aucun envoi. Voir NOTIFICATIONS.md.
+   */
+  notify: NotifyStepResult;
+  /** Aucun progrès : rien périmé, aucun boost expiré, rien lu par la projection, rien en maintenance, aucun job exécuté, aucun envoi traité (un utilisateur en erreur ou laissé à un autre processus compte comme « au repos »). */
   idle: boolean;
-  /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`). */
+  /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`, `notify_error_<code>`). */
   errors: string[];
 }
 
@@ -66,6 +73,15 @@ export interface RunMatchingCycleOptions {
   leaseSeconds?: number;
   /** Quand il est déclenché, plus aucun job n'est réservé ; le job en cours se termine. */
   signal?: AbortSignal;
+  /**
+   * Transport des envois externes SIMULÉS (lot N1). Absent : résolu à chaque cycle depuis l'environnement (`NODE_ENV=development` ET `NOMA_DEV_NOTIFY_CONSOLE=1`,
+   * sinon aucun transport). `null` : aucun transport, quoi que dise l'environnement. Réservé aux tests pour en injecter un.
+   */
+  notificationTransport?: NotificationTransport | null;
+  /** Horloge de l'étape « notify » (heures calmes, plafond du jour) : réservée aux tests. */
+  notificationNow?: () => Date;
+  /** Crochets de l'étape « notify » : réservés aux tests. */
+  notificationHooks?: NotifyHooks;
 }
 
 function requireBoundedInteger(value: unknown, field: string, min: number, max: number): number {
@@ -158,13 +174,29 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
     // La base est probablement malade : plus aucun job dans ce cycle. Le bail du job en cours expirera.
     errors.push(`job_error_${errorCodeOf(error)}`);
   }
+  // Étape « notify » (lot N1) : isolée comme l'étape boost, exécutée APRÈS les jobs (une notification née dans ce cycle part dans ce cycle). Sans la migration 0019,
+  // elle est ignorée sans erreur ; sans transport, aucun envoi externe n'a lieu.
+  let notify: NotifyStepResult = {
+    skipped: false, noTransport: false, users: 0, messages: 0, delivered: 0, skippedDeliveries: 0, deferred: 0, failed: 0, retried: 0, expired: 0, busy: 0, errors: [],
+  };
+  try {
+    const transport = options.notificationTransport === undefined ? resolveNotificationTransport(process.env) : (options.notificationTransport ?? undefined);
+    notify = await runNotificationStep({ pool, transport, now: options.notificationNow, hooks: options.notificationHooks });
+    for (const code of notify.errors) errors.push(`notify_error_${code}`);
+  } catch (error) {
+    errors.push(`notify_error_${errorCodeOf(error)}`);
+  }
   return {
     temporal,
     boost,
     projected,
     maintenance,
     jobs,
-    idle: temporal.expired === 0 && boost.expired === 0 && projected.selected === 0 && maintenance.deadLettered === 0 && jobs.length === 0,
+    notify,
+    // Au repos : l'utilisateur laissé à un autre processus (busy) ET l'utilisateur en erreur (une erreur de l'étape notify compte comme « au repos » : ses lignes ont
+    // une tentative de plus et une attente croissante, `recordUserFailure`) ne comptent pas comme du travail ; sinon un échec permanent ferait tourner la boucle sans pause.
+    idle: temporal.expired === 0 && boost.expired === 0 && projected.selected === 0 && maintenance.deadLettered === 0 && jobs.length === 0
+      && notify.users - notify.busy - notify.errors.length <= 0 && notify.expired === 0,
     errors,
   };
 }
@@ -181,6 +213,8 @@ export interface RunMatchingWorkerLoopOptions {
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
   /** Journal injectable (une ligne de texte, sans donnée métier). Défaut : console.error. */
   log?: (line: string) => void;
+  /** Étape « notify » de chaque cycle (transport, horloge, crochets) : réservé aux tests. */
+  notification?: Pick<RunMatchingCycleOptions, "notificationTransport" | "notificationNow" | "notificationHooks">;
 }
 
 export interface MatchingWorkerLoopResult {
@@ -242,7 +276,7 @@ export async function runMatchingWorkerLoop(options: RunMatchingWorkerLoopOption
   while (!signal.aborted) {
     let wait = false;
     try {
-      const result = await runMatchingCycle({ pool, workerId, maxJobs: maxJobsPerCycle, signal });
+      const result = await runMatchingCycle({ pool, workerId, maxJobs: maxJobsPerCycle, signal, ...options.notification });
       cycles++;
       jobsRun += result.jobs.length;
       for (const code of result.errors) log(`matching_worker ${code}`);

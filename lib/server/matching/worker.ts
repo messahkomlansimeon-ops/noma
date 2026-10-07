@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import type { SqlExecutor } from "../postgres/client";
 import { CatalogNotFoundError, CatalogValidationError } from "../catalog/errors";
 import type { DemandRecord, OfferRecord } from "../catalog/types";
@@ -42,6 +42,7 @@ import {
   MatchingInputConsistencyError,
   StaleAttemptSupersededError,
   StalePreconditionsError,
+  type PersistedMatchingEvaluation,
 } from "./persistence-types";
 import {
   canonicalJsonStringify,
@@ -51,6 +52,7 @@ import {
   persistEvaluatedMatch,
 } from "./persistence";
 import { computeMatchingScore } from "./scoring";
+import { recordNewMatchNotification } from "../notifications/creation";
 import { MATCHING_SCORING_CONTRACT_VERSION, type MatchingScoringOptions, type MatchingScoringResult } from "./scoring-types";
 import { findEvaluatedDemandMatchesForOffer, findEvaluatedOfferMatchesForDemand } from "./service";
 import type { EvaluatedMatchPage, InternalEvaluatedDemandMatchesQueryOptions } from "./service-types";
@@ -94,6 +96,11 @@ export interface MatchingWorkerHooks {
   afterPersist?: (candidateId: string) => HookResult;
   beforeValidate?: () => HookResult;
   afterValidate?: () => HookResult;
+  /**
+   * Lot N1 : appelé DANS la transaction de l'évaluation, juste avant et juste après l'écriture de la notification de première correspondance.
+   * Renvoyer "abandon" (ou lever) annule toute la transaction : ni évaluation ni notification (comme une mort du processus à cet instant).
+   */
+  insideTransaction?: (stage: "before_notification" | "after_notification") => HookResult;
 }
 
 export interface RunMatchingJobOptions {
@@ -486,6 +493,25 @@ function countStatus(ctx: Context, status: ResolvedCandidateStatus): void {
   else ctx.summary.alreadySuperseded++;
 }
 
+/**
+ * Lot N1 : la notification de première correspondance est écrite DANS la transaction de l'évaluation (crochet de persistEvaluatedMatch) : une panne,
+ * une relance ou un rejeu du job ne crée jamais de doublon et ne perd rien. Voir lib/server/notifications/creation.ts.
+ */
+async function notifyInTransaction(ctx: Context, client: PoolClient, stored: PersistedMatchingEvaluation): Promise<void> {
+  await runHook(ctx.hooks.insideTransaction?.("before_notification"));
+  await recordNewMatchNotification(client, {
+    evaluationId: stored.id,
+    offerId: stored.offerId,
+    demandId: stored.demandId,
+    offerOwnerId: stored.offerOwnerId,
+    demandOwnerId: stored.demandOwnerId,
+    isConfirmedMatch: stored.isConfirmedMatch,
+    sourceEventId: ctx.lease.sourceEventId,
+    jobType: ctx.lease.jobType,
+  });
+  await runHook(ctx.hooks.insideTransaction?.("after_notification"));
+}
+
 /** Évalue, persiste (2D) puis acquitte un candidat ; classement selon le plan §6.D. */
 async function processCandidate(
   ctx: Context,
@@ -528,6 +554,7 @@ async function processCandidate(
     try {
       const persisted = await persistEvaluatedMatch({
         idempotencyKey: attempt.idempotency_key, offer, demand, evaluation, scoring, scoringOptions: ctx.scoringOptions,
+        inTransaction: (client, stored) => notifyInTransaction(ctx, client, stored),
       }, ctx.pool);
       if (persisted.attemptHash !== attempt.attempt_hash) return failWith(ctx, "attempt_hash_mismatch");
       status = persisted.isReplayed ? "replayed" : "persisted";

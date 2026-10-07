@@ -6,7 +6,9 @@ import { RefreshCw } from "lucide-react";
 import { BuyerMatchCard } from "@/components/matches/match-parts";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
+import { TrackingPanel } from "@/components/tracking-panel";
 import { Badge } from "@/components/ui";
+import { UnreadSync } from "@/components/unread-badge";
 import {
   api,
   describeApiError,
@@ -146,6 +148,8 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
         </div>
       </div>
 
+      {demand.status === "active" ? <TrackingPanel demandId={demandId} /> : null}
+
       {notActive ? (
         <p role="status" className="mt-4 rounded-2xl bg-wash p-4 text-[14px] font-semibold text-ink-soft">
           {notActive}
@@ -243,6 +247,7 @@ function PageContent() {
 export default function BesoinResultatsPage() {
   return (
     <SessionGate>
+      <UnreadSync />
       <PageContent />
     </SessionGate>
   );

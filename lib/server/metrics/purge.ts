@@ -8,7 +8,7 @@ import { METRICS_RETENTION_DAYS, PURGE_PRODUCTION_VARIABLE } from "./config";
  * Rétention des mesures (lot M1) : `boost_exposures`, `offer_views` et `offer_contacts` ne sont conservés que `METRICS_RETENTION_DAYS` jours. Une ligne
  * est supprimée quand son JOUR UTC (jour servi, jour d'ouverture, jour du DERNIER contact) précède `aujourd'hui − 400 jours` : une ligne vieille de
  * 400 jours pile est gardée, celle de 401 jours est supprimée. Les statistiques agrégées ne sont PAS conservées au-delà (elles se recalculent depuis ces
- * lignes). Simulation par défaut. Voir MESURES.md.
+ * lignes). Simulation par défaut. Voir MESURES.md. (La garde d'environnement est partagée avec `notifications:purge`, lot N1, avec sa propre variable de production.)
  */
 
 export interface PurgeTableCounts {
@@ -39,16 +39,19 @@ const TABLES: ReadonlyArray<{ table: keyof PurgeTableCounts; dayExpression: stri
  * `development` ou `test`, casse exacte. Toute autre valeur (`Production`, `PRODUCTION`, `prod`, `staging`, vide…) est refusée ; `production` n'est permis que
  * avec `NOMA_METRICS_PURGE_PRODUCTION=1`. Renvoie le texte du refus (sans jamais répéter la valeur reçue), ou null si la purge est permise.
  */
-export function purgeEnvironmentRefusal(env: Record<string, string | undefined>): string | null {
+export function purgeEnvironmentRefusal(
+  env: Record<string, string | undefined>,
+  productionVariable: string = PURGE_PRODUCTION_VARIABLE,
+): string | null {
   const nodeEnv = env.NODE_ENV;
   if (nodeEnv === undefined || nodeEnv === "development" || nodeEnv === "test") return null;
   if (nodeEnv === "production") {
-    return env[PURGE_PRODUCTION_VARIABLE] === "1"
+    return env[productionVariable] === "1"
       ? null
-      : `refus en production : définissez ${PURGE_PRODUCTION_VARIABLE}=1 pour confirmer explicitement (rien n'a été lu ni supprimé).`;
+      : `refus en production : définissez ${productionVariable}=1 pour confirmer explicitement (rien n'a été lu ni supprimé).`;
   }
   return "refus : NODE_ENV doit être absent, « development » ou « test » (casse exacte ; toute autre valeur est refusée, la production exige " +
-    `${PURGE_PRODUCTION_VARIABLE}=1 avec NODE_ENV=production) ; rien n'a été lu ni supprimé.`;
+    `${productionVariable}=1 avec NODE_ENV=production) ; rien n'a été lu ni supprimé.`;
 }
 
 /**

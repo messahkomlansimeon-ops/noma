@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { PoolClient } from "pg";
 import type {
   MatchingCompatibilityStatus,
   MatchingEligibilityStatus,
@@ -128,6 +129,12 @@ export interface PersistEvaluatedMatchOptions {
   scoringOptions?: MatchingScoringOptions;
   db?: unknown;
   pool?: unknown;
+  /**
+   * Crochet INTERNE (lot N1) exécuté DANS la transaction de l'évaluation, après l'INSERT de la nouvelle évaluation et avant le COMMIT, avec le client
+   * transactionnel. Ce que le crochet écrit est validé avec l'évaluation ou annulé avec elle ; une erreur levée annule l'évaluation. Jamais appelé pour
+   * un rejeu d'une tentative déjà enregistrée (aucune écriture : aucun doublon).
+   */
+  inTransaction?: (client: PoolClient, evaluation: PersistedMatchingEvaluation) => Promise<void>;
 }
 
 export interface GetActiveMatchingEvaluationOptions {

@@ -3,6 +3,7 @@ import "server-only";
 import type { JsonObject, JsonValue } from "../catalog/types";
 import { mapStoredMatchItem, type StoredMatchItemDto } from "../matching/http-dto";
 import type { StoredOfferDetail } from "../matching/stored-matches";
+import { hasUnsafeCharacters, looksLikePhoneNumber } from "./public-text";
 
 /**
  * Fiche d'une annonce pour l'acheteur (lot M1) : DTO en LISTE BLANCHE. Elle reprend l'élément de correspondance tel que la liste des résultats le sert
@@ -15,10 +16,7 @@ export const OFFER_DETAIL_CONTRACT_VERSION = "demand-offer/v1" as const;
 export const PUBLIC_ATTRIBUTE_LIMIT = 12;
 const ATTRIBUTE_KEY = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
 const ATTRIBUTE_VALUE_MAX = 80;
-/** Caractères de contrôle, de direction de texte et invisibles : jamais affichés. */
-const UNSAFE_TEXT = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
-/** Neuf chiffres ou plus (séparateurs compris) : ressemble à un numéro de téléphone, jamais publié (le numéro ne se révèle que par le contact). */
-const PHONE_LIKE = /(?:\d[\s.\-()+]*){9,}/;
+// Contrôle du texte (caractères refusés, neuf chiffres ou plus) : fonctions partagées avec les notifications (`public-text.ts`), NFKC et chiffres de tous les systèmes d'écriture.
 
 export interface PublicAttribute {
   key: string;
@@ -30,7 +28,7 @@ function attributeText(value: JsonValue | undefined): string | null {
   if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
   if (typeof value !== "string") return null;
   const text = value.trim();
-  if (text === "" || text.length > ATTRIBUTE_VALUE_MAX || UNSAFE_TEXT.test(text) || PHONE_LIKE.test(text)) return null;
+  if (text === "" || text.length > ATTRIBUTE_VALUE_MAX || hasUnsafeCharacters(text) || looksLikePhoneNumber(text)) return null;
   return text;
 }
 
@@ -49,7 +47,8 @@ export function publicAttributes(attributes: JsonObject | null): PublicAttribute
       const inner = attributeText(raw.value);
       const unit = raw.unit === undefined || raw.unit === null ? null : attributeText(raw.unit);
       text = inner === null || (raw.unit !== undefined && raw.unit !== null && unit === null) ? null : unit === null ? inner : `${inner} ${unit}`;
-      if (text !== null && text.length > ATTRIBUTE_VALUE_MAX) text = null;
+      // Le texte assemblé (valeur + unité) est contrôlé à son tour : deux morceaux acceptables ne forment jamais un numéro de téléphone.
+      if (text !== null && (text.length > ATTRIBUTE_VALUE_MAX || looksLikePhoneNumber(text))) text = null;
     } else {
       text = attributeText(raw);
     }

@@ -5,6 +5,7 @@ import type { PoolClient, QueryResultRow } from "pg";
 import type { SqlExecutor } from "../postgres/client";
 import { requireUuid } from "../catalog/validation";
 import type { OfferRecord, DemandRecord, UserRecord } from "../catalog/types";
+import { cancelPendingDeliveriesForDemand } from "../notifications/deliveries";
 import { computeScoringConfigHash, normalizeScoringConfig } from "./persistence";
 import { MATCHING_OFFLINE_CONTRACT_VERSION } from "./types";
 import { MATCHING_SCORING_CONTRACT_VERSION } from "./scoring-types";
@@ -280,6 +281,11 @@ export async function recordOfferMutation(tx: SqlExecutor, offer: OfferRecord, b
 }
 
 export async function recordDemandMutation(tx: SqlExecutor, demand: DemandRecord, before?: DemandRecord): Promise<void> {
+  // Lot N1 : un besoin qui cesse d'être actif (satisfait, archivé, remis en brouillon) arrête tout. Les envois externes EN ATTENTE passent à `cancelled`
+  // dans la MÊME transaction que le changement de statut (annulés avec lui, ou pas du tout). Sans effet si les tables de ce lot n'existent pas encore.
+  if (demand.status !== "active" && (demand.status === "archived" || before?.status === "active")) {
+    await cancelPendingDeliveriesForDemand(tx, demand.id, `demand_${demand.status === "draft" ? "inactive" : demand.status}`);
+  }
   let eventType: OutboxEventType;
   if (demand.status === "archived") eventType = "demand.archived";
   else if (!before) {
