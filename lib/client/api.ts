@@ -11,7 +11,7 @@
  *
  * Les formes de corps et de réponses reprennent EXACTEMENT celles de lib/server/auth/http.ts,
  * lib/server/catalog/http.ts, lib/server/matching/http-dto.ts (`matching-stored-http/v1`), lib/server/boost/http.ts
- * (`boost-quote/v1`), lib/server/wallet/http.ts (`wallet/v1`) et lib/server/boost/purchase-http.ts (`boost-purchase/v1`), contrats
+ * (`boost-quote/v2`), lib/server/metrics/http.ts (`demand-offer/v1`, `offer-contact/v1`, `offer-stats/v1`), lib/server/wallet/http.ts (`wallet/v1`) et lib/server/boost/purchase-http.ts (`boost-purchase/v1`), contrats
  * documentés dans AUTH-SERVER.md, CATALOG-HTTP.md, MATCHING-STORED-READ.md, BOOST-HTTP.md, WALLET.md et BOOST-PURCHASE.md.
  * Les réponses sont relues champ par champ (liste blanche) : un champ que le serveur ajouterait un jour n'atteint jamais l'écran.
  * Les montants du portefeuille sont des entiers sûrs (|n| ≤ 2^53 − 1), vérifiés à l'envoi comme à la lecture.
@@ -169,7 +169,100 @@ export interface StoredMatchesQuery {
   limit?: number;
 }
 
-// ─── Cotations de boost (boost-quote/v1) ──────────────────────────────────────────────────────────
+// ─── Mesures d'efficacité (lot M1) : comptes arrondis, fiche d'une annonce, contact, statistiques ───────────
+
+/** Base de l'arrondi des comptes publiés (copie de COUNT_ROUNDING_BASE du serveur : un compte de 0 à 4 est « moins de 5 », sinon un multiple de 5). */
+export const STAT_ROUNDING_BASE = 5;
+
+/**
+ * Compte d'acheteurs uniques (ou d'événements) publié ARRONDI (lot M1-quater) : `{ kind: "below", bound: 5 }` (« moins de 5 ») de 0 à 4, sinon
+ * `{ kind: "approx", value }` (« environ N », multiple de 5 le plus proche). Jamais le compte exact.
+ */
+export type StatCount = { kind: "below"; bound: number } | { kind: "approx"; value: number };
+
+/** Taux publié : pourcentage arrondi à la dizaine (« environ 70 % »), calculé sur les nombres publiés ; ou `insufficient` (pas assez d'acheteurs pour un pourcentage). */
+export type StatRatio = { kind: "percent"; value: number } | { kind: "insufficient" };
+
+export type StatsPeriodCode = "7d" | "30d" | "all";
+export const STATS_PERIOD_CODES: readonly StatsPeriodCode[] = ["7d", "30d", "all"];
+
+export interface ExposureStatsEntry { servings: StatCount; sponsoredServings: StatCount; buyersExposed: StatCount; buyersSponsored: StatCount }
+
+export interface PeriodStats {
+  period: StatsPeriodCode;
+  /** Premier jour UTC de la période (AAAA-MM-JJ) ; null pour tout l'historique conservé. */
+  since: string | null;
+  /** Apparitions servies pendant un boost ; `null` quand aucun boost de l'annonce ne peut avoir servi l'annonce dans la période (annonce sans boost). */
+  exposure: ExposureStatsEntry | null;
+  opens: {
+    total: StatCount;
+    uniqueBuyers: StatCount;
+    /** `null` (avec `organic`) quand aucun boost ne peut avoir attribué une ouverture dans la période : tout est organique. */
+    attributedToBoost: { opens: StatCount; uniqueBuyers: StatCount } | null;
+    organic: { opens: StatCount; uniqueBuyers: StatCount } | null;
+  };
+  contacts: {
+    uniqueBuyers: StatCount;
+    reveals: StatCount;
+    attributedToBoost: { uniqueBuyers: StatCount } | null;
+    organic: { uniqueBuyers: StatCount } | null;
+  };
+  ratios: {
+    /** Acheteurs qui ont ouvert parmi ceux à qui l'annonce a été servie pendant un boost / acheteurs servis ; `null` : aucune apparition possible dans la période. */
+    openRate: StatRatio | null;
+    /** Acheteurs qui ont contacté parmi ceux qui ont ouvert / acheteurs qui ont ouvert. */
+    contactRate: StatRatio;
+  };
+}
+
+export interface BoostStatsEntry {
+  boostId: string;
+  durationCode: BoostDurationCode;
+  status: "effective" | "expired" | "cancelled" | "scheduled";
+  startsAt: string;
+  endsAt: string;
+  /** `null` pour un boost qui n'a pas commencé (aucune apparition possible). */
+  exposure: ExposureStatsEntry | null;
+  attributed: { opens: StatCount; uniqueOpeners: StatCount; uniqueContacts: StatCount; reveals: StatCount } | null;
+  ratios: { openRate: StatRatio | null; contactRate: StatRatio | null };
+}
+
+/** Ce que produit une annonce (vendeur) : AUCUNE identité d'acheteur ; aucun compte exact n'est publié (« moins de 5 », « environ N »). */
+export interface OfferStats {
+  /** Besoins d'acheteurs dont la correspondance est confirmée et fraîche à la lecture (des besoins, pas des acheteurs) ; « moins de 5 » de 0 à 4, sinon « environ N ». */
+  activeMatches: { needs: StatCount };
+  periods: PeriodStats[];
+  /** Les boosts de l'annonce, du plus récent au plus ancien ; vide : aucun boost, tout est organique. */
+  boosts: BoostStatsEntry[];
+}
+
+/** Attribut public d'une annonce : clé simple et valeur courte (jamais un numéro de téléphone). */
+export interface OfferPublicAttribute {
+  key: string;
+  value: string;
+}
+
+/** Fiche d'une annonce pour l'acheteur, dans le contexte d'un de ses besoins : la correspondance (indicateurs, `sponsored`) et les détails publics. */
+export interface OfferDetail {
+  item: StoredMatch;
+  details: {
+    /** Date de CRÉATION de l'annonce (le modèle ne conserve pas de date de mise en ligne distincte). */
+    createdAt: string;
+    attributes: OfferPublicAttribute[];
+  };
+  readAt: string;
+}
+
+/** Contact du vendeur : son numéro VÉRIFIÉ (E.164) et deux liens, jamais mis en cache. */
+export interface OfferContact {
+  phone: string;
+  telUrl: string;
+  whatsappUrl: string;
+  /** Vrai la première fois que ce besoin contacte cette annonce. */
+  firstContact: boolean;
+}
+
+// ─── Cotations de boost (boost-quote/v2) ──────────────────────────────────────────────────────────
 
 export const BOOST_DURATION_CODES = ["24h", "3d", "7d"] as const;
 export type BoostDurationCode = (typeof BOOST_DURATION_CODES)[number];
@@ -187,9 +280,10 @@ export interface BoostQuote {
   factors: { competitionMilli: number; demandMilli: number; scarcityMilli: number; durationMilli: number } | null;
   inputs: {
     competingSellers: number;
-    compatibleBuyers: number;
-    /** Acheteurs pour lesquels le boost ferait réellement monter l'annonce ; `null` : non évalué (devis ancien ou indisponible plus tôt). */
-    reachableBuyers: number | null;
+    /** Acheteurs compatibles, arrondis : `{ kind: "below", bound: 5 }` (« moins de 5 ») de 0 à 4, sinon `{ kind: "approx", value }` (lots M1 à M1-quater). */
+    compatibleBuyers: StatCount;
+    /** Acheteurs pour lesquels le boost ferait réellement monter l'annonce (même arrondi) ; `null` : non évalué (devis ancien ou indisponible plus tôt). */
+    reachableBuyers: StatCount | null;
     /** Lot P3 : la portée est une estimation bornée ; vrai = des acheteurs n'ont pas été examinés, `reachableBuyers` est un MINIMUM (« au moins X »). */
     reachTruncated: boolean;
     slotsTotal: number;
@@ -463,7 +557,10 @@ const AVAILABILITY_STATUSES: readonly string[] = ["available", "reserved", "unav
 const FACTOR_CODE = /^[a-z][a-z0-9_]{0,63}$/;
 
 export const MATCHING_STORED_CONTRACT_VERSION = "matching-stored-http/v1";
-export const BOOST_QUOTE_CONTRACT_VERSION = "boost-quote/v1";
+export const BOOST_QUOTE_CONTRACT_VERSION = "boost-quote/v2";
+export const OFFER_DETAIL_CONTRACT_VERSION = "demand-offer/v1";
+export const OFFER_CONTACT_CONTRACT_VERSION = "offer-contact/v1";
+export const OFFER_STATS_CONTRACT_VERSION = "offer-stats/v1";
 export const WALLET_CONTRACT_VERSION = "wallet/v1";
 export const BOOST_PURCHASE_CONTRACT_VERSION = "boost-purchase/v1";
 
@@ -657,8 +754,8 @@ function parseBoostQuote(status: number, value: unknown, flag: "reused" | "expir
   const { inputs } = value;
   if (
     typeof inputs.competingSellers !== "number" ||
-    typeof inputs.compatibleBuyers !== "number" ||
-    !(inputs.reachableBuyers === null || (typeof inputs.reachableBuyers === "number" && Number.isSafeInteger(inputs.reachableBuyers) && inputs.reachableBuyers >= 0)) ||
+    !isStatCount(inputs.compatibleBuyers) ||
+    !(inputs.reachableBuyers === null || isStatCount(inputs.reachableBuyers)) ||
     !(inputs.reachTruncated === undefined || typeof inputs.reachTruncated === "boolean") ||
     typeof inputs.slotsTotal !== "number" ||
     typeof inputs.slotsUsed !== "number"
@@ -694,8 +791,8 @@ function parseBoostQuote(status: number, value: unknown, flag: "reused" | "expir
     factors,
     inputs: {
       competingSellers: inputs.competingSellers,
-      compatibleBuyers: inputs.compatibleBuyers,
-      reachableBuyers: inputs.reachableBuyers as number | null,
+      compatibleBuyers: toStatCount(inputs.compatibleBuyers),
+      reachableBuyers: inputs.reachableBuyers === null ? null : toStatCount(inputs.reachableBuyers),
       reachTruncated: inputs.reachTruncated === true,
       slotsTotal: inputs.slotsTotal,
       slotsUsed: inputs.slotsUsed,
@@ -706,6 +803,201 @@ function parseBoostQuote(status: number, value: unknown, flag: "reused" | "expir
     expired: flag === "expired" ? (value.expired as boolean) : null,
     serverTime,
   };
+}
+
+// ─── Lecture stricte des mesures (lot M1) ───────────────────────────────────────────────────────────
+
+/**
+ * Compte arrondi EXACT : `{ kind: "below", bound: 5 }` ou `{ kind: "approx", value }` avec `value` un multiple de 5 d'au moins 5 (jamais un nombre nu, un compte
+ * « approx » non arrondi, une borne autre que 5, ni un champ de plus).
+ */
+function isStatCount(value: unknown): value is StatCount {
+  if (!isObject(value) || Object.keys(value).length !== 2) return false;
+  if (value.kind === "below") return value.bound === STAT_ROUNDING_BASE;
+  if (value.kind === "approx") return typeof value.value === "number" && Number.isSafeInteger(value.value) && value.value >= STAT_ROUNDING_BASE && value.value % STAT_ROUNDING_BASE === 0;
+  return false;
+}
+
+function toStatCount(value: StatCount): StatCount {
+  return value.kind === "below" ? { kind: "below", bound: value.bound } : { kind: "approx", value: value.value };
+}
+
+function statCount(status: number, value: unknown): StatCount {
+  if (!isStatCount(value)) throw fixedError(status, API_INVALID_RESPONSE);
+  return toStatCount(value);
+}
+
+/** Taux : `{ kind: "percent", value }` (multiple de 10, de 0 à 100) ou `{ kind: "insufficient" }`, rien d'autre. */
+function statRatio(status: number, value: unknown): StatRatio {
+  if (!isObject(value)) throw fixedError(status, API_INVALID_RESPONSE);
+  if (value.kind === "insufficient" && Object.keys(value).length === 1) return { kind: "insufficient" };
+  if (value.kind === "percent" && Object.keys(value).length === 2 && typeof value.value === "number" && Number.isSafeInteger(value.value) && value.value >= 0 && value.value <= 100 && value.value % 10 === 0) {
+    return { kind: "percent", value: value.value };
+  }
+  throw fixedError(status, API_INVALID_RESPONSE);
+}
+
+const DAY_TEXT = /^\d{4}-\d{2}-\d{2}$/;
+const BOOST_STATUSES: readonly string[] = ["effective", "expired", "cancelled", "scheduled"];
+
+function record(status: number, value: unknown): Record<string, unknown> {
+  if (!isObject(value)) throw fixedError(status, API_INVALID_RESPONSE);
+  return value;
+}
+
+function optionalRecord(status: number, value: unknown): Record<string, unknown> | null {
+  return value === null ? null : record(status, value);
+}
+
+function parseExposure(status: number, value: unknown): ExposureStatsEntry | null {
+  const exposure = optionalRecord(status, value);
+  if (exposure === null) return null;
+  return {
+    servings: statCount(status, exposure.servings),
+    sponsoredServings: statCount(status, exposure.sponsoredServings),
+    buyersExposed: statCount(status, exposure.buyersExposed),
+    buyersSponsored: statCount(status, exposure.buyersSponsored),
+  };
+}
+
+function parsePeriodStats(status: number, value: unknown): PeriodStats {
+  const raw = record(status, value);
+  if (!(STATS_PERIOD_CODES as readonly string[]).includes(String(raw.period)) || !(raw.since === null || (typeof raw.since === "string" && DAY_TEXT.test(raw.since)))) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  const opens = record(status, raw.opens);
+  const contacts = record(status, raw.contacts);
+  const attributedOpens = optionalRecord(status, opens.attributedToBoost);
+  const organicOpens = optionalRecord(status, opens.organic);
+  const attributedContacts = optionalRecord(status, contacts.attributedToBoost);
+  const organicContacts = optionalRecord(status, contacts.organic);
+  const periodRatios = record(status, raw.ratios);
+  // Les deux parts (attribuée, organique) vont ensemble : l'une sans l'autre est une réponse invalide.
+  if ((attributedOpens === null) !== (organicOpens === null) || (attributedContacts === null) !== (organicContacts === null)) throw fixedError(status, API_INVALID_RESPONSE);
+  return {
+    period: raw.period as StatsPeriodCode,
+    since: raw.since as string | null,
+    exposure: parseExposure(status, raw.exposure),
+    opens: {
+      total: statCount(status, opens.total),
+      uniqueBuyers: statCount(status, opens.uniqueBuyers),
+      attributedToBoost: attributedOpens === null ? null : { opens: statCount(status, attributedOpens.opens), uniqueBuyers: statCount(status, attributedOpens.uniqueBuyers) },
+      organic: organicOpens === null ? null : { opens: statCount(status, organicOpens.opens), uniqueBuyers: statCount(status, organicOpens.uniqueBuyers) },
+    },
+    contacts: {
+      uniqueBuyers: statCount(status, contacts.uniqueBuyers),
+      reveals: statCount(status, contacts.reveals),
+      attributedToBoost: attributedContacts === null ? null : { uniqueBuyers: statCount(status, attributedContacts.uniqueBuyers) },
+      organic: organicContacts === null ? null : { uniqueBuyers: statCount(status, organicContacts.uniqueBuyers) },
+    },
+    ratios: {
+      openRate: periodRatios.openRate === null ? null : statRatio(status, periodRatios.openRate),
+      contactRate: statRatio(status, periodRatios.contactRate),
+    },
+  };
+}
+
+function parseBoostStatsEntry(status: number, value: unknown): BoostStatsEntry {
+  const raw = record(status, value);
+  const attributed = optionalRecord(status, raw.attributed);
+  const ratios = record(status, raw.ratios);
+  if (
+    !isUuid(raw.boostId) ||
+    !(BOOST_DURATION_CODES as readonly string[]).includes(String(raw.durationCode)) ||
+    !BOOST_STATUSES.includes(String(raw.status)) ||
+    !isIsoDate(raw.startsAt) ||
+    !isIsoDate(raw.endsAt)
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return {
+    boostId: raw.boostId,
+    durationCode: raw.durationCode as BoostDurationCode,
+    status: raw.status as BoostStatsEntry["status"],
+    startsAt: raw.startsAt,
+    endsAt: raw.endsAt,
+    exposure: parseExposure(status, raw.exposure),
+    attributed: attributed === null
+      ? null
+      : {
+          opens: statCount(status, attributed.opens),
+          uniqueOpeners: statCount(status, attributed.uniqueOpeners),
+          uniqueContacts: statCount(status, attributed.uniqueContacts),
+          reveals: statCount(status, attributed.reveals),
+        },
+    ratios: {
+      openRate: ratios.openRate === null ? null : statRatio(status, ratios.openRate),
+      contactRate: ratios.contactRate === null ? null : statRatio(status, ratios.contactRate),
+    },
+  };
+}
+
+function parseOfferStats(status: number, value: unknown): OfferStats {
+  const raw = record(status, value);
+  const matches = record(status, raw.activeMatches);
+  if (
+    raw.contractVersion !== OFFER_STATS_CONTRACT_VERSION ||
+    !isStatCount(matches.needs) ||
+    !Array.isArray(raw.periods) ||
+    !Array.isArray(raw.boosts)
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  const periods = raw.periods.map((entry) => parsePeriodStats(status, entry));
+  if (periods.map((entry) => entry.period).join(",") !== STATS_PERIOD_CODES.join(",")) throw fixedError(status, API_INVALID_RESPONSE);
+  return {
+    activeMatches: { needs: toStatCount(matches.needs) },
+    periods,
+    boosts: raw.boosts.map((entry) => parseBoostStatsEntry(status, entry)),
+  };
+}
+
+const E164 = /^\+[1-9][0-9]{1,14}$/;
+const ATTRIBUTE_KEY_TEXT = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
+
+function parseOfferDetail(status: number, value: unknown): OfferDetail {
+  const raw = record(status, value);
+  const details = record(status, raw.details);
+  if (
+    raw.contractVersion !== OFFER_DETAIL_CONTRACT_VERSION ||
+    !isIsoDate(raw.readAt) ||
+    !isIsoDate(details.createdAt) ||
+    !Array.isArray(details.attributes) ||
+    details.attributes.length > 12
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return {
+    item: parseStoredMatch(status, raw.item),
+    details: {
+      createdAt: details.createdAt,
+      attributes: details.attributes.map((entry): OfferPublicAttribute => {
+        const attribute = record(status, entry);
+        if (typeof attribute.key !== "string" || !ATTRIBUTE_KEY_TEXT.test(attribute.key) || typeof attribute.value !== "string" || attribute.value.length < 1 || attribute.value.length > 80) {
+          throw fixedError(status, API_INVALID_RESPONSE);
+        }
+        return { key: attribute.key, value: attribute.value };
+      }),
+    },
+    readAt: raw.readAt,
+  };
+}
+
+/** Contact : le numéro doit être E.164 et les deux liens EXACTEMENT ceux de ce numéro (jamais un lien arbitraire venu du serveur). */
+function parseOfferContact(status: number, value: unknown): OfferContact {
+  const raw = record(status, value);
+  const contact = record(status, raw.contact);
+  if (
+    raw.contractVersion !== OFFER_CONTACT_CONTRACT_VERSION ||
+    typeof contact.phone !== "string" ||
+    !E164.test(contact.phone) ||
+    contact.telUrl !== `tel:${contact.phone}` ||
+    contact.whatsappUrl !== `https://wa.me/${contact.phone.slice(1)}` ||
+    typeof contact.firstContact !== "boolean"
+  ) {
+    throw fixedError(status, API_INVALID_RESPONSE);
+  }
+  return { phone: contact.phone, telUrl: contact.telUrl, whatsappUrl: contact.whatsappUrl, firstContact: contact.firstContact };
 }
 
 // ─── Lecture stricte du portefeuille et des achats de boost ─────────────────────────────────────────
@@ -1064,6 +1356,15 @@ export function createApiClient(options: ApiClientOptions = {}) {
         return storedMatches("offers", offerId, query, requestOptions);
       },
 
+      /**
+       * GET /api/offers/{id}/stats : ce que produit l'annonce pour son vendeur (404 si l'annonce est inconnue OU à un autre compte). Aucune identité
+       * d'acheteur ; aucun compte exact n'est publié (`{ kind: "below", bound: 5 }` ou `{ kind: "approx", value }`).
+       */
+      async stats(offerId: string, requestOptions?: RequestOptions): Promise<OfferStats> {
+        const { status, json } = await send("GET", `/api/offers/${id(offerId)}/stats`, undefined, requestOptions);
+        return parseOfferStats(status, json);
+      },
+
       /** POST /api/offers → 201 `{ offer }` (statut brouillon). */
       create(input: OfferInput, requestOptions?: RequestOptions): Promise<OfferRecord> {
         return offerResult(send("POST", "/api/offers", input, requestOptions));
@@ -1132,6 +1433,24 @@ export function createApiClient(options: ApiClientOptions = {}) {
 
       async get(demandId: string, requestOptions?: RequestOptions): Promise<DemandRecord> {
         return demandResult(send("GET", `/api/demands/${id(demandId)}`, undefined, requestOptions));
+      },
+
+      /**
+       * GET /api/demands/{id}/offers/{offerId} : la fiche d'UNE annonce des correspondances de ce besoin (404 identique pour tout accès refusé :
+       * besoin d'un autre, besoin clos, annonce hors correspondances). La lecture réussie est comptée côté serveur comme une ouverture.
+       */
+      async offer(demandId: string, offerId: string, requestOptions?: RequestOptions): Promise<OfferDetail> {
+        const { status, json } = await send("GET", `/api/demands/${id(demandId)}/offers/${id(offerId)}`, undefined, requestOptions);
+        return parseOfferDetail(status, json);
+      },
+
+      /**
+       * POST /api/demands/{id}/offers/{offerId}/contact (sans corps) : le numéro vérifié du vendeur et ses liens `tel:` et WhatsApp. 404 (accès refusé),
+       * 409 `offer_not_available` (en pause, retirée ou vendue : rien n'est révélé), 429 (20 vendeurs distincts par jour).
+       */
+      async contactOffer(demandId: string, offerId: string, requestOptions?: RequestOptions): Promise<OfferContact> {
+        const { status, json } = await send("POST", `/api/demands/${id(demandId)}/offers/${id(offerId)}/contact`, undefined, requestOptions);
+        return parseOfferContact(status, json);
       },
 
       /** POST /api/demands/{id}/activate : brouillon ou satisfait → actif. */
@@ -1299,11 +1618,17 @@ export type ApiClient = ReturnType<typeof createApiClient>;
 /** Client du navigateur : fetch global, même origine. */
 export const api: ApiClient = createApiClient();
 
-export type ApiErrorContext = "otp-request" | "otp-verify" | "catalog" | "matches" | "boost" | "wallet" | "purchase" | "default";
+export type ApiErrorContext = "otp-request" | "otp-verify" | "catalog" | "matches" | "boost" | "wallet" | "purchase" | "offer" | "contact" | "stats" | "default";
 
 export const GENERIC_ERROR_MESSAGE = "Une erreur est survenue. Réessayez dans un instant.";
 /** 429 d'une demande de devis (limite de débit par vendeur, lot P3). */
 export const BOOST_RATE_LIMITED_MESSAGE = "Trop de demandes de prix en peu de temps. Patientez une minute, puis réessayez.";
+/** 404 de la fiche d'une annonce et du contact : accès refusé, annonce hors de vos correspondances, ou retirée : une seule phrase, rien n'est distingué. */
+export const OFFER_UNAVAILABLE_MESSAGE = "Cette annonce n'est plus disponible pour votre besoin, ou elle n'existe pas.";
+/** 409 `offer_not_available` du contact : en pause, retirée ou vendue ; rien n'a été révélé. */
+export const CONTACT_OFFER_GONE_MESSAGE = "Cette annonce n'est plus disponible : le vendeur l'a mise en pause, retirée ou vendue. Aucun contact n'a été enregistré.";
+/** 429 du contact : 20 vendeurs distincts par jour. */
+export const CONTACT_RATE_LIMITED_MESSAGE = "Vous avez déjà contacté 20 vendeurs aujourd'hui. Réessayez demain.";
 /** 429 d'une recharge, d'une lecture du porte-monnaie ou d'un achat. */
 export const TOO_MANY_ATTEMPTS_MESSAGE = "Trop de tentatives, réessayez dans un instant.";
 
@@ -1362,6 +1687,23 @@ export function describeApiError(error: unknown, context: ApiErrorContext = "def
     if (error.status === 400) return "Les résultats ne peuvent pas être affichés pour le moment. Actualisez la page.";
     if (error.status === 404) return "Introuvable : cet élément a peut-être été archivé ou n'existe plus.";
     if (error.status === 503) return "Les correspondances sont temporairement indisponibles. Réessayez dans un instant.";
+  }
+  if (context === "offer") {
+    if (error.status === 400) return "Cette annonce ne peut pas être affichée. Retournez aux résultats de votre besoin.";
+    if (error.status === 404) return OFFER_UNAVAILABLE_MESSAGE;
+    if (error.status === 503) return "L'annonce est temporairement indisponible. Réessayez dans un instant.";
+  }
+  if (context === "contact") {
+    if (error.status === 404) return OFFER_UNAVAILABLE_MESSAGE;
+    if (error.status === 409 && error.code === "offer_not_available") return CONTACT_OFFER_GONE_MESSAGE;
+    if (error.status === 409) return "Le contact de ce vendeur n'est pas disponible pour le moment.";
+    if (error.status === 429) return CONTACT_RATE_LIMITED_MESSAGE;
+    if (error.status === 503) return "Le contact est temporairement indisponible. Réessayez dans un instant.";
+    if (error.status === 400) return "Cette demande de contact n'est pas valide. Rechargez la page.";
+  }
+  if (context === "stats") {
+    if (error.status === 404) return "Annonce introuvable : elle n'existe pas ou n'est pas à vous.";
+    if (error.status === 503) return "Les statistiques sont temporairement indisponibles. Réessayez dans un instant.";
   }
   if (context === "boost") {
     if (error.status === 404) return "Annonce introuvable : elle a peut-être été archivée ou n'existe plus.";

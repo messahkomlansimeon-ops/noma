@@ -3,7 +3,7 @@ import "server-only";
 import type { Pool } from "pg";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
 import { CatalogValidationError } from "../catalog/errors";
-import { withPostgresTransaction } from "../postgres/client";
+import { withPostgresTransaction, type SqlExecutor } from "../postgres/client";
 import { BoostError, withReadOnlySnapshot } from "./boosts";
 import type { BoostDurationCode } from "./boost-config";
 
@@ -139,42 +139,51 @@ export async function readOfferBoostExposureStats(input: {
     const offer = await client.query<{ owner_id: string }>("SELECT owner_id FROM offers WHERE id = $1::uuid", [offerId]);
     if (!offer.rows[0]) throw new BoostError("offer_not_found");
     if (offer.rows[0].owner_id !== ownerId) throw new BoostError("offer_not_owned");
-    const result = await client.query<StatsRow>(
-      `SELECT b.id AS boost_id, b.duration_code, b.starts_at, b.ends_at,
-              CASE WHEN b.status = 'cancelled' THEN 'cancelled'
-                   WHEN b.status = 'expired' OR b.ends_at <= clock_timestamp() THEN 'expired'
-                   WHEN b.starts_at > clock_timestamp() THEN 'scheduled'
-                   ELSE 'effective' END AS status,
-              x.unique_exposed, x.unique_sponsored, x.servings, x.sponsored_servings, x.best_position, x.best_gain, x.active_days
-         FROM offer_boosts b
-         CROSS JOIN LATERAL (
-           SELECT count(DISTINCT e.viewer_id)::int AS unique_exposed,
-                  count(DISTINCT e.viewer_id) FILTER (WHERE e.sponsored_servings > 0)::int AS unique_sponsored,
-                  COALESCE(sum(e.servings), 0)::int AS servings,
-                  COALESCE(sum(e.sponsored_servings), 0)::int AS sponsored_servings,
-                  min(e.best_position) AS best_position,
-                  max(e.best_gain) AS best_gain,
-                  count(DISTINCT e.served_day)::int AS active_days
-             FROM boost_exposures e WHERE e.boost_id = b.id
-         ) x
-        WHERE b.offer_id = $1::uuid
-        ORDER BY b.starts_at DESC, b.id DESC
-        LIMIT $2::int`,
-      [offerId, limit],
-    );
-    return result.rows.map((row): OfferBoostExposureStats => ({
-      boostId: row.boost_id,
-      durationCode: row.duration_code,
-      startsAt: row.starts_at,
-      endsAt: row.ends_at,
-      status: row.status,
-      uniqueBuyersExposed: row.unique_exposed,
-      uniqueBuyersSponsored: row.unique_sponsored,
-      servings: row.servings,
-      sponsoredServings: row.sponsored_servings,
-      bestPosition: row.best_position,
-      bestGain: row.best_gain,
-      activeDays: row.active_days,
-    }));
+    return queryOfferBoostExposureStats(client, offerId, limit);
   });
+}
+
+/**
+ * Statistiques d'exposition des boosts d'une offre, lues avec un exécuteur FOURNI (lot M1 : les statistiques du vendeur les lisent dans le MÊME
+ * instantané que leurs autres comptages). Aucun contrôle de propriété ici : l'appelant l'a déjà fait. Comptes BRUTS (administration) ; les lectures
+ * destinées au vendeur appliquent le seuil de confidentialité (lib/server/metrics).
+ */
+export async function queryOfferBoostExposureStats(client: SqlExecutor, offerId: string, limit: number): Promise<OfferBoostExposureStats[]> {
+  const result = await client.query<StatsRow>(
+    `SELECT b.id AS boost_id, b.duration_code, b.starts_at, b.ends_at,
+            CASE WHEN b.status = 'cancelled' THEN 'cancelled'
+                 WHEN b.status = 'expired' OR b.ends_at <= clock_timestamp() THEN 'expired'
+                 WHEN b.starts_at > clock_timestamp() THEN 'scheduled'
+                 ELSE 'effective' END AS status,
+            x.unique_exposed, x.unique_sponsored, x.servings, x.sponsored_servings, x.best_position, x.best_gain, x.active_days
+       FROM offer_boosts b
+       CROSS JOIN LATERAL (
+         SELECT count(DISTINCT e.viewer_id)::int AS unique_exposed,
+                count(DISTINCT e.viewer_id) FILTER (WHERE e.sponsored_servings > 0)::int AS unique_sponsored,
+                COALESCE(sum(e.servings), 0)::int AS servings,
+                COALESCE(sum(e.sponsored_servings), 0)::int AS sponsored_servings,
+                min(e.best_position) AS best_position,
+                max(e.best_gain) AS best_gain,
+                count(DISTINCT e.served_day)::int AS active_days
+           FROM boost_exposures e WHERE e.boost_id = b.id
+       ) x
+      WHERE b.offer_id = $1::uuid
+      ORDER BY b.starts_at DESC, b.id DESC
+      LIMIT $2::int`,
+    [offerId, limit],
+  );
+  return result.rows.map((row): OfferBoostExposureStats => ({
+    boostId: row.boost_id,
+    durationCode: row.duration_code,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    status: row.status,
+    uniqueBuyersExposed: row.unique_exposed,
+    uniqueBuyersSponsored: row.unique_sponsored,
+    servings: row.servings,
+    sponsoredServings: row.sponsored_servings,
+    bestPosition: row.best_position,
+    bestGain: row.best_gain,
+    activeDays: row.active_days,
+  }));
 }

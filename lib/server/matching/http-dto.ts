@@ -220,7 +220,7 @@ export function mapEvaluatedMatchesPageToDto<
  * propriétaire, ni texte brut, ni evaluation_details, ni configuration de scoring, ni clé d'idempotence, ni hash de
  * tentative (aucun de ces champs n'est même lu par le service).
  */
-function mapStoredMatchItem<TCandidate extends OfferRecord | DemandRecord>(
+export function mapStoredMatchItem<TCandidate extends OfferRecord | DemandRecord>(
   item: StoredMatchItem<TCandidate>,
 ): StoredMatchItemDto {
   return {

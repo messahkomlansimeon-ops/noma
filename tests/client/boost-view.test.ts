@@ -21,6 +21,10 @@ import { anchorQuote, anchoredQuoteValidity, anchoredRemainingMs, historyEntryEx
 
 const QUOTE_ID = "44444444-4444-4444-8444-444444444444";
 
+/** Compte d'acheteurs tel que le serveur l'envoie (lots M1 à M1-quater) : `{ kind: "approx", value }` (multiple de 5) ou `{ kind: "below", bound: 5 }`. */
+const about = (value: number) => ({ kind: "approx", value }) as const;
+const BELOW = { kind: "below", bound: 5 } as const;
+
 function availableQuote(overrides: Partial<BoostQuote> = {}): BoostQuote {
   return {
     id: QUOTE_ID,
@@ -29,8 +33,8 @@ function availableQuote(overrides: Partial<BoostQuote> = {}): BoostQuote {
     status: "available",
     amount: 2300,
     unavailableReason: null,
-    factors: { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 },
-    inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, reachTruncated: false, slotsTotal: 3, slotsUsed: 1 },
+    factors: { competitionMilli: 1060, demandMilli: 1500, scarcityMilli: 1333, durationMilli: 2500 },
+    inputs: { competingSellers: 3, compatibleBuyers: about(15), reachableBuyers: about(10), reachTruncated: false, slotsTotal: 3, slotsUsed: 1 },
     computedAt: "2031-01-01T09:55:00.000Z",
     expiresAt: "2031-01-01T10:10:00.000Z",
     reused: false,
@@ -134,32 +138,32 @@ describe("montant et explication des facteurs", () => {
       lines.map((line) => [line.title, line.text, line.effect]),
       [
         ["Concurrence", "3 autres vendeurs proposent ce produit.", "+6 % sur le prix"],
-        ["Acheteurs compatibles", "4 acheteurs compatibles avec votre annonce.", "+30 % sur le prix"],
+        ["Acheteurs compatibles", "Environ 15 acheteurs compatibles avec votre annonce.", "+50 % sur le prix"],
         ["Places disponibles", "1 place de mise en avant utilisée sur 3.", "+33,3 % sur le prix"],
         ["Durée", "Mise en avant pendant 3 jours.", "prix × 2,5 selon la durée"],
-        ["Visibilité", "Mise en avant visible auprès de 4 acheteurs.", "n'entre pas dans le prix"],
+        ["Visibilité", "Mise en avant visible auprès d'environ 10 acheteurs.", "n'entre pas dans le prix"],
       ],
     );
     const text = JSON.stringify(lines);
-    for (const raw of ["Milli", "milli", "1060", "1300", "1333", "2500"]) assert.equal(text.includes(raw), false, raw);
+    for (const raw of ["Milli", "milli", "1060", "1500", "1333", "2500"]) assert.equal(text.includes(raw), false, raw);
   });
 
-  test("portée visible : « Mise en avant visible auprès de X acheteur(s) » (pluriel, zéro), rien pour un devis non évalué ; jamais un code brut", () => {
-    const reach = (reachableBuyers: number | null) =>
-      explainFactors(availableQuote({ inputs: { competingSellers: 1, compatibleBuyers: 5, reachableBuyers, reachTruncated: false, slotsTotal: 2, slotsUsed: 0 } })).filter((line) => line.key === "reach");
-    assert.deepEqual(reach(1).map((line) => line.text), ["Mise en avant visible auprès de 1 acheteur."]);
-    assert.deepEqual(reach(3).map((line) => line.text), ["Mise en avant visible auprès de 3 acheteurs."]);
-    assert.deepEqual(reach(0).map((line) => line.text), ["Mise en avant visible auprès de 0 acheteur."]);
+  test("portée visible : « Mise en avant visible auprès d'environ X acheteurs » ou « de moins de 5 acheteurs », rien pour un devis non évalué ; jamais un code brut", () => {
+    const reach = (reachableBuyers: typeof BELOW | ReturnType<typeof about> | null) =>
+      explainFactors(availableQuote({ inputs: { competingSellers: 1, compatibleBuyers: about(5), reachableBuyers, reachTruncated: false, slotsTotal: 2, slotsUsed: 0 } })).filter((line) => line.key === "reach");
+    assert.deepEqual(reach(BELOW).map((line) => line.text), ["Mise en avant visible auprès de moins de 5 acheteurs."]);
+    assert.deepEqual(reach(about(5)).map((line) => line.text), ["Mise en avant visible auprès d'environ 5 acheteurs."]);
+    assert.deepEqual(reach(about(15)).map((line) => line.text), ["Mise en avant visible auprès d'environ 15 acheteurs."]);
     assert.deepEqual(reach(null), [], "devis d'avant la migration 0016 : aucune ligne inventée");
-    assert.equal(JSON.stringify(reach(3)).includes("reachable"), false);
+    assert.equal(JSON.stringify(reach(about(15))).includes("reachable"), false);
   });
 
-  test("portée estimée et bornée (lot P3) : « au moins X acheteur(s) » quand l'estimation est tronquée, jamais sinon", () => {
-    const reach = (reachableBuyers: number | null, reachTruncated: boolean) =>
-      explainFactors(availableQuote({ inputs: { competingSellers: 1, compatibleBuyers: 50, reachableBuyers, reachTruncated, slotsTotal: 2, slotsUsed: 0 } })).filter((line) => line.key === "reach");
-    assert.deepEqual(reach(20, true).map((line) => line.text), ["Mise en avant visible auprès d'au moins 20 acheteurs."]);
-    assert.deepEqual(reach(1, true).map((line) => line.text), ["Mise en avant visible auprès d'au moins 1 acheteur."]);
-    assert.deepEqual(reach(20, false).map((line) => line.text), ["Mise en avant visible auprès de 20 acheteurs."]);
+  test("portée estimée et bornée (lot P3) : « d'environ X acheteurs, ou plus » quand l'estimation est tronquée, jamais sinon ; « moins de 5 » ne dit jamais « ou plus »", () => {
+    const reach = (reachableBuyers: typeof BELOW | ReturnType<typeof about> | null, reachTruncated: boolean) =>
+      explainFactors(availableQuote({ inputs: { competingSellers: 1, compatibleBuyers: about(50), reachableBuyers, reachTruncated, slotsTotal: 2, slotsUsed: 0 } })).filter((line) => line.key === "reach");
+    assert.deepEqual(reach(about(20), true).map((line) => line.text), ["Mise en avant visible auprès d'environ 20 acheteurs, ou plus."]);
+    assert.deepEqual(reach(BELOW, true).map((line) => line.text), ["Mise en avant visible auprès de moins de 5 acheteurs."]);
+    assert.deepEqual(reach(about(20), false).map((line) => line.text), ["Mise en avant visible auprès d'environ 20 acheteurs."]);
     assert.deepEqual(reach(null, true), [], "portée non évaluée : aucune ligne, même si le drapeau est vrai");
   });
 
@@ -168,15 +172,28 @@ describe("montant et explication des facteurs", () => {
       availableQuote({
         durationCode: "24h",
         factors: { competitionMilli: 1000, demandMilli: 1000, scarcityMilli: 1000, durationMilli: 1000 },
-        inputs: { competingSellers: 0, compatibleBuyers: 1, reachableBuyers: 1, reachTruncated: false, slotsTotal: 1, slotsUsed: 0 },
+        inputs: { competingSellers: 0, compatibleBuyers: BELOW, reachableBuyers: BELOW, reachTruncated: false, slotsTotal: 1, slotsUsed: 0 },
       }),
     );
     assert.equal(lines[0].text, "Aucun autre vendeur ne propose ce produit.");
-    assert.equal(lines[1].text, "1 acheteur compatible avec votre annonce.");
+    assert.equal(lines[1].text, "Moins de 5 acheteurs compatibles avec votre annonce.");
     assert.equal(lines[2].text, "0 place de mise en avant utilisée sur 1.");
     assert.equal(lines[3].effect, "durée de référence (prix de base)");
-    assert.equal(lines[4].text, "Mise en avant visible auprès de 1 acheteur.", "singulier");
-    assert.equal(explainFactors(availableQuote({ inputs: { competingSellers: 1, compatibleBuyers: 2, reachableBuyers: 2, reachTruncated: false, slotsTotal: 3, slotsUsed: 2 } }))[0].text, "1 autre vendeur propose ce produit.");
+    assert.equal(lines[4].text, "Mise en avant visible auprès de moins de 5 acheteurs.");
+    assert.equal(explainFactors(availableQuote({ inputs: { competingSellers: 1, compatibleBuyers: about(5), reachableBuyers: about(5), reachTruncated: false, slotsTotal: 3, slotsUsed: 2 } }))[0].text, "1 autre vendeur propose ce produit.");
+  });
+
+  test("arrondi (lots M1 à M1-quater) : 0 à 4 acheteurs s'affichent « moins de 5 », jamais le nombre ; 5 et plus « environ N » ; plus aucun « moins de 3 »", () => {
+    const lines = (compatibleBuyers: typeof BELOW | ReturnType<typeof about>, reachableBuyers: typeof BELOW | ReturnType<typeof about> | null, reachTruncated = false) =>
+      explainFactors(availableQuote({ inputs: { competingSellers: 1, compatibleBuyers, reachableBuyers, reachTruncated, slotsTotal: 2, slotsUsed: 0 } }));
+    const masked = lines(BELOW, BELOW);
+    assert.equal(masked[1].text, "Moins de 5 acheteurs compatibles avec votre annonce.");
+    assert.equal(masked[4].text, "Mise en avant visible auprès de moins de 5 acheteurs.");
+    assert.equal(lines(BELOW, BELOW, true)[4].text, "Mise en avant visible auprès de moins de 5 acheteurs.");
+    for (const line of masked) assert.equal(/\b[0-4] acheteur|moins de 3/.test(line.text), false, line.text);
+    assert.equal(lines(about(5), about(5))[1].text, "Environ 5 acheteurs compatibles avec votre annonce.");
+    assert.equal(lines(about(120), about(95))[1].text, "Environ 120 acheteurs compatibles avec votre annonce.");
+    assert.equal(lines(about(120), about(95))[4].text, "Mise en avant visible auprès d'environ 95 acheteurs.");
   });
 
   test("devis indisponible : aucune ligne de facteur", () => {

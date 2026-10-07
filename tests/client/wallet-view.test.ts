@@ -87,7 +87,7 @@ function quote(overrides: Partial<BoostQuote> = {}): BoostQuote {
     amount: 1_300,
     unavailableReason: null,
     factors: { competitionMilli: 1020, demandMilli: 1000, scarcityMilli: 1000, durationMilli: 2500 },
-    inputs: { competingSellers: 1, compatibleBuyers: 1, reachableBuyers: 1, reachTruncated: false, slotsTotal: 2, slotsUsed: 0 },
+    inputs: { competingSellers: 1, compatibleBuyers: { kind: "below", bound: 5 }, reachableBuyers: { kind: "below", bound: 5 }, reachTruncated: false, slotsTotal: 2, slotsUsed: 0 },
     computedAt: "2031-01-01T10:00:00.000Z",
     expiresAt: "2031-01-01T10:15:00.000Z",
     reused: false,

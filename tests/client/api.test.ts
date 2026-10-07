@@ -723,16 +723,20 @@ describe("couche cliente : correspondances enregistrées (storedMatches)", () =>
   });
 });
 
+/** Compte d'acheteurs tel que le serveur l'envoie (lots M1 à M1-quater) : `{ kind: "approx", value }` (multiple de 5) ou `{ kind: "below", bound: 5 }`. */
+const BUYERS = (value: number) => ({ kind: "approx", value });
+const BELOW = { kind: "below", bound: 5 };
+
 function quoteDto(overrides: Record<string, unknown> = {}) {
   return {
     id: "44444444-4444-4444-8444-444444444444",
     durationCode: "3d",
     currency: "XOF",
     status: "available",
-    amount: 2300,
+    amount: 2500,
     unavailableReason: null,
-    factors: { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 },
-    inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, reachTruncated: false, slotsTotal: 3, slotsUsed: 1 },
+    factors: { competitionMilli: 1060, demandMilli: 1400, scarcityMilli: 1333, durationMilli: 2500 },
+    inputs: { competingSellers: 3, compatibleBuyers: BUYERS(5), reachableBuyers: BUYERS(5), reachTruncated: false, slotsTotal: 3, slotsUsed: 1 },
     computedAt: "2031-01-01T10:00:00.000Z",
     expiresAt: "2031-01-01T10:15:00.000Z",
     reused: false,
@@ -746,12 +750,12 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
       new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...(date === null ? {} : { date }) } });
     const GMT = "Wed, 06 Oct 2027 12:00:00 GMT";
     const expected = Date.parse(GMT);
-    const create = harness(() => withDate(200, { contractVersion: "boost-quote/v1", quote: quoteDto({ reused: true }) }, GMT));
+    const create = harness(() => withDate(200, { contractVersion: "boost-quote/v2", quote: quoteDto({ reused: true }) }, GMT));
     assert.equal((await create.client.boostQuotes.create(ID, "3d")).serverTime, expected);
-    const listed = harness(() => withDate(200, { contractVersion: "boost-quote/v1", quotes: [{ ...quoteDto(), reused: undefined, expired: false }, { ...quoteDto({ id: "55555555-5555-4555-8555-555555555555" }), reused: undefined, expired: true }] }, GMT));
+    const listed = harness(() => withDate(200, { contractVersion: "boost-quote/v2", quotes: [{ ...quoteDto(), reused: undefined, expired: false }, { ...quoteDto({ id: "55555555-5555-4555-8555-555555555555" }), reused: undefined, expired: true }] }, GMT));
     assert.deepEqual((await listed.client.boostQuotes.list(ID)).map((quote) => quote.serverTime), [expected, expected]);
     for (const date of [null, "pas une date", "", "x".repeat(65)]) {
-      const { client } = harness(() => withDate(201, { contractVersion: "boost-quote/v1", quote: quoteDto() }, date));
+      const { client } = harness(() => withDate(201, { contractVersion: "boost-quote/v2", quote: quoteDto() }, date));
       assert.equal((await client.boostQuotes.create(ID, "3d")).serverTime, null, String(date));
     }
     assert.equal(serverTimeFromDateHeader(GMT), expected);
@@ -762,7 +766,7 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
 
   test("create : POST /api/offers/{id}/boost-quotes avec exactement { durationCode }, 201 puis 200 réutilisée", async () => {
     const { client, calls } = harness((_request, index) =>
-      json(index === 0 ? 201 : 200, { contractVersion: "boost-quote/v1", quote: quoteDto({ reused: index === 1 }) }),
+      json(index === 0 ? 201 : 200, { contractVersion: "boost-quote/v2", quote: quoteDto({ reused: index === 1 }) }),
     );
     const created = await client.boostQuotes.create(ID, "3d");
     const reused = await client.boostQuotes.create(ID, "3d");
@@ -770,18 +774,18 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
     assert.equal(calls[0].init.method, "POST");
     assert.equal(calls[0].init.body, JSON.stringify({ durationCode: "3d" }));
     assert.equal(headerOf(calls[0], "Content-Type"), "application/json");
-    assert.equal(created.amount, 2300);
+    assert.equal(created.amount, 2500);
     assert.equal(created.reused, false);
     assert.equal(created.expired, null);
     assert.equal(reused.reused, true);
-    assert.deepEqual(created.factors, { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 });
-    assert.deepEqual(created.inputs, { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, reachTruncated: false, slotsTotal: 3, slotsUsed: 1 });
+    assert.deepEqual(created.factors, { competitionMilli: 1060, demandMilli: 1400, scarcityMilli: 1333, durationMilli: 2500 });
+    assert.deepEqual(created.inputs, { competingSellers: 3, compatibleBuyers: BUYERS(5), reachableBuyers: BUYERS(5), reachTruncated: false, slotsTotal: 3, slotsUsed: 1 });
   });
 
   test("un devis indisponible est un SUCCÈS (jamais une erreur) avec son motif", async () => {
     const { client } = harness(() =>
       json(201, {
-        contractVersion: "boost-quote/v1",
+        contractVersion: "boost-quote/v2",
         quote: quoteDto({ status: "unavailable", amount: null, factors: null, unavailableReason: "no_compatible_buyer" }),
       }),
     );
@@ -792,34 +796,34 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
     assert.equal(quote.unavailableReason, "no_compatible_buyer");
   });
 
-  test("portée visible : reachableBuyers (entier ≥ 0 ou null) relu ; motif no_visible_effect = un devis INDISPONIBLE (succès), jamais une erreur", async () => {
-    const withInputs = (reachableBuyers: number | null) => ({ competingSellers: 3, compatibleBuyers: 4, reachableBuyers, reachTruncated: false, slotsTotal: 3, slotsUsed: 1 });
-    for (const reachable of [0, 1, 4, null]) {
-      const { client } = harness(() => json(201, { contractVersion: "boost-quote/v1", quote: quoteDto({ inputs: withInputs(reachable) }) }));
-      assert.equal((await client.boostQuotes.create(ID, "3d")).inputs.reachableBuyers, reachable);
+  test("portée visible : reachableBuyers (compte arrondi { kind, … } ou null) relu ; motif no_visible_effect = un devis INDISPONIBLE (succès), jamais une erreur", async () => {
+    const withInputs = (reachableBuyers: unknown) => ({ competingSellers: 3, compatibleBuyers: BUYERS(5), reachableBuyers, reachTruncated: false, slotsTotal: 3, slotsUsed: 1 });
+    for (const reachable of [BELOW, BUYERS(5), BUYERS(15), null]) {
+      const { client } = harness(() => json(201, { contractVersion: "boost-quote/v2", quote: quoteDto({ inputs: withInputs(reachable) }) }));
+      assert.deepEqual((await client.boostQuotes.create(ID, "3d")).inputs.reachableBuyers, reachable);
     }
     const { client } = harness(() =>
       json(201, {
-        contractVersion: "boost-quote/v1",
-        quote: quoteDto({ status: "unavailable", amount: null, factors: null, unavailableReason: "no_visible_effect", inputs: withInputs(0) }),
+        contractVersion: "boost-quote/v2",
+        quote: quoteDto({ status: "unavailable", amount: null, factors: null, unavailableReason: "no_visible_effect", inputs: withInputs(BELOW) }),
       }),
     );
     const useless = await client.boostQuotes.create(ID, "24h");
-    assert.deepEqual([useless.status, useless.unavailableReason, useless.amount, useless.inputs.reachableBuyers], ["unavailable", "no_visible_effect", null, 0]);
+    assert.deepEqual([useless.status, useless.unavailableReason, useless.amount, useless.inputs.reachableBuyers], ["unavailable", "no_visible_effect", null, BELOW]);
   });
 
   test("portée estimée (lot P3) : reachTruncated booléen relu ; absent = faux ; une valeur qui n'est pas un booléen est refusée (invalid_response)", async () => {
-    const inputs = (reachTruncated: unknown) => ({ competingSellers: 3, compatibleBuyers: 40, reachableBuyers: 20, reachTruncated, slotsTotal: 3, slotsUsed: 1 });
+    const inputs = (reachTruncated: unknown) => ({ competingSellers: 3, compatibleBuyers: BUYERS(40), reachableBuyers: BUYERS(20), reachTruncated, slotsTotal: 3, slotsUsed: 1 });
     for (const [sent, expected] of [[true, true], [false, false]] as const) {
-      const { client } = harness(() => json(201, { contractVersion: "boost-quote/v1", quote: quoteDto({ inputs: inputs(sent) }) }));
+      const { client } = harness(() => json(201, { contractVersion: "boost-quote/v2", quote: quoteDto({ inputs: inputs(sent) }) }));
       assert.equal((await client.boostQuotes.create(ID, "3d")).inputs.reachTruncated, expected);
     }
     const legacyInputs: Record<string, unknown> = inputs(true);
     delete legacyInputs.reachTruncated;
-    const legacy = harness(() => json(201, { contractVersion: "boost-quote/v1", quote: quoteDto({ inputs: legacyInputs }) }));
+    const legacy = harness(() => json(201, { contractVersion: "boost-quote/v2", quote: quoteDto({ inputs: legacyInputs }) }));
     assert.equal((await legacy.client.boostQuotes.create(ID, "3d")).inputs.reachTruncated, false, "champ absent : faux");
     for (const bad of ["true", 1, null, {}]) {
-      const { client } = harness(() => json(201, { contractVersion: "boost-quote/v1", quote: quoteDto({ inputs: inputs(bad) }) }));
+      const { client } = harness(() => json(201, { contractVersion: "boost-quote/v2", quote: quoteDto({ inputs: inputs(bad) }) }));
       await assert.rejects(client.boostQuotes.create(ID, "3d"), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE, String(bad));
     }
   });
@@ -827,7 +831,7 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
   test("list : GET avec limit seulement, plus récentes d'abord ; chaque devis porte `expired`", async () => {
     const { client, calls } = harness(() =>
       json(200, {
-        contractVersion: "boost-quote/v1",
+        contractVersion: "boost-quote/v2",
         quotes: [
           { ...quoteDto({ id: "55555555-5555-4555-8555-555555555555" }), reused: undefined, expired: false },
           { ...quoteDto(), reused: undefined, expired: true },
@@ -844,7 +848,7 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
   });
 
   test("identifiant non UUID, durée ou limite invalide : ApiError sans AUCUNE requête", async () => {
-    const { client, calls } = harness(() => json(200, { contractVersion: "boost-quote/v1", quote: quoteDto() }));
+    const { client, calls } = harness(() => json(200, { contractVersion: "boost-quote/v2", quote: quoteDto() }));
     await assert.rejects(client.boostQuotes.create("pas-un-uuid", "3d"), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ID);
     await assert.rejects(client.boostQuotes.list("../x"), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_ID);
     for (const duration of ["1h", "", "3D", "24h; DROP"]) {
@@ -871,7 +875,7 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
   });
 
   test("réponse inattendue : invalid_response (champ manquant, durée ou état inconnus, version de contrat)", async () => {
-    const wrap = (quote: unknown, extra: Record<string, unknown> = {}) => json(201, { contractVersion: "boost-quote/v1", quote, ...extra });
+    const wrap = (quote: unknown, extra: Record<string, unknown> = {}) => json(201, { contractVersion: "boost-quote/v2", quote, ...extra });
     const bad: Response[] = [
       wrap(quoteDto({ durationCode: "30d" })),
       wrap(quoteDto({ status: "pending" })),
@@ -881,13 +885,22 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
       wrap(quoteDto({ reused: undefined })),
       wrap(quoteDto({ factors: { competitionMilli: 1060 } })),
       wrap(quoteDto({ inputs: null })),
-      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: 4, slotsTotal: 3, slotsUsed: 1 } })),
-      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: "4", slotsTotal: 3, slotsUsed: 1 } })),
-      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: -1, slotsTotal: 3, slotsUsed: 1 } })),
-      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 1.5, slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: BUYERS(5), slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: BUYERS(5), reachableBuyers: "4", slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: BUYERS(5), reachableBuyers: BUYERS(-1), slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: BUYERS(5), reachableBuyers: BUYERS(1.5), slotsTotal: 3, slotsUsed: 1 } })),
+      // Lots M1 à M1-quater : un nombre nu (ancienne forme), l'ancienne forme { value, belowThreshold }, une valeur qui n'est pas un multiple de 5, une borne autre que 5 ou un champ de plus sont refusés.
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: BUYERS(5), slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: BUYERS(5), reachableBuyers: 4, slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: { value: 2, belowThreshold: true }, reachableBuyers: BUYERS(5), slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: { value: null, belowThreshold: true }, reachableBuyers: BUYERS(5), slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: BUYERS(4), reachableBuyers: BUYERS(5), slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: BUYERS(12), reachableBuyers: BUYERS(5), slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: { kind: "below", bound: 3 }, reachableBuyers: BUYERS(5), slotsTotal: 3, slotsUsed: 1 } })),
+      wrap(quoteDto({ inputs: { competingSellers: 3, compatibleBuyers: { kind: "approx", value: 10, exact: 12 }, reachableBuyers: BUYERS(5), slotsTotal: 3, slotsUsed: 1 } })),
       wrap(quoteDto({ expiresAt: 5 })),
-      wrap(quoteDto(), { contractVersion: "boost-quote/v2" }),
-      json(201, { contractVersion: "boost-quote/v1" }),
+      wrap(quoteDto(), { contractVersion: "boost-quote/v1" }), // l'ancienne forme (comptes d'acheteurs en nombres) n'est plus acceptée
+      json(201, { contractVersion: "boost-quote/v2" }),
       new Response("pas du json", { status: 201 }),
     ];
     for (const response of bad) {
@@ -897,14 +910,14 @@ describe("couche cliente : cotations de boost (boostQuotes)", () => {
         (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE,
       );
     }
-    const { client } = harness(() => json(200, { contractVersion: "boost-quote/v1", quotes: "non" }));
+    const { client } = harness(() => json(200, { contractVersion: "boost-quote/v2", quotes: "non" }));
     await assert.rejects(client.boostQuotes.list(ID), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE);
   });
 
   test("le DTO ne laisse passer aucun champ inconnu (prix brut, configuration tarifaire, identifiants)", async () => {
     const { client } = harness(() =>
       json(201, {
-        contractVersion: "boost-quote/v1",
+        contractVersion: "boost-quote/v2",
         quote: quoteDto({ rawAmount: "2296.0925", pricing: { key: "default", version: 1 }, offerId: ID, sellerId: OWNER_ID }),
       }),
     );

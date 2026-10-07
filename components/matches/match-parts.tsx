@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Megaphone } from "lucide-react";
 import { Thumb } from "@/components/thumb";
 import { Badge, type BadgeTone } from "@/components/ui";
@@ -38,8 +39,27 @@ function CompatibilityBar({ text, percent }: { text: string; percent: number | n
   );
 }
 
-/** Offre dans les résultats d'un besoin : « Sponsorisé » bien visible et distinct quand l'offre a gagné des places grâce à un boost. */
-export function BuyerMatchCard({ item }: { item: StoredMatch }) {
+/** « Sponsorisé » bien visible et distinct (résultats et fiche d'une annonce) : jamais affiché sans que le serveur l'ait dit. */
+export function SponsoredNotice({ badge, notice }: { badge: string; notice: string | null }) {
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-2">
+      <span
+        title={notice ?? undefined}
+        className="inline-flex items-center gap-1 rounded-md bg-carrot px-2 py-[3px] text-[11px] font-extrabold uppercase leading-tight tracking-wide text-white"
+      >
+        <Megaphone className="size-3" aria-hidden />
+        {badge}
+      </span>
+      <span className="text-[12px] font-semibold text-carrot-ink">{notice}</span>
+    </div>
+  );
+}
+
+/**
+ * Offre dans les résultats d'un besoin : « Sponsorisé » bien visible et distinct quand l'offre a gagné des places grâce à un boost ;
+ * `detailHref` (lot M1) mène à la fiche de l'annonce, dans le contexte de ce besoin.
+ */
+export function BuyerMatchCard({ item, detailHref }: { item: StoredMatch; detailHref?: string | null }) {
   const row = buyerMatchRow(item);
   return (
     <li
@@ -47,18 +67,7 @@ export function BuyerMatchCard({ item }: { item: StoredMatch }) {
       data-sponsored={row.sponsored ? "true" : "false"}
       className={`rounded-2xl border bg-white p-3.5 ${row.sponsored ? "border-carrot/60 ring-1 ring-carrot/30" : "border-line"}`}
     >
-      {row.sponsoredBadge ? (
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span
-            title={row.sponsoredNotice ?? undefined}
-            className="inline-flex items-center gap-1 rounded-md bg-carrot px-2 py-[3px] text-[11px] font-extrabold uppercase leading-tight tracking-wide text-white"
-          >
-            <Megaphone className="size-3" aria-hidden />
-            {row.sponsoredBadge}
-          </span>
-          <span className="text-[12px] font-semibold text-carrot-ink">{row.sponsoredNotice}</span>
-        </div>
-      ) : null}
+      {row.sponsoredBadge ? <SponsoredNotice badge={row.sponsoredBadge} notice={row.sponsoredNotice} /> : null}
       <div className="flex items-center gap-3">
         <Thumb art={artForCategory(item.candidate.category)} className="size-14" iconClassName="size-7" />
         <div className="min-w-0 flex-1">
@@ -74,6 +83,15 @@ export function BuyerMatchCard({ item }: { item: StoredMatch }) {
             <IndicatorLine key={indicator.key} indicator={indicator} />
           ))}
         </ul>
+      ) : null}
+      {detailHref ? (
+        <Link
+          href={detailHref}
+          data-testid="match-detail-link"
+          className="mt-3 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white py-2.5 text-[14px] font-bold text-forest"
+        >
+          Voir l'annonce
+        </Link>
       ) : null}
     </li>
   );

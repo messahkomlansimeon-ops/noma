@@ -60,7 +60,16 @@ pause ou sans marque) répond 200 avec `"quotes": []`.
 
 ## Réponses
 
-Contrat `contractVersion: "boost-quote/v1"`. Les valeurs ci-dessous viennent des gestionnaires réels sur une base de test (monde
+**Lots M1 à M1-quater : contrat `boost-quote/v2`** — `inputs.compatibleBuyers` et `inputs.reachableBuyers` sont des **comptes d'acheteurs uniques** et sont **arrondis** (`MESURES.md`) : un objet
+`{ "kind": "below", "bound": 5 }` de 0 à 4 acheteurs (zéro compris ; l'écran dit « moins de 5 acheteurs »), ou `{ "kind": "approx", "value": N }` à partir de 5 (N multiple de 5 : de 5 à 8 → 5, de 9 à 12 → 10,
+de 13 à 17 → 15… ; l'écran dit « environ 15 acheteurs »). Jamais le compte exact. `reachableBuyers` reste `null` quand la portée n'est pas évaluée. La cotation enregistrée garde le compte exact (c'est
+l'entrée du prix) ; seul le DTO l'arrondit. Le facteur demande du prix utilise D' = 5 de 1 à 5 acheteurs (`BOOST-PRICING.md`) : le prix est identique de 1 à 5 acheteurs ; à partir de 6 il reste fonction du nombre exact (limite
+assumée). Changement de forme d'un champ existant : le contrat reste `boost-quote/v2` (jamais publié avant ce lot), le client refuse l'ancienne forme `{ "value", "belowThreshold" }` et les nombres nus.
+
+**Lot M1-bis (facteur demande)** — `factors.demandMilli` est calculé sur **D'** (D' = 3 pour 1, 2 ou 3 acheteurs compatibles, D sinon : `BOOST-PRICING.md`) : le facteur et le prix ne redonnent plus le nombre
+d'acheteurs masqué (avant : `demandMilli = 1100` disait « 2 acheteurs »). Le prix de 1, 2 ou 3 acheteurs est identique. Aucun champ ni version ne change (`boost-quote/v2`) ; la cotation enregistrée garde D exact.
+
+Contrat `contractVersion: "boost-quote/v2"`. Les valeurs ci-dessous viennent des gestionnaires réels sur une base de test (monde
 de l'exemple de contrôle de 2I2 : 3 vendeurs concurrents, 4 acheteurs compatibles, 1 place utilisée sur 3 ; les identifiants et
 les dates changent à chaque exécution).
 
@@ -68,16 +77,16 @@ les dates changent à chaque exécution).
 
 ```json
 {
-  "contractVersion": "boost-quote/v1",
+  "contractVersion": "boost-quote/v2",
   "quote": {
     "id": "b6fada3d-0ecd-45f6-965e-7aebeb1d2bd4",
     "durationCode": "3d",
     "currency": "XOF",
     "status": "available",
-    "amount": 2300,
+    "amount": 2500,
     "unavailableReason": null,
-    "factors": { "competitionMilli": 1060, "demandMilli": 1300, "scarcityMilli": 1333, "durationMilli": 2500 },
-    "inputs": { "competingSellers": 3, "compatibleBuyers": 4, "slotsTotal": 3, "slotsUsed": 1, "reachableBuyers": 2, "reachTruncated": false },
+    "factors": { "competitionMilli": 1060, "demandMilli": 1400, "scarcityMilli": 1333, "durationMilli": 2500 },
+    "inputs": { "competingSellers": 3, "compatibleBuyers": { "kind": "below", "bound": 5 }, "slotsTotal": 3, "slotsUsed": 1, "reachableBuyers": { "kind": "below", "bound": 5 }, "reachTruncated": false },
     "computedAt": "2026-10-05T17:01:29.061Z",
     "expiresAt": "2026-10-05T17:16:29.061Z",
     "reused": false
@@ -92,9 +101,9 @@ devis neuf INDISPONIBLE (`no_visible_effect`, 201) qui est renvoyé, jamais le m
 **201 — cotation indisponible** (offre sans acheteur compatible) : `status: "unavailable"`, `amount: null`, `factors: null`,
 `unavailableReason: "no_compatible_buyer"`, expiration 60 s après le calcul. Même forme avec `"no_visible_effect"` (lot P2-bis : des
 acheteurs compatibles existent mais le boost ne ferait monter l'offre dans aucune de leurs listes, par exemple moins de 7 offres
-comparables) : `inputs.reachableBuyers` vaut alors 0.
+comparables) : `inputs.reachableBuyers` vaut alors `{ "kind": "below", "bound": 5 }` (0 est arrondi comme 1 à 4 : le motif, lui, le dit).
 
-**GET** : `{ "contractVersion": "boost-quote/v1", "quotes": [ … ] }`, chaque élément ayant les mêmes champs que ci-dessus, avec
+**GET** : `{ "contractVersion": "boost-quote/v2", "quotes": [ … ] }`, chaque élément ayant les mêmes champs que ci-dessus, avec
 `expired` (booléen) à la place de `reused`.
 
 ### Champs (liste blanche exacte)
@@ -175,4 +184,4 @@ requête ni un identifiant. Un journal qui lève est ignoré (la réponse ne cha
   aucune impression et ne garantit pas la place : la disponibilité sera revérifiée à l'achat (lot paiement).
 - **Valeurs tarifaires provisoires** (`BOOST-PRICING.md`), à calibrer sur des usages réels.
 - Aucune route d'administration (attribution, historique des prix d'un périmètre) : `readScopeBoostPriceHistory` n'est pas exposé.
-- Le contrat `boost-quote/v1` est figé par les tests (liste blanche exacte) : tout champ nouveau passe par une nouvelle version.
+- Le contrat `boost-quote/v2` est figé par les tests (liste blanche exacte) : tout champ nouveau passe par une nouvelle version.

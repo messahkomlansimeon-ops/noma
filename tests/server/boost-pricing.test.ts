@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BOOST_DURATION_CODES, type BoostDurationCode } from "../../lib/server/boost/boost-config";
 import {
-  computeBoostPrice, computeCompetitionFactor, computeDemandFactor, computeDurationFactor, computeScarcityFactor,
+  computeBoostPrice, computeCompetitionFactor, computeDemandFactor, computeDurationFactor, computeScarcityFactor, effectiveDemandBuyers,
   validatePricingSettings, type BoostPricingSettings,
 } from "../../lib/server/boost/pricing";
 
@@ -36,7 +36,9 @@ function largestMultiple(numerator: number, total: number): number {
 
 function oracle(s: number, d: number, used: number, total: number, code: BoostDurationCode, cfg: BoostPricingSettings) {
   const competition = minFraction(milli(1000 + cfg.competitionStepMilli * s), milli(cfg.competitionMaxMilli));
-  const demand = minFraction(milli(1000 + cfg.demandStepMilli * (d - 1)), milli(cfg.demandMaxMilli));
+  // D' (lots M1-bis et M1-quater) : 1 à 5 acheteurs donnent le MÊME facteur (celui de 5) ; au-delà, D exact. Écrit ici sans réutiliser le module testé.
+  const demandBuyers = d <= 5 ? 5 : d;
+  const demand = minFraction(milli(1000 + cfg.demandStepMilli * (demandBuyers - 1)), milli(cfg.demandMaxMilli));
   const scarcityMilli = 1000 + largestMultiple((cfg.scarcityMaxMilli - 1000) * used, total);
   const durationMilli = { "24h": cfg.duration24hMilli, "3d": cfg.duration3dMilli, "7d": cfg.duration7dMilli }[code];
   const raw = times(times(times(times(fraction(big(cfg.baseAmount), big(1)), competition), demand), milli(scarcityMilli)), milli(durationMilli));
@@ -63,33 +65,34 @@ function oracle(s: number, d: number, used: number, total: number, code: BoostDu
 
 // ───────────── contrôle et exemples calculés à la main ─────────────
 
-test("exemple de contrôle : S = 3, D = 4, used = 1 sur 3, durée 3d, réglages par défaut → 1060 / 1300 / 1333 / 2500, brut 2 296,0925, 2 300 XOF", () => {
-  const result = price({ s: 3, d: 4, used: 1, total: 3, code: "3d" });
-  assert.deepEqual(result.factors, { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 });
-  // 500 × 1,060 × 1,300 × 1,333 × 2,500 = 2 296,0925 (calcul à la main : 500 × 1,378 = 689 ; × 1,333 = 918,437 ; × 2,5 = 2 296,0925).
-  assert.equal(result.rawAmount, "2296.092500000000");
-  assert.equal(result.amount, 2300, "2 296,0925 arrondi à la grille de 100 → 2 300");
+test("exemple de contrôle : S = 3, D = 7, used = 1 sur 3, durée 3d, réglages par défaut → 1060 / 1600 / 1333 / 2500, brut 2 825,96, 2 800 XOF", () => {
+  const result = price({ s: 3, d: 7, used: 1, total: 3, code: "3d" });
+  assert.deepEqual(result.factors, { competitionMilli: 1060, demandMilli: 1600, scarcityMilli: 1333, durationMilli: 2500 });
+  // 500 × 1,060 × 1,600 × 1,333 × 2,500 = 2 825,96 (calcul à la main : 500 × 1,696 = 848 ; × 1,333 = 1 130,384 ; × 2,5 = 2 825,96).
+  assert.equal(result.rawAmount, "2825.960000000000");
+  assert.equal(result.amount, 2800, "2 825,96 arrondi à la grille de 100 → 2 800");
 });
 
 test("exemples calculés à la main : clamp au minimum, clamp au maximum, brut pile à mi-grille, rareté avec used = total − 1", () => {
-  // Minimum : base 450, tous les facteurs à 1000 → brut 450 ; arrondi 500 (4,5 → 5) ; le minimum 1000 l'emporte.
+  // Minimum : base 450, D = 1 → D' = 5 (lot M1-quater) → facteur demande 1400 (avant : 1000, brut 450) ; brut 450 × 1,4 = 630 ; arrondi 600 ; le minimum 1000 l'emporte.
   const atMin = price({ s: 0, d: 1, used: 0, total: 5, settings: settings({ baseAmount: 450, minAmount: 1000 }) });
-  assert.equal(atMin.rawAmount, "450.000000000000");
+  assert.equal(atMin.rawAmount, "630.000000000000");
   assert.equal(atMin.amount, 1000);
-  // Minimum par défaut : brut 500 → 500.
-  assert.equal(price({ s: 0, d: 1, used: 0, total: 5 }).amount, 500);
+  // Minimum par défaut : D = 1 → D' = 5 → brut 500 × 1,4 = 700 (avant M1-bis : 500 ; avant M1-quater : 600) → 700.
+  assert.equal(price({ s: 0, d: 1, used: 0, total: 5 }).amount, 700);
   // Maximum : base 10 000 ; concurrence 1500, demande 3000, rareté 1000 + floor(1000 × 2 / 3) = 1666, durée 7d = 5000.
   // 10 000 × 1,5 × 3 × 1,666 × 5 = 374 850 → arrondi 374 900 → plafonné à 50 000.
   const atMax = price({ s: 100, d: 100, used: 2, total: 3, code: "7d", settings: settings({ baseAmount: 10_000 }) });
   assert.deepEqual(atMax.factors, { competitionMilli: 1500, demandMilli: 3000, scarcityMilli: 1666, durationMilli: 5000 });
   assert.equal(atMax.rawAmount, "374850.000000000000");
   assert.equal(atMax.amount, 50_000);
-  // Pile à mi-grille : base 1500, pas de concurrence 500 (max 1500), S = 1 → 1500 × 1,5 = 2 250 → demi-haut → 2 300.
-  const tie = settings({ baseAmount: 1500, competitionStepMilli: 500 });
+  // Pile à mi-grille : base 1500, pas de concurrence 500 (max 1500), S = 1 → 1500 × 1,5 = 2 250 → demi-haut → 2 300. Pas de demande 0 : l'essai porte sur
+  // l'arrondi, pas sur D' (avec D = 1 et le pas par défaut, D' = 5 donnerait 1500 × 1,5 × 1,4 = 3 150).
+  const tie = settings({ baseAmount: 1500, competitionStepMilli: 500, demandStepMilli: 0 });
   assert.equal(price({ s: 1, d: 1, used: 0, total: 5, settings: tie }).rawAmount, "2250.000000000000");
   assert.equal(price({ s: 1, d: 1, used: 0, total: 5, settings: tie }).amount, 2300, "2 250 : demi-haut");
   // Juste sous la mi-grille : pas 499 → 1500 × 1,499 = 2 248,5 → 2 200.
-  assert.equal(price({ s: 1, d: 1, used: 0, total: 5, settings: settings({ baseAmount: 1500, competitionStepMilli: 499 }) }).amount, 2200);
+  assert.equal(price({ s: 1, d: 1, used: 0, total: 5, settings: settings({ baseAmount: 1500, competitionStepMilli: 499, demandStepMilli: 0 }) }).amount, 2200);
   // Rareté : used = total − 1 → 1000 + floor(1000 × (total − 1) / total).
   assert.equal(computeScarcityFactor(2, 3, DEFAULTS), 1666);
   assert.equal(computeScarcityFactor(6, 7, DEFAULTS), 1857);
@@ -100,7 +103,7 @@ test("exemples calculés à la main : clamp au minimum, clamp au maximum, brut p
   assert.equal(computeCompetitionFactor(0, DEFAULTS), 1000);
   assert.equal(computeCompetitionFactor(25, DEFAULTS), 1500);
   assert.equal(computeCompetitionFactor(26, DEFAULTS), 1500, "plafonné");
-  assert.equal(computeDemandFactor(1, DEFAULTS), 1000);
+  assert.equal(computeDemandFactor(1, DEFAULTS), 1400, "D = 1 → D' = 5 : 1000 + 100 × (5 − 1) (avant M1-bis : 1000 ; avant M1-quater : 1200)");
   assert.equal(computeDemandFactor(21, DEFAULTS), 3000);
   assert.equal(computeDemandFactor(1000, DEFAULTS), 3000, "plafonné");
   assert.deepEqual(BOOST_DURATION_CODES.map((code) => computeDurationFactor(code, DEFAULTS)), [1000, 2500, 5000]);
@@ -108,12 +111,40 @@ test("exemples calculés à la main : clamp au minimum, clamp au maximum, brut p
 
 test("un montant arrondi APRÈS un clamp dépasserait les bornes : ici l'arrondi précède le clamp et le résultat reste dans [min, max] sur la grille", () => {
   // Bornes 700 et 1 300, grille 100 : un brut de 649,99 s'arrondit à 600 puis est relevé à 700 ; un brut de 1 349,99 à 1 300 ; un brut de 1 350 à 1 400 puis ramené à 1 300.
-  const cfg = settings({ minAmount: 700, maxAmount: 1300, baseAmount: 650, scarcityMaxMilli: 1000 });
+  // Pas de demande 0 : l'essai porte sur l'ordre arrondi puis bornes, pas sur D' (D = 1 avec le pas par défaut donnerait un facteur 1400).
+  const cfg = settings({ minAmount: 700, maxAmount: 1300, baseAmount: 650, scarcityMaxMilli: 1000, demandStepMilli: 0 });
   const below = computeBoostPrice({ competingSellers: 0, compatibleBuyers: 1, slotsUsed: 0, slotsTotal: 3, durationCode: "24h", settings: settings({ ...cfg, baseAmount: 649 }) });
   assert.equal(below.amount, 700);
   const high = computeBoostPrice({ competingSellers: 0, compatibleBuyers: 1, slotsUsed: 0, slotsTotal: 3, durationCode: "3d", settings: settings({ ...cfg, baseAmount: 540 }) });
   assert.equal(high.rawAmount, "1350.000000000000");
   assert.equal(high.amount, 1300, "1 350 → arrondi 1 400 → borné à 1 300 (jamais 1 400)");
+});
+
+// ───────────── D' : le prix ne redonne jamais un petit nombre d'acheteurs (lots M1-bis et M1-quater, K2) ─────────────
+
+test("D' : le prix et le facteur demande sont IDENTIQUES de 1 à 5 acheteurs (D' = 5) ; D = 6 est plus cher ; D = 0 n'a pas de prix", () => {
+  assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 7, 1000].map(effectiveDemandBuyers), [0, 5, 5, 5, 5, 5, 6, 7, 1000]);
+  assert.throws(() => effectiveDemandBuyers(-1), RangeError);
+  assert.throws(() => effectiveDemandBuyers(1.5), RangeError);
+  const quotes = [1, 2, 3, 4, 5].map((d) => price({ s: 3, d, used: 1, total: 3, code: "3d" }));
+  // Exemple de BOOST-PRICING.md : S = 3, 1 place sur 3, durée 3d, D de 1 à 5 → demande 1 400 : 500 × 1,060 × 1,400 × 1,333 × 2,5 = 2 472,715 → grille : 2 500.
+  for (const quote of quotes) {
+    assert.deepEqual(quote.factors, { competitionMilli: 1060, demandMilli: 1400, scarcityMilli: 1333, durationMilli: 2500 });
+    assert.equal(quote.rawAmount, "2472.715000000000");
+    assert.equal(quote.amount, 2500);
+  }
+  for (let index = 1; index < quotes.length; index++) assert.deepEqual(quotes[index], quotes[0], `D = ${index + 1} identique à D = 1`);
+  const six = price({ s: 3, d: 6, used: 1, total: 3, code: "3d" });
+  assert.equal(six.factors.demandMilli, 1500);
+  assert.equal(six.rawAmount, "2649.337500000000");
+  assert.equal(six.amount, 2600);
+  assert.ok(six.amount > quotes[4].amount, "6 acheteurs : plus cher que 5");
+  // Le facteur ne redonne jamais D = 1 (1 000), 2 (1 100), 3 (1 200) ni 4 (1 300) : c'est celui de D = 5.
+  for (const hidden of [1000, 1100, 1200, 1300]) assert.notEqual(quotes[0].factors.demandMilli, hidden);
+  for (let d = 1; d < 5; d++) assert.equal(computeDemandFactor(d, DEFAULTS), computeDemandFactor(d + 1, DEFAULTS), `D = ${d} et D = ${d + 1}`);
+  assert.ok(computeDemandFactor(6, DEFAULTS) > computeDemandFactor(5, DEFAULTS));
+  // D = 4 : D' = 5, jamais 4 (le facteur de 4 acheteurs serait 1 300).
+  assert.equal(computeDemandFactor(4, DEFAULTS), 1400);
 });
 
 // ───────────── grille exhaustive reproductible contre l'oracle ─────────────

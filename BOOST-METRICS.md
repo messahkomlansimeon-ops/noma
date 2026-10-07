@@ -1,5 +1,10 @@
 # BOOST-METRICS.md — Expiration des boosts et journal d'exposition (lot 2I4)
 
+> **Mise à jour (lot M1)** : les ouvertures de la fiche d'une annonce, les contacts, les statistiques du vendeur (route `GET /api/offers/{id}/stats`, écran « Ce que produit votre annonce »),
+> l'**arrondi des comptes publiés** (« moins de 5 », « environ N », lot M1-quater) et la **rétention de 400 jours** (`npm run metrics:purge`) existent : voir `MESURES.md` (définitions exactes, dénominateurs, attribution au boost, limites).
+> Ce qui suit décrit l'état du lot 2I4 ; ses « Limites » sur l'absence de clic, de contact, de route HTTP et de purge sont levées par le lot M1, sauf la vente (toujours non mesurée).
+> `readOfferBoostExposureStats` et `npm run boost:stats` restent des lectures d'**administration** (comptes bruts, sans arrondi) ; la lecture du **vendeur** arrondit tous ses comptes.
+
 Brief SCOUTR §19 et §35, AUDIT-EVOLUTION-SCOUTR.md §6 « Mesure et économie » : le vendeur qui boost une offre doit pouvoir savoir
 ce que son boost a produit. **Ce lot est entièrement côté serveur** : aucune route HTTP, aucune interface, aucun paiement ni
 crédit, aucun clic, favori, contact, conversation, vente ni impression « réellement visible » (ils exigent les écrans), aucune
@@ -93,7 +98,7 @@ situations de 2I1 et à plusieurs instants (test différentiel).
 `viewer_id` et `demand_id` sont stockés pour dédoublonner et compter des acheteurs distincts ; **aucune lecture destinée au vendeur
 ne les renvoie** : la lecture n'expose que des comptages. La sortie sérialisée de `readOfferBoostExposureStats` et celle de
 `boost:stats` ne contiennent ni identité d'acheteur, ni identifiant de demande, ni texte métier (vérifié). Un comptage de 1
-acheteur unique identifie néanmoins le seul acheteur concerné pour qui le connaît : aucun seuil de confidentialité n'est appliqué.
+acheteur unique identifie néanmoins le seul acheteur concerné pour qui le connaît : aucun arrondi n'est appliqué dans cette lecture d'administration (la lecture du vendeur, elle, arrondit).
 
 ## Expiration automatique des boosts
 

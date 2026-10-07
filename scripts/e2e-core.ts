@@ -18,7 +18,12 @@
  * (réconciliation du grand livre, lecture seule). Scénario du lot P2-bis (portée visible) : un produit à UNE annonce et un besoin → devis 24 h
  * INDISPONIBLE (`no_visible_effect`, `inputs.reachableBuyers` = 0, aucun prix), achat refusé 409 `quote_unavailable`, aucun débit ; la commande
  * `dev:seed` (base noma_e2e) ajoute 8 annonces d'exemple de vendeurs fictifs ; devis 3 jours DISPONIBLE (`reachableBuyers` = 1) ; `dev:seed`
- * relancé : aucun doublon. Suppose un serveur lancé par `npm run dev:try` (prestataire fictif actif).
+ * relancé : aucun doublon. Scénario du lot M1 (mesures d'efficacité) : un produit à 9 annonces (celle de A + 8 d'exemple) ; la fiche d'une annonce n'est
+ * lue que par le propriétaire du besoin pour une annonce de SES correspondances (404 au corps identique pour tout autre cas, vendeur lui-même compris) ;
+ * DTO en liste blanche (ni numéro, ni identifiant) ; contact : origine vérifiée avant la session, numéro vérifié E.164 + liens tel: et wa.me, no-store ;
+ * statistiques du vendeur avec UN acheteur (« moins de 5 », aucune ligne de boost, aucun taux) puis avec CINQ acheteurs (boost d'administration : « Sponsorisé » relu ;
+ * « environ 5 » publié, aucun compte exact, aucun pourcentage sous 10 acheteurs, lot M1-quater) ; annonce en pause : contact 409, fiche 404. Suppose un serveur lancé par
+ * `npm run dev:try` (prestataire fictif actif).
  *
  * Variables (voir scripts/e2e-common.ts) : NOMA_E2E_BASE_URL (relais, défaut http://localhost:3212), NOMA_E2E_SERVER_LOG,
  * NOMA_E2E_DATABASE_URL (noma_e2e, pour boost:grant), NOMA_E2E_DIRECT_URL (Next sans relais, défaut http://127.0.0.1:3211),
@@ -43,6 +48,7 @@ import {
   E2E_SERVER_LOG,
   RelaySession,
   awaitOtpLine,
+  e2eDatabaseUrl,
   grantBoostByAdministration,
   logSize,
   loginWithOtp,
@@ -51,6 +57,11 @@ import {
   uniquePhone,
   walletCheckByAdministration,
 } from "./e2e-common";
+
+/** Un compte de 0 à 4 : « moins de 5 » (lot M1-quater, arrondi des comptes publiés). */
+const BELOW = { kind: "below", bound: 5 } as const;
+/** Un compte de 5 ou plus : « environ N » (multiple de 5). */
+const about = (value: number) => ({ kind: "approx", value }) as const;
 
 const DIRECT = (process.env.NOMA_E2E_DIRECT_URL ?? "http://127.0.0.1:3211").replace(/\/$/, "");
 const WORKER_TIMEOUT_MS = Number(process.env.NOMA_E2E_WORKER_TIMEOUT_MS ?? "300000");
@@ -576,7 +587,8 @@ async function main(): Promise<void> {
     assert.equal(created.reused, false);
     assert.ok(created.amount !== null && created.amount >= 500, `montant : ${String(created.amount)}`);
     // Lot P2-bis (S1) : `reachableBuyers` = acheteurs chez qui le boost ferait monter l'offre (ici B : 9 offres, une place mise en avant).
-    assert.deepEqual(created.inputs, { competingSellers: 1, compatibleBuyers: 1, slotsTotal: 2, slotsUsed: 0, reachableBuyers: 1, reachTruncated: false });
+    // Lots M1 à M1-quater : un compte d'acheteurs n'est jamais publié exact (« moins de 5 » de 0 à 4).
+    assert.deepEqual(created.inputs, { competingSellers: 1, compatibleBuyers: BELOW, slotsTotal: 2, slotsUsed: 0, reachableBuyers: BELOW, reachTruncated: false });
     assert.ok(created.factors);
     firstQuoteId = created.id;
     ok(
@@ -1006,8 +1018,8 @@ async function main(): Promise<void> {
     assert.equal(alone.unavailableReason, "no_visible_effect");
     assert.equal(alone.amount, null);
     assert.equal(alone.factors, null);
-    assert.equal(alone.inputs.compatibleBuyers, 1);
-    assert.equal(alone.inputs.reachableBuyers, 0);
+    assert.deepEqual(alone.inputs.compatibleBuyers, BELOW, "1 acheteur compatible : « moins de 5 »");
+    assert.deepEqual(alone.inputs.reachableBuyers, BELOW, "0 acheteur atteint : « moins de 5 » aussi (le motif no_visible_effect dit l'absence d'effet)");
     assert.equal(Date.parse(alone.expiresAt) - Date.parse(alone.computedAt), 60_000, "une cotation indisponible vaut 60 s");
     const rawAlone = await seller.fetch(`/api/offers/${reachTarget.id}/boost-quotes`, {
       method: "POST",
@@ -1015,10 +1027,11 @@ async function main(): Promise<void> {
       body: JSON.stringify({ durationCode: "24h" }),
     });
     const rawAloneText = await rawAlone.text();
-    assert.ok(rawAloneText.includes('"reachableBuyers":0'), "le DTO expose reachableBuyers");
+    assert.ok(rawAloneText.includes('"reachableBuyers":{"kind":"below","bound":5}'), "le DTO expose reachableBuyers arrondi (0 : moins de 5)");
+    assert.ok(rawAloneText.includes('"compatibleBuyers":{"kind":"below","bound":5}'), "le DTO ne porte jamais le nombre 1");
     assert.equal(rawAloneText.includes("rawAmount"), false, "aucun prix brut");
     for (const secret of [sellerId, buyerId, sellerPhone]) assert.equal(rawAloneText.includes(secret), false, "aucune identité dans le devis");
-    ok("1 annonce + 1 besoin : devis 24 h INDISPONIBLE, motif no_visible_effect, aucun prix, inputs.reachableBuyers = 0 (1 acheteur compatible mais aucune place mise en avant sous 7 offres)");
+    ok("1 annonce + 1 besoin : devis 24 h INDISPONIBLE, motif no_visible_effect, aucun prix, inputs.reachableBuyers = « moins de 5 » (1 acheteur compatible mais aucune place mise en avant sous 7 offres)");
     const refusedPurchase = await rejects(sellerApi.boostPurchases.create(reachTarget.id, { quoteId: alone.id, idempotencyKey: randomUUID() }));
     expectApiError(refusedPurchase, 409, "quote_unavailable");
     assert.equal((await sellerApi.wallet.overview({ limit: 1 })).balanceXof, TOPUP_AMOUNT - (payQuote.amount as number), "aucun débit pour un devis sans effet visible");
@@ -1042,19 +1055,247 @@ async function main(): Promise<void> {
     // Les 60 s du devis indisponible ne bloquent pas une autre durée : nouveau calcul, désormais disponible.
     const withSeed = await sellerApi.boostQuotes.create(reachTarget.id, "3d");
     assert.equal(withSeed.status, "available", `devis après dev:seed : ${withSeed.status} / ${String(withSeed.unavailableReason)}`);
-    assert.equal(withSeed.inputs.reachableBuyers, 1);
-    assert.equal(withSeed.inputs.compatibleBuyers, 1);
+    assert.deepEqual(withSeed.inputs.reachableBuyers, BELOW);
+    assert.deepEqual(withSeed.inputs.compatibleBuyers, BELOW);
     assert.equal(withSeed.inputs.competingSellers, 8);
     assert.ok(withSeed.amount !== null && withSeed.amount >= 500);
-    ok(`avec 9 offres : devis 3 jours DISPONIBLE (${withSeed.amount} FCFA), inputs.reachableBuyers = 1, 8 vendeurs concurrents`);
+    assert.equal(withSeed.factors?.demandMilli, 1400, "1 acheteur compatible : facteur demande de D' = 5 (jamais 1 000), lots M1-bis et M1-quater");
+    ok(`avec 9 offres : devis 3 jours DISPONIBLE (${withSeed.amount} FCFA), inputs.reachableBuyers = « moins de 5 » (1 acheteur), 8 vendeurs concurrents`);
     const history = await sellerApi.boostQuotes.list(reachTarget.id);
-    assert.deepEqual(history.map((quote) => [quote.durationCode, quote.status, quote.inputs.reachableBuyers]).sort(), [["24h", "unavailable", 0], ["3d", "available", 1]]);
-    ok("GET boost-quotes : l'historique porte reachableBuyers (0 puis 1)");
+    assert.deepEqual(history.map((quote) => [quote.durationCode, quote.status, quote.inputs.reachableBuyers]).sort(), [["24h", "unavailable", BELOW], ["3d", "available", BELOW]]);
+    ok("GET boost-quotes : l'historique porte reachableBuyers arrondi (« moins de 5 » dans les deux devis)");
     const again = await seedExamplesByAdministration({ category: "phones", brand: "nokia", model: reachProduct.model, offers: 8 });
     assert.match(again, /0 annonce\(s\) d'exemple publiée\(s\), 8 déjà présente\(s\) ; 0 vendeur\(s\) fictif\(s\) créé\(s\), 8 déjà présent\(s\)/);
     const afterAgain = await allMatches(buyer, reachDemand.id, "relevance");
     assert.equal(afterAgain.length, 9, "relancer dev:seed ne crée aucun doublon");
     ok("dev:seed relancé : 0 annonce créée, 8 déjà présentes, toujours 9 offres chez B");
+  });
+
+  // ─── Lot M1 : mesures d'efficacité (fiche d'annonce, contact, ouvertures, statistiques du vendeur, seuil de confidentialité) ───
+  const metricsTag = (Date.now() + 9).toString(36).slice(-5);
+  const metricsProduct = { category: "Téléphones", brand: "Motorola", model: `Razr ${metricsTag}` };
+  const metricsDemandText = `Je cherche un ${metricsProduct.brand} ${metricsProduct.model}`;
+  const NOT_FOUND = { error: { code: "resource_not_found", message: "Ressource introuvable." } };
+  let metricsOffer: OfferRecord = undefined as unknown as OfferRecord;
+  let metricsDemand: DemandRecord = undefined as unknown as DemandRecord;
+
+  /** Un besoin actif de l'acheteur pour le produit de la mesure, prêt à être comparé par le worker. */
+  const activateMetricsDemand = async (api: ReturnType<RelaySession["client"]>): Promise<DemandRecord> => {
+    const built = buildDemandInput(
+      {
+        text: metricsDemandText, category: metricsProduct.category, brand: metricsProduct.brand, model: metricsProduct.model, variant: "",
+        condition: "Occasion", location: "Abidjan", budget: "250 000", deadline: "",
+      },
+      new Date().toISOString().slice(0, 10),
+    );
+    assert.ok(built.ok);
+    const created = await api.demands.create(built.input);
+    return api.demands.activate(created.id, created.contentVersion);
+  };
+  const waitForMetricsMatches = (session: RelaySession, demandId: string) => pollUntil(
+    "les 9 offres du produit dans les résultats",
+    async () => {
+      const items = await allMatches(session, demandId, "relevance");
+      return items.length >= 9 && items.some((item) => item.candidateId === metricsOffer.id) ? items : null;
+    },
+    WORKER_TIMEOUT_MS * 2,
+  );
+  /** Réponse brute d'un POST de contact (l'origine peut être retirée) : texte, statut et en-têtes pour les contrôles de sécurité. */
+  const rawContact = async (session: RelaySession, demandId: string, offerId: string, origin?: string | null) => {
+    const response = await session.fetch(`/api/demands/${demandId}/offers/${offerId}/contact`, { method: "POST", ...(origin === undefined ? {} : { origin }) });
+    return { status: response.status, text: await response.text(), cacheControl: response.headers.get("cache-control") };
+  };
+  const statsOf = async (session: RelaySession, offerId: string) => {
+    const raw = await rawGet(session, `/api/offers/${offerId}/stats`);
+    assert.equal(raw.status, 200);
+    return { raw, stats: await session.client().offers.stats(offerId) };
+  };
+
+  await step(`Mesures (lot M1) : « ${metricsProduct.brand} ${metricsProduct.model} », A publie, dev:seed ajoute 8 annonces d'exemple, B active son besoin`, async () => {
+    const built = buildOfferInput({
+      title: `${metricsProduct.brand} ${metricsProduct.model} · offre de A`, description: "Appelez-moi au 0700000099 (ce numéro ne doit jamais sortir de la fiche).",
+      category: metricsProduct.category, brand: metricsProduct.brand, model: metricsProduct.model, variant: "", condition: "Occasion", location: "Abidjan", price: "190 000", available: true,
+    });
+    assert.ok(built.ok);
+    const created = await sellerApi.offers.create(built.input);
+    metricsOffer = await sellerApi.offers.publish(created.id, created.contentVersion);
+    const seeded = await seedExamplesByAdministration({ category: "phones", brand: "motorola", model: metricsProduct.model, offers: 8 });
+    assert.match(seeded, /8 annonce\(s\) d'exemple publiée\(s\)/);
+    metricsDemand = await activateMetricsDemand(buyerApi);
+    const seen = await waitForMetricsMatches(buyer, metricsDemand.id);
+    assert.equal(seen.length, 9);
+    ok("A : annonce publiée (190 000 FCFA, la plus chère) ; 8 annonces d'exemple ; B : besoin actif, 9 offres dans ses résultats");
+  });
+
+  await step("Fiche : accès réservé au propriétaire du besoin, pour une annonce de SES correspondances ; 404 IDENTIQUE pour tout refus (aucun parcours possible)", async () => {
+    const own = await rawGet(buyer, `/api/demands/${metricsDemand.id}/offers/${metricsOffer.id}`);
+    assert.equal(own.status, 200, "témoin : B lit la fiche de l'annonce de ses correspondances");
+    const strangerDemand = await activateMetricsDemand(rivalApi);
+    const denials: Array<[string, { status: number; text: string }]> = [
+      ["un autre acheteur (C) sur le besoin de B", await rawGet(rival, `/api/demands/${metricsDemand.id}/offers/${metricsOffer.id}`)],
+      ["B sur le besoin d'un autre (celui de C)", await rawGet(buyer, `/api/demands/${strangerDemand.id}/offers/${metricsOffer.id}`)],
+      ["B, annonce hors de ses correspondances (l'annonce iPhone 12 de A)", await rawGet(buyer, `/api/demands/${metricsDemand.id}/offers/${offer.id}`)],
+      ["le vendeur A sur le besoin de B", await rawGet(seller, `/api/demands/${metricsDemand.id}/offers/${metricsOffer.id}`)],
+      ["annonce inconnue", await rawGet(buyer, `/api/demands/${metricsDemand.id}/offers/00000000-0000-4000-8000-000000000000`)],
+    ];
+    for (const [label, denied] of denials) {
+      assert.equal(denied.status, 404, label);
+      assert.deepEqual(JSON.parse(denied.text), NOT_FOUND, label);
+      assert.equal(denied.text, denials[0][1].text, `${label} : corps identique`);
+    }
+    ok("fiche : 404 au corps strictement identique pour un autre acheteur, un besoin d'autrui, une annonce hors correspondances, le vendeur lui-même et une annonce inconnue");
+    const contactDenied = await rawContact(rival, metricsDemand.id, metricsOffer.id);
+    assert.deepEqual([contactDenied.status, JSON.parse(contactDenied.text)], [404, NOT_FOUND]);
+    assert.equal((await rawContact(seller, metricsDemand.id, metricsOffer.id)).status, 404, "le vendeur ne peut pas se contacter lui-même");
+    ok("contact : même 404 pour un autre acheteur ; le vendeur ne peut pas se contacter lui-même (404)");
+    const strangerStats = await rawGet(rival, `/api/offers/${metricsOffer.id}/stats`);
+    assert.deepEqual([strangerStats.status, strangerStats.json], [404, NOT_FOUND], "statistiques d'une annonce d'autrui : 404");
+    assert.deepEqual((await rawGet(buyer, `/api/offers/${metricsOffer.id}/stats`)).json, NOT_FOUND, "un acheteur n'a pas accès aux statistiques");
+    ok("statistiques : réservées au vendeur (404 pour un autre compte, acheteur compris)");
+  });
+
+  await step("Fiche et contact d'un acheteur : DTO en liste blanche (aucun téléphone, aucun identifiant), numéro vérifié et liens tel: / WhatsApp, origine vérifiée, no-store", async () => {
+    const response = await buyer.fetch(`/api/demands/${metricsDemand.id}/offers/${metricsOffer.id}`);
+    const text = await response.text();
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    const body = JSON.parse(text) as { contractVersion: string; item: StoredMatch & { candidateId: string }; details: { createdAt: string; attributes: unknown[] } };
+    assert.equal(body.contractVersion, "demand-offer/v1");
+    assert.equal(body.item.candidateId, metricsOffer.id);
+    assert.equal(body.item.sponsored, false, "sans boost : organique");
+    assert.deepEqual(body.details.attributes, []);
+    for (const secret of [sellerId, sellerPhone, sellerPhone.slice(4), "0700000099", "RAW_SECRET", "rawText", "ownerId"]) assert.equal(text.includes(secret), false, `la fiche ne contient pas ${secret}`);
+    ok("fiche : prix, indicateurs, « sponsored » faux ; ni identifiant, ni numéro (pas même celui écrit dans la description), ni texte brut");
+    const refusedOrigin = await rawContact(buyer, metricsDemand.id, metricsOffer.id, "https://evil.example");
+    const noOrigin = await rawContact(buyer, metricsDemand.id, metricsOffer.id, null);
+    assert.deepEqual([refusedOrigin.status, noOrigin.status], [403, 403], "origine vérifiée avant la session");
+    assert.equal((await rawContact(new RelaySession("sans session"), metricsDemand.id, metricsOffer.id)).status, 401);
+    ok("contact : origine étrangère ou absente → 403 ; sans session → 401");
+    const contact = await buyerApi.demands.contactOffer(metricsDemand.id, metricsOffer.id);
+    assert.deepEqual(contact, { phone: sellerPhone, telUrl: `tel:${sellerPhone}`, whatsappUrl: `https://wa.me/${sellerPhone.slice(1)}`, firstContact: true });
+    const rawOk = await rawContact(buyer, metricsDemand.id, metricsOffer.id);
+    assert.equal(rawOk.status, 200);
+    assert.equal(rawOk.cacheControl, "no-store", "le numéro n'est jamais mis en cache");
+    assert.equal(JSON.parse(rawOk.text).contact.firstContact, false);
+    ok(`contact : numéro vérifié ${sellerPhone.slice(0, 7)}… (E.164), « tel: » et « https://wa.me/<chiffres> », no-store ; la seconde révélation n'est pas un premier contact`);
+  });
+
+  await step("Statistiques du vendeur avec UN seul acheteur : « moins de 5 », aucun pourcentage ; le nombre exact n'apparaît nulle part", async () => {
+    const { raw, stats } = await statsOf(seller, metricsOffer.id);
+    assert.equal("privacyThreshold" in stats, false, "plus de seuil k : chaque compte porte sa borne");
+    assert.deepEqual(stats.activeMatches.needs, BELOW, "1 ou 2 besoins correspondants (B, et peut-être C) : « moins de 5 »");
+    const week = stats.periods[0];
+    for (const count of [week.opens.uniqueBuyers, week.opens.total, week.contacts.uniqueBuyers, week.contacts.reveals]) assert.deepEqual(count, BELOW);
+    // Aucun boost : aucune ligne « pendant un boost », aucune part attribuée, aucun boost (tout est organique).
+    assert.equal(week.exposure, null, "sans boost : pas d'exposition");
+    assert.equal(week.opens.attributedToBoost, null);
+    assert.equal(week.contacts.attributedToBoost, null);
+    assert.equal(week.ratios.openRate, null, "sans boost : pas de taux d'ouverture");
+    assert.deepEqual(week.ratios.contactRate, { kind: "insufficient" }, "1 ouvreur : pas assez d'acheteurs pour un pourcentage");
+    assert.deepEqual(stats.boosts, []);
+    for (const secret of [buyerId, buyerPhone, buyerPhone.slice(4), metricsDemand.id, "viewer_id", "demand_id"]) assert.equal(raw.text.includes(secret), false, `les statistiques ne contiennent pas ${secret}`);
+    assert.equal(/"value":[0-4](,|\})/.test(raw.text), false, "jamais un petit nombre exact en clair");
+    ok("1 acheteur a ouvert la fiche et contacté, sans boost : ouvertures et contacts « moins de 5 », aucune exposition, aucune part attribuée, aucun boost, aucune identité");
+  });
+
+  let metricsBoostId = "";
+  await step("Cinq acheteurs : B, D, E, F et G voient l'annonce « Sponsorisé », l'ouvrent et contactent ; le vendeur voit « environ 5 », jamais un compte exact ni un pourcentage", async () => {
+    const extraSessions = ["D", "E", "F", "G"].map((label, index) => ({ label, session: new RelaySession(`acheteur ${label}`), phone: uniquePhone(`${45 + index}`) }));
+    for (const entry of extraSessions) await loginWithOtp(entry.session, entry.phone);
+    const extraDemands: DemandRecord[] = [];
+    for (const entry of extraSessions) extraDemands.push(await activateMetricsDemand(entry.session.client()));
+    for (const [index, entry] of extraSessions.entries()) await waitForMetricsMatches(entry.session, extraDemands[index].id);
+    const grant = await grantBoostByAdministration(metricsOffer.id, "24h");
+    assert.match(grant, /Boost \(administration\)/);
+    const buyersSessions: Array<[string, RelaySession, DemandRecord]> = [["B", buyer, metricsDemand], ...extraSessions.map((entry, index): [string, RelaySession, DemandRecord] => [entry.label, entry.session, extraDemands[index]])];
+    for (const [label, session, demandOfBuyer] of buyersSessions) {
+      // La liste des résultats sert l'annonce SPONSORISÉE (le journal d'exposition la compte), puis la fiche est ouverte, puis le contact.
+      const results = await allMatches(session, demandOfBuyer.id, "relevance");
+      const served = results.find((item) => item.candidateId === metricsOffer.id);
+      assert.equal(served?.sponsored, true, `${label} : l'annonce est sponsorisée dans ses résultats`);
+      const sheet = await session.client().demands.offer(demandOfBuyer.id, metricsOffer.id);
+      assert.equal(sheet.item.sponsored, true, `${label} : la fiche porte « Sponsorisé » (relu par le serveur)`);
+      const revealed = await session.client().demands.contactOffer(demandOfBuyer.id, metricsOffer.id);
+      assert.equal(revealed.phone, sellerPhone);
+    }
+    await buyerApi.demands.offer(metricsDemand.id, metricsOffer.id); // B rouvre : le compteur monte, pas le nombre d'acheteurs
+    ok("B, D, E, F et G : annonce « sponsorisée » dans leurs résultats et sur la fiche (relu par le serveur), numéro révélé");
+    const { raw, stats } = await statsOf(seller, metricsOffer.id);
+    const week = stats.periods[0];
+    // L'annonce est neuve : 7 jours, 30 jours et depuis la publication sont les mêmes chiffres. 5 acheteurs : « environ 5 » (jamais « 5 » : un compte n'est pas publié exact).
+    assert.deepEqual(week.exposure?.buyersExposed, about(5));
+    assert.deepEqual(week.exposure?.buyersSponsored, about(5));
+    assert.deepEqual(week.opens.uniqueBuyers, about(5), "5 acheteurs distincts malgré les ouvertures répétées de B");
+    assert.deepEqual(week.opens.attributedToBoost?.uniqueBuyers, about(5), "les cinq ont ouvert après avoir vu l'annonce sponsorisée : la part attribuée est publiée « environ 5 »");
+    assert.deepEqual(week.opens.organic?.uniqueBuyers, BELOW, "0 acheteur organique : « moins de 5 » (zéro n'est pas exact)");
+    assert.deepEqual(week.contacts.uniqueBuyers, about(5));
+    // B a contacté AVANT le boost (organique), D, E, F et G après avoir vu l'annonce sponsorisée : 4 attribués, 1 organique (tous deux sous 5).
+    assert.deepEqual(week.contacts.attributedToBoost, { uniqueBuyers: BELOW });
+    assert.deepEqual(week.contacts.organic, { uniqueBuyers: BELOW });
+    assert.deepEqual(week.ratios, { openRate: { kind: "insufficient" }, contactRate: { kind: "insufficient" } }, "moins de 10 acheteurs publiés : aucun pourcentage");
+    assert.deepEqual(stats.activeMatches.needs, about(5), "5 ou 6 besoins correspondants : environ 5");
+    assert.equal(stats.boosts.length, 1);
+    const boostStats = stats.boosts[0];
+    metricsBoostId = boostStats.boostId;
+    assert.equal(boostStats.status, "effective");
+    assert.deepEqual(boostStats.exposure?.buyersExposed, about(5), "un seul boost, annonce neuve : la même valeur que les acheteurs exposés");
+    assert.deepEqual(boostStats.exposure?.buyersSponsored, about(5));
+    assert.deepEqual(boostStats.attributed?.uniqueOpeners, about(5));
+    assert.deepEqual(boostStats.attributed?.uniqueContacts, BELOW, "4 contacts attribués : moins de 5");
+    assert.deepEqual(boostStats.ratios, { openRate: { kind: "insufficient" }, contactRate: { kind: "insufficient" } });
+    for (const secret of [buyerId, buyerPhone, ...extraDemands.map((demand) => demand.id), metricsDemand.id]) assert.equal(raw.text.includes(secret), false);
+    // Aucun nombre de la réponse n'est un compte exact : seulement `bound` (5) ou `value` (multiples de 5 ou de 10).
+    for (const match of raw.text.matchAll(/"(\w+)":(-?\d+)/g)) {
+      assert.ok(match[1] === "bound" || match[1] === "value", `nombre nu : ${match[0]}`);
+      assert.equal(Number(match[2]) % 5, 0, match[0]);
+    }
+    assert.deepEqual(stats.periods[2].opens.uniqueBuyers, about(5));
+    ok("vendeur : 5 acheteurs exposés / ouvreurs / contacts publiés « environ 5 » ; parts attribuées « environ 5 » ou « moins de 5 » ; aucun pourcentage ; aucun compte exact dans la réponse");
+  });
+
+  await step("Journal des ouvertures (M1-bis) : table offer_views VERROUILLÉE, la fiche répond quand même vite (écriture après la réponse, after() de Next.js) ; l'ouverture est écrite une fois le verrou relâché", async () => {
+    const { Client } = await import("pg");
+    const locker = new Client({ connectionString: e2eDatabaseUrl() });
+    await locker.connect();
+    try {
+      const viewsOf = async (): Promise<number> =>
+        Number((await locker.query("SELECT COALESCE(sum(views), 0)::int AS n FROM offer_views WHERE offer_id = $1 AND demand_id = $2", [metricsOffer.id, metricsDemand.id])).rows[0].n);
+      const before = await viewsOf();
+      await locker.query("BEGIN");
+      await locker.query("LOCK TABLE offer_views IN ACCESS EXCLUSIVE MODE");
+      const started = Date.now();
+      const response = await buyer.fetch(`/api/demands/${metricsDemand.id}/offers/${metricsOffer.id}`);
+      await response.text();
+      const took = Date.now() - started;
+      assert.equal(response.status, 200, "la fiche répond 200 malgré le verrou");
+      // Avant le lot M1-bis, la fiche attendait le délai du journal (2 s) : ici elle ne dépend plus du journal.
+      assert.ok(took < 1500, `la fiche doit répondre sans attendre le journal verrouillé (délai de 2 s) : ${took} ms`);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      await locker.query("ROLLBACK");
+      const deadline = Date.now() + 8_000;
+      while (Date.now() < deadline && (await viewsOf()) < before + 1) await new Promise((resolve) => setTimeout(resolve, 100));
+      assert.equal(await viewsOf(), before + 1, "l'ouverture est écrite une fois le verrou relâché (dans le délai de 2 s de l'écriture)");
+      ok(`table offer_views verrouillée : la fiche répond 200 en ${took} ms (< 1 500 ms, le journal attendait 2 s avant M1-bis) ; l'ouverture est écrite après le relâchement du verrou (${before} → ${before + 1})`);
+    } finally {
+      await locker.query("ROLLBACK").catch(() => undefined);
+      await locker.end();
+    }
+  });
+
+  await step("Annonce en pause : contact refusé (409 offer_not_available, rien révélé), fiche 404 ; les ouvertures de la fiche ne comptent pas la lecture du vendeur", async () => {
+    const before = await statsOf(seller, metricsOffer.id);
+    await sellerApi.offers.pause(metricsOffer.id, metricsOffer.contentVersion);
+    const paused = await rawContact(buyer, metricsDemand.id, metricsOffer.id);
+    assert.equal(paused.status, 409);
+    assert.deepEqual(JSON.parse(paused.text), { error: { code: "offer_not_available", message: "Cette annonce n'est plus disponible." } });
+    assert.equal(paused.text.includes(sellerPhone), false, "aucun numéro dans le refus");
+    const gone = await rawGet(buyer, `/api/demands/${metricsDemand.id}/offers/${metricsOffer.id}`);
+    assert.deepEqual([gone.status, gone.json], [404, NOT_FOUND]);
+    // Le vendeur consulte ses propres statistiques et sa propre annonce : rien n'est compté comme ouverture.
+    const after = await statsOf(seller, metricsOffer.id);
+    assert.deepEqual(after.stats.periods[2].opens.total, before.stats.periods[2].opens.total, "ni la pause, ni la lecture des statistiques ne créent d'ouverture");
+    assert.equal(after.stats.boosts[0].boostId, metricsBoostId);
+    ok("pause : contact 409 offer_not_available (aucun numéro), fiche 404 ; le vendeur qui lit ses statistiques n'ajoute aucune ouverture");
   });
 
   await step("Historique long du porte-monnaie : pages de 20 suivies par curseur, sans doublon ni oubli, du plus récent au plus ancien", async () => {

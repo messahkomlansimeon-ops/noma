@@ -27,6 +27,7 @@ import {
   mergeIfCurrent,
   resultsState,
 } from "@/lib/client/match-view";
+import { offerDetailPath } from "@/lib/client/metrics-view";
 
 interface Loaded {
   demand: DemandRecord;
@@ -188,7 +189,7 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
           {state === "results" ? (
             <ul className="mt-3 space-y-3" aria-label="Offres correspondant à votre besoin">
               {loaded.items.map((item) => (
-                <BuyerMatchCard key={item.candidateId} item={item} />
+                <BuyerMatchCard key={item.candidateId} item={item} detailHref={offerDetailPath(demandId, item.candidateId)} />
               ))}
             </ul>
           ) : null}

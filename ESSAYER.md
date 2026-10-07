@@ -2,7 +2,8 @@
 
 Ce guide est écrit pour quelqu'un qui n'est pas développeur. Il explique comment ouvrir l'application dans votre
 navigateur, vous connecter, publier une annonce, exprimer un besoin, voir les correspondances, **recharger un
-porte-monnaie et acheter un boost**. **Aucun SMS n'est envoyé, aucun vrai site n'est contacté et aucun argent réel n'est
+porte-monnaie et acheter un boost**, puis **ouvrir la fiche d'une annonce, contacter le vendeur et voir ce que produit
+votre annonce**. **Aucun SMS n'est envoyé, aucun vrai site n'est contacté et aucun argent réel n'est
 utilisé** (la recharge du porte-monnaie passe par une page de paiement SIMULÉ) : c'est un essai local, entièrement simulé.
 
 ## Ce qu'il faut avoir avant
@@ -20,10 +21,11 @@ utilisé** (la recharge du porte-monnaie passe par une page de paiement SIMULÉ)
    `npm run dev:try`, voir ci-dessous). La commande ne lit aucun fichier `.env` pour la deviner, et elle refuse de démarrer
    si la base n'est pas sur **votre ordinateur** (`127.0.0.1`, `localhost` ou `::1`).
 
-   **La base d'essai doit être migrée jusqu'au bout : 17 migrations** (de `0001` à `0017`, dont le porte-monnaie `0014`,
-   l'achat de boost `0015`, la portée visible d'un devis de boost `0016` et son estimation bornée `0017`). Si votre base d'essai a
+   **La base d'essai doit être migrée jusqu'au bout : 18 migrations** (de `0001` à `0018`, dont le porte-monnaie `0014`,
+   l'achat de boost `0015`, la portée visible d'un devis de boost `0016`, son estimation bornée `0017` et les mesures d'efficacité
+   `0018` : ouvertures de la fiche et contacts). Si votre base d'essai a
    été créée avant ces lots, relancez simplement la deuxième commande ci-dessus (elle n'applique que ce qui manque). Contrôle : la
-   commande suivante doit afficher `17`.
+   commande suivante doit afficher `18`.
 
    ```
    docker exec deploy-postgres-1 psql -U noma_local -d noma_essai -tAc "select count(*) from noma_schema_migrations"
@@ -91,8 +93,8 @@ second compte (deux numéros différents, par exemple `07 00 00 00 42` et `07 00
    montrer qui sont les acheteurs : un même acheteur peut avoir plusieurs besoins, donc on ne compte pas des acheteurs ici) et, dans
    « Booster cette annonce », un devis de prix pour 24 heures, 3 jours ou 7 jours (avec le temps pendant lequel ce prix reste
    valable). Un devis n'est proposé que si le boost ferait réellement monter votre annonce chez au moins un acheteur : il indique
-   alors « Mise en avant visible auprès de X acheteur(s) » (sans jamais dire qui ; « d'au moins X » quand l'estimation a été limitée à
-   quelques dizaines de besoins : c'est un minimum). Tant que votre porte-monnaie est vide, le bouton
+   alors « Mise en avant visible auprès de X acheteur(s) » (sans jamais dire qui ; « d'environ X acheteurs, ou plus » quand l'estimation a été limitée à
+   quelques dizaines de besoins : c'est un minimum ; l'écran n'affiche jamais le nombre exact : « moins de 5 acheteurs » de 0 à 4, « environ 10 acheteurs » à partir de 5). Tant que votre porte-monnaie est vide, le bouton
    « Acheter » reste éteint et l'écran dit « Solde insuffisant (0 FCFA) », avec un bouton « Recharger ».
 6. **Vendeur** : **recharger son porte-monnaie** (paiement simulé). Appuyez sur « Recharger » (ou, depuis l'onglet « Compte » :
    « Mon porte-monnaie » puis « Recharger »), choisissez un montant (1 000, 2 000, 5 000 ou 10 000 FCFA, ou un autre montant de
@@ -111,6 +113,23 @@ second compte (deux numéros différents, par exemple `07 00 00 00 42` et `07 00
 8. **Acheteur** : sur la page de ses résultats, appuyez sur « Actualiser » : l'annonce boostée remonte avec le badge **« Sponsorisé »**
    (grâce aux annonces d'exemple de l'étape 4 : sans elles, la liste compte trop peu d'offres et aucune place n'est mise en avant).
    Un boost n'est ni une garantie de position, ni une garantie de vente.
+9. **Acheteur** : **ouvrir la fiche d'une annonce et contacter le vendeur**. Dans les résultats, chaque carte a un bouton « Voir l'annonce » :
+   la fiche montre le titre, le prix, l'état, la localisation, la compatibilité, les indicateurs en mots simples, le badge « Sponsorisé »
+   quand il y a lieu et la date de l'annonce, **sans jamais montrer le numéro du vendeur**. « Contacter le vendeur » révèle alors son
+   numéro vérifié, avec un bouton « Appeler » et un lien WhatsApp, et dit : « Le vendeur verra que vous l'avez contacté via noma. »
+   (le vendeur voit un compteur, jamais votre nom ni votre numéro). On ne peut ouvrir que les annonces de **ses propres
+   correspondances** ; une annonce mise en pause, retirée ou vendue n'est plus joignable (« Cette annonce n'est plus disponible ») et
+   un même acheteur peut joindre au plus **20 vendeurs différents par jour**.
+10. **Vendeur** : sur l'annonce, la section **« Ce que produit votre annonce »** montre, sur 7 jours, 30 jours et depuis la publication,
+    les besoins correspondants, les acheteurs qui ont **ouvert** l'annonce et ceux qui vous ont **contacté** ; **sans boost**, l'écran dit
+    « Aucun boost sur cette annonce : tout est organique. » et ne montre aucune ligne « pendant un boost » ni « attribué au boost ». **Avec un boost**, il ajoute
+    les apparitions dans les résultats (pendant le boost), la part attribuée au boost (l'acheteur avait vu l'annonce sponsorisée dans les 7 jours qui précèdent), la
+    part organique, puis, par boost, ses chiffres et deux taux. **L'écran n'affiche jamais un compte exact** : **« moins de 5 »** de 0 à 4 acheteurs (zéro compris), **« environ 5 »** de 5 à 8,
+    **« environ 10 »** de 9 à 12, puis le multiple de 5 le plus proche ; un pourcentage s'affiche « environ 70 % » (dizaine de pour cent, calculé sur les nombres affichés) et n'existe que si les deux
+    nombres affichés valent au moins 10, sinon « pas assez d'acheteurs pour un pourcentage ». Une phrase sous les chiffres le rappelle : « Pour protéger les acheteurs, les chiffres sont arrondis à 5 près et les petits nombres ne sont pas
+    détaillés. » Pour voir des « environ N », créez **cinq comptes acheteurs** (autres fenêtres de navigation privée) qui activent un besoin pour le même produit, ouvrent la fiche et contactent le vendeur, puis appuyez sur
+    « Actualiser » sous « Ce que produit votre annonce » : avec un à quatre acheteurs, tout reste « moins de 5 » ; à partir de cinq, « environ 5 » apparaît (`MESURES.md`).
+    « Ouverture » veut dire que la page de l'annonce a été servie, pas qu'elle a été lue ; aucune vente n'est mesurée (`MESURES.md`).
 
 ## La recherche rapide de la page d'accueil
 
@@ -123,6 +142,7 @@ n'appelle aucune intelligence artificielle et ne demande aucun contrôle anti-ro
 - **Prix** : « en dessous du marché », « dans la moyenne », « au-dessus du marché » ou « marché insuffisant pour comparer ».
 - **Disponibilité** : « confirmée récemment », « à reconfirmer », « non renseignée »…
 - **Confiance** : élevée, moyenne ou faible, d'après l'ancienneté du compte et le soin apporté à l'annonce.
+- **Voir l'annonce / Contacter le vendeur** : la fiche d'une annonce de vos correspondances ; le numéro du vendeur n'apparaît qu'après « Contacter le vendeur ».
 - **Sponsorisé** : le vendeur a payé pour mettre son offre en avant, **mais seulement parmi des offres déjà pertinentes** ; cela ne
   rend jamais une offre qui ne convient pas plus visible qu'une offre qui convient. (Dans cet essai, le « paiement » est simulé :
   aucun argent réel.)
@@ -130,6 +150,8 @@ n'appelle aucune intelligence artificielle et ne demande aucun contrôle anti-ro
 ## Arrêter
 
 Dans le terminal : **Ctrl+C**. Tout s'arrête (le serveur, le worker et le relais). Vos données restent dans la base d'essai.
+Les mesures (ouvertures, contacts, apparitions) sont conservées 400 jours ; `npm run metrics:purge` (simulation par défaut,
+`-- --apply` pour supprimer) retire les lignes plus anciennes (`MESURES.md`).
 
 ## Si quelque chose ne marche pas
 
@@ -145,6 +167,10 @@ Dans le terminal : **Ctrl+C**. Tout s'arrête (le serveur, le worker et le relai
 | « dev:seed : refus — … » | La commande d'exemple n'écrit que dans une base d'essai de votre ordinateur, hors production : lisez la raison affichée (NODE_ENV, DATABASE_URL absente ou distante, base autre que `noma_essai`, `noma_e2e` ou `noma_essai_…`, ou un texte `--category`, `--brand` ou `--model` qui contient un caractère de contrôle, de direction de texte ou invisible comme U+200B : retapez-le sans copier-coller). |
 | « Vérification impossible pour le moment, réessayez dans un instant. » | La base était trop lente pour vérifier à temps qu'un acheteur verrait votre annonce monter (rien n'a été écrit ni débité) : réessayez dans quelques secondes (pour un achat, « Confirmer l'achat » réutilise la même clé : vous ne serez débité qu'une fois). |
 | « Trop de devis demandés en peu de temps » | Au plus 20 prix calculés par minute pour un même vendeur : patientez une minute. |
+| « Cette annonce n'est plus disponible pour votre besoin, ou elle n'existe pas. » | La fiche n'est servie que pour une annonce de vos correspondances actuelles : retournez aux résultats de votre besoin et « Actualiser ». |
+| « Cette annonce n'est plus disponible : le vendeur l'a mise en pause, retirée ou vendue. Aucun contact n'a été enregistré. » | Rien n'a été révélé : revenez plus tard ou choisissez une autre annonce. |
+| « Vous avez déjà contacté 20 vendeurs aujourd'hui. Réessayez demain. » | Limite de 20 vendeurs différents par jour et par acheteur (jour UTC) ; un vendeur déjà contacté reste joignable. |
+| « moins de 5 » à la place d'un nombre d'acheteurs, « pas assez d'acheteurs pour un pourcentage » | Normal : un compte exact n'est jamais publié (protection des acheteurs) : « moins de 5 » de 0 à 4, « environ N » ensuite (arrondi à 5 près). Il faut au moins 5 acheteurs distincts pour voir « environ 5 », et des nombres affichés d'au moins 10 pour voir un pourcentage. |
 | « Solde insuffisant » sous « Acheter » | Rechargez votre porte-monnaie (« Recharger »), puis revenez à l'annonce. |
 | « Ce devis a expiré » | Un prix ne vaut que quelques minutes : appuyez sur « Demander un nouveau devis ». |
 | « NODE_ENV vaut … : dev:try ne démarre jamais hors développement » | Une variable `NODE_ENV` est définie dans votre terminal : retirez-la (`unset NODE_ENV`) ou mettez `NODE_ENV=development`. |

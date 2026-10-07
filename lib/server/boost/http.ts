@@ -9,6 +9,7 @@ import { CatalogValidationError } from "../catalog/errors";
 import { checkPostOrigin, noStoreJsonResponse, readJsonBodyCapped, readSingleCookie } from "../http/protection";
 import { getPostgresPool } from "../postgres/client";
 import { BOOST_DURATION_CODES, BOOST_QUOTE_RATE_WINDOW_SECONDS, BOOST_REACH_RETRY_AFTER_SECONDS, type BoostDurationCode } from "./boost-config";
+import { roundCount, type StatCount } from "../metrics/privacy";
 import { BoostError } from "./boosts";
 import { listOfferBoostQuotes, quoteOfferBoost, type BoostQuote, type BoostQuoteHistoryItem } from "./quotes";
 
@@ -17,8 +18,11 @@ import { listOfferBoostQuotes, quoteOfferBoost, type BoostQuote, type BoostQuote
  * achat, paiement, crédit ni réservation de place. Voir BOOST-HTTP.md.
  */
 
-/** Version du contrat de réponse (champ `contractVersion`). */
-export const BOOST_QUOTE_CONTRACT_VERSION = "boost-quote/v1";
+/**
+ * Version du contrat de réponse (champ `contractVersion`). v2 (lots M1 à M1-quater) : les comptes d'ACHETEURS uniques `inputs.compatibleBuyers` et `inputs.reachableBuyers`
+ * sont arrondis : `{ kind: "below", bound: 5 }` de 0 à 4 acheteurs, sinon `{ kind: "approx", value }` (multiple de 5 le plus proche). Jamais le compte exact.
+ */
+export const BOOST_QUOTE_CONTRACT_VERSION = "boost-quote/v2";
 
 /** Même plafond de corps que le catalogue. */
 export const BOOST_HTTP_BODY_MAX_BYTES = CATALOG_HTTP_BODY_MAX_BYTES;
@@ -93,7 +97,14 @@ interface BoostQuoteDto {
   unavailableReason: BoostQuote["unavailableReason"];
   factors: { competitionMilli: number; demandMilli: number; scarcityMilli: number; durationMilli: number } | null;
   inputs: {
-    competingSellers: number; compatibleBuyers: number; reachableBuyers: number | null; reachTruncated: boolean; slotsTotal: number; slotsUsed: number;
+    competingSellers: number;
+    /** Acheteurs uniques compatibles : « moins de 5 » de 0 à 4, sinon « environ N » (arrondi à 5 près). */
+    compatibleBuyers: StatCount;
+    /** Acheteurs uniques chez qui le boost ferait monter l'annonce (même arrondi) ; `null` : non évalué. */
+    reachableBuyers: StatCount | null;
+    reachTruncated: boolean;
+    slotsTotal: number;
+    slotsUsed: number;
   };
   computedAt: string;
   expiresAt: string;
@@ -116,8 +127,8 @@ function quoteDto(quote: BoostQuote | BoostQuoteHistoryItem): BoostQuoteDto {
     },
     inputs: {
       competingSellers: quote.inputs.competingSellers,
-      compatibleBuyers: quote.inputs.compatibleBuyers,
-      reachableBuyers: quote.inputs.reachableBuyers,
+      compatibleBuyers: roundCount(quote.inputs.compatibleBuyers),
+      reachableBuyers: quote.inputs.reachableBuyers === null ? null : roundCount(quote.inputs.reachableBuyers),
       reachTruncated: quote.inputs.reachTruncated,
       slotsTotal: quote.inputs.slotsTotal,
       slotsUsed: quote.inputs.slotsUsed,

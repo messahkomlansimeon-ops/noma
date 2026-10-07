@@ -55,6 +55,9 @@ dernier job `completed`, ainsi que les boosts (`boosts.effective` : effectifs ma
 `npm run boost:stats -- --offer <uuid>` (statistiques d'exposition d'une offre, lecture seule, voir `BOOST-METRICS.md`). Elles sortent en code 1 sur un
 refus ou une erreur, avec un texte fixe.
 
+**Rétention des mesures (lot M1)** : `npm run metrics:purge` (simulation par défaut ; `-- --apply` supprime) retire les lignes de `boost_exposures`, `offer_views` et `offer_contacts`
+de plus de 400 jours (jour UTC) ; elle ne s'exécute que si `NODE_ENV` est absent, `development` ou `test` (casse exacte : « Production » est refusé), et `NODE_ENV=production` exige `NOMA_METRICS_PURGE_PRODUCTION=1` (refus sinon, simulation comprise). À planifier (une fois par jour suffit) ; voir `MESURES.md`.
+
 Les événements `ignored` d'un autre code que `job_integrity_conflict` sont comptés mais n'avertissent pas. Si le
 schéma n'est pas prêt, seules les informations de schéma sont rapportées (les tables de matching peuvent manquer).
 

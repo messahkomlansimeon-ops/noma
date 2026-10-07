@@ -335,10 +335,18 @@ describe("pagination « Voir plus » et états", () => {
 
   test("côté vendeur : on compte des BESOINS, jamais des acheteurs (un acheteur peut avoir plusieurs besoins)", () => {
     assert.equal(matchingNeedsLabel(0, false), "Aucun besoin d'acheteur ne correspond pour le moment");
-    assert.equal(matchingNeedsLabel(1, false), "1 besoin d'acheteur correspond à votre annonce");
-    assert.equal(matchingNeedsLabel(2, false), "2 besoins d'acheteurs correspondent à votre annonce");
-    assert.equal(matchingNeedsLabel(3, false), "3 besoins d'acheteurs correspondent à votre annonce");
+    // Lot M1-quater (R6) : le titre suit l'arrondi des statistiques : « Moins de 5 besoins … » de 1 à 4, « Environ N besoins … » à partir de 5 (la liste, elle, reste affichée).
+    for (const count of [1, 2, 3, 4]) assert.equal(matchingNeedsLabel(count, false), "Moins de 5 besoins d'acheteurs correspondent à votre annonce", String(count));
+    assert.equal(matchingNeedsLabel(5, false), "Environ 5 besoins d'acheteurs correspondent à votre annonce");
+    assert.equal(matchingNeedsLabel(8, false), "Environ 10 besoins d'acheteurs correspondent à votre annonce");
+    assert.equal(matchingNeedsLabel(12, false), "Environ 10 besoins d'acheteurs correspondent à votre annonce");
+    assert.equal(matchingNeedsLabel(13, false), "Environ 15 besoins d'acheteurs correspondent à votre annonce");
+    assert.equal(matchingNeedsLabel(102, false), "Environ 100 besoins d'acheteurs correspondent à votre annonce");
+    // Tant qu'il reste des pages le nombre est un minimum : « Au moins N », N arrondi vers le bas (jamais plus que la réalité), jamais le nombre exact.
     assert.equal(matchingNeedsLabel(20, true), "Au moins 20 besoins d'acheteurs correspondent à votre annonce");
+    assert.equal(matchingNeedsLabel(27, true), "Au moins 25 besoins d'acheteurs correspondent à votre annonce");
+    assert.equal(matchingNeedsLabel(3, true), "Plusieurs besoins d'acheteurs correspondent à votre annonce");
+    for (const count of [1, 2, 3, 4, 5, 8, 12, 27]) assert.equal(/moins de 3|\b(1|2|3|4|8|12|27) besoin/i.test(matchingNeedsLabel(count, false)), false);
     for (const [count, more] of [[0, false], [1, false], [2, false], [7, true]] as const) {
       const label = matchingNeedsLabel(count, more);
       assert.equal(/acheteurs? intéressés?/.test(label), false, label);

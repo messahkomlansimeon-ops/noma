@@ -22,7 +22,7 @@ Tests : `npm run test:boost-pricing` (pur), `npm run test:boost-quotes` (base `T
 | Facteur | Définition | Réglage |
 | --- | --- | --- |
 | concurrence | `min(competition_max, 1000 + competition_step × S)` ; **S** = vendeurs AUTRES distincts ayant au moins une offre éligible dans le périmètre (les doublons d'un même vendeur ne gonflent rien, les offres du vendeur coté ne comptent pas) | 20 / 1 500 |
-| demande | `min(demand_max, 1000 + demand_step × (D − 1))` ; **D ≥ 1** = acheteurs compatibles distincts | 100 / 3 000 |
+| demande | `min(demand_max, 1000 + demand_step × (D' − 1))` ; **D ≥ 1** = acheteurs compatibles distincts, **D'** = D lissé (voir « D' » ci-dessous) | 100 / 3 000 |
 | rareté | `1000 + floor((scarcity_max − 1000) × used / total)`, défini seulement si `0 ≤ used < total` | 2 000 |
 | durée | `duration_24h_milli`, `duration_3d_milli` ou `duration_7d_milli` (croissants) | 1 000 / 2 500 / 5 000 |
 
@@ -39,12 +39,32 @@ multiples de la grille (CHECK en base, `validatePricingSettings` en code), le mo
 arrondi, puis l'arrondi, donnerait le même résultat tant que les bornes sont des multiples de la grille ; interdire les bornes
 hors grille est donc la protection).
 
+### D' : le facteur demande ne redonne jamais un petit nombre d'acheteurs (lots M1-bis et M1-quater)
+
+Le nombre d'acheteurs compatibles est publié arrondi dans les devis (« moins de 5 » de 0 à 4, sinon « environ N » : `MESURES.md`), mais le facteur demande et le prix qui
+s'affichent (« +10 % sur le prix ») permettaient de retrouver D (`demandMilli = 1100` ⇒ D = 2). Le facteur est donc calculé avec **D'** :
+
+| D | D' |
+| --- | --- |
+| 0 | 0 (aucun prix : la cotation est indisponible, `no_compatible_buyer`) |
+| 1, 2, 3, 4 ou 5 | **5** (le facteur est celui de 5 acheteurs : `1000 + 100 × 4 = 1 400` avec les réglages par défaut) |
+| 6 et plus | D (inchangé) |
+
+Le prix pour 1 à 5 acheteurs est **identique** (lot M1-quater ; M1-bis : 1 à 3 acheteurs, D' = 3). L'écran et le DTO (`factors.demandMilli`) portent le facteur calculé sur D' ; la cotation enregistrée (`boost_quotes`)
+garde **D exact** (`compatible_buyers`, pour l'administration) et le facteur de D' (`demand_milli`). Un devis écrit avant le lot M1-quater garde son facteur d'alors (un devis
+« 1 à 3 acheteurs » écrit sous M1-bis a un facteur de 1 200). **Limite assumée** : à partir de 6 acheteurs, le prix reste fonction du nombre exact (`demandMilli = 1500` ⇒ D = 6) :
+le prix laisse retrouver D dès 6, même si le compte publié est « environ 5 » (6 à 8) ; ce que le prix ne donne jamais, c'est un nombre de 1 à 4 acheteurs, ni la différence entre 1 et 5.
+
+Exemple (S = 3, 1 place utilisée sur 3, durée 3d, réglages par défaut) : D de 1 à 5 → demande **1 400** ; brut `500 × 1,060 × 1,400 × 1,333 × 2,500 = 2 472,715`, arrondi à la grille de 100 :
+**2 500 XOF** pour les cinq (avant M1-quater : D de 1 à 3 → 1 200, brut 2 119,47, 2 100 ; avant M1-bis : D = 1 → 1 000, 1 800 ; D = 2 → 1 100, 1 900 ; D = 3 → 1 200, 2 100). D = 6 → demande 1 500, brut 2 649,3375 :
+**2 600 XOF** ; D = 7 → demande 1 600 : 2 800 XOF (exemple ci-dessous).
+
 ### Exemple de contrôle (réglages par défaut)
-S = 3, D = 4, 1 place utilisée sur 3, durée 3d : concurrence `1000 + 20 × 3 = 1 060`, demande `1000 + 100 × 3 = 1 300`, rareté
-`1000 + floor(1000 × 1 / 3) = 1 333`, durée 2 500. Brut `500 × 1,060 × 1,300 × 1,333 × 2,500 = 2 296,0925`, arrondi à la grille de
-100 : **2 300 XOF**. Pour la même situation : 24h → brut 918,437 → 900 ; 7d → brut 4 592,185 → 4 600. Quelques repères
+S = 3, D = 7, 1 place utilisée sur 3, durée 3d : concurrence `1000 + 20 × 3 = 1 060`, demande `1000 + 100 × 6 = 1 600`, rareté
+`1000 + floor(1000 × 1 / 3) = 1 333`, durée 2 500. Brut `500 × 1,060 × 1,600 × 1,333 × 2,500 = 2 825,96`, arrondi à la grille de
+100 : **2 800 XOF**. Pour la même situation : 24h → brut 1 130,384 → 1 100 ; 7d → brut 5 651,92 → 5 700. Quelques repères
 supplémentaires (testés) : un brut de 2 250 s'arrondit à 2 300 (demi-haut), 2 248,5 à 2 200 ; un brut de 450 avec min 1 000 donne
-1 000 ; un brut de 374 850 avec max 50 000 donne 50 000.
+1 000 (avec un seul acheteur compatible, D' = 5 porterait ce brut à 630, le minimum de 1 000 l'emportant toujours) ; un brut de 374 850 avec max 50 000 donne 50 000.
 
 ## Configuration versionnée (`boost_pricing_settings`)
 

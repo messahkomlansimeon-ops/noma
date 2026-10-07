@@ -77,3 +77,14 @@ export const BOOST_REACH_QUEUE_WAIT_MS = 5_000;
 
 /** `Retry-After` (secondes) d'une vérification de portée non terminée à temps (`reach_check_unavailable`, lot P3-bis) : court, la nouvelle tentative est légère. */
 export const BOOST_REACH_RETRY_AFTER_SECONDS = 2;
+
+/**
+ * Revérification de la portée d'un devis RÉUTILISÉ (lot M1, réserve du lot P3-bis) : le résultat « atteignable » est gardé en mémoire
+ * `BOOST_REUSE_RECHECK_CACHE_MS` par devis, et les revérifications réellement calculées sont limitées à `BOOST_REUSE_RECHECK_LIMIT` par vendeur sur
+ * `BOOST_REUSE_RECHECK_WINDOW_MS` (au-delà : `rate_limited`, 429). Par processus, comme le créneau de calcul de portée qu'elles protègent.
+ */
+export const BOOST_REUSE_RECHECK_CACHE_MS = 10_000;
+export const BOOST_REUSE_RECHECK_LIMIT = 60;
+export const BOOST_REUSE_RECHECK_WINDOW_MS = 60_000;
+/** Bornes de la mémoire (entrées de devis, vendeurs suivis) : jamais de croissance sans fin. */
+export const BOOST_REUSE_RECHECK_MAX_ENTRIES = 5_000;

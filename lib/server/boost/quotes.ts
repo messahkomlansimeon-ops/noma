@@ -12,6 +12,7 @@ import {
   type BoostDurationCode,
 } from "./boost-config";
 import { createReachGate, type ReachGate } from "./gate";
+import { processReuseRecheckGuard, type ReuseRecheckGuard } from "./recheck-guard";
 import {
   BOOST_ELIGIBLE_OFFER_SQL, BoostError, boostEffectiveSql, completeScope, computeSellerLimit, computeSlots, loadOfferFacts,
   readBoostSettings, withReadOnlySnapshot, type BoostScope,
@@ -98,6 +99,8 @@ export interface BoostQuoteTestHooks {
   reachQueueWaitMs?: number;
   /** Réservé aux tests (lot P3-bis) : budget (ms) de la revérification de la portée d'un devis « disponible » réutilisé. */
   reuseReachBudgetMs?: number;
+  /** Réservé aux tests (lot M1) : mémoire du résultat « atteignable » et limite de revérifications (par défaut celles du processus). */
+  reuseRecheckGuard?: ReuseRecheckGuard;
 }
 
 // ───────────── validations (avant tout SQL) ─────────────
@@ -416,6 +419,11 @@ export async function quoteOfferBoost(input: {
   if (early.reusable) {
     const candidate = early.reusable;
     if (candidate.status !== "available") return { ...mapQuote(candidate), reused: true };
+    // Lot M1 : un devis vérifié ATTEIGNABLE il y a moins de 10 s est renvoyé sans nouvelle vérification (les résultats non atteignable ou indéterminé ne sont
+    // jamais retenus) ; chaque revérification réellement calculée compte dans la limite du vendeur (60 par minute, `rate_limited`).
+    const guard = hooks?.reuseRecheckGuard ?? processReuseRecheckGuard;
+    if (guard.isFresh(candidate.id)) return { ...mapQuote(candidate), reused: true };
+    if (!guard.tryAcquire(ownerId)) throw new BoostError("rate_limited");
     const release = await (hooks?.reachGate ?? processReachGate).acquire(hooks?.reachQueueWaitMs ?? BOOST_REACH_QUEUE_WAIT_MS);
     let recheck: BoostReach;
     try {
@@ -425,7 +433,10 @@ export async function quoteOfferBoost(input: {
     } finally {
       release();
     }
-    if (recheck.reachableBuyers > 0) return { ...mapQuote(candidate), reused: true };
+    if (recheck.reachableBuyers > 0) {
+      guard.remember(candidate.id);
+      return { ...mapQuote(candidate), reused: true };
+    }
     if (isReachUndetermined(recheck)) throw new BoostError("reach_check_unavailable");
     staleQuoteId = candidate.id;
     verified = recheck;

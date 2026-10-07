@@ -1,3 +1,4 @@
+import { COUNT_ROUNDING_BASE } from "../metrics/config";
 import type { BoostDurationCode } from "./boost-config";
 
 /**
@@ -99,10 +100,21 @@ export function computeCompetitionFactor(competingSellers: number, settings: Boo
   return Math.min(settings.competitionMaxMilli, 1000 + settings.competitionStepMilli * competingSellers);
 }
 
-/** min(demand_max, 1000 + demand_step × (D − 1)). D ≥ 1 acheteurs compatibles distincts. */
+/**
+ * D' : le nombre d'acheteurs utilisé par le facteur demande (lots M1-bis et M1-quater). Le facteur ne doit pas redonner un petit nombre d'acheteurs
+ * (moins de 5, la borne de « moins de 5 » des devis) à qui connaît la formule : D' = 0 si D = 0 (aucun prix), D' = 5 pour 1 à 5 acheteurs (le prix est identique),
+ * D' = D au-delà (limite assumée : à partir de 6 acheteurs, le prix reste fonction du nombre exact, MESURES.md). La cotation enregistrée garde D exact pour
+ * l'administration ; seul le prix et le facteur affiché passent par D'.
+ */
+export function effectiveDemandBuyers(compatibleBuyers: number): number {
+  requireIntegerInRange(compatibleBuyers, 0, 1_000_000_000, "compatibleBuyers");
+  return compatibleBuyers === 0 ? 0 : Math.max(compatibleBuyers, COUNT_ROUNDING_BASE);
+}
+
+/** min(demand_max, 1000 + demand_step × (D' − 1)). D ≥ 1 acheteurs compatibles distincts (au moins 1 : sans acheteur il n'y a pas de prix) ; D' : voir `effectiveDemandBuyers`. */
 export function computeDemandFactor(compatibleBuyers: number, settings: BoostPricingSettings): number {
   requireIntegerInRange(compatibleBuyers, 1, 1_000_000_000, "compatibleBuyers");
-  return Math.min(settings.demandMaxMilli, 1000 + settings.demandStepMilli * (compatibleBuyers - 1));
+  return Math.min(settings.demandMaxMilli, 1000 + settings.demandStepMilli * (effectiveDemandBuyers(compatibleBuyers) - 1));
 }
 
 /** 1000 + floor((scarcity_max − 1000) × used / total), défini seulement si 0 ≤ used < total. */

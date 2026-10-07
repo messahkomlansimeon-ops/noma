@@ -8,6 +8,7 @@ import type { DemandRecord, OfferRecord } from "../../lib/server/catalog/types";
 import { BOOST_QUOTE_LOCK_NAMESPACE } from "../../lib/server/boost/boost-config";
 import { grantOfferBoost } from "../../lib/server/boost/boosts";
 import { processReachGate } from "../../lib/server/boost/quotes";
+import { processReuseRecheckGuard } from "../../lib/server/boost/recheck-guard";
 import {
   BOOST_QUOTE_CONTRACT_VERSION, createBoostHttpHandlers, type BoostHttpHandlers, type BoostHttpDependencies,
 } from "../../lib/server/boost/http";
@@ -131,10 +132,15 @@ const post = async (offerId: string, options: CallOptions = {}): Promise<Reply> 
 const list = async (offerId: string, query = "", options: CallOptions = {}): Promise<Reply> =>
   reply(await (options.handlers ?? handlers).quotes.list(build("GET", `/api/offers/${offerId}/boost-quotes${query}`, options), offerId));
 
+/** Compte d'acheteurs uniques du DTO (lots M1 à M1-quater, contrat boost-quote/v2) : « moins de 5 » de 0 à 4, sinon « environ N » (multiple de 5). */
+type Buyers = { kind: "below"; bound: number } | { kind: "approx"; value: number };
+const buyers = (value: number): Buyers => ({ kind: "approx", value });
+const BELOW: Buyers = { kind: "below", bound: 5 };
+
 interface QuoteDto {
   id: string; durationCode: string; currency: string; status: string; amount: number | null; unavailableReason: string | null;
   factors: { competitionMilli: number; demandMilli: number; scarcityMilli: number; durationMilli: number } | null;
-  inputs: { competingSellers: number; compatibleBuyers: number; reachableBuyers: number | null; reachTruncated: boolean; slotsTotal: number; slotsUsed: number };
+  inputs: { competingSellers: number; compatibleBuyers: Buyers; reachableBuyers: Buyers | null; reachTruncated: boolean; slotsTotal: number; slotsUsed: number };
   computedAt: string; expiresAt: string; reused?: boolean; expired?: boolean;
 }
 
@@ -441,7 +447,7 @@ test("201 à la création, 200 en réutilisation (même id, reused true), 201 po
   assert.equal(quoteOf(first).reused, false);
   assert.equal(quoteOf(first).status, "available");
   assert.equal(quoteOf(first).durationCode, "24h");
-  assert.equal(quoteOf(first).amount, 500, "monde minimal : base 500, tous les facteurs à 1000");
+  assert.equal(quoteOf(first).amount, 700, "monde minimal : base 500 × demande 1,4 (un acheteur compatible : D' = 5, lot M1-quater ; avant : 1,2 puis 1,0)");
   const second = await post(offer.id, { body: { durationCode: "24h" } });
   assert.equal(second.status, 200);
   assert.equal(quoteOf(second).reused, true);
@@ -451,7 +457,7 @@ test("201 à la création, 200 en réutilisation (même id, reused true), 201 po
   const threeDays = await post(offer.id, { body: { durationCode: "3d" } });
   assert.equal(threeDays.status, 201);
   assert.notEqual(quoteOf(threeDays).id, quoteOf(first).id);
-  assert.equal(quoteOf(threeDays).amount, 1300, "500 × 2,5 = 1 250 arrondi à la grille de 100 (demi-haut)");
+  assert.equal(quoteOf(threeDays).amount, 1800, "500 × 2,5 × 1,4 (D' = 5) = 1 750 : pile à mi-grille de 100, arrondi demi-haut à 1 800 (avant M1-quater : 1 500 ; avant M1-bis : 1 250 arrondi à 1 300)");
   assert.equal(await count(), 2);
   // Plafond de corps : un corps valide de EXACTEMENT 32 768 octets est accepté (le plafond du catalogue, atteint mais non dépassé).
   const atCap = await post(offer.id, { raw: padded('{"durationCode":"7d"}', BODY_CAP_BYTES) });
@@ -481,7 +487,7 @@ test("cotation indisponible (plus de place, aucun acheteur) : 201 avec status un
   assert.equal(quoteOf(full).unavailableReason, "no_slot_available");
   assert.equal(quoteOf(full).amount, null);
   assert.equal(quoteOf(full).factors, null);
-  assert.deepEqual(quoteOf(full).inputs, { competingSellers: 1, compatibleBuyers: 1, reachableBuyers: null, reachTruncated: false, slotsTotal: 1, slotsUsed: 1 });
+  assert.deepEqual(quoteOf(full).inputs, { competingSellers: 1, compatibleBuyers: BELOW, reachableBuyers: null, reachTruncated: false, slotsTotal: 1, slotsUsed: 1 });
   assert.equal(quoteOf(full).reused, false);
   assert.equal(Date.parse(quoteOf(full).expiresAt) - Date.parse(quoteOf(full).computedAt), 60_000, "validité courte d'une indisponibilité");
   const again = await post(mine.id, { body: { durationCode: "3d" } });
@@ -498,7 +504,7 @@ test("cotation indisponible (plus de place, aucun acheteur) : 201 avec status un
   assert.equal(quoteOf(lonely).unavailableReason, "no_compatible_buyer");
   assert.equal(quoteOf(lonely).amount, null);
   assert.equal(quoteOf(lonely).factors, null);
-  assert.deepEqual(quoteOf(lonely).inputs, { competingSellers: 0, compatibleBuyers: 0, reachableBuyers: 0, reachTruncated: false, slotsTotal: 1, slotsUsed: 0 });
+  assert.deepEqual(quoteOf(lonely).inputs, { competingSellers: 0, compatibleBuyers: BELOW, reachableBuyers: BELOW, reachTruncated: false, slotsTotal: 1, slotsUsed: 0 });
   assert.deepEqual(keys(quoteOf(lonely)), POST_KEYS, "mêmes clés qu'une cotation disponible");
   const history = await list(offer.id);
   assert.equal(history.status, 200);
@@ -520,7 +526,7 @@ test("portée visible (lot P2-bis) : liste de 6 offres → 201 unavailable no_vi
   assert.equal(quoteOf(useless).unavailableReason, "no_visible_effect");
   assert.equal(quoteOf(useless).amount, null);
   assert.equal(quoteOf(useless).factors, null);
-  assert.deepEqual(quoteOf(useless).inputs, { competingSellers: 0, compatibleBuyers: 1, reachableBuyers: 0, reachTruncated: false, slotsTotal: 1, slotsUsed: 0 });
+  assert.deepEqual(quoteOf(useless).inputs, { competingSellers: 0, compatibleBuyers: BELOW, reachableBuyers: BELOW, reachTruncated: false, slotsTotal: 1, slotsUsed: 0 });
   assert.deepEqual(keys(quoteOf(useless)), POST_KEYS);
   assert.deepEqual(keys(quoteOf(useless).inputs), INPUT_KEYS);
   assert.equal(Date.parse(quoteOf(useless).expiresAt) - Date.parse(quoteOf(useless).computedAt), 60_000);
@@ -530,8 +536,8 @@ test("portée visible (lot P2-bis) : liste de 6 offres → 201 unavailable no_vi
   assert.equal(useful.status, 201);
   assert.equal(quoteOf(useful).status, "available");
   assert.equal(quoteOf(useful).unavailableReason, null);
-  assert.deepEqual(quoteOf(useful).inputs, { competingSellers: 0, compatibleBuyers: 1, reachableBuyers: 1, reachTruncated: false, slotsTotal: 1, slotsUsed: 0 });
-  assert.equal(quoteOf(useful).amount, 500);
+  assert.deepEqual(quoteOf(useful).inputs, { competingSellers: 0, compatibleBuyers: BELOW, reachableBuyers: BELOW, reachTruncated: false, slotsTotal: 1, slotsUsed: 0 });
+  assert.equal(quoteOf(useful).amount, 700, "base 500 × demande 1,4 (D' = 5 pour 1 à 5 acheteurs ; avant : 1,2 puis 1,0)");
   // Un devis d'avant la migration 0016 (NULL) est servi avec reachableBuyers null, DTO inchangé par ailleurs.
   await pool.query("UPDATE boost_quotes SET reachable_buyers = NULL, reach_truncated = NULL WHERE id = $1", [quoteOf(useful).id]);
   const history = await list(offer.id);
@@ -693,6 +699,67 @@ test("503 : un vrai verrou consultatif tenu plus longtemps que lock_timeout → 
   assert.equal(recovered.status, 201);
 });
 
+test("arrondi des acheteurs compatibles (lots M1 à M1-quater) : 1 à 4 acheteurs → { kind: \"below\", bound: 5 }, jamais le nombre ; 5 → « environ 5 » ; le prix est IDENTIQUE de 1 à 5 acheteurs (D' = 5), 6 est plus cher", async () => {
+  const raw = (response: Reply) => response.text;
+  const quotes: Reply[] = [];
+  for (const count of [1, 2, 4, 5]) {
+    const world = await smallWorld(count);
+    const posted = await post(world.offer.id, { body: { durationCode: "24h" } });
+    quotes.push(posted);
+    const stored = await pool.query<{ compatible_buyers: number; demand_milli: number }>("SELECT compatible_buyers, demand_milli FROM boost_quotes WHERE id = $1", [quoteOf(posted).id]);
+    assert.deepEqual(stored.rows[0], { compatible_buyers: count, demand_milli: 1400 }, `D = ${count} enregistré exact (administration), facteur de D' = 5`);
+    if (count < 5) {
+      assert.deepEqual(quoteOf(posted).inputs.compatibleBuyers, BELOW, `${count} acheteurs`);
+      assert.ok(raw(posted).includes('"compatibleBuyers":{"kind":"below","bound":5}'), "le corps brut ne porte pas le nombre");
+      assert.ok(!new RegExp(`"compatibleBuyers":\\s*\\{[^}]*${count}[,}]`).test(raw(posted)), `jamais ${count} en clair`);
+    } else {
+      assert.deepEqual(quoteOf(posted).inputs.compatibleBuyers, buyers(5), "5 acheteurs : environ 5");
+    }
+    // L'historique applique le même arrondi.
+    const history = await list(world.offer.id);
+    assert.deepEqual(quotesOf(history)[0].inputs.compatibleBuyers, quoteOf(posted).inputs.compatibleBuyers);
+  }
+  // K2 (lots M1-bis et M1-quater) : le PRIX et le facteur demande sont identiques de 1 à 5 acheteurs (D' = 5) : le facteur ne redonne pas le nombre masqué.
+  for (const quote of quotes) {
+    assert.equal(quoteOf(quote).factors?.demandMilli, 1400, "demande de 1 à 5 acheteurs = celle de 5 acheteurs");
+    assert.equal(quoteOf(quote).amount, 700);
+  }
+  for (const quote of quotes.slice(1)) assert.deepEqual(quoteOf(quote).factors, quoteOf(quotes[0]).factors);
+  assert.ok(!/"demandMilli":(?:1000|1100|1200|1300)[,}]/.test(quotes.map(raw).join("")), "ni 1 000, ni 1 100, ni 1 200, ni 1 300 (1 à 4 acheteurs) en clair");
+  // 6 acheteurs : publiés « environ 5 » (6 à 8), le prix, lui, est celui de 6 (limite assumée, MESURES.md).
+  const six = await smallWorld(6);
+  const quoteSix = await post(six.offer.id, { body: { durationCode: "24h" } });
+  assert.deepEqual(quoteOf(quoteSix).inputs.compatibleBuyers, buyers(5));
+  assert.equal(quoteOf(quoteSix).factors?.demandMilli, 1500, "6 acheteurs : le facteur de 6");
+  assert.ok(quoteOf(quoteSix).amount! > quoteOf(quotes[3]).amount!, "6 acheteurs : plus cher que 5");
+});
+
+test("revérification d'un devis réutilisé (lot M1, D6) : au-delà de 60 par vendeur et par minute → 429 rate_limited avec Retry-After, aucun devis écrit ; un autre vendeur n'est pas touché", async () => {
+  const limited = await login();
+  await wipe();
+  const offer = await makeOffer({ ownerId: limited.userId });
+  await addBuyer(offer);
+  const created = await post(offer.id, { cookie: limited.cookie, body: { durationCode: "24h" } });
+  assert.equal(created.status, 201);
+  assert.equal(quoteOf(created).status, "available");
+  // 60 revérifications déjà comptées pour ce vendeur dans la minute (garde du PROCESSUS, celle des routes réelles).
+  for (let index = 0; index < 60; index++) assert.equal(processReuseRecheckGuard.tryAcquire(limited.userId), true);
+  const refused = await post(offer.id, { cookie: limited.cookie, body: { durationCode: "24h" } });
+  assert.equal(refused.status, 429);
+  assert.deepEqual(keys(refused.json), ["error"]);
+  assert.equal((refused.json as { error: { code: string } }).error.code, "rate_limited");
+  assert.equal(refused.headers.find(([name]) => name === "retry-after")?.[1], "60");
+  assert.equal((await pool.query<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes")).rows[0].n, 1, "aucun devis écrit par le refus");
+  // Un autre vendeur (autre garde) : sa revérification a lieu, le devis est renvoyé.
+  const fine = await login();
+  const fineOffer = await makeOffer({ ownerId: fine.userId, model: "iPhone 13" });
+  await addBuyer(fineOffer);
+  assert.equal((await post(fineOffer.id, { cookie: fine.cookie, body: { durationCode: "24h" } })).status, 201);
+  const reused = await post(fineOffer.id, { cookie: fine.cookie, body: { durationCode: "24h" } });
+  assert.equal(reused.status, 200);
+  assert.equal(quoteOf(reused).reused, true);
+});
+
 // ═════════════ 9. DTO ═════════════
 
 test("DTO : clés EXACTEMENT égales à la liste blanche (POST et GET), valeurs de l'exemple de contrôle, rien de secret dans le corps brut", async () => {
@@ -701,16 +768,16 @@ test("DTO : clés EXACTEMENT égales à la liste blanche (POST et GET), valeurs 
   assert.equal(created.status, 201);
   assert.deepEqual(keys(created.json), sorted(["contractVersion", "quote"]));
   assert.equal(asObject(created).contractVersion, BOOST_QUOTE_CONTRACT_VERSION);
-  assert.equal(BOOST_QUOTE_CONTRACT_VERSION, "boost-quote/v1");
+  assert.equal(BOOST_QUOTE_CONTRACT_VERSION, "boost-quote/v2");
   assert.deepEqual(keys(quoteOf(created)), POST_KEYS);
   assert.deepEqual(keys(quoteOf(created).factors), FACTOR_KEYS);
   assert.deepEqual(keys(quoteOf(created).inputs), INPUT_KEYS);
   const row = (await pool.query<{ id: string; computed_at: Date; expires_at: Date; raw_amount: string }>(
     "SELECT id, computed_at, expires_at, raw_amount::text AS raw_amount FROM boost_quotes")).rows[0];
   assert.deepEqual(quoteOf(created), {
-    id: row.id, durationCode: "3d", currency: "XOF", status: "available", amount: 2300, unavailableReason: null,
-    factors: { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 },
-    inputs: { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, reachTruncated: false, slotsTotal: 3, slotsUsed: 1 },
+    id: row.id, durationCode: "3d", currency: "XOF", status: "available", amount: 2500, unavailableReason: null,
+    factors: { competitionMilli: 1060, demandMilli: 1400, scarcityMilli: 1333, durationMilli: 2500 },
+    inputs: { competingSellers: 3, compatibleBuyers: BELOW, reachableBuyers: BELOW, reachTruncated: false, slotsTotal: 3, slotsUsed: 1 },
     computedAt: row.computed_at.toISOString(), expiresAt: row.expires_at.toISOString(), reused: false,
   });
   assert.equal(Date.parse(quoteOf(created).expiresAt) - Date.parse(quoteOf(created).computedAt), 900_000);
@@ -762,7 +829,7 @@ test("GET : plus récentes d'abord, limite par défaut 20, limite 50, limite exp
   const { offer } = await smallWorld();
   const empty = await list(offer.id);
   assert.equal(empty.status, 200);
-  assert.deepEqual(asObject(empty), { contractVersion: "boost-quote/v1", quotes: [] });
+  assert.deepEqual(asObject(empty), { contractVersion: "boost-quote/v2", quotes: [] });
 
   // 55 cotations : g = 1 est la plus récente (valide), g = 55 la plus ancienne (expirée).
   await pool.query(

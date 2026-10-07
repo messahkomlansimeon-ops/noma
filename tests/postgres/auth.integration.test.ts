@@ -157,6 +157,7 @@ if (!configuredUrl?.trim()) {
         "0015_boost_purchases",
         "0016_boost_quote_reach",
         "0017_boost_quote_reach_truncated",
+        "0018_offer_metrics",
       ]);
     });
 

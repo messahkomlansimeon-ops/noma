@@ -12,7 +12,13 @@ import {
 import {
   listOfferBoostPurchases, purchaseOfferBoost, refundBoostPurchase, type BoostPurchaseResult, type BoostPurchaseTestHooks,
 } from "../../lib/server/boost/purchase";
-import { quoteOfferBoost } from "../../lib/server/boost/quotes";
+import { quoteOfferBoost as quoteOfferBoostWithProcessGuard } from "../../lib/server/boost/quotes";
+import { createReuseRecheckGuard } from "../../lib/server/boost/recheck-guard";
+
+// Lot M1 : la revérification d'un devis réutilisé a une mémoire de 10 s par processus (D6). Ces essais enchaînent des revérifications du MÊME devis en changeant
+// le monde entre deux : chaque appel reçoit une garde SANS mémoire (les essais de la mémoire et de la limite sont dans boost-quotes.integration.test.ts).
+const quoteOfferBoost: typeof quoteOfferBoostWithProcessGuard = (input) =>
+  quoteOfferBoostWithProcessGuard({ ...input, hooks: { reuseRecheckGuard: createReuseRecheckGuard({ ttlMs: 0 }), ...input.hooks } });
 import { runMatchingCycle } from "../../lib/server/matching/runner";
 import { listStoredOfferMatchesForDemand } from "../../lib/server/matching/stored-matches";
 import { runMigrations } from "../../lib/server/postgres/migrations";
@@ -311,14 +317,14 @@ async function tamperPurchasedBoost(boostId: string, assignments: string): Promi
 
 // ═════════════ 1. Migration 0015 ═════════════
 
-test("migration 0015 (suivie de 0016 et 0017) : 17 appliquées, la relance n'en applique aucune, tables, index et déclencheurs présents", async () => {
-  assert.equal(firstMigration.applied.length, 17);
+test("migration 0015 (suivie de 0016, 0017 et 0018) : 18 appliquées, la relance n'en applique aucune, tables, index et déclencheurs présents", async () => {
+  assert.equal(firstMigration.applied.length, 18);
   assert.ok(firstMigration.applied.includes("0015_boost_purchases"));
-  assert.equal(firstMigration.applied.at(-1), "0017_boost_quote_reach_truncated");
+  assert.equal(firstMigration.applied.at(-1), "0018_offer_metrics");
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 17);
-  assert.equal(rerun.skipped.at(-1), "0017_boost_quote_reach_truncated");
+  assert.equal(rerun.skipped.length, 18);
+  assert.equal(rerun.skipped.at(-1), "0018_offer_metrics");
   assert.equal(await countRows("boost_purchases"), 0);
 
   const columns = (await pool.query<{ column_name: string; is_nullable: string; data_type: string }>(

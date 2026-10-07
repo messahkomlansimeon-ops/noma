@@ -11,8 +11,9 @@
  *    rebours ANCRÉ sur une horloge monotone (aucune horloge murale) sont dans `wallet-view.ts`.
  */
 
-import { BOOST_DURATION_CODES, type BoostDurationCode, type BoostQuote, type OfferRecord } from "./api";
+import { BOOST_DURATION_CODES, type BoostDurationCode, type BoostQuote, type StatCount, type OfferRecord } from "./api";
 import { formatAmount } from "./catalog-view";
+import { countText } from "./metrics-view";
 
 export const BOOST_DURATIONS: readonly { code: BoostDurationCode; label: string }[] = [
   { code: "24h", label: "24 h" },
@@ -105,6 +106,14 @@ export interface FactorLine {
 
 const plural = (count: number, singular: string, pluralForm: string) => (count > 1 ? pluralForm : singular);
 
+/**
+ * « environ 15 acheteurs compatibles », « moins de 5 acheteurs compatibles » : un compte d'acheteurs d'un devis n'est jamais publié exact (lot M1-quater) ; le serveur
+ * envoie `{ kind: "below", bound: 5 }` ou `{ kind: "approx", value }`.
+ */
+function buyersPhrase(count: StatCount, adjective: string): string {
+  return `${countText(count)} acheteurs ${adjective}s`;
+}
+
 /** Explication du prix en clair : une ligne par facteur ; vide si le devis est indisponible. */
 export function explainFactors(quote: Pick<BoostQuote, "factors" | "inputs" | "durationCode">): FactorLine[] {
   if (quote.factors === null) return [];
@@ -126,7 +135,7 @@ export function explainFactors(quote: Pick<BoostQuote, "factors" | "inputs" | "d
     {
       key: "demand",
       title: "Acheteurs compatibles",
-      text: `${compatibleBuyers} acheteur${plural(compatibleBuyers, "", "s")} compatible${plural(compatibleBuyers, "", "s")} avec votre annonce.`,
+      text: `${upperFirst(buyersPhrase(compatibleBuyers, "compatible"))} avec votre annonce.`,
       effect: factorEffectText(quote.factors.demandMilli),
     },
     {
@@ -146,21 +155,22 @@ export function explainFactors(quote: Pick<BoostQuote, "factors" | "inputs" | "d
 }
 
 /**
- * Portée visible : « Mise en avant visible auprès de X acheteur(s) » ; « d'au moins X » quand l'estimation a été bornée (des acheteurs n'ont pas
+ * Portée visible : « Mise en avant visible auprès d'environ X acheteurs » ; « d'environ X acheteurs, ou plus » quand l'estimation a été bornée (des acheteurs n'ont pas
  * été examinés : le nombre est un minimum) ; rien pour un devis ancien (non évalué). Elle n'entre pas dans le prix.
  */
-function reachLines(reachableBuyers: number | null, truncated: boolean): FactorLine[] {
+function reachLines(reachableBuyers: StatCount | null, truncated: boolean): FactorLine[] {
   if (reachableBuyers === null) return [];
-  return [
-    {
-      key: "reach",
-      title: "Visibilité",
-      text: truncated
-        ? `Mise en avant visible auprès d'au moins ${reachableBuyers} acheteur${plural(reachableBuyers, "", "s")}.`
-        : `Mise en avant visible auprès de ${reachableBuyers} acheteur${plural(reachableBuyers, "", "s")}.`,
-      effect: "n'entre pas dans le prix",
-    },
-  ];
+  // « moins de 5 » : même tronquée, la portée ne dit pas « ou plus » (le compte n'est pas détaillé) ; « environ N » : « ou plus » quand des acheteurs n'ont pas été examinés.
+  const text = reachableBuyers.kind === "below"
+    ? `Mise en avant visible auprès de ${countText(reachableBuyers)} acheteurs.`
+    : truncated
+      ? `Mise en avant visible auprès d'${countText(reachableBuyers)} acheteurs, ou plus.`
+      : `Mise en avant visible auprès d'${countText(reachableBuyers)} acheteurs.`;
+  return [{ key: "reach", title: "Visibilité", text, effect: "n'entre pas dans le prix" }];
+}
+
+function upperFirst(text: string): string {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 }
 
 /** Durée de validité totale d'un devis (expiresAt − computedAt, en ms), ou null si les dates sont illisibles. */

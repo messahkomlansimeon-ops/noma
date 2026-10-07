@@ -2,7 +2,7 @@ import "server-only";
 
 import type { Pool } from "pg";
 import type { SqlExecutor } from "../postgres/client";
-import { CatalogValidationError } from "../catalog/errors";
+import { CatalogNotFoundError, CatalogValidationError } from "../catalog/errors";
 import { mapDemand, mapOffer, type DemandRow, type OfferRow } from "../catalog/shared";
 import type { DemandRecord, OfferRecord } from "../catalog/types";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
@@ -380,6 +380,8 @@ interface RowsInput {
   candidateColumns: string;
   rowLimit: number;
   cursor: StoredMatchCursorPayload | null;
+  /** Lot M1 : ne lit que la ligne de CE candidat (la fiche d'une annonce relit une seule correspondance confirmée et fraîche). */
+  candidateId?: string;
 }
 
 /** Lignes confirmées et fraîches de la source, dans l'ordre du score, `rowLimit` lignes au plus. */
@@ -388,6 +390,11 @@ async function fetchRows<TRow extends OfferRow | DemandRow>(client: SqlExecutor,
   const freshness = buildMatchingFreshnessPredicate(input.freshness, 2);
   const values: unknown[] = [input.sourceId, ...freshness.values];
   const cursorCondition = input.cursor ? keysetCondition(input.cursor, values) : "";
+  let candidateCondition = "";
+  if (input.candidateId !== undefined) {
+    values.push(input.candidateId);
+    candidateCondition = `AND ${input.sourceKind === "offer" ? "e.demand_id" : "e.offer_id"} = $${values.length}::uuid`;
+  }
   values.push(input.rowLimit);
 
   const result = await client.query<CandidateRow<TRow>>(
@@ -398,6 +405,7 @@ async function fetchRows<TRow extends OfferRow | DemandRow>(client: SqlExecutor,
         AND e.is_confirmed_match = TRUE
         AND ${freshness.conditions.join("\n        AND ")}
         ${cursorCondition}
+        ${candidateCondition}
       ORDER BY ${SORT_ORDER}
       LIMIT $${values.length}`,
     values,
@@ -767,6 +775,64 @@ async function readStored<TSource extends OfferRecord | DemandRecord, TCandidate
   });
   if (exposure) await journalBoostExposures(input.pool, exposure);
   return page;
+}
+
+// ───────────── fiche d'une annonce dans le contexte d'un besoin (lot M1) ─────────────
+
+export interface StoredOfferDetail {
+  /** Annonce complète (usage interne : le DTO public n'en prend que les champs de la liste blanche, jamais le propriétaire ni le texte brut). */
+  offer: OfferRecord;
+  /** La correspondance telle que la liste des résultats la sert : compatibilité, indicateurs, pertinence et `sponsored` (placement relu maintenant). */
+  item: StoredMatchItem<OfferRecord>;
+  readAt: Date;
+}
+
+/**
+ * Fiche d'UNE annonce pour l'acheteur, dans le contexte d'un de ses besoins : la correspondance n'est servie que si l'annonce figure parmi les correspondances
+ * CONFIRMÉES ET FRAÎCHES de ce besoin (mêmes lignes et même prédicat que `listStoredOfferMatchesForDemand`, `fetchRows`), le besoin appartenant à
+ * l'acheteur et étant actif. `null` dans tous les autres cas (besoin inconnu, d'un autre, non actif ; annonce hors correspondances ; vendeur lui-même) :
+ * l'appelant répond le même 404, sans rien distinguer. `sponsored` est RELU : le placement (pertinence, boosts effectifs, quota, ancienneté) est recalculé
+ * dans le même instantané que la liste des résultats (même fonction `applyBoost`), jamais déduit de la requête du client. Aucune écriture : le journal d'exposition
+ * ne compte que les pages de résultats servies, pas cette lecture.
+ */
+export async function readStoredOfferForDemand(
+  ownerIdValue: string,
+  demandIdValue: string,
+  offerIdValue: string,
+  pool?: Pool,
+): Promise<StoredOfferDetail | null> {
+  const ownerId = requireUuid(ownerIdValue, "ownerId").toLowerCase();
+  const demandId = requireUuid(demandIdValue, "demandId").toLowerCase();
+  const offerId = requireUuid(offerIdValue, "offerId").toLowerCase();
+  const freshness = resolveMatchingFreshnessParams();
+  const targetPool = requireTransactionPool(pool);
+  return withReadSnapshot(targetPool, async (client) => {
+    let demand: DemandRecord;
+    try {
+      demand = await loadSourceDemand(ownerId, demandId, client);
+    } catch (error) {
+      if (error instanceof CatalogNotFoundError || error instanceof CatalogValidationError) return null;
+      throw error;
+    }
+    const clock = await client.query<{ read_at: Date }>("SELECT clock_timestamp() AS read_at");
+    const readAt = clock.rows[0].read_at;
+    const rowsInput = { sourceKind: "demand" as const, sourceId: demandId, freshness, candidateColumns: SOURCE_OFFER_COLUMNS };
+    const rows = await fetchRows<OfferRow>(client, { ...rowsInput, rowLimit: RELEVANCE_WINDOW + 1, cursor: null });
+    const truncated = rows.length > RELEVANCE_WINDOW;
+    const ranked = await buildItems<OfferRecord, OfferRow>(client, {
+      sourceKind: "demand", source: demand, rows: truncated ? rows.slice(0, RELEVANCE_WINDOW) : rows, mapCandidate: mapOffer, now: readAt,
+    });
+    ranked.sort(compareByRelevance);
+    const applied = await applyBoost<OfferRecord>(client, { organic: ranked, demand, at: readAt });
+    const found = applied.items.find((entry) => entry.candidateId === offerId);
+    if (found) return { offer: found.candidate, item: found, readAt };
+    // Plus de RELEVANCE_WINDOW correspondances : une annonce confirmée et fraîche peut être au-delà de la fenêtre triée (jamais promue : elle n'est pas dans le placement).
+    if (!truncated) return null;
+    const single = await fetchRows<OfferRow>(client, { ...rowsInput, rowLimit: 1, cursor: null, candidateId: offerId });
+    if (single.length === 0) return null;
+    const [entry] = await buildItems<OfferRecord, OfferRow>(client, { sourceKind: "demand", source: demand, rows: single, mapCandidate: mapOffer, now: readAt });
+    return { offer: entry.item.candidate, item: entry.item, readAt };
+  });
 }
 
 // ───────────── classement organique d'une demande, pour la portée d'un boost (lot P2-bis) ─────────────

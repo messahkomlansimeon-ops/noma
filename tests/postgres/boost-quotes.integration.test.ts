@@ -10,6 +10,7 @@ import {
   listOfferBoostQuotes, quoteOfferBoost, readBoostPricingSettings, readScopeBoostPriceHistory, type BoostQuote, type BoostQuoteTestHooks,
 } from "../../lib/server/boost/quotes";
 import { createReachGate } from "../../lib/server/boost/gate";
+import { createReuseRecheckGuard, processReuseRecheckGuard } from "../../lib/server/boost/recheck-guard";
 import { BOOST_QUOTE_RATE_LIMIT, BOOST_QUOTE_RATE_NAMESPACE } from "../../lib/server/boost/boost-config";
 import {
   BOOST_PURCHASE_REACH_BUDGET_MS, BOOST_QUOTE_REACH_BUDGET_MS, BOOST_REACH_COUNT_LIMIT, BOOST_REACH_SEARCH_LIMIT, BOOST_REACH_STATEMENT_TIMEOUT_MS, BOOST_REUSE_REACH_BUDGET_MS, computeBoostReach, isReachUndetermined,
@@ -149,8 +150,10 @@ async function addDemand(offer: OfferRecord, buyerId: string, options: EvalOptio
 const wipe = () => { fillerOffers = []; return wipeTables(); };
 const wipeTables = () => pool.query("TRUNCATE boost_quotes, offer_boosts, matching_evaluations, matching_jobs, matching_outbox_events, demands, offers CASCADE");
 const sqlRow = async <T extends Record<string, unknown>>(text: string, values: unknown[] = []): Promise<T> => (await pool.query<T>(text, values)).rows[0];
+// Lot M1 : la revérification d'un devis réutilisé a une mémoire de 10 s PAR PROCESSUS et une limite par vendeur. Les essais d'avant le lot (qui enchaînent
+// des revérifications du MÊME devis en changeant le monde entre deux) reçoivent une garde SANS mémoire à chaque appel ; les essais du lot M1 passent la leur.
 const quote = (offer: OfferRecord, durationCode: "24h" | "3d" | "7d" = "24h", db: Pool = pool, hooks?: BoostQuoteTestHooks) =>
-  quoteOfferBoost({ pool: db, ownerId: offer.ownerId, offerId: offer.id, durationCode, hooks });
+  quoteOfferBoost({ pool: db, ownerId: offer.ownerId, offerId: offer.id, durationCode, hooks: { reuseRecheckGuard: createReuseRecheckGuard({ ttlMs: 0 }), ...hooks } });
 const grant = (offer: OfferRecord) => grantOfferBoost({ pool, offerId: offer.id, ownerId: offer.ownerId, durationCode: "24h", source: "admin_grant" });
 
 async function code(promise: Promise<unknown>): Promise<BoostErrorCode | "ok" | string> {
@@ -200,13 +203,13 @@ async function controlWorld() {
 
 // ═════════════ 1. Migration 0012 ═════════════
 
-test("migration 0012 : 17 appliquées (dont 0012, 0016 et 0017), la relance n'en applique aucune, ligne default v1 exacte, index présents", async () => {
-  assert.equal(firstMigration.applied.length, 17);
-  assert.equal(firstMigration.applied.at(-1), "0017_boost_quote_reach_truncated");
+test("migration 0012 : 18 appliquées (dont 0012, 0016 et 0017), la relance n'en applique aucune, ligne default v1 exacte, index présents", async () => {
+  assert.equal(firstMigration.applied.length, 18);
+  assert.equal(firstMigration.applied.at(-1), "0018_offer_metrics");
   assert.ok(firstMigration.applied.includes("0012_boost_pricing"));
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 17);
+  assert.equal(rerun.skipped.length, 18);
   const rows = (await pool.query("SELECT * FROM boost_pricing_settings")).rows;
   assert.equal(rows.length, 1);
   const { created_at: createdAt, ...rest } = rows[0];
@@ -336,16 +339,16 @@ test("migration 0012 : boost_quotes, chaque CHECK, clés étrangères (dont la v
 
 // ═════════════ 2. Exemple de contrôle de bout en bout ═════════════
 
-test("exemple de contrôle de bout en bout : S = 3, D = 4, 1 place utilisée sur 3, durée 3d → 1060 / 1300 / 1333 / 2500, brut 2296,0925, 2 300 XOF", async () => {
+test("exemple de contrôle de bout en bout : S = 3, D = 4 (D' = 5), 1 place utilisée sur 3, durée 3d → 1060 / 1400 / 1333 / 2500, brut 2472,715, 2 500 XOF", async () => {
   const { offer, seller } = await controlWorld();
   assert.deepEqual((await readBoostSlots({ pool, offerId: offer.id })).used, 1);
   const result = await quote(offer, "3d");
   assert.equal(result.status, "available");
   assert.equal(result.reused, false);
-  assert.equal(result.amount, 2300);
-  assert.equal(result.rawAmount, "2296.092500000000");
+  assert.equal(result.amount, 2500);
+  assert.equal(result.rawAmount, "2472.715000000000");
   assert.equal(result.currency, "XOF");
-  assert.deepEqual(result.factors, { competitionMilli: 1060, demandMilli: 1300, scarcityMilli: 1333, durationMilli: 2500 });
+  assert.deepEqual(result.factors, { competitionMilli: 1060, demandMilli: 1400, scarcityMilli: 1333, durationMilli: 2500 });
   assert.deepEqual(result.inputs, { competingSellers: 3, compatibleBuyers: 4, reachableBuyers: 4, reachTruncated: false, slotsTotal: 3, slotsUsed: 1 });
   assert.deepEqual(result.pricing, { key: "default", version: 1 });
   assert.equal(result.unavailableReason, null);
@@ -355,16 +358,16 @@ test("exemple de contrôle de bout en bout : S = 3, D = 4, 1 place utilisée sur
   const stored = await sqlRow<Record<string, unknown>>("SELECT * FROM boost_quotes WHERE id = $1", [result.id]);
   assert.equal(stored.seller_id, seller);
   assert.deepEqual([stored.scope_category, stored.scope_brand, stored.scope_model], ["smartphones", "apple", "iphone 13"]);
-  assert.equal(stored.amount, 2300);
-  assert.equal(stored.raw_amount, "2296.092500000000");
-  assert.deepEqual([stored.competition_milli, stored.demand_milli, stored.scarcity_milli, stored.duration_milli], [1060, 1300, 1333, 2500]);
+  assert.equal(stored.amount, 2500);
+  assert.equal(stored.raw_amount, "2472.715000000000");
+  assert.deepEqual([stored.competition_milli, stored.demand_milli, stored.scarcity_milli, stored.duration_milli], [1060, 1400, 1333, 2500]);
   assert.deepEqual([stored.competing_sellers, stored.compatible_buyers, stored.reachable_buyers, stored.slots_total, stored.slots_used], [3, 4, 4, 3, 1]);
   assert.equal(stored.status, "available");
   // Les deux autres durées sur le même monde : brut = 500 × 1,060 × 1,300 × 1,333 × durée.
-  assert.equal((await quote(offer, "24h")).rawAmount, "918.437000000000");
-  assert.equal((await quote(offer, "24h")).amount, 900);
-  assert.equal((await quote(offer, "7d")).rawAmount, "4592.185000000000");
-  assert.equal((await quote(offer, "7d")).amount, 4600);
+  assert.equal((await quote(offer, "24h")).rawAmount, "989.086000000000");
+  assert.equal((await quote(offer, "24h")).amount, 1000);
+  assert.equal((await quote(offer, "7d")).rawAmount, "4945.430000000000");
+  assert.equal((await quote(offer, "7d")).amount, 4900);
   // Aucune réservation de place : les places utilisées n'ont pas bougé.
   assert.equal((await readBoostSlots({ pool, offerId: offer.id })).used, 1);
   assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM offer_boosts")).n, 1);
@@ -391,7 +394,7 @@ test("réutilisation : même id pendant la validité malgré des comptages et un
   const stillValid = await quote(offer, "3d");
   assert.equal(stillValid.id, first.id, "même cotation pendant sa validité, même si tout a changé");
   assert.equal(stillValid.reused, true);
-  assert.equal(stillValid.amount, 2300);
+  assert.equal(stillValid.amount, 2500);
   assert.deepEqual(stillValid.pricing, { key: "default", version: 1 });
   assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes")).n, 1);
 
@@ -693,7 +696,7 @@ test("réglages tarifaires : la catégorie de l'offre (casse et espaces ignorés
     await pool.query("DELETE FROM boost_quotes");
     const category = await quote(offer);
     assert.deepEqual(category.pricing, { key: "smartphones", version: 3 });
-    assert.equal(category.rawAmount, "3000.000000000000", "base 3 000, tous les facteurs à 1000 (S = 0, D = 1, 1 place sur 1, 24h)");
+    assert.equal(category.rawAmount, "4200.000000000000", "base 3 000 × demande 1,4 (D = 1 → D' = 5, lot M1-quater ; avant : 1,2 puis 1,0), autres facteurs à 1000 (S = 0, 1 place sur 1, 24h)");
     // La catégorie de l'offre en casse mixte désigne la même ligne.
     await pool.query("UPDATE offers SET category = '  SmartPhones ' WHERE id = $1", [offer.id]);
     await pool.query("DELETE FROM boost_quotes");
@@ -747,7 +750,7 @@ test("concurrence : 6 cotations simultanées de la même offre et durée (pools 
   assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes")).n, 1, "une seule ligne");
   assert.equal(new Set(results.map((result) => result.id)).size, 1, "six réponses de même id");
   assert.equal(results.filter((result) => !result.reused).length, 1, "une seule calcule, les cinq autres réutilisent");
-  assert.ok(results.every((result) => result.amount === 2300));
+  assert.ok(results.every((result) => result.amount === 2500));
   // Offres ou durées différentes : pas de verrou partagé qui bloque (une ligne par couple).
   const other = await Promise.all([quote(offer, "24h", pools[0]), quote(offer, "7d", pools[1])]);
   assert.notEqual(other[0].id, other[1].id);
@@ -1246,6 +1249,107 @@ test("devis réutilisé revérifié (lot P3-bis, N1) : atteignable → même dev
   assert.equal(await total(), 2);
 });
 
+test("devis réutilisé (lot M1, D6) : « atteignable » gardé 10 s PAR DEVIS (aucune revérification pendant ce temps, même si la portée a disparu), puis revérifié ; « non atteignable » n'est jamais retenu ; un autre devis n'est pas couvert", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  await addBuyer(offer, { listSize: 7 });
+  let now = 1_000;
+  const guard = createReuseRecheckGuard({ now: () => now });
+  let rechecks = 0;
+  const hooks: BoostQuoteTestHooks = { reuseRecheckGuard: guard, beforeReachDemand: () => { rechecks += 1; } };
+  const first = await quote(offer, "24h", pool, hooks);
+  assert.equal(first.reused, false);
+  rechecks = 0;
+  // 1re réutilisation : revérifiée (la mémoire est vide), atteignable → retenue.
+  const second = await quote(offer, "24h", pool, hooks);
+  assert.deepEqual([second.id, second.reused], [first.id, true]);
+  assert.equal(rechecks, 1, "une revérification calculée");
+  assert.equal(guard.size().quotes, 1);
+  // La portée disparaît (part promue ramenée à 5 % : plus aucune place). Pendant 10 s la mémoire répond : aucune revérification, même devis.
+  await setBoostSettings("smartphones", { max_promoted_share: 0.05 });
+  now += 9_999;
+  const cached = await quote(offer, "24h", pool, hooks);
+  assert.deepEqual([cached.id, cached.reused, cached.status], [first.id, true, "available"]);
+  assert.equal(rechecks, 1, "dans les 10 s : aucune nouvelle revérification");
+  // À 10 s pile : la mémoire est périmée, la revérification a lieu et DÉMONTRE que la portée a disparu : devis neuf indisponible.
+  now += 1;
+  const stale = await quote(offer, "24h", pool, hooks);
+  assert.equal(rechecks, 2, "après 10 s : revérifié");
+  assert.notEqual(stale.id, first.id);
+  assert.deepEqual([stale.status, stale.unavailableReason], ["unavailable", "no_visible_effect"]);
+  assert.equal(guard.size().quotes, 0, "un résultat non atteignable n'est jamais retenu (et le périmé a été oublié)");
+  // L'indisponible est réutilisé tel quel (aucune revérification : seuls les devis « disponibles » sont revérifiés).
+  const loop = await quote(offer, "24h", pool, hooks);
+  assert.deepEqual([loop.id, loop.status, loop.reused], [stale.id, "unavailable", true]);
+  assert.equal(rechecks, 2);
+  // Un AUTRE devis (autre durée) n'est pas couvert par la mémoire du premier : il est revérifié.
+  await resetBoostSettings();
+  const other = await quote(offer, "3d", pool, hooks);
+  assert.equal(other.reused, false);
+  const before = rechecks;
+  const otherAgain = await quote(offer, "3d", pool, hooks);
+  assert.deepEqual([otherAgain.id, otherAgain.reused], [other.id, true]);
+  assert.equal(rechecks, before + 1, "le devis de 3 jours est revérifié une fois (mémoire propre à chaque devis)");
+  const otherCached = await quote(offer, "3d", pool, hooks);
+  assert.equal(otherCached.id, other.id);
+  assert.equal(rechecks, before + 1, "puis mémorisé 10 s");
+  // Un résultat INDÉTERMINÉ (budget épuisé avant le premier besoin) n'est jamais retenu non plus : la garde reste vide et le même devis est revérifié ensuite.
+  const fresh = createReuseRecheckGuard({ now: () => now });
+  let tick = 0;
+  assert.equal(await code(quote(offer, "3d", pool, { reuseRecheckGuard: fresh, reuseReachBudgetMs: 40, reachClock: () => (tick += 50) })), "reach_check_unavailable");
+  assert.equal(fresh.size().quotes, 0, "indéterminé : rien de retenu");
+  rechecks = 0;
+  const afterwards = await quote(offer, "3d", pool, { reuseRecheckGuard: fresh, beforeReachDemand: () => { rechecks += 1; } });
+  assert.deepEqual([afterwards.id, afterwards.reused], [other.id, true]);
+  assert.equal(rechecks, 1, "revérifié");
+});
+
+test("devis réutilisé (lot M1, D6) : les revérifications comptent dans une limite de 60 par vendeur et par minute (rate_limited au-delà, aucune revérification calculée) ; un autre vendeur n'est pas touché ; la fenêtre glisse", async () => {
+  await wipe();
+  const offer = await makeOffer();
+  await addBuyer(offer, { listSize: 7 });
+  const rival = await makeOffer();
+  await addBuyer(rival, { listSize: 7 });
+  let now = 5_000;
+  // Pas de mémoire (ttl 0) : chaque réutilisation est une revérification, donc comptée.
+  const guard = createReuseRecheckGuard({ now: () => now, ttlMs: 0 });
+  let rechecks = 0;
+  const hooks: BoostQuoteTestHooks = { reuseRecheckGuard: guard, beforeReachDemand: () => { rechecks += 1; } };
+  const created = await quote(offer, "24h", pool, hooks);
+  const rivalQuote = await quote(rival, "24h", pool, hooks);
+  rechecks = 0;
+  for (let index = 0; index < 60; index++) {
+    const again = await quote(offer, "24h", pool, hooks);
+    assert.deepEqual([again.id, again.reused], [created.id, true], `revérification n° ${index + 1}`);
+    now += 10;
+  }
+  assert.equal(rechecks, 60);
+  assert.equal(await code(quote(offer, "24h", pool, hooks)), "rate_limited", "la 61e est refusée");
+  assert.equal(rechecks, 60, "le refus ne calcule rien");
+  // Un autre vendeur : sa propre limite.
+  assert.deepEqual([(await quote(rival, "24h", pool, hooks)).id, rechecks], [rivalQuote.id, 61]);
+  // Un devis NEUF (calculé) n'est pas une revérification : la limite de 20 devis par minute est celle de `assertQuoteRate`, pas celle-ci.
+  // La fenêtre glisse : une minute après les premières revérifications, de nouveau permis.
+  now += 60_000;
+  assert.equal((await quote(offer, "24h", pool, hooks)).reused, true);
+  assert.equal(rechecks, 62);
+});
+
+test("devis réutilisé (lot M1, D6) : la garde du PROCESSUS est celle des devis réels (par défaut) ; ses compteurs sont bornés en mémoire", async () => {
+  // Par défaut (aucun hook) : la garde du processus compte et mémorise.
+  await wipe();
+  const offer = await makeOffer();
+  await addBuyer(offer, { listSize: 7 });
+  const created = await quoteOfferBoost({ pool, ownerId: offer.ownerId, offerId: offer.id, durationCode: "24h" });
+  const reused = await quoteOfferBoost({ pool, ownerId: offer.ownerId, offerId: offer.id, durationCode: "24h" });
+  assert.deepEqual([reused.id, reused.reused], [created.id, true]);
+  assert.equal(processReuseRecheckGuard.isFresh(created.id), true, "mémorisé par la garde du processus");
+  // Bornes : une garde de 3 entrées ne grandit jamais au-delà.
+  const small = createReuseRecheckGuard({ now: () => 0, maxEntries: 3 });
+  for (let index = 0; index < 20; index++) { small.remember(`q${index}`); small.tryAcquire(`s${index}`); }
+  assert.ok(small.size().quotes <= 3 && small.size().sellers <= 3, JSON.stringify(small.size()));
+});
+
 test("devis (lot P3-bis, N3) : une vérification non terminée n'écrit AUCUN devis (rien n'est réutilisé 60 s) ; la demande suivante calcule normalement ; no_visible_effect n'est écrit que s'il est démontré", async () => {
   await wipe();
   const offer = await makeOffer();
@@ -1393,7 +1497,7 @@ test("script boost:quote : 0 pour une cotation disponible ou indisponible, 1 pou
   const first = await runScript(QUOTE, ["--offer", offer.id, "--duration", "3d"], schema);
   assert.equal(first.code, 0, first.output);
   assert.equal(first.output.trim().split("\n").length, 1);
-  assert.match(first.output.trim(), /^Cotation \(administration\) : [0-9a-f-]{36}, durée 3d, DISPONIBLE 2300 XOF \(brut 2296\.092500000000\)\. Facteurs \(millièmes\) : concurrence 1060, demande 1300, rareté 1333, durée 2500\. Comptages : vendeurs concurrents 3, acheteurs compatibles 4, acheteurs qui verraient l'offre monter 4, places 1\/3\. Réglages default v1\. Cotation calculée le \d{4}-.*, valable jusqu'au \d{4}-.*\.$/);
+  assert.match(first.output.trim(), /^Cotation \(administration\) : [0-9a-f-]{36}, durée 3d, DISPONIBLE 2500 XOF \(brut 2472\.715000000000\)\. Facteurs \(millièmes\) : concurrence 1060, demande 1400, rareté 1333, durée 2500\. Comptages : vendeurs concurrents 3, acheteurs compatibles 4, acheteurs qui verraient l'offre monter 4, places 1\/3\. Réglages default v1\. Cotation calculée le \d{4}-.*, valable jusqu'au \d{4}-.*\.$/);
   const again = await runScript(QUOTE, ["--offer", offer.id, "--duration", "3d"], schema);
   assert.equal(again.code, 0);
   assert.match(again.output, /\(cotation réutilisée\)/);

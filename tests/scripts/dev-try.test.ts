@@ -496,9 +496,10 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
   const guide = readFileSync(fileURLToPath(new URL("../../ESSAYER.md", import.meta.url)), "utf8");
   const normalized = guide.replace(/\s+/g, " ");
 
-  test("le guide dit (lots P2, P2-bis et P3) : base à 17 migrations, recharge simulée, achat de boost, « aucun argent réel », « Sponsorisé »", () => {
+  test("le guide dit (lots P2, P2-bis, P3 et M1) : base à 18 migrations, recharge simulée, achat de boost, « aucun argent réel », « Sponsorisé »", () => {
     for (const expected of [
-      "17 migrations",
+      "18 migrations",
+      "0018",
       "0017",
       "0016",
       "0015",
@@ -540,11 +541,40 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
     const quoteStep = normalized.indexOf("Booster cette annonce");
     assert.ok(seedStep !== -1 && quoteStep !== -1 && seedStep < quoteStep, "l'étape des annonces d'exemple vient AVANT l'essai du boost");
     assert.equal(/15 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations");
+    assert.equal(/\b17 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations (17)");
     assert.equal(/l'annonce boostée est en tête avec le badge/.test(normalized), false, "le badge n'est plus promis sans condition");
     // Le guide ne dit plus que l'achat est éteint ou que le paiement n'existe pas.
     assert.equal(/le paiement n'existe pas encore/.test(normalized), false);
     assert.equal(/aucun paiement n'est possible/.test(normalized), false);
     assert.equal(/Paiement bientôt disponible/.test(normalized), false);
+  });
+
+  test("le guide dit (lot M1) : fiche d'annonce, contact, numéro jamais montré avant le contact, « moins de 5 » et « environ N », cinq acheteurs, limite de 20 vendeurs, rétention", () => {
+    for (const expected of [
+      "Voir l'annonce",
+      "Contacter le vendeur",
+      "sans jamais montrer le numéro du vendeur",
+      "Le vendeur verra que vous l'avez contacté via noma.",
+      "Appeler",
+      "WhatsApp",
+      "propres correspondances",
+      "20 vendeurs différents par jour",
+      "Ce que produit votre annonce",
+      "moins de 5",
+      "environ 10",
+      "arrondis à 5 près",
+      "cinq comptes acheteurs",
+      "pas qu'elle a été lue",
+      "aucune vente n'est mesurée",
+      "MESURES.md",
+      "npm run metrics:purge",
+      "400 jours",
+    ]) {
+      assert.ok(normalized.includes(expected), `ESSAYER.md doit contenir « ${expected} »`);
+    }
+    const contactStep = normalized.indexOf("Contacter le vendeur");
+    const boostPurchase = normalized.indexOf("acheter un boost");
+    assert.ok(contactStep !== -1 && boostPurchase !== -1 && boostPurchase < contactStep, "le parcours de contact vient après l'achat du boost");
   });
 
   test("le guide dit : base indiquée dans la commande, base de CE poste, NODE_ENV, recherche simulée, besoins, port jamais exposé", () => {

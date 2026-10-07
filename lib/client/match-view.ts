@@ -10,7 +10,7 @@
  *    que parmi des résultats déjà pertinents.
  */
 
-import type { DemandStatus, MatchIndicators, MatchProduct, OfferStatus, StoredMatch } from "./api";
+import { STAT_ROUNDING_BASE, type DemandStatus, type MatchIndicators, type MatchProduct, type OfferStatus, type StoredMatch } from "./api";
 import { formatAmount, formatMoney } from "./catalog-view";
 
 export type IndicatorTone = "good" | "neutral" | "warn" | "muted";
@@ -301,12 +301,20 @@ export function offerNotPublishedMessage(status: OfferStatus): string | null {
 
 /**
  * Nombre de BESOINS d'acheteurs qui correspondent à l'annonce (jamais un nombre d'acheteurs : un acheteur peut avoir plusieurs
- * besoins et l'écran sert à vendre un boost payant : on ne surestime pas). « Au moins … » tant qu'il reste des pages.
+ * besoins et l'écran sert à vendre un boost payant : on ne surestime pas). Lot M1-quater : le titre suit l'arrondi des statistiques (« Moins de 5 besoins … »,
+ * « Environ 10 besoins … » : multiple de 5 le plus proche, la moitié vers le haut) ; la liste, elle, reste affichée : c'est le produit. Tant qu'il reste des pages,
+ * le nombre est un minimum : « Au moins N » avec N arrondi VERS LE BAS au multiple de 5 (jamais plus que la réalité).
  */
 export function matchingNeedsLabel(count: number, hasMore: boolean): string {
   if (count === 0) return "Aucun besoin d'acheteur ne correspond pour le moment";
-  const base = count === 1 ? "1 besoin d'acheteur correspond à votre annonce" : `${count} besoins d'acheteurs correspondent à votre annonce`;
-  return hasMore ? `Au moins ${base}` : base;
+  const base = STAT_ROUNDING_BASE;
+  if (hasMore) {
+    return count < base
+      ? "Plusieurs besoins d'acheteurs correspondent à votre annonce"
+      : `Au moins ${Math.floor(count / base) * base} besoins d'acheteurs correspondent à votre annonce`;
+  }
+  if (count < base) return `Moins de ${base} besoins d'acheteurs correspondent à votre annonce`;
+  return `Environ ${Math.floor((2 * count + base) / (2 * base)) * base} besoins d'acheteurs correspondent à votre annonce`;
 }
 
 /** « 4 offres correspondent à votre besoin » ; « Au moins … » tant qu'il reste des pages. */

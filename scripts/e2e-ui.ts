@@ -17,7 +17,7 @@
  * Partie 3 (lots P2 et P2-bis) : porte-monnaie, recharge SIMULÉE et achat de boost, tout dans le navigateur. Autre produit : l'offre de A (la plus
  * chère, créée dans le navigateur) et le besoin de B ; A est la SEULE annonce : devis « Pour le moment, un boost ne ferait monter votre annonce chez aucun acheteur… » (aucun prix,
  * aucun « Acheter ») ; puis `dev:seed` ajoute 8 annonces d'exemple (vendeurs fictifs) : devis disponible avec « Mise en avant visible auprès de
- * 1 acheteur ». A sans crédit : « Solde insuffisant (0 FCFA) », « Recharger » → montants refusés (dont « 000000000500 » normalisé) → 2 000 FCFA →
+ * moins de 5 acheteurs » (arrondi des comptes publiés). A sans crédit : « Solde insuffisant (0 FCFA) », « Recharger » → montants refusés (dont « 000000000500 » normalisé) → 2 000 FCFA →
  * page « paiement simulé » (bandeau SIMULATION) → « Confirmer le paiement » → retour à l'annonce. Devis RÉUTILISÉ (âgé de ≥ 30 s) : première
  * valeur du compte à rebours ≤ temps réellement restant (heure du serveur) ; veille simulée + retour au premier plan : solde, achats et devis
  * relus, compte à rebours ré-ancré ; « Relire mon solde ». Refus d'achat simulés (409, puis 429 « Trop de tentatives »). Un nouveau devis demandé
@@ -39,6 +39,13 @@
  * texte neutre), le devis redemandé est INDISPONIBLE (jamais le même « disponible »), plus aucun « Acheter », deux requêtes seulement (achat, devis),
  * aucune boucle ; (N4) la page d'une recharge rechargée après le paiement dit « déjà créditée… une seule fois », celle d'une recharge échouée rechargée
  * « terminée sans paiement » ; (N2) textes neutres du devis et du refus d'achat.
+ *
+ * Partie 6 (lots M1 à M1-quater) : un produit à 9 annonces (S, dans le navigateur, + 8 d'exemple `dev:seed`), cinq acheteurs (B1 dans le navigateur, B2 à B5 par l'API).
+ * B1 ouvre la fiche depuis ses résultats (lien « Voir l'annonce »), ne voit ni numéro ni lien d'appel, appuie sur « Contacter le vendeur » et voit le numéro vérifié,
+ * « Appeler », WhatsApp et « Le vendeur verra que vous l'avez contacté via noma. » ; une annonce hors de ses correspondances répond « introuvable ». S voit
+ * ensuite « moins de 5 » (jamais le nombre), aucun pourcentage et aucune ligne de boost (« Aucun boost sur cette annonce : tout est organique. ») ; après un boost
+ * d'administration, B1 à B5 voient « Sponsorisé », ouvrent et contactent, et S voit « environ 5 » (jamais un compte exact) ; les parts attribuée (« environ 5 » ou « moins de 5 »)
+ * et organique, les taux (« pas assez d'acheteurs pour un pourcentage » sous 10 acheteurs), sans aucune identité d'acheteur.
  * Captures d'écran dans NOMA_E2E_SHOTS.
  *
  * Variables : NOMA_E2E_BASE_URL (relais, défaut http://localhost:3212), NOMA_E2E_SERVER_LOG, NOMA_E2E_DATABASE_URL (noma_e2e,
@@ -50,7 +57,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { buildOfferInput } from "../lib/client/catalog-view";
+import { buildDemandInput, buildOfferInput } from "../lib/client/catalog-view";
 import {
   E2E_BASE,
   E2E_SERVER_LOG,
@@ -58,6 +65,7 @@ import {
   awaitOtpLine,
   grantBoostByAdministration,
   loginWithOtp,
+  pollUntil,
   refundPurchaseByAdministration,
   seedExamplesByAdministration,
   uniquePhone,
@@ -502,7 +510,11 @@ async function main(): Promise<void> {
     await refreshUntil(sellerPage, "le besoin de B dans « Acheteurs intéressés »", async () => {
       return (await sellerPage.getByTestId("interested-buyer").count()) >= 1;
     });
-    assert.equal((await sellerPage.getByTestId("interested-count").textContent())?.trim(), "1 besoin d'acheteur correspond à votre annonce");
+    // Lots M1-bis et M1-quater (K3, R6) : 1 besoin → « Moins de 5 besoins… » dans le titre, mais la LISTE reste affichée (c'est le produit : budget, lieu).
+    assert.equal((await sellerPage.getByTestId("interested-count").textContent())?.trim(), "Moins de 5 besoins d'acheteurs correspondent à votre annonce");
+    assert.equal(await sellerPage.getByTestId("interested-buyer").count(), 1, "la liste montre le besoin de B");
+    await sellerPage.getByTestId("stats-matching").waitFor();
+    assert.equal((await sellerPage.getByTestId("stats-matching").textContent())?.replace(/\s+/g, " ").trim(), "Moins de 5 besoins d'acheteurs correspondent à votre annonce.", "statistiques : même règle");
     assert.match((await sellerPage.getByTestId("interested-note").textContent()) ?? "", /un même acheteur peut en avoir plusieurs/);
     const buyerRowText = (await sellerPage.getByTestId("interested-buyer").first().innerText()).replace(/\s+/g, " ");
     assert.match(buyerRowText, /Samsung Galaxy S21/);
@@ -513,14 +525,15 @@ async function main(): Promise<void> {
       assert.equal(sellerText.includes(secret), false, `le vendeur ne voit pas « ${secret} »`);
     }
     assert.equal(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/.test(sellerText), false, "aucun identifiant (UUID) à l'écran du vendeur");
-    ok("« 1 besoin d'acheteur correspond à votre annonce » (on compte des besoins, pas des acheteurs) : produit, budget 250 000 FCFA, compatibilité, sans nom, ni téléphone, ni identifiant");
+    ok("« Moins de 5 besoins d'acheteurs correspondent à votre annonce » (titre et statistiques ; on compte des besoins, pas des acheteurs), la liste reste affichée : produit, budget 250 000 FCFA, compatibilité, sans nom, ni téléphone, ni identifiant");
     await durations.getByRole("button", { name: "3 jours", exact: true }).click();
     await sellerPage.getByTestId("boost-amount").waitFor();
     const amountText = ((await sellerPage.getByTestId("boost-amount").textContent()) ?? "").replace(/\s/g, " ").trim();
     assert.match(amountText, /^\d[\d ]* FCFA$/);
     const explanation = ((await sellerPage.getByRole("list", { name: "Comment ce prix est calculé" }).innerText()) ?? "").replace(/\s+/g, " ");
     for (const label of ["Concurrence", "Acheteurs compatibles", "Places disponibles", "Durée", "Visibilité"]) assert.ok(explanation.includes(label), label);
-    assert.ok(explanation.includes("Mise en avant visible auprès de 1 acheteur."), `ligne de portée : ${explanation}`);
+    assert.ok(explanation.includes("Mise en avant visible auprès de moins de 5 acheteurs."), `ligne de portée (1 acheteur : « moins de 5 », arrondi) : ${explanation}`);
+    assert.equal(/auprès de 1 acheteur|1 acheteur compatible/.test(explanation), false, "jamais le nombre exact d'acheteurs quand il est de 1 à 4");
     assert.equal(/milli/i.test(explanation), false);
     const validity = (await sellerPage.getByTestId("boost-validity").textContent()) ?? "";
     assert.match(validity, /^Prix valable encore \d+ min \d+ s$/);
@@ -672,9 +685,9 @@ async function main(): Promise<void> {
     await payDurations.getByRole("button", { name: "3 jours", exact: true }).click();
     await sellerPage.getByTestId("boost-amount").waitFor();
     const reachExplanation = norm(await sellerPage.getByRole("list", { name: "Comment ce prix est calculé" }).innerText());
-    assert.ok(reachExplanation.includes("Mise en avant visible auprès de 1 acheteur."), `ligne de portée absente : ${reachExplanation}`);
+    assert.ok(reachExplanation.includes("Mise en avant visible auprès de moins de 5 acheteurs."), `ligne de portée absente : ${reachExplanation}`);
     assert.ok(reachExplanation.includes("n'entre pas dans le prix"), "la portée n'entre pas dans le prix");
-    ok("devis 3 jours DISPONIBLE avec 9 offres : « Mise en avant visible auprès de 1 acheteur. » (n'entre pas dans le prix)");
+    ok("devis 3 jours DISPONIBLE avec 9 offres : « Mise en avant visible auprès de moins de 5 acheteurs. » (1 acheteur : arrondi ; n'entre pas dans le prix)");
     const quoteAmount = Number(norm(await sellerPage.getByTestId("boost-amount").textContent()).replace(/\D/g, ""));
     assert.ok(quoteAmount >= 500 && quoteAmount <= 2_000, `montant du devis 3 jours : ${quoteAmount} (attendu entre 500 et 2 000 pour que 2 000 FCFA suffisent)`);
     const fmt = (amount: number) => `${String(amount).replace(/\B(?=(\d{3})+(?!\d))/g, " ")} FCFA`;
@@ -1548,6 +1561,227 @@ async function main(): Promise<void> {
     ok("page d'une recharge déjà terminée rouverte : « Cette recharge a déjà été créditée sur votre porte-monnaie (… une seule fois). » (jamais « a été crédité de »), solde inchangé");
     await tab2.unroute(/\/api\/wallet\/topups$/);
     await tab2.close();
+
+    // ─────────────────────────── Partie 6 (lots M1 à M1-quater) : fiche d'annonce, contact, « Ce que produit votre annonce », arrondi « moins de 5 » / « environ N » ───────────────────────────
+    step("Mesures (lot M1) : le vendeur S publie dans le navigateur, dev:seed ajoute 8 annonces d'exemple, l'acheteur B1 (navigateur) et quatre acheteurs B2 à B5 (API) activent un besoin");
+    const mTag = (Date.now() + 11).toString(36).slice(-5);
+    const mProduct = { category: "Téléphones", brand: "Motorola", model: `Edge ${mTag}` };
+    const mTitle = `${mProduct.brand} ${mProduct.model}`;
+    const mSellerContext = await browser.newContext({ ...VIEWPORT });
+    const mSellerPage = await mSellerContext.newPage();
+    mSellerPage.setDefaultTimeout(60_000);
+    watch(mSellerPage);
+    openPages.push(mSellerPage);
+    const mSellerLocal = localPhone(401);
+    await loginViaUi(mSellerPage, mSellerLocal, "/vendeur/annonces", (url) => url.pathname === "/vendeur/annonces");
+    await mSellerPage.getByText("Vous n'avez pas encore d'annonce.").waitFor();
+    await mSellerPage.getByRole("button", { name: "Nouvelle annonce" }).last().click();
+    const mForm = mSellerPage.getByRole("dialog");
+    await mForm.getByPlaceholder("iPhone 12 · 128 Go").fill(`${mTitle} · offre de S`);
+    await mForm.getByRole("button", { name: "Téléphones", exact: true }).click();
+    await mForm.getByPlaceholder("Apple", { exact: true }).fill(mProduct.brand);
+    await mForm.getByPlaceholder("iPhone 12", { exact: true }).fill(mProduct.model);
+    await mForm.getByPlaceholder("150 000").fill("190 000");
+    await mForm.getByPlaceholder("Marcory, Abidjan").fill("Abidjan");
+    await mForm.getByRole("button", { name: "Publier l'annonce" }).click();
+    await mSellerPage.getByText("Annonce publiée").waitFor();
+    const mSellerCard = mSellerPage.locator("div.rounded-2xl", { hasText: `${mTitle} · offre de S` }).first();
+    await mSellerCard.getByText("En ligne", { exact: true }).waitFor();
+    await mSellerCard.getByRole("link", { name: /Acheteurs intéressés et boost/ }).click();
+    await mSellerPage.waitForURL(/\/vendeur\/annonces\/[0-9a-f-]{36}$/);
+    const mOfferId = mSellerPage.url().split("/").pop() as string;
+    const mSellerE164 = `+225${mSellerLocal}`;
+    const mSellerSpaced = `+225 ${mSellerLocal.slice(0, 2)} ${mSellerLocal.slice(2, 4)} ${mSellerLocal.slice(4, 6)} ${mSellerLocal.slice(6, 8)} ${mSellerLocal.slice(8, 10)}`;
+    ok(`S : annonce « ${mTitle} » publiée à 190 000 FCFA (la plus chère)`);
+    const mSeed = await seedExamplesByAdministration({ category: "phones", brand: "motorola", model: mProduct.model, offers: 8 });
+    assert.match(mSeed, /8 annonce\(s\) d'exemple publiée\(s\)/);
+    ok("dev:seed : 8 annonces d'exemple du même produit (vendeurs fictifs)");
+
+    const mBuyerContext = await browser.newContext({ ...VIEWPORT });
+    const mBuyerPage = await mBuyerContext.newPage();
+    mBuyerPage.setDefaultTimeout(60_000);
+    watch(mBuyerPage);
+    openPages.push(mBuyerPage);
+    const mBuyerLocal = localPhone(402);
+    await loginViaUi(mBuyerPage, mBuyerLocal, "/alerte/nouvelle", (url) => url.pathname === "/alerte/nouvelle");
+    await mBuyerPage.getByPlaceholder(/Un iPhone 12 en bon état/).fill(`Je cherche un ${mTitle}`);
+    await mBuyerPage.getByRole("button", { name: "Téléphones", exact: true }).click();
+    await mBuyerPage.getByPlaceholder("Apple", { exact: true }).fill(mProduct.brand);
+    await mBuyerPage.getByPlaceholder("iPhone 12", { exact: true }).fill(mProduct.model);
+    await mBuyerPage.getByPlaceholder("200 000").fill("250 000");
+    await mBuyerPage.getByRole("button", { name: "Activer le besoin" }).click();
+    await mBuyerPage.waitForURL("**/alertes");
+    await mBuyerPage.locator("div.rounded-2xl", { hasText: `Je cherche un ${mTitle}` }).first().getByRole("link", { name: "Voir les offres", exact: true }).click();
+    await mBuyerPage.waitForURL(/\/besoins\/[0-9a-f-]{36}$/);
+    const mDemandId = mBuyerPage.url().split("/").pop() as string;
+    // B2 à B5 : par l'API (quatre comptes distincts), même produit.
+    const mApiBuyers: Array<{ label: string; session: RelaySession; demandId: string }> = [];
+    for (const [label, suffix] of [["B2", "47"], ["B3", "48"], ["B4", "49"], ["B5", "50"]] as const) {
+      const session = new RelaySession(`acheteur ${label}`);
+      await loginWithOtp(session, uniquePhone(suffix));
+      const client = session.client();
+      const built = buildDemandInput(
+        {
+          text: `Je cherche un ${mTitle}`, category: mProduct.category, brand: mProduct.brand, model: mProduct.model, variant: "", condition: "Occasion", location: "Abidjan",
+          budget: "250 000", deadline: "",
+        },
+        new Date().toISOString().slice(0, 10),
+      );
+      assert.ok(built.ok);
+      const created = await client.demands.create(built.input);
+      const activated = await client.demands.activate(created.id, created.contentVersion);
+      mApiBuyers.push({ label, session, demandId: activated.id });
+    }
+    const mCards = mBuyerPage.getByTestId("match-card");
+    await refreshUntil(mBuyerPage, "les 9 offres du produit dans les résultats de B1", async () => (await mCards.count()) >= 9);
+    for (const { label, session, demandId } of mApiBuyers) {
+      await pollUntil(
+        `les 9 offres dans les résultats de ${label}`,
+        async () => {
+          const page = await session.client().demands.storedMatches(demandId, { sort: "relevance", limit: 100 });
+          return page.items.length >= 9 && page.items.some((item) => item.candidateId === mOfferId) ? true : null;
+        },
+        WORKER_TIMEOUT_MS * 2,
+      );
+    }
+    ok("B1 à B5 : 9 offres dans leurs résultats (celle de S et les 8 d'exemple)");
+    const mSellerResultCard = mCards.filter({ hasText: /190\s000\sFCFA/ });
+    assert.equal(await mSellerResultCard.count(), 1, "l'annonce de S est la seule à 190 000 FCFA");
+    assert.equal(await mSellerResultCard.getByTestId("match-detail-link").count(), 1, "la carte mène à la fiche : lien « Voir l'annonce »");
+    ok("la carte de résultats de l'annonce de S porte le lien « Voir l'annonce »");
+
+    step("Fiche d'annonce (B1, navigateur) : titre, prix, indicateurs, aucun téléphone ; « Contacter le vendeur » → numéro vérifié, appel, WhatsApp et message");
+    await mSellerResultCard.getByTestId("match-detail-link").click();
+    await mBuyerPage.waitForURL(new RegExp(`/besoins/${mDemandId}/offres/${mOfferId}$`));
+    const sheetNode = mBuyerPage.getByTestId("offer-detail");
+    await sheetNode.waitFor();
+    assert.equal(norm(await mBuyerPage.getByTestId("offer-title").textContent()), mTitle);
+    assert.match(norm(await mBuyerPage.getByTestId("offer-price").textContent()), /^190 000 FCFA$/);
+    assert.equal(await sheetNode.getAttribute("data-sponsored"), "false", "sans boost : pas « Sponsorisé »");
+    const sheetText = norm(await mBuyerPage.locator("main").innerText());
+    assert.match(sheetText, /Compatibilité \d+ %/);
+    assert.match(sheetText, /Confiance (élevée|moyenne|faible)/);
+    assert.match(sheetText, /Annonce du \d{1,2} [a-zéû]+ \d{4}/, "date de l'annonce");
+    for (const secret of [mSellerLocal, mSellerLocal.slice(1), mSellerE164, mSellerSpaced, mSellerLocal.slice(-8), "wa.me", "tel:"]) assert.equal(sheetText.includes(secret), false, `la fiche n'affiche pas « ${secret} » avant le contact`);
+    assert.equal(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/.test(sheetText), false, "aucun identifiant (UUID) affiché");
+    assert.equal(await mBuyerPage.locator('a[href^="tel:"], a[href*="wa.me"]').count(), 0, "aucun lien d'appel avant le contact");
+    ok("fiche : titre, prix 190 000 FCFA, compatibilité, confiance, date ; ni numéro, ni lien d'appel, ni identifiant avant le contact");
+    await shot(mBuyerPage, "40-fiche-annonce");
+    const contactNotice = norm(await mBuyerPage.getByTestId("contact-notice").textContent());
+    assert.ok(contactNotice.includes("Le vendeur verra que vous l'avez contacté via noma."), contactNotice);
+    await mBuyerPage.getByTestId("contact-button").click();
+    await mBuyerPage.getByTestId("contact-result").waitFor();
+    assert.equal(norm(await mBuyerPage.getByTestId("contact-phone").textContent()), mSellerSpaced);
+    assert.equal(await mBuyerPage.getByTestId("contact-tel").getAttribute("href"), `tel:${mSellerE164}`);
+    const whatsappLink = mBuyerPage.getByTestId("contact-whatsapp");
+    assert.equal(await whatsappLink.getAttribute("href"), `https://wa.me/${mSellerE164.slice(1)}`);
+    assert.equal(await whatsappLink.getAttribute("target"), "_blank");
+    assert.match((await whatsappLink.getAttribute("rel")) ?? "", /noopener/);
+    assert.equal(await mBuyerPage.getByTestId("contact-button").count(), 0, "le bouton laisse la place au numéro");
+    assert.ok(norm(await mBuyerPage.getByTestId("contact-notice").textContent()).includes("Le vendeur verra que vous l'avez contacté via noma."));
+    ok(`« Contacter le vendeur » : numéro vérifié « ${mSellerSpaced} », lien d'appel tel:…, lien WhatsApp https://wa.me/… (nouvel onglet, noopener), message « Le vendeur verra que vous l'avez contacté via noma. »`);
+    await shot(mBuyerPage, "41-fiche-contact-revele");
+    // Aucun cache côté navigateur : le numéro n'est pas gardé dans le stockage de la page.
+    const stored = await mBuyerPage.evaluate(() => JSON.stringify([Object.entries(window.localStorage), Object.entries(window.sessionStorage)]));
+    assert.equal(stored.includes(mSellerE164) || stored.includes(mSellerLocal), false, "le numéro n'est écrit dans aucun stockage du navigateur");
+    ok("le numéro n'est gardé dans aucun stockage du navigateur (mémoire de la page seulement)");
+    // Une annonce hors de ses correspondances : la fiche répond comme « introuvable » (même message, jamais d'indice).
+    await expectingConsoleErrors("fiche d'une annonce hors correspondances (404 attendu)", /status of 404/, async () => {
+      await mBuyerPage.goto(`${BASE}/besoins/${mDemandId}/offres/${offerId}`);
+      await mBuyerPage.getByTestId("offer-load-error").waitFor();
+    });
+    assert.ok(norm(await mBuyerPage.getByTestId("offer-load-error").textContent()).includes("Cette annonce n'est plus disponible pour votre besoin, ou elle n'existe pas."));
+    ok("annonce hors correspondances : « Cette annonce n'est plus disponible pour votre besoin, ou elle n'existe pas. » (aucun indice sur son existence)");
+
+    step("Vendeur S : « Ce que produit votre annonce » avec UN seul acheteur → « moins de 5 », aucun pourcentage");
+    await mSellerPage.goto(`${BASE}/vendeur/annonces/${mOfferId}`);
+    const statsSection = mSellerPage.getByTestId("offer-stats");
+    await statsSection.waitFor();
+    await statsSection.getByRole("heading", { name: "Ce que produit votre annonce" }).waitFor();
+    await mSellerPage.getByTestId("stats-lines-7d").waitFor();
+    const statValue = async (period: string, key: string) => norm(await mSellerPage.getByTestId(`stats-lines-${period}`).locator(`[data-stat="${key}"] [data-stat-value]`).textContent());
+    assert.equal(await statValue("7d", "openers"), "moins de 5 acheteurs");
+    assert.equal(await statValue("7d", "opens"), "moins de 5 ouvertures");
+    assert.equal(await statValue("7d", "contacts"), "moins de 5 acheteurs");
+    // Annonce SANS boost (M1-ter) : aucune ligne « pendant un boost », « attribué au boost » ou taux ; une phrase dit que tout est organique.
+    for (const absent of ["served", "exposed", "openers-boost", "openers-organic", "contacts-boost", "contacts-organic", "open-rate"]) {
+      assert.equal(await mSellerPage.getByTestId("stats-lines-7d").locator(`[data-stat="${absent}"]`).count(), 0, `sans boost : pas de ligne « ${absent} »`);
+    }
+    assert.equal(await statValue("7d", "contact-rate"), "pas assez d'acheteurs pour un pourcentage", "le taux de contact des ouvreurs existe sans boost : un seul ouvreur, pas de pourcentage");
+    assert.equal(norm(await mSellerPage.getByTestId("stats-no-boost").textContent()), "Aucun boost sur cette annonce : tout est organique.");
+    assert.equal(await mSellerPage.getByTestId("stats-boosts").count(), 0, "sans boost : pas de section « Par boost »");
+    assert.ok(norm(await mSellerPage.getByTestId("stats-few").textContent()).startsWith("Encore peu d'activité"), "tout est « moins de 5 » : la phrase simple l'explique");
+    const oneBuyerText = norm(await statsSection.innerText());
+    assert.equal(/\b[0-9]+ (acheteurs?|ouvertures?|apparitions?)\b/.test(oneBuyerText.replace(/(moins de|environ) [0-9]+/g, "")), false, `aucun compte exact ne doit apparaître : ${oneBuyerText.slice(0, 300)}`);
+    assert.equal(oneBuyerText.includes("%"), false, "aucun pourcentage sous 10 acheteurs");
+    assert.ok(oneBuyerText.includes("Pour protéger les acheteurs, les chiffres sont arrondis à 5 près et les petits nombres ne sont pas détaillés."), "la phrase d'arrondi est affichée");
+    assert.equal(/moins de 3/i.test(oneBuyerText), false, "plus aucun « moins de 3 »");
+    assert.equal(oneBuyerText.includes("attribués au boost seulement si l'acheteur avait vu votre annonce sponsorisée"), false, "sans boost : aucune phrase d'attribution");
+    assert.ok(oneBuyerText.includes("ce n'est pas la preuve qu'il l'a lue"), "« ouverture » = page servie");
+    for (const secret of [mBuyerLocal, mBuyerLocal.slice(1), `+225${mBuyerLocal}`, "viewer"]) assert.equal(oneBuyerText.includes(secret), false, `aucune identité d'acheteur (${secret})`);
+    ok("1 acheteur a ouvert et contacté, sans boost : ouvreurs, ouvertures et contacts « moins de 5 », aucune ligne de boost ni de taux d'ouverture, « Aucun boost sur cette annonce : tout est organique. », aucune identité");
+    await shot(mSellerPage, "42-annonce-mesures-moins-de-5");
+
+    step("Boost d'administration : B1 (navigateur), B2 à B5 (API) voient l'annonce « Sponsorisé », l'ouvrent et contactent ; S voit les chiffres et l'attribution au boost");
+    const mGrant = await grantBoostByAdministration(mOfferId, "24h");
+    assert.match(mGrant, /Boost \(administration\)/);
+    await mBuyerPage.goto(`${BASE}/besoins/${mDemandId}`);
+    await refreshUntil(mBuyerPage, "l'annonce de S « Sponsorisé » dans les résultats de B1", async () => (await mCards.filter({ hasText: /190\s000\sFCFA/ }).first().getAttribute("data-sponsored")) === "true");
+    ok("B1 : après « Actualiser », la carte de l'annonce de S porte le badge « Sponsorisé »");
+    await mCards.filter({ hasText: /190\s000\sFCFA/ }).first().getByTestId("match-detail-link").click();
+    await mBuyerPage.waitForURL(new RegExp(`/besoins/${mDemandId}/offres/${mOfferId}$`));
+    await mBuyerPage.getByTestId("offer-detail").waitFor();
+    assert.equal(await mBuyerPage.getByTestId("offer-detail").getAttribute("data-sponsored"), "true");
+    assert.equal(await mBuyerPage.getByTestId("offer-detail").getByText("Sponsorisé", { exact: true }).count(), 1, "le badge « Sponsorisé » est visible sur la fiche");
+    assert.ok(norm(await mBuyerPage.getByTestId("offer-detail").textContent()).includes("parmi des résultats déjà pertinents"), "la précision « parmi des résultats déjà pertinents » accompagne le badge");
+    ok("fiche de B1 : badge « Sponsorisé » (relu par le serveur), même précision que sur la liste");
+    await shot(mBuyerPage, "43-fiche-sponsorisee");
+    for (const { label, session, demandId } of mApiBuyers) {
+      const client = session.client();
+      const page = await client.demands.storedMatches(demandId, { sort: "relevance", limit: 100 });
+      assert.equal(page.items.find((item) => item.candidateId === mOfferId)?.sponsored, true, `${label} : annonce sponsorisée dans ses résultats`);
+      assert.equal((await client.demands.offer(demandId, mOfferId)).item.sponsored, true, `${label} : fiche sponsorisée`);
+      assert.equal((await client.demands.contactOffer(demandId, mOfferId)).phone, mSellerE164, `${label} : numéro vérifié`);
+    }
+    ok("B2 à B5 : « Sponsorisé » dans leurs résultats et sur la fiche, numéro vérifié révélé");
+    await mSellerPage.goto(`${BASE}/vendeur/annonces/${mOfferId}`);
+    await mSellerPage.getByTestId("stats-lines-7d").waitFor();
+    assert.equal(await mSellerPage.getByTestId("stats-no-boost").count(), 0, "un boost existe : la phrase « aucun boost » disparaît");
+    assert.equal(await statValue("7d", "exposed"), "environ 5 acheteurs");
+    assert.equal(await statValue("7d", "openers"), "environ 5 acheteurs");
+    // L'annonce est neuve : cinq acheteurs. Aucun compte exact : « environ 5 » (5 à 8) ; les 5 ont ouvert après avoir vu l'annonce sponsorisée (B1 a rouvert après le boost) : la part attribuée est « environ 5 »,
+    // la part organique « moins de 5 » (0).
+    assert.equal(await statValue("7d", "openers-boost"), "environ 5 acheteurs", "les cinq ont ouvert après avoir vu l'annonce sponsorisée");
+    assert.equal(await statValue("7d", "openers-organic"), "moins de 5 acheteurs", "0 acheteur organique : « moins de 5 » (zéro n'est pas exact)");
+    assert.equal(await mSellerPage.getByTestId("stats-few").count(), 0, "des chiffres « environ N » : plus de « peu d'activité »");
+    assert.equal(await statValue("7d", "contacts"), "environ 5 acheteurs");
+    assert.equal(await statValue("7d", "contacts-boost"), "moins de 5 acheteurs", "4 contacts attribués (B2 à B5) : moins de 5");
+    assert.equal(await statValue("7d", "contacts-organic"), "moins de 5 acheteurs", "1 contact organique (B1, avant le boost) : moins de 5");
+    assert.equal(await statValue("7d", "open-rate"), "pas assez d'acheteurs pour un pourcentage", "environ 5 sur environ 5 : moins de 10, aucun pourcentage");
+    assert.equal(await statValue("7d", "contact-rate"), "pas assez d'acheteurs pour un pourcentage");
+    // 30 jours et depuis la publication : les mêmes valeurs (annonce neuve).
+    await mSellerPage.getByTestId("stats-period-30d").click();
+    assert.equal(await statValue("30d", "openers"), "environ 5 acheteurs");
+    await mSellerPage.getByTestId("stats-period-all").click();
+    assert.equal(await statValue("all", "contacts"), "environ 5 acheteurs");
+    const boostBlock = mSellerPage.getByTestId("stats-boost").first();
+    assert.match(norm(await boostBlock.locator(".text-\\[13px\\].font-bold").first().textContent()), /^Boost de 24 h · en cours$/);
+    const boostValue = async (key: string) => norm(await boostBlock.locator(`[data-stat="${key}"] [data-stat-value]`).textContent());
+    assert.equal(await boostValue("exposed"), "environ 5 acheteurs");
+    assert.equal(await boostValue("sponsored"), "environ 5 acheteurs");
+    assert.equal(await boostValue("opens"), "environ 5 acheteurs", "ouvreurs attribués à ce boost");
+    assert.equal(await boostValue("contacts"), "moins de 5 acheteurs", "4 contacts attribués à ce boost");
+    assert.equal(await boostValue("open-rate"), "pas assez d'acheteurs pour un pourcentage");
+    assert.equal(await boostValue("contact-rate"), "pas assez d'acheteurs pour un pourcentage");
+    const allText = norm(await mSellerPage.getByTestId("offer-stats").innerText());
+    for (const secret of [mBuyerLocal, mBuyerLocal.slice(1), mBuyerLocal.slice(-8), "+225"]) assert.equal(allText.includes(secret), false, `aucune identité d'acheteur (${secret})`);
+    assert.equal(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/.test(allText), false, "aucun identifiant (UUID) affiché");
+    assert.equal(/moins de 3/i.test(allText), false, "plus aucun « moins de 3 »");
+    assert.ok(allText.includes("Pour protéger les acheteurs, les chiffres sont arrondis à 5 près et les petits nombres ne sont pas détaillés."), "la phrase d'arrondi est affichée");
+    ok("5 acheteurs : exposés, ouvreurs, contacts « environ 5 » ; part attribuée « environ 5 », part organique et contacts attribués « moins de 5 », aucun pourcentage ; bloc « Par boost » en cours ; aucune identité");
+    await shot(mSellerPage, "44-annonce-mesures-cinq-acheteurs");
+    await mSellerContext.close();
+    await mBuyerContext.close();
 
     await sellerContext.close();
     await buyerContext.close();
