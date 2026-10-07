@@ -883,12 +883,15 @@ test("GET : plus récentes d'abord, limite par défaut 20, limite 50, limite exp
 
 // ═════════════ 11. Concurrence ═════════════
 
-async function waitForQuoteLockWaiters(expected: number, timeoutMs: number): Promise<number> {
+/** Attentes du verrou de cotation DE CETTE OFFRE, dans cette base : `pg_locks` est global à l'instance, les attentes d'une autre exécution (autre offre) ne comptent pas. */
+async function waitForQuoteLockWaiters(offerId: string, expected: number, timeoutMs: number): Promise<number> {
   const deadline = Date.now() + timeoutMs;
   let waiting = 0;
   while (Date.now() < deadline) {
     waiting = (await pool.query<{ n: number }>(
-      "SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted AND classid::bigint = $1", [BOOST_QUOTE_LOCK_NAMESPACE])).rows[0].n;
+      `SELECT count(*)::int AS n FROM pg_locks
+        WHERE locktype = 'advisory' AND NOT granted AND classid::bigint = $1 AND objid = hashtext($2::text)::oid
+          AND database = (SELECT oid FROM pg_database WHERE datname = current_database())`, [BOOST_QUOTE_LOCK_NAMESPACE, offerId])).rows[0].n;
     if (waiting >= expected) return waiting;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
@@ -911,7 +914,7 @@ test("concurrence : 6 POST simultanés (6 pools, verrou de l'offre tenu jusqu'à
     await holder.query("BEGIN");
     await holder.query("SELECT pg_advisory_xact_lock($1::int, hashtext($2::text))", [BOOST_QUOTE_LOCK_NAMESPACE, offer.id]);
     const attempts = concurrent.map((each) => post(offer.id, { body: { durationCode: "3d" }, handlers: each }));
-    waiting = await waitForQuoteLockWaiters(6, 4_000);
+    waiting = await waitForQuoteLockWaiters(offer.id, 6, 4_000);
     await holder.query("COMMIT");
     results = await Promise.all(attempts);
   } finally {

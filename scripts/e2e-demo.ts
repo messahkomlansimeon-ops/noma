@@ -22,7 +22,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { E2E_BASE, E2E_SERVER_LOG, awaitOtpLine, demoSeedByAdministration } from "./e2e-common";
+import { E2E_BASE, E2E_SERVER_LOG, awaitOtpLine, demoSeedByAdministration, waitForValue } from "./e2e-common";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require("../poc/node_modules/playwright") as typeof import("../poc/node_modules/playwright");
@@ -172,7 +172,7 @@ async function main(): Promise<void> {
     assert.match(demandsText, /9 annonces correspondent/);
     assert.match(demandsText, /\d annonces correspondent/);
     await buyer.getByRole("link", { name: /Décrire un besoin/ }).waitFor();
-    assert.match(await buyer.locator("[data-unread-summary]").innerText(), /3 notifications non lues/);
+    await waitForValue("résumé des notifications non lues de l'accueil", async () => (await buyer.locator("[data-unread-summary]").innerText({ timeout: 1_000 })).replace(/\s+/g, " ").trim(), (value) => /3 notifications non lues/.test(value), "/3 notifications non lues/");
     assert.equal(await buyer.locator('[data-role-switcher] a[href="/admin"]').count(), 0, "lot D3 : l'acheteur ne voit pas l'onglet Admin");
     assert.equal(await buyer.locator('[data-role-switcher] a[href="/vendeur"]').count(), 1);
     assert.equal(await buyer.locator('a[href^="/offre/"]').count(), 0, "aucune annonce publique listée sur l'accueil");
@@ -364,8 +364,7 @@ async function main(): Promise<void> {
     assert.match(rowText, /Annonce : Apple iPhone 12 128 Go/);
     assert.ok(rowText.includes(FIRST));
     assert.equal(/Alex|0700000101|07 00 00 01 01/.test(rowText), false, "aucune identité de l'acheteur");
-    await vendor.getByTestId("messages-badge").first().waitFor();
-    assert.equal((await vendor.getByTestId("messages-badge").first().innerText()).trim(), "1", "pastille : une conversation non lue");
+    await waitForValue("pastille des messages du vendeur (une conversation non lue)", async () => (await vendor.getByTestId("messages-badge").first().innerText({ timeout: 1_000 })).trim(), (value) => value === "1", '"1"');
     await checkClean(vendor, "messages vendeur");
     await shot(vendor, "16-messages-vendeur");
     await sellerRow.click();

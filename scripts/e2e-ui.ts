@@ -1819,6 +1819,27 @@ async function main(): Promise<void> {
     nPage.on("request", (request) => {
       if (/\/api\/notifications\?limit=1$/.test(request.url())) nCountRequests.push(request.url());
     });
+    /**
+     * Pastilles de non-lues affichées (une valeur par pastille). Le compteur est mis à jour de façon ASYNCHRONE (lecture réseau, magasin partagé) : jamais de lecture
+     * immédiate, toujours une attente BORNÉE de la valeur attendue. Lecture atomique (aucune attente implicite d'un élément qui disparaît). Avec `reload`, /alertes est
+     * rechargée entre deux séries d'essais (la notification naît quand le worker de matching a passé) ; l'échec dit la valeur observée.
+     */
+    const nBadgeValues = (): Promise<string[]> =>
+      nPage.getByTestId("unread-badge").evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? "").replace(/\s+/g, " ").trim()));
+    const nWaitBadges = async (label: string, expected: readonly string[], timeoutMs: number, reload: boolean): Promise<void> => {
+      const deadline = Date.now() + timeoutMs;
+      let observed: string[] = [];
+      do {
+        if (reload) await nPage.goto(`${BASE}/alertes`);
+        const round = Date.now() + 6_000;
+        do {
+          observed = await nBadgeValues();
+          if (observed.length === expected.length && observed.every((value, index) => value === expected[index])) return;
+          await sleep(250);
+        } while (Date.now() < round && Date.now() < deadline);
+      } while (reload && Date.now() < deadline);
+      assert.fail(`${label} : pastilles attendues ${JSON.stringify(expected)}, observées ${JSON.stringify(observed)} après ${timeoutMs} ms`);
+    };
     await loginViaUi(nPage, localPhone(701), "/alerte/nouvelle", (url) => url.pathname === "/alerte/nouvelle");
     await nPage.getByPlaceholder(/Un iPhone 12 en bon état/).fill(`Je cherche un ${nTitle}`);
     await nPage.getByRole("button", { name: "Téléphones", exact: true }).click();
@@ -1846,18 +1867,7 @@ async function main(): Promise<void> {
     await shot(nPage, "50-besoin-suivi-actif");
 
     const nFirst = await nPublish("A1", "60 000");
-    await pollUntil("la pastille de notifications de l'acheteur", async () => {
-      await nPage.goto(`${BASE}/alertes`);
-      try {
-        await nPage.getByTestId("unread-badge").first().waitFor({ timeout: 3_000 });
-        return true as const;
-      } catch {
-        return null;
-      }
-    }, WORKER_TIMEOUT_MS, "le worker de matching tourne-t-il sur la même base ?");
-    const badges = nPage.getByTestId("unread-badge");
-    assert.equal(await badges.count(), 2, "la pastille est dans l'en-tête de la page et sur l'onglet « Alertes »");
-    for (let index = 0; index < 2; index += 1) assert.equal(norm(await badges.nth(index).textContent()), "1");
+    await nWaitBadges("la pastille de notifications de l'acheteur (dans l'en-tête de la page et sur l'onglet « Alertes »), le worker de matching tourne-t-il sur la même base ?", ["1", "1"], WORKER_TIMEOUT_MS, true);
     assert.equal(await nPage.locator('nav a[href="/alertes"] [data-testid="unread-badge"]').count(), 1, "pastille dans la navigation basse");
     ok("après le worker : pastille « 1 » dans la navigation basse (onglet Alertes) et sur le lien « Notifications »");
     await shot(nPage, "51-alertes-pastille");
@@ -1930,7 +1940,7 @@ async function main(): Promise<void> {
     await nPage.locator('[data-testid="notification-row"][data-unread="false"]').first().waitFor();
     assert.equal(norm(await nPage.getByTestId("notifications-heading").textContent()), "Tout est lu");
     assert.equal(await nPage.getByRole("button", { name: "Tout marquer comme lu" }).isDisabled(), true);
-    assert.equal(await nPage.getByTestId("unread-badge").count(), 0, "plus de pastille");
+    await nWaitBadges("« Tout marquer comme lu » : plus de pastille", [], 10_000, false);
     const nWeightRead = await nRows.first().locator(".font-medium").first().evaluate((node) => Number(getComputedStyle(node).fontWeight));
     assert.ok(nWeightRead < 700, `lue : plus en gras (${nWeightRead})`);
     ok("« Tout marquer comme lu » : élément lu (plus en gras), « Tout est lu », bouton éteint, pastille disparue");
@@ -1982,16 +1992,7 @@ async function main(): Promise<void> {
     assert.match(await nHeadline(), /^Suivi actif jusqu'au \d{2}\/\d{2}\/\d{4}$/);
     ok(`« Reprendre » : « ${nUntilResumed} » ; « Prolonger de 30 jours » : « ${await nHeadline()} »`);
     const nThird = await nPublish("A3", "58 000");
-    await pollUntil("la pastille après la reprise", async () => {
-      await nPage.goto(`${BASE}/alertes`);
-      try {
-        await nPage.getByTestId("unread-badge").first().waitFor({ timeout: 3_000 });
-        return true as const;
-      } catch {
-        return null;
-      }
-    }, WORKER_TIMEOUT_MS);
-    assert.equal(norm(await nPage.getByTestId("unread-badge").first().textContent()), "1");
+    await nWaitBadges("la pastille après la reprise, le worker de matching tourne-t-il sur la même base ?", ["1", "1"], WORKER_TIMEOUT_MS, true);
     await nPage.getByRole("link", { name: /Notifications/ }).first().click();
     await nPage.getByTestId("notification-row").nth(2).waitFor();
     const nListText = norm(await nPage.locator("main").innerText());

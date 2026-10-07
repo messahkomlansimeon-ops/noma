@@ -5,7 +5,7 @@ import { Pool, type PoolClient, type PoolConfig } from "pg";
 import { createDemand, createOffer, createUser } from "../../lib/server/catalog";
 import { CatalogValidationError } from "../../lib/server/catalog/errors";
 import type { DemandRecord, OfferRecord } from "../../lib/server/catalog/types";
-import { BOOST_PURCHASE_LOCK_NAMESPACE } from "../../lib/server/boost/boost-config";
+import { BOOST_PURCHASE_LOCK_NAMESPACE, BOOST_QUOTE_LOCK_NAMESPACE, BOOST_SCOPE_LOCK_NAMESPACE } from "../../lib/server/boost/boost-config";
 import {
   BoostError, cancelOfferBoost, expireOfferBoosts, grantOfferBoost, readBoostSlots,
 } from "../../lib/server/boost/boosts";
@@ -29,7 +29,7 @@ import { applyProviderEvent, createTopupIntent, type ProviderEvent } from "../..
 import { addReachableBuyer, insertEvaluation } from "./boost-fixtures";
 import { runScript } from "./run-script";
 import {
-  createTemporarySchemaName, openVerifiedIsolatedPool, openVerifiedTestDatabase, quoteTemporarySchema, type DedicatedTestDatabase,
+  createTemporarySchemaName, openVerifiedIsolatedPool, openVerifiedTestDatabase, ownAdvisoryLocks, quoteTemporarySchema, type DedicatedTestDatabase,
 } from "./test-database";
 
 // ───────────── infrastructure ─────────────
@@ -2120,9 +2120,10 @@ test("portée revérifiée à l'achat : SOUS le verrou du périmètre (verrous d
       beforeReachDemand: async (index) => {
         events.push(`portée:${index}`);
         if (index !== 0) return;
-        const locks = await observer.query<{ namespace: number }>("SELECT classid::int AS namespace FROM pg_locks WHERE locktype = 'advisory' AND granted AND classid IN (1314664948, 1314664949, 1314664951)");
-        const count = (namespace: number) => locks.rows.filter((row) => row.namespace === namespace).length;
-        seen = { scope: count(1_314_664_948), idempotency: count(1_314_664_951), quote: count(1_314_664_949) };
+        // Seulement NOS sessions (`RUN_ID`), dans NOTRE base : `pg_locks` est global à l'instance, une autre exécution tient des verrous des mêmes espaces.
+        const locks = await ownAdvisoryLocks(observer, RUN_ID, [BOOST_SCOPE_LOCK_NAMESPACE, BOOST_QUOTE_LOCK_NAMESPACE, BOOST_PURCHASE_LOCK_NAMESPACE], { granted: true });
+        const count = (namespace: number) => locks.filter((row) => row.namespace === namespace).length;
+        seen = { scope: count(BOOST_SCOPE_LOCK_NAMESPACE), idempotency: count(BOOST_PURCHASE_LOCK_NAMESPACE), quote: count(BOOST_QUOTE_LOCK_NAMESPACE) };
       },
       beforeDebit: async () => { events.push("avant-débit"); },
       afterDebit: async () => { events.push("après-débit"); },

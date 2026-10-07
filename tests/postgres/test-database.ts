@@ -136,3 +136,42 @@ export async function openVerifiedIsolatedPool(
     throw error;
   }
 }
+
+/** Un verrou consultatif vu dans `pg_locks` : espace (classid), clé (objid : l'entier de `hashtext` lu comme un OID, donc non signé), accordé ou en attente. */
+export interface AdvisoryLockRow {
+  namespace: number;
+  key: number;
+  granted: boolean;
+}
+
+/**
+ * Verrous consultatifs d'espaces donnés qui appartiennent aux SESSIONS D'UN SEUL FICHIER D'ESSAI. `pg_locks` est global à l'instance : d'autres exécutions (agents,
+ * terminaux) tiennent des verrous du même espace sur la même base de test. Le filtre retient donc (1) la base courante, (2) les sessions dont l'`application_name`
+ * commence par `applicationPrefix` (chaque fichier nomme ses pools avec un préfixe unique à l'exécution : voir `uniqueApplicationPrefix`).
+ */
+export async function ownAdvisoryLocks(
+  db: { query: Pool["query"] },
+  applicationPrefix: string,
+  namespaces: readonly number[],
+  options: { granted?: boolean } = {},
+): Promise<AdvisoryLockRow[]> {
+  const result = await db.query<{ namespace: string; key: string; granted: boolean }>(
+    `SELECT l.classid::bigint AS namespace, l.objid::bigint AS key, l.granted
+       FROM pg_locks l
+       JOIN pg_stat_activity a ON a.pid = l.pid
+      WHERE l.locktype = 'advisory'
+        AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())
+        AND a.datname = current_database()
+        AND left(a.application_name, length($1::text)) = $1::text
+        AND l.classid::bigint = ANY($2::bigint[])
+        AND ($3::boolean IS NULL OR l.granted = $3::boolean)
+      ORDER BY 1, 2, 3`,
+    [applicationPrefix, [...namespaces], options.granted ?? null],
+  );
+  return result.rows.map((row) => ({ namespace: Number(row.namespace), key: Number(row.key), granted: row.granted }));
+}
+
+/** Préfixe d'`application_name` unique à cette exécution d'un fichier d'essai (pid + aléa) : `<étiquette>_<pid>_<aléa>`. */
+export function uniqueApplicationPrefix(label: string): string {
+  return `${label}_${process.pid}_${randomUUID().slice(0, 8)}`;
+}

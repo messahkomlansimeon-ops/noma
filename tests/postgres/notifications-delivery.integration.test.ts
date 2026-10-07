@@ -363,20 +363,68 @@ async function simulate(s: Scenario, transport: NotificationTransport, window: {
   return arrived;
 }
 
-test("création : une ligne d'envoi n'est envoyable qu'après la fenêtre de collecte de 15 minutes (next_attempt_at = created_at + 15 min exactement)", async () => {
-  await resetAll();
-  await scenario({ offers: 3, align: false });
-  const rows = await deliveries();
-  assert.equal(rows.length, 3);
-  for (const row of rows) assert.equal(row.next_attempt_at.getTime() - row.created_at.getTime(), EXTERNAL_COLLECTION_WINDOW_MS, "created_at + 15 minutes");
-  const { transport, calls } = spy();
-  const last = Math.max(...rows.map((row) => row.created_at.getTime()));
-  const early = await step(transport, new Date(Math.min(...rows.map((row) => row.next_attempt_at.getTime())) - 1));
-  assert.equal(early.users, 0);
-  assert.equal(calls.length, 0, "avant la fin de la fenêtre de la première ligne : rien");
-  const due = await step(transport, new Date(last + EXTERNAL_COLLECTION_WINDOW_MS));
-  assert.equal(due.messages, 1);
-  assert.equal(calls[0].count, 3, "le message emporte TOUT ce qui est en attente");
+/**
+ * Instants d'ARRIVÉE de l'essai de la fenêtre de collecte (jour de `NOW`, UTC). Jamais l'heure réelle : un jeu FIXE qui couvre le jour, chaque bord des heures calmes
+ * (22 h – 7 h) et le passage de minuit. L'horloge de l'essai est injectable : `NOMA_TEST_CLOCK` (« HH:MM » UTC le jour de `NOW`, ou un instant ISO complet) la remplace
+ * par UN seul instant, pour prouver que l'essai est vrai à n'importe quelle heure (aucune dépendance à l'heure réelle).
+ */
+function collectionArrivals(): Date[] {
+  const forced = process.env.NOMA_TEST_CLOCK?.trim();
+  if (forced) {
+    const hhmm = /^(\d{1,2}):(\d{2})$/.exec(forced);
+    const instant = hhmm ? at(Number(hhmm[1]), Number(hhmm[2])) : new Date(forced);
+    assert.ok(!Number.isNaN(instant.getTime()), `NOMA_TEST_CLOCK illisible : ${forced}`);
+    return [instant];
+  }
+  return [at(0, 30), at(6, 44), at(6, 45), at(6, 59), at(7, 0), at(12, 0), at(21, 43), at(21, 44), at(21, 45), at(21, 46), at(23, 59)];
+}
+
+/** Heures calmes, calculées ici à part de la production (22 h inclus – 7 h exclu, UTC) : le jour et l'heure de fin attendus d'un instant calme. */
+const isQuiet = (instant: Date): boolean => instant.getUTCHours() >= 22 || instant.getUTCHours() < 7;
+const quietEnd = (instant: Date): Date => at(7, 0, 0, new Date(instant.getTime() + (instant.getUTCHours() >= 22 ? DAY : 0)));
+
+test("création : une ligne d'envoi n'est envoyable qu'après la fenêtre de collecte de 15 minutes (next_attempt_at = created_at + 15 min exactement), à toute heure d'arrivée", async () => {
+  for (const arrival of collectionArrivals()) {
+    const label = arrival.toISOString().slice(0, 16);
+    await resetAll();
+    await scenario({ offers: 3, align: false });
+    // 1. La formule, sur les lignes réellement créées (horloge de la base) : exacte, quelle que soit l'heure.
+    const created = await deliveries();
+    assert.equal(created.length, 3);
+    for (const row of created) assert.equal(row.next_attempt_at.getTime() - row.created_at.getTime(), EXTERNAL_COLLECTION_WINDOW_MS, `${label} : created_at + 15 minutes`);
+    // 2. Les lignes sont recalées sur l'instant d'arrivée de l'essai (une par seconde, la formule conservée) : le comportement de l'envoi ne dépend plus de l'heure réelle.
+    await pool.query(
+      `UPDATE notification_deliveries d SET created_at = x.t, updated_at = x.t, next_attempt_at = x.t + ($2::bigint * interval '1 millisecond')
+         FROM (SELECT id, $1::timestamptz + ((row_number() OVER (ORDER BY created_at, id)) - 1) * interval '1 second' AS t FROM notification_deliveries) x WHERE d.id = x.id`,
+      [arrival, EXTERNAL_COLLECTION_WINDOW_MS],
+    );
+    await pool.query("UPDATE demands SET notify_until = $1::timestamptz + interval '30 days'", [arrival]);
+    const rows = await deliveries();
+    for (const row of rows) assert.equal(row.next_attempt_at.getTime() - row.created_at.getTime(), EXTERNAL_COLLECTION_WINDOW_MS, `${label} : recalage fidèle`);
+    const { transport, calls } = spy();
+    const last = Math.max(...rows.map((row) => row.created_at.getTime()));
+    const early = await step(transport, new Date(Math.min(...rows.map((row) => row.next_attempt_at.getTime())) - 1));
+    assert.equal(early.users, 0, label);
+    assert.equal(calls.length, 0, `${label} : avant la fin de la fenêtre de la première ligne : rien`);
+    const windowEnd = new Date(last + EXTERNAL_COLLECTION_WINDOW_MS);
+    const due = await step(transport, windowEnd);
+    if (!isQuiet(windowEnd)) {
+      assert.equal(due.messages, 1, `${label} : fin de fenêtre ${windowEnd.toISOString()} hors heures calmes : le message part`);
+      assert.equal(calls[0].count, 3, `${label} : le message emporte TOUT ce qui est en attente`);
+    } else {
+      // La fenêtre se termine dans les heures calmes : rien ne part, l'envoi est reporté à 7 h (et part alors, en un seul message).
+      const morning = quietEnd(windowEnd);
+      assert.equal(due.messages, 0, `${label} : fin de fenêtre ${windowEnd.toISOString()} dans les heures calmes : rien ne part`);
+      assert.equal(due.deferred, 3, label);
+      assert.equal(calls.length, 0, label);
+      for (const row of await deliveries()) assert.equal(row.next_attempt_at.getTime(), morning.getTime(), `${label} : reporté à 7 h`);
+      assert.equal((await step(transport, new Date(morning.getTime() - 1))).users, 0, label);
+      assert.equal((await step(transport, morning)).messages, 1, `${label} : à 7 h le message part`);
+      assert.equal(calls[0].count, 3, label);
+    }
+    assert.equal(calls.length, 1, label);
+    assert.deepEqual(await byStatus(), { sent: 3 }, label);
+  }
 });
 
 test("rafale : 12 annonces en 1 seconde → UN message de 12, 15 minutes après la première (rien avant)", async () => {

@@ -58,6 +58,34 @@ export async function pollUntil<T>(
   throw new Error(`${label} : délai de ${timeoutMs} ms dépassé — ${hint}`);
 }
 
+/**
+ * Attente BORNÉE d'une VALEUR (jamais « l'élément est apparu, donc sa valeur est la bonne ») : un compteur qui se met à jour de façon asynchrone (lecture réseau, flux en direct,
+ * magasin partagé) ne se lit pas une fois pour toutes. `read` ne doit pas attendre longtemps (utiliser `{ timeout }` ou une lecture atomique) ; une lecture qui échoue compte comme
+ * « non lisible ». L'échec nomme la valeur attendue et la dernière valeur OBSERVÉE.
+ */
+export async function waitForValue<T>(
+  label: string,
+  read: () => Promise<T>,
+  accept: (value: T) => boolean,
+  expectedLabel: string,
+  timeoutMs = 15_000,
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  let observed = "(aucune lecture)";
+  for (;;) {
+    try {
+      const value = await read();
+      if (accept(value)) return value;
+      observed = JSON.stringify(value);
+    } catch (error) {
+      observed = `(illisible : ${error instanceof Error ? error.message.split("\n")[0] : String(error)})`;
+    }
+    if (Date.now() >= deadline) break;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`${label} : valeur attendue ${expectedLabel}, observée ${observed} après ${timeoutMs} ms`);
+}
+
 /** Un « navigateur » : jar de cookies et en-tête Origin ; AUCUN en-tête du proxy de confiance (le relais les écrit). */
 export class RelaySession {
   readonly cookies = new Map<string, string>();

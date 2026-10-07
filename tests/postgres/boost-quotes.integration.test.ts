@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, test } from "node:test";
-import { Pool } from "pg";
+import { Pool, type PoolConfig } from "pg";
 import { createDemand, createOffer, createUser } from "../../lib/server/catalog";
 import { CatalogValidationError } from "../../lib/server/catalog/errors";
 import type { DemandRecord, OfferRecord } from "../../lib/server/catalog/types";
@@ -11,7 +11,7 @@ import {
 } from "../../lib/server/boost/quotes";
 import { createReachGate } from "../../lib/server/boost/gate";
 import { createReuseRecheckGuard, processReuseRecheckGuard } from "../../lib/server/boost/recheck-guard";
-import { BOOST_QUOTE_RATE_LIMIT, BOOST_QUOTE_RATE_NAMESPACE } from "../../lib/server/boost/boost-config";
+import { BOOST_QUOTE_LOCK_NAMESPACE, BOOST_QUOTE_RATE_LIMIT, BOOST_QUOTE_RATE_NAMESPACE, BOOST_SCOPE_LOCK_NAMESPACE } from "../../lib/server/boost/boost-config";
 import {
   BOOST_PURCHASE_REACH_BUDGET_MS, BOOST_QUOTE_REACH_BUDGET_MS, BOOST_REACH_COUNT_LIMIT, BOOST_REACH_SEARCH_LIMIT, BOOST_REACH_STATEMENT_TIMEOUT_MS, BOOST_REUSE_REACH_BUDGET_MS, computeBoostReach, isReachUndetermined,
 } from "../../lib/server/boost/reach";
@@ -23,12 +23,18 @@ import { runMigrations } from "../../lib/server/postgres/migrations";
 import { EVALUATION_SUMMARY_JSON, PREFERENCES_SUMMARY_JSON, REACHABLE_LIST_SIZE, SCORING_SUMMARY_JSON, slowReachPool } from "./boost-fixtures";
 import { runScript } from "./run-script";
 import {
-  createTemporarySchemaName, openVerifiedIsolatedPool, openVerifiedTestDatabase, quoteTemporarySchema, type DedicatedTestDatabase,
+  createTemporarySchemaName, openVerifiedIsolatedPool, openVerifiedTestDatabase, ownAdvisoryLocks, quoteTemporarySchema, uniqueApplicationPrefix, type DedicatedTestDatabase,
 } from "./test-database";
 
 const HASH = computeScoringConfigHash(normalizeScoringConfig());
 const schema = createTemporarySchemaName();
 const quoted = quoteTemporarySchema(schema);
+/**
+ * Chaque pool de ce fichier porte un `application_name` unique à cette exécution : `pg_locks` est global à l'instance PostgreSQL (d'autres exécutions tiennent des
+ * verrous consultatifs des MÊMES espaces sur la même base de test), les vérifications de verrous ne regardent donc que NOS sessions (`ownAdvisoryLocks`).
+ */
+const APPLICATION = uniqueApplicationPrefix("bqu");
+const ownSessions = (config: PoolConfig): Pool => new Pool({ ...config, application_name: APPLICATION });
 const emptySchema = createTemporarySchemaName();
 let admin: Pool, pool: Pool;
 let target: DedicatedTestDatabase;
@@ -41,7 +47,7 @@ before(async () => {
   target = opened.target;
   await admin.query(`CREATE SCHEMA ${quoted}`);
   await admin.query(`CREATE SCHEMA ${quoteTemporarySchema(emptySchema)}`);
-  pool = await openVerifiedIsolatedPool(target, schema);
+  pool = await openVerifiedIsolatedPool(target, schema, ownSessions);
   firstMigration = await runMigrations(pool);
 });
 
@@ -720,7 +726,7 @@ test("réglages tarifaires : la catégorie de l'offre (casse et espaces ignorés
 async function distinctPools(count: number): Promise<Pool[]> {
   const pools: Pool[] = [];
   for (let index = 0; index < count; index++) {
-    const extra = await openVerifiedIsolatedPool(target, schema);
+    const extra = await openVerifiedIsolatedPool(target, schema, ownSessions);
     extraPools.push(extra);
     pools.push(extra);
   }
@@ -1152,8 +1158,9 @@ test("devis (lot P3) : AUCUN verrou tenu pendant le calcul de la portée — un 
   const slowOutcome = slow.then((value) => ({ value }), (error: unknown) => ({ error }));
   await inReach;
   try {
-    const locks = await observer.query("SELECT classid::int AS namespace FROM pg_locks WHERE locktype = 'advisory' AND granted AND classid IN (1314664948, 1314664949, 1314664952)");
-    assert.deepEqual(locks.rows, [], "aucun verrou consultatif de périmètre, de cotation ni de vendeur pendant le calcul de la portée");
+    // Seulement NOS sessions, dans NOTRE base : un verrou de périmètre, de cotation ou de vendeur tenu par une autre exécution n'est pas une régression de ce test.
+    const locks = await ownAdvisoryLocks(observer, APPLICATION, [BOOST_SCOPE_LOCK_NAMESPACE, BOOST_QUOTE_LOCK_NAMESPACE, BOOST_QUOTE_RATE_NAMESPACE], { granted: true });
+    assert.deepEqual(locks, [], "aucun verrou consultatif de périmètre, de cotation ni de vendeur pendant le calcul de la portée");
     const startedAt = Date.now();
     const concurrent = await quote(offer, "3d", observer);
     assert.equal(concurrent.status, "available", "un devis d'une autre durée aboutit pendant le calcul du premier");
@@ -1409,7 +1416,7 @@ test("limite de débit (lot P3) : 30 demandes SIMULTANÉES du même vendeur (off
   const offers: OfferRecord[] = [];
   for (let index = 0; index < 10; index++) offers.push(await makeOffer({ ownerId: seller }));
   await addBuyer(offers[0], { listSize: 7 });
-  const concurrentPool = new Pool({ connectionString: target.connectionString, max: 12, options: `-c search_path=${schema}` });
+  const concurrentPool = new Pool({ connectionString: target.connectionString, max: 12, options: `-c search_path=${schema}`, application_name: APPLICATION });
   extraPools.push(concurrentPool);
   const plan = offers.flatMap((offer) => (["24h", "3d", "7d"] as const).map((duration) => ({ offer, duration })));
   const outcomes = await Promise.all(plan.map(({ offer, duration }) => code(quote(offer, duration, concurrentPool))));
@@ -1417,7 +1424,7 @@ test("limite de débit (lot P3) : 30 demandes SIMULTANÉES du même vendeur (off
   assert.equal(outcomes.filter((outcome) => outcome === "ok").length, 20, outcomes.join(","));
   assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM boost_quotes")).n, 20, "exactement 20 devis écrits");
   // Le verrou du vendeur n'est tenu que pendant l'écriture : aucun reste après coup.
-  assert.equal((await sqlRow<{ n: number }>("SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND classid = $1", [BOOST_QUOTE_RATE_NAMESPACE])).n, 0);
+  assert.deepEqual(await ownAdvisoryLocks(pool, APPLICATION, [BOOST_QUOTE_RATE_NAMESPACE]), []);
 });
 
 test("migration 0017 (lot P3) : reach_truncated booléen (NULL permis, seulement avec reachable_buyers), index (vendeur, calculé le) présent", async () => {

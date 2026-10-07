@@ -18,6 +18,9 @@ texte public partagé avec la fiche M1 `lib/server/metrics/public-text.ts`, bran
 commande `scripts/notifications-purge.ts`.
 Commandes de test : `npm run test:notifications` (règles pures + création et suivi), `test:notifications-delivery` (envois), `test:notifications-http`, `test:notifications-purge`
 (base `TEST_DATABASE_URL` dédiée), et les modules purs du client dans `npm run test:client`.
+Les essais d'envoi ne dépendent pas de l'heure réelle (heures calmes 22 h – 7 h UTC) : l'essai de la fenêtre de collecte de 15 minutes recale ses lignes sur des instants d'arrivée
+FIXES (un jeu qui couvre le jour, chaque bord des heures calmes et minuit) ; `NOMA_TEST_CLOCK=HH:MM` (UTC, jour du 15/06/2032) ou un instant ISO le remplace par un seul instant,
+par exemple `NOMA_TEST_CLOCK=23:59 npm run test:notifications-delivery`.
 
 ## Règles exactes — la naissance d'une notification
 
