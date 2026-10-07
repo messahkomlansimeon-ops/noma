@@ -47,4 +47,6 @@ export interface VerifyOtpResult {
 export interface ResolvedSession {
   userId: string;
   expiresAt: Date;
+  /** Compte administrateur (lot D3) : un booléen, jamais un rôle ni une liste de droits. Absent = faux. L'autorisation réelle des routes d'administration relit la base. */
+  isAdmin?: boolean;
 }

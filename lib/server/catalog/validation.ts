@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 import { getPostgresPool } from "../postgres/client";
-import { looksLikePhoneNumber } from "../../phone-text";
-import { CatalogPhoneNumberError, CatalogValidationError } from "./errors";
+import { isValidNestedAttributeKey, isValidOfferAttributeKey, looksLikePhoneNumber, type OfferTextField } from "../../phone-text";
+import { CatalogAttributeKeyError, CatalogPhoneNumberError, CatalogValidationError } from "./errors";
 import type {
   CatalogContentInput,
   CatalogPagination,
@@ -153,22 +153,29 @@ export function normalizeCatalogContent(input: CatalogContentInput) {
   };
 }
 
-/** Tout texte (clés et valeurs, à toute profondeur) et tout nombre d'un objet JSON : un seul qui ressemble à un numéro de téléphone suffit. */
-function jsonCarriesPhoneNumber(value: JsonValue | undefined, depth = 0): boolean {
-  if (value === null || value === undefined || typeof value === "boolean" || depth > 8) return false;
+const JSON_DEPTH_LIMIT = 8;
+
+/** Toute valeur (texte ou nombre, à toute profondeur) d'un objet JSON : une seule qui ressemble à un numéro de téléphone suffit. Les valeurs sont contrôlées UNE PAR UNE, jamais concaténées. */
+function jsonValueCarriesPhoneNumber(value: JsonValue | undefined, depth = 0): boolean {
+  if (value === null || value === undefined || typeof value === "boolean" || depth > JSON_DEPTH_LIMIT) return false;
   if (typeof value === "string") return looksLikePhoneNumber(value);
   if (typeof value === "number") return looksLikePhoneNumber(String(value));
-  if (Array.isArray(value)) return value.some((item) => jsonCarriesPhoneNumber(item, depth + 1));
-  return Object.entries(value).some(([key, inner]) => looksLikePhoneNumber(key) || jsonCarriesPhoneNumber(inner, depth + 1));
+  if (Array.isArray(value)) return value.some((item) => jsonValueCarriesPhoneNumber(item, depth + 1));
+  return Object.values(value).some((inner) => jsonValueCarriesPhoneNumber(inner, depth + 1));
 }
 
 /**
- * Une annonce (offre) ne porte jamais de numéro de téléphone dans les champs que l'acheteur voit : catégorie, marque, modèle, variante, état, unité,
- * localisation et attributs (lot D1). L'acheteur contacte le vendeur par noma, le numéro ne se révèle que par ce contact. Lève `CatalogPhoneNumberError`
- * (message clair : « Pas de numéro de téléphone dans l'annonce : l'acheteur vous contactera par noma. »). Le texte brut de l'annonce n'est pas contrôlé : il n'est
- * jamais servi à un acheteur.
+ * Un nom d'attribut qui n'est pas écrit en lettres minuscules et tiret bas seulement. Les noms d'attributs sont les clés du niveau supérieur ; les clés d'un objet imbriqué
+ * (« value », « unit », « sourceUnit » de l'extraction) n'ont jamais de chiffre, ni de séparateur (lettres et tiret bas, majuscules admises).
  */
-export function requireNoPhoneInOfferFields(fields: {
+function jsonHasInvalidKey(value: JsonValue | undefined, depth = 0): boolean {
+  if (value === null || value === undefined || typeof value !== "object" || depth > JSON_DEPTH_LIMIT) return false;
+  if (Array.isArray(value)) return value.some((item) => jsonHasInvalidKey(item, depth + 1));
+  const valid = depth === 0 ? isValidOfferAttributeKey : isValidNestedAttributeKey;
+  return Object.entries(value).some(([key, inner]) => !valid(key) || jsonHasInvalidKey(inner, depth + 1));
+}
+
+export interface OfferTextFields {
   category?: string | null;
   brand?: string | null;
   model?: string | null;
@@ -177,9 +184,34 @@ export function requireNoPhoneInOfferFields(fields: {
   unit?: string | null;
   location?: string | null;
   attributes?: JsonObject | null;
-}): void {
-  const texts = [fields.category, fields.brand, fields.model, fields.variant, fields.condition, fields.unit, fields.location];
-  if (texts.some((text) => typeof text === "string" && looksLikePhoneNumber(text)) || jsonCarriesPhoneNumber(fields.attributes ?? null)) {
-    throw new CatalogPhoneNumberError();
+}
+
+/** Champs textuels de l'annonce dans l'ordre où ils sont contrôlés. */
+const TEXT_FIELDS_IN_ORDER = ["category", "brand", "model", "variant", "condition", "unit", "location"] as const;
+
+/** Premier champ de l'annonce dont le texte (ou une valeur d'attribut) ressemble à un numéro de téléphone ; null si aucun. Les champs ne sont jamais concaténés. */
+export function findPhoneNumberField(fields: OfferTextFields): OfferTextField | null {
+  for (const field of TEXT_FIELDS_IN_ORDER) {
+    const text = fields[field];
+    if (typeof text === "string" && looksLikePhoneNumber(text)) return field;
   }
+  return jsonValueCarriesPhoneNumber(fields.attributes ?? null) ? "attributes" : null;
+}
+
+/**
+ * Une annonce (offre) ne porte jamais de numéro de téléphone dans les champs que l'acheteur voit : catégorie, marque, modèle, variante, état, unité,
+ * localisation et attributs (lots D1 et D3). L'acheteur contacte le vendeur par noma, le numéro ne se révèle que par ce contact.
+ *  - lève `CatalogPhoneNumberError` (message clair avec le champ concerné : « Pas de numéro de téléphone dans l'annonce (champ : variante) : l'acheteur vous contactera
+ *    par noma. ») ; chaque champ et chaque valeur d'attribut est contrôlé SEUL : un numéro coupé entre plusieurs champs ou attributs n'est pas détecté (limite documentée) ;
+ *  - lève `CatalogAttributeKeyError` si un nom d'attribut (à toute profondeur) n'est pas écrit en lettres minuscules et tiret bas seulement (« tel_0708 » est refusé : un
+ *    chiffre dans un nom ne sert qu'à faire passer un numéro).
+ * Le texte brut de l'annonce n'est pas contrôlé : il n'est jamais servi à un acheteur.
+ */
+export function requireNoPhoneInOfferFields(fields: OfferTextFields): void {
+  for (const field of TEXT_FIELDS_IN_ORDER) {
+    const text = fields[field];
+    if (typeof text === "string" && looksLikePhoneNumber(text)) throw new CatalogPhoneNumberError(field);
+  }
+  if (jsonHasInvalidKey(fields.attributes ?? null)) throw new CatalogAttributeKeyError();
+  if (jsonValueCarriesPhoneNumber(fields.attributes ?? null)) throw new CatalogPhoneNumberError("attributes");
 }

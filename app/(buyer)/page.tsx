@@ -8,6 +8,7 @@ import { Sheet } from "@/components/modal";
 import { NeedForm } from "@/components/need-form";
 import { Thumb } from "@/components/thumb";
 import { Badge } from "@/components/ui";
+import { MessagesUnreadSync } from "@/components/messages-badge";
 import { UnreadSync } from "@/components/unread-badge";
 import { api, describeApiError, isUnauthorized, type BuyerHome } from "@/lib/client/api";
 import {
@@ -90,6 +91,7 @@ function BuyerHomeScreen({ home }: { home: BuyerHome }) {
   return (
     <main className="px-4">
       <UnreadSync />
+      <MessagesUnreadSync />
       <div className="flex items-center justify-between py-3">
         <LogoMark />
         <Link

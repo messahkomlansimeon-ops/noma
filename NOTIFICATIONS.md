@@ -74,7 +74,7 @@ déjà une correspondance » et la privrait de sa notification. Une annonce **an
 Titre de l'annonce (marque, modèle, variante), prix, lien vers la fiche **dans le contexte du besoin** (`/besoins/{id}/offres/{offerId}`, la fiche M1). Chaque morceau du titre est un texte saisi par
 le vendeur : il est nettoyé par les **MÊMES fonctions que les attributs publics de la fiche M1** (`lib/server/metrics/public-text.ts`) : texte **normalisé en NFKC** (chiffres pleine chasse « ０７０８… », exposants,
 chiffres mathématiques ramenés à la forme usuelle), chiffres comptés avec `\p{Nd}` (arabes-indiens « ٠٧٠٨… », dévanagari, etc. : jamais `\d`, qui ne voit que l'ASCII), caractères de contrôle, de direction ou invisibles refusés ;
-un morceau de plus de 50 caractères, ou qui ressemble à un téléphone — 9 chiffres ou plus d'affilée, séparateurs compris — est écarté. Le titre **assemblé** est contrôlé à son tour : **au plus 8 chiffres au total** (tous
+un morceau de plus de 50 caractères, ou qui ressemble à un téléphone (règle du lot D3 : `lib/phone-text.ts`, voir `MESURES.md`, section « Numéros de téléphone cachés ») est écarté. Le titre **assemblé** est contrôlé à son tour : **au plus 8 chiffres au total** (tous
 systèmes d'écriture confondus, séparateurs quelconques) ; le morceau qui ferait dépasser est retiré, les précédents restent ; « Nouvelle annonce » s'il ne reste rien. La fiche M1 applique la même fonction à ses attributs (valeur,
 unité et texte assemblé). **Jamais** : téléphone, identifiant du vendeur, texte libre (description, attributs).
 Le DTO de l'API est en liste blanche avec `contractVersion` ; le client relit chaque champ et ne suit jamais un lien venu du serveur (il le reconstruit depuis les identifiants).

@@ -241,7 +241,6 @@ export function boostStatsView(boost: BoostStatsEntry, durationText: string): Bo
 }
 
 export interface OfferStatsView {
-  matchingNeedsText: string;
   periods: PeriodView[];
   /** Vrai quand les ouvertures, les contacts et les apparitions de tout l'historique sont tous « moins de 5 » (zéro compris : on ne sait pas dire « rien »). */
   fewActivity: boolean;
@@ -251,19 +250,12 @@ export interface OfferStatsView {
   notes: string[];
 }
 
-/** « Environ 10 besoins d'acheteurs correspondent à votre annonce » : des besoins, pas des acheteurs (un acheteur peut en avoir plusieurs) ; « Moins de 5 » de 0 à 4. */
-export function activeMatchesText(needs: StatCount): string {
-  if (needs.kind === "below") return `Moins de ${needs.bound} besoins d'acheteurs correspondent à votre annonce.`;
-  return `Environ ${needs.value} besoins d'acheteurs correspondent à votre annonce.`;
-}
-
 export function offerStatsView(stats: OfferStats): OfferStatsView {
   const all = stats.periods.find((period) => period.period === "all");
   const below = (count: StatCount) => count.kind === "below";
   const noBoost = stats.boosts.length === 0;
   const fewActivity = all !== undefined && below(all.opens.total) && below(all.contacts.uniqueBuyers) && (all.exposure === null || below(all.exposure.servings));
   return {
-    matchingNeedsText: activeMatchesText(stats.activeMatches.needs),
     periods: stats.periods.map((period) => periodView(period)),
     fewActivity,
     noBoost,

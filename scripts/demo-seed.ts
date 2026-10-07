@@ -2,12 +2,17 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Pool } from "pg";
 import { activateDemand, createDemand, createOffer, createUser, getUserById, publishOffer } from "../lib/server/catalog";
+import { grantAdmin } from "../lib/server/admin/grant";
 import { BOOST_ERROR_MESSAGES, BoostError, grantOfferBoost } from "../lib/server/boost/boosts";
 import { runMatchingCycle } from "../lib/server/matching/runner";
 import { isMatchingSchemaReady } from "../lib/server/matching/schema-ready";
 import { revealOfferContact } from "../lib/server/metrics/contacts";
 import { recordOfferView } from "../lib/server/metrics/views";
 import { closePostgresPool, getPostgresPool } from "../lib/server/postgres/client";
+import { openConversation, sendMessage } from "../lib/server/social/conversations";
+import { SocialError } from "../lib/server/social/errors";
+import { addFavorite } from "../lib/server/social/favorites";
+import { declareOrder } from "../lib/server/social/orders";
 import { recordWalletTransaction } from "../lib/server/wallet/ledger";
 import {
   DEMO_ADMIN_PHONE,
@@ -15,9 +20,16 @@ import {
   DEMO_BUYER_DEMANDS,
   DEMO_BUYER_PHONE,
   DEMO_CONTACTERS,
+  DEMO_CONVERSATION_DEMAND_KEY,
+  DEMO_CONVERSATION_MESSAGES,
+  DEMO_CONVERSATION_OFFER_KEY,
   DEMO_EXTRA_BUYER_COUNT,
+  DEMO_FAVORITE_OFFER_KEY,
   DEMO_OFFERS,
   DEMO_OPENERS,
+  DEMO_ORDER_BUYER_INDEX,
+  DEMO_ORDER_OFFER_KEY,
+  DEMO_ORDER_PRICE_XOF,
   DEMO_SEED_LOCK_NAMESPACE,
   DEMO_SEED_USAGE,
   DEMO_VENDOR_CREDIT_REFERENCE,
@@ -38,7 +50,7 @@ import {
 /**
  * `npm run demo:seed` (lot D1) : peuple une base d'ESSAI (`noma_essai`) d'un marché de démonstration réaliste, REJOUABLE, pour présenter noma à des investisseurs :
  * 8 vendeurs (dont le vendeur démo), 30 annonces publiées dans 4 catégories, trois comptes de démonstration aux numéros fixes (acheteur +225 07 00 00 01 01,
- * vendeur +225 07 00 00 02 02, admin +225 07 00 00 03 03), 3 besoins actifs avec correspondances pour l'acheteur démo, 4 annonces dont une boostée, un solde de crédits,
+ * vendeur +225 07 00 00 02 02, admin +225 07 00 00 03 03, ce dernier administrateur), 3 besoins actifs avec correspondances pour l'acheteur démo, 4 annonces dont une boostée, un solde de crédits,
  * des ouvertures et des contacts d'acheteurs fictifs pour le vendeur démo, et quelques notifications pour l'acheteur démo (annonces publiées APRÈS ses besoins).
  *
  * Tout passe par les VRAIS services (catalogue, publication, activation d'un besoin, attribution d'un boost, journal des ouvertures et des contacts, grand livre) ; le worker du
@@ -59,6 +71,11 @@ export interface DemoSeedReport {
   contactsRecorded: number;
   creditAdded: boolean;
   boost: "granted" | "existing" | "refused";
+  /** Lot D2 : rôle d'administrateur attribué ce coup-ci, messages écrits, favori et commande de démonstration créés ce coup-ci. */
+  adminGranted: boolean;
+  messagesWritten: number;
+  favoriteAdded: boolean;
+  orderDeclared: boolean;
   /** Cycles du worker du matching exécutés (jusqu'au repos). */
   cycles: number;
 }
@@ -213,7 +230,7 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
   const counters: Counters = {
     report: {
       accountsCreated: 0, accountsExisting: 0, offersCreated: 0, offersExisting: 0, demandsCreated: 0, demandsExisting: 0,
-      viewsRecorded: 0, contactsRecorded: 0, creditAdded: false, boost: "existing", cycles: 0,
+      viewsRecorded: 0, contactsRecorded: 0, creditAdded: false, boost: "existing", adminGranted: false, messagesWritten: 0, favoriteAdded: false, orderDeclared: false, cycles: 0,
     },
   };
   const { report } = counters;
@@ -228,6 +245,8 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
   const buyerId = await account(DEMO_BUYER_PHONE);
   const vendorId = await account(DEMO_VENDOR_PHONE);
   await account(DEMO_ADMIN_PHONE);
+  // Lot D2 : le rôle d'administrateur du compte Admin démo, par le MÊME chemin que la commande `admin:grant` (journalisé, idempotent).
+  report.adminGranted = (await grantAdmin({ pool, phone: DEMO_ADMIN_PHONE })).granted;
   const sellerIds = new Map<number, string>([[0, vendorId]]);
   for (let index = 1; index <= 7; index += 1) sellerIds.set(index, await account(vendorPhoneOf(index as 1)));
   const extraBuyerIds: string[] = [];
@@ -284,7 +303,46 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
     }
   }
   await runMatchingUntilIdle(pool, counters);
+
+  // 6. Lot D2 : conversation, favori et commande de démonstration (vrais services : mêmes contrôles d'accès que l'application ; rejouable sans doublon).
+  await seedSocial(pool, report, { offerIds, demandIds, buyerId, sellerIds, extraBuyerIds });
   return report;
+}
+
+async function seedSocial(
+  pool: Pool,
+  report: DemoSeedReport,
+  world: { offerIds: Map<string, string>; demandIds: Map<string, string>; buyerId: string; sellerIds: Map<number, string>; extraBuyerIds: string[] },
+): Promise<void> {
+  const offer = (key: string): string => world.offerIds.get(key) as string;
+  // Une conversation entre l'acheteur démo et un vendeur fictif, 3 messages : écrits une seule fois (une conversation qui a déjà des messages n'est jamais complétée).
+  const conversationOffer = DEMO_OFFERS.find((entry) => entry.key === DEMO_CONVERSATION_OFFER_KEY) as DemoOffer;
+  const sellerId = world.sellerIds.get(conversationOffer.vendor) as string;
+  const opened = await openConversation({ pool, viewerId: world.buyerId, demandId: world.demandIds.get(DEMO_CONVERSATION_DEMAND_KEY) as string, offerId: offer(DEMO_CONVERSATION_OFFER_KEY) });
+  const written = await pool.query<{ n: number }>("SELECT count(*)::int AS n FROM messages WHERE conversation_id = $1::uuid", [opened.conversationId]);
+  if (written.rows[0].n === 0) {
+    for (const message of DEMO_CONVERSATION_MESSAGES) {
+      // Historique de démonstration : sans notification (l'acheteur démo garde exactement ses 3 notifications de nouvelles annonces ; les nouveaux messages de la démonstration en direct notifient).
+      await sendMessage({ pool, senderId: message.from === "buyer" ? world.buyerId : sellerId, conversationId: opened.conversationId, body: message.body, notify: false });
+      report.messagesWritten += 1;
+    }
+  }
+  // Un favori de l'acheteur démo.
+  report.favoriteAdded = (await addFavorite({ pool, userId: world.buyerId, demandId: world.demandIds.get(DEMO_CONVERSATION_DEMAND_KEY) as string, offerId: offer(DEMO_FAVORITE_OFFER_KEY) })).created;
+  // Une commande PROPOSÉE au vendeur démo par un acheteur fictif (à confirmer pendant la démonstration) ; une commande déjà active n'est pas dupliquée.
+  const orderBuyerId = world.extraBuyerIds[DEMO_ORDER_BUYER_INDEX - 1];
+  try {
+    await declareOrder({
+      pool,
+      buyerId: orderBuyerId,
+      demandId: world.demandIds.get(extraBuyerDemand(DEMO_ORDER_BUYER_INDEX).key) as string,
+      offerId: offer(DEMO_ORDER_OFFER_KEY),
+      price: DEMO_ORDER_PRICE_XOF,
+    });
+    report.orderDeclared = true;
+  } catch (error) {
+    if (!(error instanceof SocialError) || error.code !== "order_active_exists") throw error;
+  }
 }
 
 async function main(): Promise<number> {
@@ -310,10 +368,14 @@ async function main(): Promise<number> {
       `${report.viewsRecorded} ouverture(s) et ${report.contactsRecorded} contact(s) fictifs écrits, crédits ${report.creditAdded ? "ajoutés" : "déjà présents"}, ` +
       `boost ${report.boost === "granted" ? "attribué" : report.boost === "existing" ? "déjà actif" : "NON attribué"}.`,
   );
+  console.log(
+    `demo:seed : messagerie, favoris, commandes et administration : ${report.messagesWritten} message(s) écrit(s), favori ${report.favoriteAdded ? "ajouté" : "déjà présent"}, ` +
+      `commande de démonstration ${report.orderDeclared ? "proposée au vendeur démo" : "déjà active"}, rôle admin ${report.adminGranted ? "attribué au compte Admin démo" : "déjà attribué"}.`,
+  );
   console.log("demo:seed : comptes de démonstration (le code de connexion s'affiche dans le terminal de `npm run dev:try`) :");
   console.log("  Acheteur démo : +225 07 00 00 01 01");
   console.log("  Vendeur démo  : +225 07 00 00 02 02");
-  console.log("  Admin démo    : +225 07 00 00 03 03");
+  console.log("  Admin démo    : +225 07 00 00 03 03 (administrateur)");
   return report.boost === "refused" ? 1 : 0;
 }
 

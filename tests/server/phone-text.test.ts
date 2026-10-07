@@ -5,7 +5,7 @@ import { mapStoredMatchItem } from "../../lib/server/matching/http-dto";
 import type { StoredMatchItem } from "../../lib/server/matching/stored-matches";
 import type { OfferRecord } from "../../lib/server/catalog/types";
 import { requireNoPhoneInOfferFields } from "../../lib/server/catalog/validation";
-import { CatalogPhoneNumberError } from "../../lib/server/catalog/errors";
+import { CatalogAttributeKeyError, CatalogPhoneNumberError } from "../../lib/server/catalog/errors";
 import { buildNotificationTitle } from "../../lib/server/notifications/content";
 import { publicAttributes } from "../../lib/server/metrics/offer-detail";
 import * as reexported from "../../lib/server/metrics/public-text";
@@ -70,25 +70,25 @@ describe("détection d'un numéro de téléphone caché (lib/phone-text.ts)", ()
     assert.equal(looksLikePhoneNumber("07 . 08 . 09 . 10 . 11"), true, "trois caractères (espace, point, espace) : dans la règle");
   });
 
-  test("une LETTRE entre deux chiffres casse la suite : « 07a08b09c10d11 » PASSE désormais (limite assumée) ; un numéro séparé par des symboles reste refusé", () => {
-    assert.equal(looksLikePhoneNumber("07a08b09c10d11"), false, "limite assumée : des lettres entre toutes les paires échappent à la règle");
+  test("une LETTRE seule entre deux groupes de 1 ou 2 chiffres sépare un groupe dans une suite d'au moins 4 groupes (« 07a08b09c10d11 » est refusé depuis le lot D3) ; des lettres dans des groupes longs ne sont pas des séparateurs", () => {
+    assert.equal(looksLikePhoneNumber("07a08b09c10d11"), true, "lot D3 : cinq groupes de deux chiffres séparés par une lettre seule");
     assert.equal(looksLikePhoneNumber("i7-1165G7 16 Go"), false);
     assert.equal(looksLikePhoneNumber("appelez le 0708091011 merci"), true, "des lettres AUTOUR du numéro ne le protègent pas");
     assert.equal(looksLikePhoneNumber("tel:+225 07 08 09 10 11"), true);
     assert.equal(looksLikePhoneNumber("07#08#09#10#11"), true);
     assert.equal(looksLikePhoneNumber("07🙂08🙂09🙂10🙂11"), true);
-    assert.equal(looksLikePhoneNumber("0708 091x0911"), false, "une lettre au milieu : 7 chiffres d'un côté, 4 de l'autre");
-    assert.equal(looksLikePhoneNumber("07080910x11"), true, "8 chiffres d'affilée AVANT la lettre");
+    assert.equal(looksLikePhoneNumber("0708 091x0911"), false, "une lettre au milieu de groupes de 3 et 4 chiffres : pas un séparateur");
+    assert.equal(looksLikePhoneNumber("07080910x11"), false, "limite assumée : huit chiffres d'affilée puis une lettre ne forment pas un numéro (la lettre ne sépare que des groupes de 1 ou 2 chiffres)");
   });
 
-  test("les années ne sont exemptées QUE si tous les groupes de chiffres sont des années à quatre chiffres ASCII ; un numéro glissé parmi elles est détecté", () => {
+  test("les années, dates et références ne sont des numéros que si une des règles (a) à (d) les couvre ; un numéro glissé parmi elles est détecté", () => {
     assert.equal(looksLikePhoneNumber("2019 2021"), false);
     assert.equal(looksLikePhoneNumber("2019 2021 0708091011"), true);
-    assert.equal(looksLikePhoneNumber("2019 2021 07 08"), true, "des groupes de deux chiffres ne sont pas des années : 12 chiffres");
-    assert.equal(looksLikePhoneNumber("٢٠١٩ ٢٠٢١"), true, "des années en chiffres non ASCII ne sont jamais exemptées");
+    assert.equal(looksLikePhoneNumber("2019 2021 07 08"), false, "lot D3 : ni dix chiffres ivoiriens ni quatre groupes de deux chiffres");
+    assert.equal(looksLikePhoneNumber("٢٠١٩ ٢٠٢١"), false, "des années en chiffres non ASCII sont des années comme les autres (chiffres ramenés à l'ASCII)");
     assert.equal(looksLikePhoneNumber("2026-10-06 0708091011"), true, "un numéro à côté d'une date est détecté");
-    assert.equal(looksLikePhoneNumber("2026 10 06 07"), true, "quatre groupes : ce n'est plus une date");
-    assert.equal(looksLikePhoneNumber("1850 1851"), true, "ce ne sont pas des années plausibles (1900 à 2099)");
+    assert.equal(looksLikePhoneNumber("2026 10 06 07"), false, "trois groupes de deux chiffres seulement");
+    assert.equal(looksLikePhoneNumber("1850 1851"), false, "huit chiffres sans structure de numéro");
   });
 
   test("comptage des chiffres : tous les systèmes d'écriture", () => {
@@ -178,8 +178,8 @@ describe("publication : refus d'une annonce qui porte un numéro (requireNoPhone
       requireNoPhoneInOfferFields(fields);
       return false;
     } catch (error) {
-      assert.ok(error instanceof CatalogPhoneNumberError);
-      assert.equal(error.message, PHONE_IN_OFFER_MESSAGE);
+      assert.ok(error instanceof CatalogPhoneNumberError || error instanceof CatalogAttributeKeyError);
+      if (error instanceof CatalogPhoneNumberError) assert.ok(error.message.startsWith("Pas de numéro de téléphone dans l'annonce (champ : "), error.message);
       return true;
     }
   };
@@ -191,10 +191,11 @@ describe("publication : refus d'une annonce qui porte un numéro (requireNoPhone
       }
       assert.equal(refused({ attributes: { contact: text } }), true, `attribut : « ${text} »`);
     }
-    assert.equal(refused({ attributes: { w0708091011: "oui" } }), true, "clé d'attribut");
+    assert.equal(refused({ attributes: { w0708091011: "oui" } }), true, "clé d'attribut (refusée : un chiffre dans un nom d'attribut)");
     assert.equal(refused({ attributes: { garantie: { value: "3 mois", unit: "0708091011" } } }), true, "objet imbriqué");
     assert.equal(refused({ attributes: { liste: ["a", { b: "07 08 09 10 11" }] } }), true, "tableau imbriqué");
-    assert.equal(refused({ attributes: { numero: 707080910 } }), true, "nombre à neuf chiffres");
+    assert.equal(refused({ attributes: { numero: 2250708091011 } }), true, "nombre : indicatif 225 suivi de dix chiffres");
+    assert.equal(refused({ attributes: { numero: 707080910 } }), false, "un nombre de neuf chiffres n'est pas un numéro (aucune règle ne le couvre)");
   });
 
   test("accepté : une annonce ordinaire, prix, capacités et années compris ; le texte brut n'est pas contrôlé (il n'est jamais servi)", () => {

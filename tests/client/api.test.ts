@@ -87,7 +87,7 @@ const ID = "6f1d4f5c-9d2e-4d8e-8f56-0a8b9f0a1b2c";
 
 describe("couche cliente : requêtes (même origine, JSON, cookies)", () => {
   test("toutes les requêtes sont envoyées en même origine, sans cache, avec Accept JSON", async () => {
-    const { client, calls } = harness(() => json(200, { userId: ID }));
+    const { client, calls } = harness(() => json(200, { authenticated: true, userId: ID, isAdmin: false }));
     await client.auth.session();
     assert.equal(calls[0].url, "/api/auth/session");
     assert.equal(calls[0].init.method, "GET");
@@ -131,12 +131,15 @@ describe("couche cliente : requêtes (même origine, JSON, cookies)", () => {
     assert.equal(headerOf(calls[0], "Content-Type"), undefined);
   });
 
-  test("sessionOutcome : 200 connecté, 401 anonyme, 503/réseau/réponse inattendue indisponible", async () => {
+  test("sessionOutcome (lot D3) : 200 { authenticated: true, userId, isAdmin } connecté ; 200 { authenticated: false } ou 401 anonyme ; 503/réseau/réponse inattendue indisponible", async () => {
     const outcome = async (responder: Responder) => harness(responder).client.auth.sessionOutcome();
-    assert.deepEqual(await outcome(() => json(200, { userId: ID })), { kind: "authenticated", userId: ID });
+    assert.deepEqual(await outcome(() => json(200, { authenticated: true, userId: ID, isAdmin: false })), { kind: "authenticated", userId: ID, isAdmin: false });
+    assert.deepEqual(await outcome(() => json(200, { authenticated: true, userId: ID, isAdmin: true })), { kind: "authenticated", userId: ID, isAdmin: true });
+    assert.deepEqual(await outcome(() => json(200, { authenticated: false })), { kind: "anonymous" }, "le visiteur anonyme : 200, jamais un 401 dans la console");
     assert.deepEqual(
       await outcome(() => json(401, { error: { code: "authentication_refused", message: "Authentification refusée." } })),
       { kind: "anonymous" },
+      "un ancien serveur qui répond 401 reste lu comme anonyme",
     );
     assert.deepEqual(
       await outcome(() => json(503, { error: { code: "auth_unavailable", message: "Indisponible." } })),
@@ -145,6 +148,18 @@ describe("couche cliente : requêtes (même origine, JSON, cookies)", () => {
     assert.deepEqual(await outcome(() => { throw new TypeError("fetch failed"); }), { kind: "unavailable" });
     assert.deepEqual(await outcome(() => new Response("<html>502</html>", { status: 502 })), { kind: "unavailable" });
     assert.deepEqual(await outcome(() => json(200, { nope: true })), { kind: "unavailable" });
+    assert.deepEqual(await outcome(() => json(200, { userId: ID })), { kind: "unavailable" }, "l'ancienne forme { userId } n'est plus une réponse valide");
+    for (const isAdmin of ["true", 1, null, undefined]) {
+      assert.deepEqual(await outcome(() => json(200, { authenticated: true, userId: ID, isAdmin })), { kind: "unavailable" }, `isAdmin ${String(isAdmin)} n'est pas un booléen`);
+    }
+    assert.deepEqual(await outcome(() => json(200, { authenticated: "oui", userId: ID, isAdmin: false })), { kind: "unavailable" });
+  });
+
+  test("session (lot D3) : { userId, isAdmin } quand la session est valide ; une ApiError 401 sans session (200 { authenticated: false } ou 401)", async () => {
+    assert.deepEqual(await harness(() => json(200, { authenticated: true, userId: ID, isAdmin: true })).client.auth.session(), { userId: ID, isAdmin: true });
+    for (const responder of [() => json(200, { authenticated: false }), () => json(401, { error: { code: "authentication_refused", message: "x" } })]) {
+      await assert.rejects(harness(responder).client.auth.session(), (error: unknown) => error instanceof ApiError && error.status === 401 && error.code === "authentication_required");
+    }
   });
 
   test("sessionOutcome : une requête interrompue est propagée, jamais prise pour une panne", async () => {

@@ -10,6 +10,7 @@ import {
   type AuthHttpHandlers,
 } from "../../lib/server/auth/http";
 import type { SendOtpInput } from "../../lib/server/auth";
+import { grantAdmin } from "../../lib/server/admin/grant";
 import { updateUser } from "../../lib/server/catalog";
 import { runMigrations } from "../../lib/server/postgres/migrations";
 import {
@@ -208,11 +209,15 @@ if (!configuredUrl?.trim()) {
       const session = await handlers.session(sessionRequest(loginResult.cookie));
       assert.equal(session.status, 200);
       assertNoStore(session);
-      assert.deepEqual(await session.json(), { userId: loginResult.userId });
-      assert.equal(
-        (await handlers.session(sessionRequest(`noma_sid=${randomUUID()}`))).status,
-        401,
-      );
+      assert.deepEqual(await session.json(), { authenticated: true, userId: loginResult.userId, isAdmin: false });
+      // Lot D3 : sans session valide, 200 { authenticated: false } (jamais un 401 : le visiteur anonyme ne remplit pas la console du navigateur).
+      const unknownCookie = await handlers.session(sessionRequest(`noma_sid=${randomUUID()}`));
+      assert.equal(unknownCookie.status, 200);
+      assert.deepEqual(await unknownCookie.json(), { authenticated: false });
+      const noCookie = await handlers.session(new Request(`${ORIGIN}/api/auth/session`));
+      assert.equal(noCookie.status, 200);
+      assertNoStore(noCookie);
+      assert.deepEqual(await noCookie.json(), { authenticated: false });
 
       const databaseSession = await pool.query<{ token_sha256: string; expires_at: Date }>(
         "SELECT token_sha256, expires_at FROM auth_sessions WHERE user_id = $1",
@@ -248,7 +253,9 @@ if (!configuredUrl?.trim()) {
         { cookie: loginResult.cookie },
       ));
       assert.equal(repeated.status, 204);
-      assert.equal((await handlers.session(sessionRequest(loginResult.cookie))).status, 401);
+      const afterLogout = await handlers.session(sessionRequest(loginResult.cookie));
+      assert.equal(afterLogout.status, 200);
+      assert.deepEqual(await afterLogout.json(), { authenticated: false });
       const revoked = await pool.query<{ revoked_at: Date | null }>(
         "SELECT revoked_at FROM auth_sessions WHERE user_id = $1",
         [loginResult.userId],
@@ -260,8 +267,9 @@ if (!configuredUrl?.trim()) {
       const expiring = await login(uniquePhone(), "198.51.100.44");
       clock.advance(7 * DAY + 1);
       const expired = await handlers.session(sessionRequest(expiring.cookie));
-      assert.equal(expired.status, 401);
+      assert.equal(expired.status, 200);
       assertNoStore(expired);
+      assert.deepEqual(await expired.json(), { authenticated: false });
 
       const suspended = await login(uniquePhone(), "198.51.100.46");
       await updateUser(
@@ -269,10 +277,27 @@ if (!configuredUrl?.trim()) {
         pool,
       );
       const denied = await handlers.session(sessionRequest(suspended.cookie));
-      assert.equal(denied.status, 401);
-      assert.deepEqual(await denied.json(), {
-        error: { code: "authentication_refused", message: "Authentification refusée." },
-      });
+      assert.equal(denied.status, 200);
+      assert.deepEqual(await denied.json(), { authenticated: false });
+    });
+
+    test("lot D3 : la session expose isAdmin (un booléen, jamais un rôle) ; vrai seulement pour un administrateur attribué par commande ; faux pour un compte ordinaire ; rien pour un visiteur", async () => {
+      const ordinary = await login(uniquePhone(), "198.51.100.62");
+      const boss = await login(uniquePhone(), "198.51.100.63");
+      const before = await (await handlers.session(sessionRequest(boss.cookie))).json();
+      assert.deepEqual(before, { authenticated: true, userId: boss.userId, isAdmin: false }, "avant l'attribution : faux");
+      assert.equal((await grantAdmin({ pool, phone: boss.phone })).granted, true);
+      const granted = await handlers.session(sessionRequest(boss.cookie));
+      assert.equal(granted.status, 200);
+      assertNoStore(granted);
+      const body = await granted.json();
+      assert.deepEqual(body, { authenticated: true, userId: boss.userId, isAdmin: true });
+      assert.equal(typeof body.isAdmin, "boolean");
+      assert.deepEqual(Object.keys(body).sort(), ["authenticated", "isAdmin", "userId"], "aucune autre donnée (ni rôle, ni téléphone)");
+      assert.deepEqual(await (await handlers.session(sessionRequest(ordinary.cookie))).json(), { authenticated: true, userId: ordinary.userId, isAdmin: false });
+      const visitor = await (await handlers.session(sessionRequest())).json();
+      assert.deepEqual(visitor, { authenticated: false });
+      assert.equal("isAdmin" in visitor, false, "un visiteur ne reçoit aucune information sur les rôles");
     });
 
     test("origines absentes ou intersites refusées avant les services", async () => {
@@ -548,7 +573,7 @@ if (!configuredUrl?.trim()) {
           [loginResult.userId],
         )).rows[0].revoked_at,
       );
-      assert.equal((await handlers.session(sessionRequest(loginResult.cookie))).status, 401);
+      assert.deepEqual(await (await handlers.session(sessionRequest(loginResult.cookie))).json(), { authenticated: false });
 
       const repeated = await handlers.logout(postRequest(
         "/api/auth/logout",

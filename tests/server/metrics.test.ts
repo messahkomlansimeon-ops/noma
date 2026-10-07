@@ -321,10 +321,11 @@ describe("fiche : attributs publics en liste blanche (offer-detail.ts)", () => {
     const mixed = "0७٠8１2٣4५6";
     const result = publicAttributes({
       a: fullWidth, b: arabicIndic, c: devanagari, d: superscript, e: mixed, f: `Appelez le ${fullWidth.slice(0, 3)} ${arabicIndic.slice(3)}`,
-      g: { value: "12345 6789", unit: "x" }, h: { value: "1234", unit: "56789" },
+      // Lot D3 : la règle ne tient plus pour un numéro un texte de 9 chiffres (aucune règle ivoirienne ou internationale ne le couvre) ; l'assemblage valeur + unité reste contrôlé : dix chiffres ivoiriens.
+      g: { value: "07080", unit: "91011" }, h: { value: "0708", unit: "091011" },
       ok: "128 Go", okFull: "１２８ Go", okArabic: "٢٥٦ Go",
     });
-    assert.deepEqual(result.map((entry) => entry.key), ["ok", "okArabic", "okFull"], "seuls les textes à moins de 9 chiffres survivent");
+    assert.deepEqual(result.map((entry) => entry.key), ["ok", "okArabic", "okFull"], "seuls les textes sans numéro de téléphone survivent (valeur + unité assemblées comprises)");
     const text = JSON.stringify(result);
     for (const forbidden of [fullWidth, arabicIndic, devanagari, superscript, mixed]) assert.equal(text.includes(forbidden), false);
   });

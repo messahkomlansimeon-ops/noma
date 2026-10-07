@@ -12,7 +12,6 @@ import {
   PROCESSING_MESSAGE,
   TRUNCATED_NOTE,
   createGenerationGuard,
-  matchingNeedsLabel,
   mergeIfCurrent,
   offerNotPublishedMessage,
   resultsState,
@@ -26,9 +25,9 @@ interface Loaded {
 }
 
 /**
- * « Acheteurs intéressés » : le nombre et la liste des BESOINS d'acheteurs qui correspondent à l'annonce (un acheteur peut
- * en avoir plusieurs : on ne parle jamais d'un nombre d'acheteurs), SANS identité ni téléphone (le serveur n'en envoie pas
- * et l'écran n'en affiche jamais).
+ * « Acheteurs intéressés » : la liste anonyme des BESOINS d'acheteurs qui correspondent à l'annonce (un acheteur peut en avoir plusieurs : on ne parle jamais d'un nombre
+ * d'acheteurs), SANS identité ni téléphone (le serveur n'en envoie pas et l'écran n'en affiche jamais). Lot D3 : AUCUN compte n'est affiché au-dessus de la liste (le titre
+ * arrondi « Environ 10 besoins… » contredisait les lignes visibles : l'arrondi protège les STATISTIQUES, pas la liste, qui est le produit) ; une phrase dit ce qu'est une ligne.
  */
 export function InterestedBuyers({ offer }: { offer: OfferRecord }) {
   const redirectIfUnauthorized = useUnauthorizedRedirect();
@@ -143,7 +142,7 @@ export function InterestedBuyers({ offer }: { offer: OfferRecord }) {
   );
 }
 
-function InterestedList({
+export function InterestedList({
   loaded,
   moreError,
   loadingMore,
@@ -159,11 +158,8 @@ function InterestedList({
   const state = resultsState({ loaded: true, itemCount: loaded.items.length, processing: loaded.processing });
   return (
     <>
-      <p className="mt-1 text-[14px] font-bold text-ink" data-testid="interested-count">
-        {matchingNeedsLabel(loaded.items.length, loaded.nextCursor !== null)}
-      </p>
       {loaded.items.length > 0 ? (
-        <p className="mt-0.5 text-[12px] text-ink-soft" data-testid="interested-note">
+        <p className="mt-1 text-[13px] text-ink-soft" data-testid="interested-note">
           {NEEDS_NOTE}
         </p>
       ) : null}
@@ -175,7 +171,7 @@ function InterestedList({
       ) : null}
 
       {state === "empty" || state === "processing" ? (
-        <div className="mt-3 rounded-2xl bg-wash p-4 text-center">
+        <div className="mt-3 rounded-2xl bg-wash p-4 text-center" data-testid="interested-empty">
           <p className="text-[14px] font-bold text-ink">{state === "processing" ? PROCESSING_MESSAGE : EMPTY_SELLER_MESSAGE}</p>
           {state === "empty" ? <p className="mt-1 text-[13px] text-ink-soft">{EMPTY_SELLER_HINT}</p> : null}
         </div>

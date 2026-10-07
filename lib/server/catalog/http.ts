@@ -1,7 +1,6 @@
 import "server-only";
 
 import type { Pool } from "pg";
-import { PHONE_IN_OFFER_MESSAGE } from "../../phone-text";
 import { AUTH_SESSION_COOKIE } from "../auth/http";
 import { resolveSession } from "../auth/sessions";
 import type { AuthClock } from "../auth/types";
@@ -13,6 +12,7 @@ import {
 } from "../http/protection";
 import {
   ArchivedCatalogResourceError,
+  CatalogAttributeKeyError,
   CatalogNotFoundError,
   CatalogOwnershipError,
   CatalogPhoneNumberError,
@@ -133,8 +133,12 @@ function serviceUnavailable(): Response {
 }
 
 function mapCatalogError(error: unknown): Response {
-  // Message FIXE et clair (jamais le texte saisi) : un numéro de téléphone dans l'annonce est refusé (lot D1).
-  if (error instanceof CatalogPhoneNumberError) return catalogError(400, "phone_number_in_offer", PHONE_IN_OFFER_MESSAGE);
+  // Message FIXE et clair (jamais le texte saisi) : un numéro de téléphone dans l'annonce est refusé (lots D1 et D3) ; le champ concerné est nommé (liste fermée de noms).
+  if (error instanceof CatalogPhoneNumberError) {
+    return noStoreJsonResponse(400, { error: { code: "phone_number_in_offer", message: error.message, ...(error.field === null ? {} : { field: error.field }) } });
+  }
+  // Un nom d'attribut hors de [a-z_] (lot D3) : refus explicite, sans répéter le nom saisi.
+  if (error instanceof CatalogAttributeKeyError) return catalogError(400, "invalid_attribute_key", error.message);
   if (error instanceof CatalogValidationError) return invalidRequest();
   if (error instanceof CatalogNotFoundError || error instanceof CatalogOwnershipError) {
     return catalogError(404, "resource_not_found", "Ressource introuvable.");

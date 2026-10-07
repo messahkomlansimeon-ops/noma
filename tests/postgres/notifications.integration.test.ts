@@ -33,7 +33,7 @@ before(async () => {
   target = opened.target;
   await admin.query(`CREATE SCHEMA ${quoted}`);
   pool = await openVerifiedIsolatedPool(target, schema, wide);
-  assert.equal((await runMigrations(pool)).applied.length, 19);
+  assert.equal((await runMigrations(pool)).applied.length, 20);
 });
 
 after(async () => {
@@ -803,10 +803,10 @@ test("migration 0019 appliquée à une base déjà peuplée : les besoins exista
     const directory = join(process.cwd(), "database", "migrations");
     const all = readdirSync(directory).filter((name) => /^\d{4}_.*\.sql$/.test(name)).sort();
     assert.ok(all.includes("0019_notifications.sql"), "la migration 0019 existe");
-    // La base « d'avant » reçoit toutes les migrations SAUF la 0019, exclue par son nom (jamais « la dernière de la liste »).
-    const files = all.filter((name) => name !== "0019_notifications.sql");
+    // La base « d'avant » reçoit les migrations ANTÉRIEURES à la 0019 (la 0020 et les suivantes en dépendent), choisies par leur numéro.
+    const files = all.filter((name) => name < "0019_");
     assert.equal(files.length, 18);
-    assert.ok(files.every((name) => !name.startsWith("0019_")));
+    assert.ok(files.every((name) => name < "0019_"));
     for (const name of files) await late.query(readFileSync(join(directory, name), "utf8"));
     const owner = await createUser({}, late);
     const demand = await createDemand(demandInput(owner.id, { status: "draft" }), late);
@@ -869,8 +869,8 @@ test("migration 0019 : contraintes des tables (statuts, compteurs, formes, unici
   // Relancer les migrations n'applique rien.
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 19);
-  assert.equal(rerun.skipped.at(-1), "0019_notifications");
+  assert.equal(rerun.skipped.length, 20);
+  assert.equal(rerun.skipped.at(-1), "0020_social_orders_admin");
 });
 
 // ───────────── 9. lot N1-bis : seules les annonces NOUVELLES pour le besoin notifient ─────────────

@@ -1,4 +1,4 @@
-import { PHONE_IN_OFFER_MESSAGE } from "../../phone-text";
+import { ATTRIBUTE_KEY_MESSAGE, phoneInOfferMessage, type OfferTextField } from "../../phone-text";
 
 export class CatalogValidationError extends Error {
   constructor(message: string) {
@@ -7,11 +7,25 @@ export class CatalogValidationError extends Error {
   }
 }
 
-/** Une annonce porte un numéro de téléphone caché (marque, modèle, variante, attribut…) : refusée avec un message clair (lot D1). */
+/**
+ * Une annonce porte un numéro de téléphone caché (marque, modèle, variante, attribut…) : refusée avec un message clair qui nomme le champ concerné (lots D1 et D3).
+ * `field` est l'un des champs textuels de l'annonce (jamais le texte saisi).
+ */
 export class CatalogPhoneNumberError extends CatalogValidationError {
-  constructor() {
-    super(PHONE_IN_OFFER_MESSAGE);
+  readonly field: OfferTextField | null;
+
+  constructor(field: OfferTextField | null = null) {
+    super(phoneInOfferMessage(field));
     this.name = "CatalogPhoneNumberError";
+    this.field = field;
+  }
+}
+
+/** Un nom d'attribut de l'annonce n'est pas écrit en lettres minuscules et tiret bas seulement (lot D3) : refusé, sans jamais répéter le nom saisi. */
+export class CatalogAttributeKeyError extends CatalogValidationError {
+  constructor() {
+    super(ATTRIBUTE_KEY_MESSAGE);
+    this.name = "CatalogAttributeKeyError";
   }
 }
 

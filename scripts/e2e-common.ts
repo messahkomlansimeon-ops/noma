@@ -84,7 +84,7 @@ export class RelaySession {
   }
 
   async fetch(path: string, init: RequestInit & { origin?: string | null; noCookies?: boolean } = {}): Promise<Response> {
-    const { origin = this.base, noCookies = false, headers: given, ...rest } = init;
+    const { origin = this.base, noCookies = false, headers: given, signal: callerSignal, ...rest } = init;
     const headers: Record<string, string> = { ...((given as Record<string, string> | undefined) ?? {}) };
     if (origin !== null) headers.origin = origin;
     const cookie = this.cookieHeader();
@@ -93,7 +93,9 @@ export class RelaySession {
       ...rest,
       headers,
       redirect: "manual",
-      signal: AbortSignal.timeout(120_000),
+      // Le signal de l'appelant COMPTE (lot D3) : avant, il était remplacé par le délai de 120 s, si bien qu'un flux « abandonné » par `controller.abort()` n'était jamais fermé
+      // (c'est ce qui faisait croire à une fuite de places dans le flux en direct). Le délai et l'abandon de l'appelant s'additionnent.
+      signal: callerSignal ? AbortSignal.any([AbortSignal.timeout(120_000), callerSignal]) : AbortSignal.timeout(120_000),
     });
     this.absorb(response);
     return response;

@@ -8,6 +8,7 @@ import { TopBar } from "@/components/top-bar";
 import { Badge } from "@/components/ui";
 import { BoostSection } from "@/components/vendor/boost-section";
 import { InterestedBuyers } from "@/components/vendor/interested-buyers";
+import { OfferSalesSection } from "@/components/vendor/offer-sales";
 import { OfferStatsSection } from "@/components/vendor/offer-stats";
 import { ApiError, api, describeApiError, isUuid, type OfferRecord } from "@/lib/client/api";
 import {
@@ -93,6 +94,7 @@ function Annonce({ offerId }: { offerId: string }) {
 
       <InterestedBuyers offer={offer} />
       <OfferStatsSection offer={offer} />
+      <OfferSalesSection offerId={offer.id} />
       <BoostSection offer={offer} onOfferChanged={() => setReloadKey((key) => key + 1)} />
     </>
   );

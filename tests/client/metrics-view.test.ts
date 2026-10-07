@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, test } from "node:test";
 import type { BoostStatsEntry, OfferDetail, OfferStats, PeriodStats, StatCount, StatRatio, StoredMatch } from "../../lib/client/api";
 import {
@@ -13,7 +15,6 @@ import {
   PRIVACY_SENTENCE,
   PERIOD_LABELS,
   RATIO_INSUFFICIENT_TEXT,
-  activeMatchesText,
   attributeLabel,
   boostStatsView,
   buyersText,
@@ -28,6 +29,7 @@ import {
   periodView,
   ratioText,
 } from "../../lib/client/metrics-view";
+import * as metricsView from "../../lib/client/metrics-view";
 
 const about = (value: number): StatCount => ({ kind: "approx", value });
 const BELOW: StatCount = { kind: "below", bound: 5 };
@@ -59,7 +61,7 @@ describe("comptes arrondis : « moins de 5 », « environ 15 », jamais le nombr
   });
 
   test("plus aucun « moins de 3 » nulle part dans les textes de la vue", () => {
-    const sentences = [ATTRIBUTION_SENTENCE, EXPOSURE_SENTENCE, OPEN_SENTENCE, PRIVACY_SENTENCE, FEW_STATS_YET, NO_BOOST_SENTENCE, BOOST_NOT_STARTED_SENTENCE, RATIO_INSUFFICIENT_TEXT, countText(BELOW), activeMatchesText(BELOW)];
+    const sentences = [ATTRIBUTION_SENTENCE, EXPOSURE_SENTENCE, OPEN_SENTENCE, PRIVACY_SENTENCE, FEW_STATS_YET, NO_BOOST_SENTENCE, BOOST_NOT_STARTED_SENTENCE, RATIO_INSUFFICIENT_TEXT, countText(BELOW)];
     for (const text of sentences) assert.equal(/moins de 3|inférieur à 3/i.test(text), false, text);
   });
 });
@@ -194,7 +196,8 @@ describe("« Ce que produit votre annonce » (vendeur)", () => {
   test("vue d'ensemble : besoins correspondants (des besoins, pas des acheteurs), trois périodes, phrases d'explication, « peu d'activité » quand tout est « moins de 5 »", () => {
     const stats: OfferStats = { activeMatches: { needs: about(10) }, periods: [period({ period: "7d" }), period({ period: "30d" }), period({ period: "all", since: null })], boosts: [boost()] };
     const view = offerStatsView(stats);
-    assert.equal(view.matchingNeedsText, "Environ 10 besoins d'acheteurs correspondent à votre annonce.");
+    // Lot D3-bis : la page d'une annonce ne répète plus le compte arrondi des besoins (la liste « Acheteurs intéressés » de la même page fait foi : un besoin par ligne, anonyme).
+    assert.equal("matchingNeedsText" in view, false, "plus de ligne « besoins » dans la section statistiques");
     assert.deepEqual(view.periods.map((entry) => entry.period), ["7d", "30d", "all"]);
     assert.equal(view.fewActivity, false);
     // Les phrases d'attribution, de mesure, d'ouverture et de confidentialité sont TOUJOURS là.
@@ -212,18 +215,20 @@ describe("« Ce que produit votre annonce » (vendeur)", () => {
     });
     const few = offerStatsView({ activeMatches: { needs: BELOW }, periods: [{ ...masked, period: "7d" }, { ...masked, period: "30d" }, { ...masked, period: "all", since: null }], boosts: [] });
     assert.equal(few.fewActivity, true);
-    assert.equal(few.matchingNeedsText, "Moins de 5 besoins d'acheteurs correspondent à votre annonce.");
+    assert.equal("matchingNeedsText" in few, false);
     assert.match(FEW_STATS_YET, /Encore peu d'activité/);
     assert.equal(/[0-9]/.test(JSON.stringify(few.periods.map((entry) => entry.lines.map((line) => line.value))).replaceAll("moins de 5", "")), false, "aucun nombre à l'écran, zéro compris, hors « moins de 5 »");
     // Un total publié : jamais présenté comme « peu d'activité ».
     assert.equal(offerStatsView({ ...stats, periods: [period({ period: "7d", opens: { ...period().opens, total: BELOW } }), period({ period: "30d" }), { ...period({ period: "all" }), opens: { ...period().opens, total: BELOW } }] }).fewActivity, false);
   });
 
-  test("besoins correspondants : « environ 10 » (5 et plus) ou « moins de 5 » (de 0 à 4) ; jamais « 1 besoin » ni « aucun besoin »", () => {
-    assert.equal(activeMatchesText(about(5)), "Environ 5 besoins d'acheteurs correspondent à votre annonce.");
-    assert.equal(activeMatchesText(about(120)), "Environ 120 besoins d'acheteurs correspondent à votre annonce.");
-    assert.equal(activeMatchesText(BELOW), "Moins de 5 besoins d'acheteurs correspondent à votre annonce.");
-    assert.equal(/Aucun besoin|\b[01] besoin/.test(activeMatchesText(BELOW)), false);
+  test("lot D3-bis : aucun libellé « besoins d'acheteurs correspondent » dans la vue des statistiques (la liste de la page fait foi) ; le tableau de bord, sans liste, garde le compte arrondi", () => {
+    const source = readFileSync(join(import.meta.dirname, "../../lib/client/metrics-view.ts"), "utf8");
+    assert.equal(/besoins d'acheteurs correspondent/.test(source), false);
+    assert.equal("activeMatchesText" in metricsView, false);
+    const component = readFileSync(join(import.meta.dirname, "../../components/vendor/offer-stats.tsx"), "utf8");
+    assert.equal(component.includes("stats-matching"), false);
+    assert.equal(component.includes("matchingNeedsText"), false);
   });
 });
 

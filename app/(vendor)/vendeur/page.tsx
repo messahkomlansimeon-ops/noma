@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ChevronRight, Plus, Wallet, Zap } from "lucide-react";
+import { ChevronRight, MessageCircle, Package, Plus, Wallet, Zap } from "lucide-react";
 import { LogoMark } from "@/components/logo";
+import { MessagesBadge, MessagesUnreadSync } from "@/components/messages-badge";
 import { Sheet } from "@/components/modal";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { Thumb } from "@/components/thumb";
@@ -68,6 +69,7 @@ function Dashboard() {
   const view = vendorHomeView(state.home);
   return (
     <main>
+      <MessagesUnreadSync />
       <div className="flex items-center justify-between px-4 py-3">
         <LogoMark />
         <Link
@@ -121,6 +123,20 @@ function Dashboard() {
               <div className="mt-1 text-[12px] text-ink-soft">{NO_BOOST_MESSAGE}</div>
             )}
           </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2.5" data-vendor-links>
+          <Link href="/vendeur/messages" data-testid="vendor-messages-link" className="flex items-center justify-between gap-2 rounded-2xl border border-line bg-white p-3.5 transition hover:bg-wash/40">
+            <span className="flex items-center gap-2 text-[14px] font-bold text-ink">
+              <MessageCircle className="size-4" aria-hidden />
+              Messages
+            </span>
+            <MessagesBadge />
+          </Link>
+          <Link href="/vendeur/commandes" data-testid="vendor-orders-link" className="flex items-center gap-2 rounded-2xl border border-line bg-white p-3.5 text-[14px] font-bold text-ink transition hover:bg-wash/40">
+            <Package className="size-4" aria-hidden />
+            Commandes
+          </Link>
         </div>
 
         <button

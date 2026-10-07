@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { api, isUnauthorized } from "@/lib/client/api";
 import { clearOtpFlow } from "@/lib/client/otp-flow";
+import { readSharedSession } from "@/lib/client/session-shared";
 import {
   INITIAL_GATE_STATE,
   loginHref,
@@ -72,9 +73,12 @@ export function SessionGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     const controller = new AbortController();
     runSessionGate({
-      sessionOutcome: () => api.auth.sessionOutcome({ signal: controller.signal }),
+      sessionOutcome: () => readSharedSession(),
       currentPath: currentLocation(),
-      navigate: (to) => router.replace(to),
+      // La lecture est partagée (non annulable) : un effet déjà démonté (React Strict Mode) ne navigue jamais.
+      navigate: (to) => {
+        if (!controller.signal.aborted) router.replace(to);
+      },
     }).then(
       (next) => {
         if (!controller.signal.aborted) setState(next);

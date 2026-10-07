@@ -118,7 +118,8 @@ async function login(session: RelaySession, phone: string): Promise<string> {
   ok(`${session.label} : code correct accepté, cookie noma_auth posé`);
   const current = await api.auth.session();
   assert.equal(current.userId, userId);
-  ok(`${session.label} : GET /api/auth/session renvoie le même userId`);
+  assert.equal(current.isAdmin, false, "un compte ordinaire n'est pas administrateur");
+  ok(`${session.label} : GET /api/auth/session renvoie le même userId et isAdmin faux`);
   return userId;
 }
 
@@ -213,9 +214,10 @@ async function main(): Promise<void> {
 
   await step("Relais joignable, aucune session sans cookie", async () => {
     const response = await seller.fetch("/api/auth/session", { noCookies: true });
-    assert.equal(response.status, 401);
+    assert.equal(response.status, 200, "lot D3 : sans cookie, 200 { authenticated: false } (jamais un 401 dans la console du navigateur)");
+    assert.deepEqual(await response.json(), { authenticated: false });
     assert.equal(response.headers.get("cache-control"), "no-store");
-    ok(`GET ${E2E_BASE}/api/auth/session sans cookie : 401 (le relais joint le serveur)`);
+    ok(`GET ${E2E_BASE}/api/auth/session sans cookie : 200 { authenticated: false } (le relais joint le serveur)`);
     const noOffers = await rejects(sellerApi.offers.list());
     expectApiError(noOffers, 401, "authentication_required");
     ok("GET /api/offers sans session : 401 authentication_required");
@@ -478,8 +480,9 @@ async function main(): Promise<void> {
     }
     ok(`${pages.length} pages : 200 HTML avec session et sans session (la redirection vers /connexion est faite par la garde cliente : voir e2e:ui)`);
     const anonymousSession = await seller.fetch("/api/auth/session", { noCookies: true });
-    assert.equal(anonymousSession.status, 401);
-    ok("la garde cliente s'appuie sur GET /api/auth/session : 401 sans cookie");
+    assert.equal(anonymousSession.status, 200);
+    assert.deepEqual(await anonymousSession.json(), { authenticated: false });
+    ok("la garde cliente s'appuie sur GET /api/auth/session : 200 { authenticated: false } sans cookie");
   });
 
   // ─── Scénario « mise en avant » : un produit unique, 8 offres concurrentes, l'offre de A est la plus chère ───
@@ -1700,14 +1703,22 @@ async function main(): Promise<void> {
 
   await step("Lot D1 : numéro de téléphone refusé dans une annonce (400, message clair) ; accueils de l'acheteur et du vendeur lus sur le serveur", async () => {
     const before = (await sellerApi.offers.listAll()).items.length;
-    for (const variant of ["WhatsApp 0708091011", "07/08/09/10/11", "07:08:09:10:11"]) {
-      const refusal = await sellerApi.offers
-        .create({ rawText: "iPhone 12 avec numéro caché", category: "Téléphones", brand: "Apple", model: "iPhone 12", variant, price: { amount: 150_000, currency: "XOF" } })
-        .then(() => null, (error: unknown) => error);
+    // Lot D3 : la règle réécrite (lettre O, « x » entre les groupes, indicatif +225 refusés) et le champ concerné nommé dans le message.
+    const base = { rawText: "iPhone 12 avec numéro caché", category: "Téléphones", brand: "Apple", model: "iPhone 12", price: { amount: 150_000, currency: "XOF" } } as const;
+    for (const variant of ["WhatsApp 0708091011", "07/08/09/10/11", "07:08:09:10:11", "07 O8 09 10 11", "O7 O8 O9 l0 ll", "07x08x09x10x11", "+225 07 08 09 10 11"]) {
+      const refusal = await sellerApi.offers.create({ ...base, variant }).then(() => null, (error: unknown) => error);
       assert.ok(refusal instanceof ApiError && refusal.status === 400 && refusal.code === "phone_number_in_offer", `variante « ${variant} » refusée en 400 phone_number_in_offer`);
-      assert.equal(describeApiError(refusal, "catalog"), "Pas de numéro de téléphone dans l'annonce : l'acheteur vous contactera par noma.");
+      assert.equal(refusal.field, "variant");
+      assert.equal(describeApiError(refusal, "catalog"), "Pas de numéro de téléphone dans l'annonce (champ : variante) : l'acheteur vous contactera par noma.");
     }
-    ok("POST /api/offers avec un numéro caché (« WhatsApp 0708091011 », « 07/08/09/10/11 », « 07:08:09:10:11 ») : 400 phone_number_in_offer, message clair");
+    const located = await sellerApi.offers.create({ ...base, location: "Cocody 07 08 09 10 11" }).then(() => null, (error: unknown) => error);
+    assert.ok(located instanceof ApiError && located.field === "location", "le champ « localisation » est nommé");
+    ok("POST /api/offers avec un numéro caché (« WhatsApp 0708091011 », « 07 O8 09 10 11 », « 07x08x09x10x11 », « +225 07 08 09 10 11 »…) : 400 phone_number_in_offer, message clair avec le champ");
+    const badKey = await sellerApi.offers.create({ ...base, attributes: { tel_0708: "09 10 11" } }).then(() => null, (error: unknown) => error);
+    assert.ok(badKey instanceof ApiError && badKey.status === 400 && badKey.code === "invalid_attribute_key", "nom d'attribut « tel_0708 » refusé");
+    assert.equal(badKey.message.includes("tel_0708"), false, "le nom saisi n'est jamais répété");
+    assert.match(describeApiError(badKey, "catalog"), /lettres minuscules/);
+    ok("POST /api/offers avec un nom d'attribut hors de [a-z_] (« tel_0708 ») : 400 invalid_attribute_key, sans répéter le nom");
     assert.equal((await sellerApi.offers.listAll()).items.length, before, "rien n'a été écrit");
     ok("aucune annonce écrite par les refus");
 
@@ -1740,13 +1751,14 @@ async function main(): Promise<void> {
       assert.equal(session.cookies.has("noma_auth"), false, "le cookie est supprimé");
       ok(`${label} : POST /api/auth/logout : 204 et cookie supprimé`);
       const after = await session.fetch("/api/auth/session");
-      assert.equal(after.status, 401);
-      ok(`${label} : GET /api/auth/session après déconnexion : 401`);
+      assert.equal(after.status, 200);
+      assert.deepEqual(await after.json(), { authenticated: false });
+      ok(`${label} : GET /api/auth/session après déconnexion : 200 { authenticated: false }`);
       const replay = await session.fetch("/api/offers", { noCookies: true, headers: { cookie: oldCookie } });
       assert.equal(replay.status, 401);
       const replaySession = await session.fetch("/api/auth/session", { noCookies: true, headers: { cookie: oldCookie } });
-      assert.equal(replaySession.status, 401);
-      ok(`${label} : rejeu de l'ancien jeton : 401 (session révoquée côté serveur)`);
+      assert.deepEqual(await replaySession.json(), { authenticated: false });
+      ok(`${label} : rejeu de l'ancien jeton : 401 sur les routes, { authenticated: false } sur la session (session révoquée côté serveur)`);
       const again = await api.auth.logout();
       assert.equal(again, undefined);
       ok(`${label} : seconde déconnexion idempotente`);

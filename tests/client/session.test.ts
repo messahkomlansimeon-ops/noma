@@ -81,7 +81,7 @@ describe("loginHref", () => {
 });
 
 describe("garde de session", () => {
-  const authenticated: SessionOutcome = { kind: "authenticated", userId: "u-1" };
+  const authenticated: SessionOutcome = { kind: "authenticated", userId: "u-1", isAdmin: false };
   const anonymous: SessionOutcome = { kind: "anonymous" };
   const unavailable: SessionOutcome = { kind: "unavailable" };
 

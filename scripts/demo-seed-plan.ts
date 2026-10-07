@@ -4,7 +4,7 @@
  * (tests/scripts/demo-seed.test.ts).
  *
  * Numéros (aucun SMS n'est jamais envoyé : la connexion par code n'existe que sur ce poste, le code s'affiche dans le terminal de `dev:try`) :
- *   Acheteur démo +225 07 00 00 01 01 · Vendeur démo +225 07 00 00 02 02 · Admin démo +225 07 00 00 03 03 (pour le lot D2)
+ *   Acheteur démo +225 07 00 00 01 01 · Vendeur démo +225 07 00 00 02 02 · Admin démo +225 07 00 00 03 03 (rôle administrateur, attribué par `admin:grant`)
  *   Vendeurs fictifs +225 07 88 88 88 01 à 07 · acheteurs fictifs +225 07 66 66 66 01 à 11 : des numéros qui n'appartiennent à personne.
  */
 import { createHash } from "node:crypto";
@@ -17,8 +17,13 @@ export const DEMO_ADMIN_PHONE = "+2250700000303";
 export const DEMO_VENDOR_PHONE_PREFIX = "+22507888888";
 export const DEMO_EXTRA_BUYER_PHONE_PREFIX = "+22507666666";
 
-/** Espace du verrou consultatif qui sérialise deux `demo:seed` (distinct de 1_314_664_945 à 954 : migrations, matching, boosts, portefeuille, dev:seed, contacts). */
-export const DEMO_SEED_LOCK_NAMESPACE = 1_314_664_955;
+/**
+ * Espace du verrou consultatif qui sérialise deux `demo:seed`. Constante DÉDIÉE (lot D3) : l'ancienne valeur, 1_314_664_955, était celle du plafond de notifications
+ * (`NOTIFICATION_CAP_LOCK_NAMESPACE`) ; deux verrous d'usages différents ne partagent jamais un espace. Liste des espaces utilisés : 1_314_664_945 (migrations), 946 et 947 (matching),
+ * 948 et 949 (boost : périmètre, devis), 950 (recharges), 951 (achat de boost), 952 (cadence des devis), 953 (dev:seed), 954 (contacts), 955 et 956 (notifications), 957 à 959 (messagerie,
+ * conversations, favoris), 960 (demo:seed). Un test (`tests/scripts/demo-seed.test.ts`) vérifie qu'aucun espace n'est déclaré deux fois.
+ */
+export const DEMO_SEED_LOCK_NAMESPACE = 1_314_664_960;
 /** Repère placé dans le texte de chaque annonce et de chaque besoin de démonstration : c'est lui qui rend la commande rejouable sans doublon. */
 export const DEMO_MARKER_PREFIX = "[demo:seed:";
 
@@ -35,6 +40,22 @@ export const DEMO_BOOST_DURATION = "7d" as const;
 export const DEMO_EXTRA_BUYER_COUNT = 11;
 export const DEMO_OPENERS = 11;
 export const DEMO_CONTACTERS = 6;
+
+/**
+ * Lot D2 : une conversation de démonstration entre l'acheteur démo et un vendeur FICTIF (3 messages, sans numéro de téléphone), un favori, une commande proposée au
+ * vendeur démo par un acheteur fictif, et le rôle d'administrateur du compte Admin démo.
+ */
+export const DEMO_CONVERSATION_OFFER_KEY = "iphone12-v1";
+export const DEMO_CONVERSATION_DEMAND_KEY = "buyer-iphone12";
+export const DEMO_CONVERSATION_MESSAGES: ReadonlyArray<{ from: "buyer" | "seller"; body: string }> = Object.freeze([
+  { from: "buyer", body: "Bonjour, votre iPhone 12 est-il toujours disponible ?" },
+  { from: "seller", body: "Bonjour, oui il est disponible. Vous pouvez passer le voir à Cocody." },
+  { from: "buyer", body: "Parfait, merci. Je peux passer demain en fin de journée ?" },
+]);
+export const DEMO_FAVORITE_OFFER_KEY = "iphone12-v6";
+export const DEMO_ORDER_BUYER_INDEX = 1;
+export const DEMO_ORDER_OFFER_KEY = "iphone12-demo";
+export const DEMO_ORDER_PRICE_XOF = 160_000;
 
 export type DemoCategory = "Téléphones" | "Électronique" | "Maison et meubles" | "Climatisation";
 

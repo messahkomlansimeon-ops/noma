@@ -213,7 +213,10 @@ async function main(): Promise<void> {
     ok("code correct : redirection vers l'accueil (le next hostile https://evil.example a été ignoré)");
     const session = await api(context, "/api/auth/session");
     assert.equal(session.status(), 200);
-    ok("GET /api/auth/session : 200 dans le navigateur");
+    const sessionBody = (await session.json()) as { authenticated: boolean; userId: string; isAdmin: boolean };
+    assert.equal(sessionBody.authenticated, true);
+    assert.equal(sessionBody.isAdmin, false);
+    ok("GET /api/auth/session : 200 { authenticated: true, isAdmin: false } dans le navigateur");
 
     step("Annonces du vendeur : liste réelle et actions");
     sessionRequests.length = 0;
@@ -332,8 +335,10 @@ async function main(): Promise<void> {
     await page.getByRole("button", { name: "Se déconnecter" }).click();
     await page.waitForURL("**/connexion");
     ok("« Se déconnecter » : retour à /connexion");
-    assert.equal((await api(context, "/api/auth/session")).status(), 401);
-    ok("GET /api/auth/session après déconnexion : 401");
+    const afterLogout = await api(context, "/api/auth/session");
+    assert.equal(afterLogout.status(), 200);
+    assert.deepEqual(await afterLogout.json(), { authenticated: false });
+    ok("GET /api/auth/session après déconnexion : 200 { authenticated: false }");
     await page.goto(`${BASE}/vendeur/annonces`);
     await page.waitForURL(`**/connexion?next=${encodeURIComponent("/vendeur/annonces")}`);
     ok("/vendeur/annonces redirige de nouveau vers /connexion?next=…");
@@ -403,9 +408,12 @@ async function main(): Promise<void> {
     await sellerCard.getByRole("link", { name: /Acheteurs intéressés et boost/ }).click();
     await sellerPage.waitForURL(/\/vendeur\/annonces\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     const offerId = sellerPage.url().split("/").pop() as string;
-    await sellerPage.getByTestId("interested-count").waitFor();
-    assert.equal((await sellerPage.getByTestId("interested-count").textContent())?.trim(), "Aucun besoin d'acheteur ne correspond pour le moment");
-    ok("« Acheteurs intéressés » : « Aucun besoin d'acheteur ne correspond pour le moment » (aucun besoin ne correspond encore)");
+    await sellerPage.getByTestId("interested-empty").waitFor();
+    // Juste après la publication, le calcul des correspondances peut encore tourner : « Recherche en cours… » ; sinon « Aucun besoin d'acheteur ne correspond pour le moment ».
+    assert.match((await sellerPage.getByTestId("interested-empty").textContent()) ?? "", /Aucun besoin d'acheteur ne correspond pour le moment|Recherche en cours/);
+    assert.equal(await sellerPage.getByTestId("interested-buyer").count(), 0, "aucun besoin ne correspond encore");
+    assert.equal(await sellerPage.getByTestId("interested-count").count(), 0, "aucun compte au-dessus de la liste (lot D3)");
+    ok("« Acheteurs intéressés » : aucun besoin ne correspond encore (message vide ou « Recherche en cours… »), aucun compte au-dessus de la liste");
     const durations = sellerPage.getByRole("group", { name: "Durée du boost" });
     for (const label of ["24 h", "3 jours", "7 jours"]) await durations.getByRole("button", { name: label, exact: true }).waitFor();
     ok("choix de durée : 24 h, 3 jours, 7 jours");
@@ -510,12 +518,14 @@ async function main(): Promise<void> {
     await refreshUntil(sellerPage, "le besoin de B dans « Acheteurs intéressés »", async () => {
       return (await sellerPage.getByTestId("interested-buyer").count()) >= 1;
     });
-    // Lots M1-bis et M1-quater (K3, R6) : 1 besoin → « Moins de 5 besoins… » dans le titre, mais la LISTE reste affichée (c'est le produit : budget, lieu).
-    assert.equal((await sellerPage.getByTestId("interested-count").textContent())?.trim(), "Moins de 5 besoins d'acheteurs correspondent à votre annonce");
+    // Lot D3 : plus aucun compte arrondi au-dessus de la liste (il contredisait les lignes visibles) ; la LISTE anonyme reste affichée (c'est le produit : budget, lieu).
+    assert.equal(await sellerPage.getByTestId("interested-count").count(), 0, "aucun compte au-dessus de la liste");
     assert.equal(await sellerPage.getByTestId("interested-buyer").count(), 1, "la liste montre le besoin de B");
-    await sellerPage.getByTestId("stats-matching").waitFor();
-    assert.equal((await sellerPage.getByTestId("stats-matching").textContent())?.replace(/\s+/g, " ").trim(), "Moins de 5 besoins d'acheteurs correspondent à votre annonce.", "statistiques : même règle");
-    assert.match((await sellerPage.getByTestId("interested-note").textContent()) ?? "", /un même acheteur peut en avoir plusieurs/);
+    // Lot D3-bis : la section « Ce que produit votre annonce » ne répète plus de compte de besoins ; la liste de la page fait foi.
+    await sellerPage.getByTestId("stats-few").or(sellerPage.getByTestId("stats-no-boost")).first().waitFor();
+    assert.equal(await sellerPage.getByTestId("stats-matching").count(), 0, "plus de ligne « besoins » dans les statistiques");
+    assert.equal(/besoins d'acheteurs correspondent/.test(await sellerPage.locator("main").innerText()), false, "aucun compte de besoins sur la page de l'annonce");
+    assert.equal((await sellerPage.getByTestId("interested-note").textContent())?.trim(), "Chaque ligne est le besoin d'un acheteur, sans son identité.");
     const buyerRowText = (await sellerPage.getByTestId("interested-buyer").first().innerText()).replace(/\s+/g, " ");
     assert.match(buyerRowText, /Samsung Galaxy S21/);
     assert.match(buyerRowText, /Budget : jusqu'à 250\s000 FCFA/);
@@ -525,7 +535,7 @@ async function main(): Promise<void> {
       assert.equal(sellerText.includes(secret), false, `le vendeur ne voit pas « ${secret} »`);
     }
     assert.equal(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/.test(sellerText), false, "aucun identifiant (UUID) à l'écran du vendeur");
-    ok("« Moins de 5 besoins d'acheteurs correspondent à votre annonce » (titre et statistiques ; on compte des besoins, pas des acheteurs), la liste reste affichée : produit, budget 250 000 FCFA, compatibilité, sans nom, ni téléphone, ni identifiant");
+    ok("aucun compte de besoins sur la page (ni titre, ni statistiques) ; la liste reste affichée : produit, budget 250 000 FCFA, compatibilité, sans nom, ni téléphone, ni identifiant");
     await durations.getByRole("button", { name: "3 jours", exact: true }).click();
     await sellerPage.getByTestId("boost-amount").waitFor();
     const amountText = ((await sellerPage.getByTestId("boost-amount").textContent()) ?? "").replace(/\s/g, " ").trim();

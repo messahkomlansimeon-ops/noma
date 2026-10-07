@@ -2,8 +2,8 @@ import {
   AirVent,
   Car,
   Drill,
+  Laptop,
   Package,
-  Plug,
   Smartphone,
   Sofa,
   type LucideIcon,
@@ -13,7 +13,7 @@ import type { ArtKey } from "@/lib/client/catalog-view";
 const artIcon: Record<ArtKey, LucideIcon> = {
   phone: Smartphone,
   sofa: Sofa,
-  plug: Plug,
+  laptop: Laptop,
   ac: AirVent,
   drill: Drill,
   car: Car,

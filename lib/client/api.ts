@@ -18,7 +18,7 @@
  * Les montants du portefeuille sont des entiers sûrs (|n| ≤ 2^53 − 1), vérifiés à l'envoi comme à la lecture.
  */
 
-import { PHONE_IN_OFFER_MESSAGE } from "../phone-text";
+import { ATTRIBUTE_KEY_MESSAGE, OFFER_TEXT_FIELDS, phoneInOfferMessage, type OfferTextField } from "../phone-text";
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 export type JsonObject = { [key: string]: JsonValue };
@@ -267,8 +267,8 @@ export interface OfferContact {
 
 // ─── Notifications et suivi des besoins (notifications/v1, notification-preferences/v1, demand-tracking/v1) ───
 
-export type NotificationKind = "new_match" | "new_matches_digest";
-export const NOTIFICATION_KINDS: readonly NotificationKind[] = ["new_match", "new_matches_digest"];
+export type NotificationKind = "new_match" | "new_matches_digest" | "new_message";
+export const NOTIFICATION_KINDS: readonly NotificationKind[] = ["new_match", "new_matches_digest", "new_message"];
 
 /** Une notification DANS l'application : liste blanche (titre, prix, lien interne) ; jamais de téléphone, d'identifiant du vendeur ni de texte libre. */
 export interface NotificationItem {
@@ -282,7 +282,7 @@ export interface NotificationItem {
   demandId: string;
   /** new_match : l'annonce, dans le contexte du besoin ; null pour un résumé. */
   offerId: string | null;
-  /** Lien INTERNE vers la fiche (new_match) ou le besoin (résumé). */
+  /** Lien INTERNE vers la fiche (new_match), le besoin (résumé) ou la conversation (new_message : `/messages/{id}`). */
   link: string;
   createdAt: string;
   readAt: string | null;
@@ -538,7 +538,7 @@ export interface OtpChallenge {
 }
 
 export type SessionOutcome =
-  | { kind: "authenticated"; userId: string }
+  | { kind: "authenticated"; userId: string; /** Compte administrateur (booléen seulement) : affiche l'onglet Admin du sélecteur d'espace. */ isAdmin: boolean }
   | { kind: "anonymous" }
   | { kind: "unavailable" };
 
@@ -567,12 +567,15 @@ const FIXED_ERROR_MESSAGES: Record<string, string> = {
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  /** Champ de l'annonce nommé par le serveur (liste fermée, lot D3) : seulement pour `phone_number_in_offer`. */
+  readonly field: OfferTextField | null;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, field: OfferTextField | null = null) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.field = field;
   }
 }
 
@@ -584,9 +587,11 @@ const ERROR_CODE = /^[a-z][a-z0-9_]{0,63}$/;
 
 function errorFromBody(status: number, body: unknown): ApiError {
   if (isObject(body) && isObject(body.error)) {
-    const { code, message } = body.error;
+    const { code, message, field } = body.error;
     if (typeof code === "string" && ERROR_CODE.test(code) && typeof message === "string" && message.length <= 500) {
-      return new ApiError(status, code, message);
+      // Le champ n'est repris que s'il fait partie de la liste fermée des champs d'une annonce : jamais un texte du serveur.
+      const known = typeof field === "string" ? OFFER_TEXT_FIELDS.find((candidate) => candidate === field) : undefined;
+      return new ApiError(status, code, message, known ?? null);
     }
   }
   return fixedError(status, API_INVALID_RESPONSE);
@@ -1289,6 +1294,22 @@ function parseNotificationItem(status: number, value: unknown): NotificationItem
     }
     return { id: value.id, kind, title: value.title, price, count: null, demandId: value.demandId, offerId: value.offerId, link: value.link, createdAt: value.createdAt, readAt: value.readAt };
   }
+  if (kind === "new_message") {
+    // Un nouveau message : titre de l'annonce et lien INTERNE exact vers la conversation ; jamais de texte de message, de prix ni d'identité.
+    if (
+      typeof value.title !== "string" ||
+      value.title.length < 1 ||
+      value.title.length > 160 ||
+      UNSAFE_NOTIFICATION_TEXT.test(value.title) ||
+      value.price !== null ||
+      value.offerId !== null ||
+      value.count !== null ||
+      !/^\/messages\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.link)
+    ) {
+      throw fixedError(status, API_INVALID_RESPONSE);
+    }
+    return { id: value.id, kind, title: value.title, price: null, count: null, demandId: value.demandId, offerId: null, link: value.link, createdAt: value.createdAt, readAt: value.readAt };
+  }
   if (
     value.title !== null ||
     value.price !== null ||
@@ -1382,7 +1403,7 @@ function parseDemandTracking(status: number, value: unknown): DemandTracking {
 // ─── Lecture stricte des accueils (lot D1) ──────────────────────────────────────────────────────────
 
 const HOME_TEXT_MAX = 200;
-const NOTIFICATION_LINK = /^\/besoins\/[0-9a-f-]{36}(\/offres\/[0-9a-f-]{36})?$/i;
+const NOTIFICATION_LINK = /^\/(besoins\/[0-9a-f-]{36}(\/offres\/[0-9a-f-]{36})?|messages\/[0-9a-f-]{36})$/i;
 
 function homeText(status: number, value: unknown): string | null {
   if (value === null) return null;
@@ -1641,10 +1662,29 @@ export function createApiClient(options: ApiClientOptions = {}) {
     return parseStoredMatchesPage(status, json);
   }
 
-  async function session(requestOptions?: RequestOptions): Promise<{ userId: string }> {
-    const { status, json } = await send("GET", "/api/auth/session", undefined, requestOptions);
-    if (!isObject(json) || typeof json.userId !== "string") throw fixedError(status, API_INVALID_RESPONSE);
-    return { userId: json.userId };
+  /**
+   * GET /api/auth/session (lot D3) : 200 `{ authenticated: true, userId, isAdmin }` ou 200 `{ authenticated: false }` (le visiteur anonyme ne provoque aucun 401). Une réponse 401 (ancien
+   * serveur) est lue comme « anonyme ». Le résultat est `{ userId, isAdmin }` ; sans session, une ApiError 401 est levée par le client (comme avant le lot D3).
+   */
+  async function sessionRead(requestOptions?: RequestOptions): Promise<{ authenticated: false } | { authenticated: true; userId: string; isAdmin: boolean }> {
+    let reply: { status: number; json: unknown };
+    try {
+      reply = await send("GET", "/api/auth/session", undefined, requestOptions);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) return { authenticated: false };
+      throw error;
+    }
+    const { status, json } = reply;
+    if (!isObject(json)) throw fixedError(status, API_INVALID_RESPONSE);
+    if (json.authenticated === false) return { authenticated: false };
+    if (json.authenticated !== true || typeof json.userId !== "string" || typeof json.isAdmin !== "boolean") throw fixedError(status, API_INVALID_RESPONSE);
+    return { authenticated: true, userId: json.userId, isAdmin: json.isAdmin };
+  }
+
+  async function session(requestOptions?: RequestOptions): Promise<{ userId: string; isAdmin: boolean }> {
+    const read = await sessionRead(requestOptions);
+    if (!read.authenticated) throw new ApiError(401, "authentication_required", "Authentification requise.");
+    return { userId: read.userId, isAdmin: read.isAdmin };
   }
 
   async function listOffers(pagination?: Partial<Pagination>, requestOptions?: RequestOptions) {
@@ -1709,19 +1749,18 @@ export function createApiClient(options: ApiClientOptions = {}) {
         return { userId: json.userId };
       },
 
-      /** GET /api/auth/session → 200 `{ userId }` ; 401 sans session valide (ApiError). */
+      /** GET /api/auth/session → `{ userId, isAdmin }` ; sans session valide, une ApiError 401 est levée (le serveur répond 200 `{ authenticated: false }`). */
       session,
 
       /**
-       * Résultat de session sans exception : 200 → authenticated, 401 → anonymous, tout le reste
-       * (503, panne réseau, réponse inattendue) → unavailable. Sert la garde de session des écrans.
+       * Résultat de session sans exception : session valide → authenticated (avec `isAdmin`), `{ authenticated: false }` (ou 401 d'un ancien serveur) → anonymous, tout le reste
+       * (503, panne réseau, réponse inattendue) → unavailable. Sert la garde de session des écrans et le sélecteur d'espace.
        */
       async sessionOutcome(requestOptions?: RequestOptions): Promise<SessionOutcome> {
         try {
-          const { userId } = await session(requestOptions);
-          return { kind: "authenticated", userId };
+          const read = await sessionRead(requestOptions);
+          return read.authenticated ? { kind: "authenticated", userId: read.userId, isAdmin: read.isAdmin } : { kind: "anonymous" };
         } catch (error) {
-          if (error instanceof ApiError && error.status === 401) return { kind: "anonymous" };
           if (error instanceof ApiError && error.code === API_ABORTED) throw error;
           return { kind: "unavailable" };
         }
@@ -2164,8 +2203,10 @@ export function describeApiError(error: unknown, context: ApiErrorContext = "def
   if (error.code === API_ABORTED) return "Requête interrompue.";
   if (error.code === API_INVALID_ID) return "Identifiant invalide. Rechargez la page.";
   if (error.code === API_INVALID_ARGUMENT) return "Paramètre invalide. Rechargez la page.";
-  // Annonce refusée parce qu'elle porte un numéro de téléphone (lot D1) : message fixe et clair, quel que soit le contexte.
-  if (error.status === 400 && error.code === "phone_number_in_offer") return PHONE_IN_OFFER_MESSAGE;
+  // Annonce refusée parce qu'elle porte un numéro de téléphone (lots D1 et D3) : message fixe et clair qui nomme le champ (liste fermée), quel que soit le contexte.
+  if (error.status === 400 && error.code === "phone_number_in_offer") return phoneInOfferMessage(error.field);
+  // Nom d'attribut refusé (lot D3) : rappel de la règle, jamais le nom saisi.
+  if (error.status === 400 && error.code === "invalid_attribute_key") return ATTRIBUTE_KEY_MESSAGE;
 
   if (context === "matches") {
     if (error.status === 400) return "Les résultats ne peuvent pas être affichés pour le moment. Actualisez la page.";

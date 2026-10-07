@@ -19,7 +19,6 @@ import {
   interestedBuyerRow,
   NEEDS_NOTE,
   createGenerationGuard,
-  matchingNeedsLabel,
   mergeIfCurrent,
   mergeMatchPages,
   offerNotPublishedMessage,
@@ -333,26 +332,10 @@ describe("pagination « Voir plus » et états", () => {
     assert.match(offerNotPublishedMessage("archived") ?? "", /archivée/);
   });
 
-  test("côté vendeur : on compte des BESOINS, jamais des acheteurs (un acheteur peut avoir plusieurs besoins)", () => {
-    assert.equal(matchingNeedsLabel(0, false), "Aucun besoin d'acheteur ne correspond pour le moment");
-    // Lot M1-quater (R6) : le titre suit l'arrondi des statistiques : « Moins de 5 besoins … » de 1 à 4, « Environ N besoins … » à partir de 5 (la liste, elle, reste affichée).
-    for (const count of [1, 2, 3, 4]) assert.equal(matchingNeedsLabel(count, false), "Moins de 5 besoins d'acheteurs correspondent à votre annonce", String(count));
-    assert.equal(matchingNeedsLabel(5, false), "Environ 5 besoins d'acheteurs correspondent à votre annonce");
-    assert.equal(matchingNeedsLabel(8, false), "Environ 10 besoins d'acheteurs correspondent à votre annonce");
-    assert.equal(matchingNeedsLabel(12, false), "Environ 10 besoins d'acheteurs correspondent à votre annonce");
-    assert.equal(matchingNeedsLabel(13, false), "Environ 15 besoins d'acheteurs correspondent à votre annonce");
-    assert.equal(matchingNeedsLabel(102, false), "Environ 100 besoins d'acheteurs correspondent à votre annonce");
-    // Tant qu'il reste des pages le nombre est un minimum : « Au moins N », N arrondi vers le bas (jamais plus que la réalité), jamais le nombre exact.
-    assert.equal(matchingNeedsLabel(20, true), "Au moins 20 besoins d'acheteurs correspondent à votre annonce");
-    assert.equal(matchingNeedsLabel(27, true), "Au moins 25 besoins d'acheteurs correspondent à votre annonce");
-    assert.equal(matchingNeedsLabel(3, true), "Plusieurs besoins d'acheteurs correspondent à votre annonce");
-    for (const count of [1, 2, 3, 4, 5, 8, 12, 27]) assert.equal(/moins de 3|\b(1|2|3|4|8|12|27) besoin/i.test(matchingNeedsLabel(count, false)), false);
-    for (const [count, more] of [[0, false], [1, false], [2, false], [7, true]] as const) {
-      const label = matchingNeedsLabel(count, more);
-      assert.equal(/acheteurs? intéressés?/.test(label), false, label);
-      assert.match(label, /besoin/);
-    }
-    assert.match(NEEDS_NOTE, /un même acheteur peut en avoir plusieurs/);
+  test("côté vendeur (lot D3) : aucun compte arrondi au-dessus de la liste ; la phrase dit que chaque ligne est le besoin d'un acheteur, sans son identité", () => {
+    assert.equal(NEEDS_NOTE, "Chaque ligne est le besoin d'un acheteur, sans son identité.");
+    assert.equal(/acheteurs? intéressés?/.test(NEEDS_NOTE), false);
+    assert.equal(/\d/.test(NEEDS_NOTE), false, "aucun nombre dans la phrase");
   });
 
   test("compteurs de l'acheteur : accord au pluriel et « Au moins » tant qu'il reste des pages", () => {    assert.equal(buyerResultsLabel(0, false), "Aucune offre pour le moment");

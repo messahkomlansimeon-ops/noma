@@ -94,6 +94,7 @@ if (!configuredUrl?.trim()) {
         "0017_boost_quote_reach_truncated",
         "0018_offer_metrics",
         "0019_notifications",
+        "0020_social_orders_admin",
       ]);
     });
 

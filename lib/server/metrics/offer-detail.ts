@@ -16,7 +16,7 @@ export const OFFER_DETAIL_CONTRACT_VERSION = "demand-offer/v1" as const;
 export const PUBLIC_ATTRIBUTE_LIMIT = 12;
 const ATTRIBUTE_KEY = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
 const ATTRIBUTE_VALUE_MAX = 80;
-// Contrôle du texte (caractères refusés, huit chiffres ou plus à moins de quatre caractères les uns des autres) : fonctions partagées avec les notifications (`public-text.ts`), NFKC et chiffres de tous les systèmes d'écriture.
+// Contrôle du texte (caractères refusés, numéro de téléphone : règle de `lib/phone-text.ts`) : fonctions partagées avec les notifications (`public-text.ts`). Noms d'attributs à l'AFFICHAGE : forme historique conservée (les annonces enregistrées avant le lot D3 gardent leurs clés) ; à la PUBLICATION, seuls [a-z_] sont acceptés (lot D3).
 
 export interface PublicAttribute {
   key: string;

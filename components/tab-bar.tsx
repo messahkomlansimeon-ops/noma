@@ -16,6 +16,7 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react";
+import { MessagesBadge, messagesRefresher } from "@/components/messages-badge";
 import { UnreadBadge, unreadRefresher } from "@/components/unread-badge";
 
 interface TabItem {
@@ -25,8 +26,11 @@ interface TabItem {
   match: string[];
   /** Pastille de notifications non lues sur cet onglet (acheteur : « Alertes »). */
   unread?: boolean;
+  /** Pastille de conversations non lues sur cet onglet (lot D2 : acheteur « Compte », vendeur « Messages »). */
+  messages?: boolean;
 }
 
+/** Les adresses « / », « /vendeur » et « /admin » ne rendent l'onglet actif QUE sur elles-mêmes (sinon il le serait sur toutes les pages de leur espace). */
 function TabBar({ items }: { items: TabItem[] }) {
   const pathname = usePathname();
   return (
@@ -34,7 +38,7 @@ function TabBar({ items }: { items: TabItem[] }) {
       <div className="grid grid-cols-4">
         {items.map((it) => {
           const active = it.match.some((m) =>
-            m === "/" ? pathname === "/" : pathname.startsWith(m),
+            m === "/" || m === "/vendeur" || m === "/admin" ? pathname === m : pathname.startsWith(m),
           );
           return (
             <Link
@@ -47,6 +51,7 @@ function TabBar({ items }: { items: TabItem[] }) {
               <span className="relative">
                 <it.icon className="size-5" strokeWidth={active ? 2.3 : 1.8} />
                 {it.unread ? <UnreadBadge className="absolute -right-2.5 -top-1.5" /> : null}
+                {it.messages ? <MessagesBadge className="absolute -right-2.5 -top-1.5" /> : null}
               </span>
               {it.label}
             </Link>
@@ -61,36 +66,45 @@ function TabBar({ items }: { items: TabItem[] }) {
  * Navigation de l'acheteur : la pastille des notifications non lues est sur « Alertes ». Une fois le compteur connu (une page gardée l'a lu, donc la
  * session est confirmée), il est relu à l'arrivée sur chaque page et au retour au premier plan, JAMAIS plus d'une fois par minute.
  */
-export function BuyerTabBar() {
-  const pathname = usePathname();
+function useRefreshOnNavigation(pathname: string | null) {
   useEffect(() => {
     if (unreadRefresher.get() !== null) void unreadRefresher.refresh();
+    if (messagesRefresher.get() !== null) void messagesRefresher.refresh();
   }, [pathname]);
   useEffect(() => {
     const onForeground = () => {
-      if (document.visibilityState === "visible" && unreadRefresher.get() !== null) void unreadRefresher.refresh();
+      if (document.visibilityState !== "visible") return;
+      if (unreadRefresher.get() !== null) void unreadRefresher.refresh();
+      if (messagesRefresher.get() !== null) void messagesRefresher.refresh();
     };
     document.addEventListener("visibilitychange", onForeground);
     return () => document.removeEventListener("visibilitychange", onForeground);
   }, []);
+}
+
+export function BuyerTabBar() {
+  const pathname = usePathname();
+  useRefreshOnNavigation(pathname);
   return (
     <TabBar
       items={[
         { href: "/", label: "Explorer", icon: Search, match: ["/", "/recherche", "/offre", "/comparer", "/partager"] },
         { href: "/favoris", label: "Favoris", icon: Heart, match: ["/favoris"] },
         { href: "/alertes", label: "Alertes", icon: Bell, match: ["/alertes", "/alerte", "/notifications"], unread: true },
-        { href: "/compte", label: "Compte", icon: User, match: ["/compte", "/messages", "/commandes", "/signaler", "/propositions", "/inviter"] },
+        { href: "/compte", label: "Compte", icon: User, match: ["/compte", "/messages", "/commandes", "/signaler", "/propositions", "/inviter"], messages: true },
       ]}
     />
   );
 }
 
 export function VendorTabBar() {
+  const pathname = usePathname();
+  useRefreshOnNavigation(pathname);
   return (
     <TabBar
       items={[
-        { href: "/vendeur", label: "Accueil", icon: House, match: ["/vendeur", "/vendeur/commandes", "/vendeur/devis"] },
-        { href: "/vendeur/demandes", label: "Demandes", icon: MessageCircle, match: ["/vendeur/demandes"] },
+        { href: "/vendeur", label: "Accueil", icon: House, match: ["/vendeur", "/vendeur/commandes", "/vendeur/devis", "/vendeur/demandes"] },
+        { href: "/vendeur/messages", label: "Messages", icon: MessageCircle, match: ["/vendeur/messages"], messages: true },
         { href: "/vendeur/annonces", label: "Annonces", icon: Tag, match: ["/vendeur/annonces"] },
         { href: "/vendeur/profil", label: "Compte", icon: User, match: ["/vendeur/profil"] },
       ]}

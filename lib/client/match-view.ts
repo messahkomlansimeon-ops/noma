@@ -10,7 +10,7 @@
  *    que parmi des résultats déjà pertinents.
  */
 
-import { STAT_ROUNDING_BASE, type DemandStatus, type MatchIndicators, type MatchProduct, type OfferStatus, type StoredMatch } from "./api";
+import type { DemandStatus, MatchIndicators, MatchProduct, OfferStatus, StoredMatch } from "./api";
 import { formatAmount, formatMoney } from "./catalog-view";
 
 export type IndicatorTone = "good" | "neutral" | "warn" | "muted";
@@ -34,7 +34,7 @@ export const EMPTY_BUYER_HINT = "Revenez plus tard : de nouvelles annonces peuve
 export const EMPTY_SELLER_MESSAGE = "Aucun besoin d'acheteur ne correspond pour le moment.";
 export const EMPTY_SELLER_HINT = "Les besoins qui correspondent à votre annonce apparaîtront ici.";
 /** La liste du vendeur compte des BESOINS : un même acheteur peut en avoir plusieurs (on ne surestime jamais le nombre d'acheteurs). */
-export const NEEDS_NOTE = "Chaque ligne est un besoin : un même acheteur peut en avoir plusieurs, donc il y a peut-être moins d'acheteurs que de besoins.";
+export const NEEDS_NOTE = "Chaque ligne est le besoin d'un acheteur, sans son identité.";
 export const TRUNCATED_NOTE = "Plus de 200 correspondances existent : seules les meilleures sont affichées.";
 
 /** « 2 h », « 5 jours » : ancienneté entière d'une confirmation, en heures (valeur du serveur). */
@@ -297,24 +297,6 @@ export function offerNotPublishedMessage(status: OfferStatus): string | null {
     default:
       return "Cette annonce est archivée : il n'y a plus d'acheteurs à afficher.";
   }
-}
-
-/**
- * Nombre de BESOINS d'acheteurs qui correspondent à l'annonce (jamais un nombre d'acheteurs : un acheteur peut avoir plusieurs
- * besoins et l'écran sert à vendre un boost payant : on ne surestime pas). Lot M1-quater : le titre suit l'arrondi des statistiques (« Moins de 5 besoins … »,
- * « Environ 10 besoins … » : multiple de 5 le plus proche, la moitié vers le haut) ; la liste, elle, reste affichée : c'est le produit. Tant qu'il reste des pages,
- * le nombre est un minimum : « Au moins N » avec N arrondi VERS LE BAS au multiple de 5 (jamais plus que la réalité).
- */
-export function matchingNeedsLabel(count: number, hasMore: boolean): string {
-  if (count === 0) return "Aucun besoin d'acheteur ne correspond pour le moment";
-  const base = STAT_ROUNDING_BASE;
-  if (hasMore) {
-    return count < base
-      ? "Plusieurs besoins d'acheteurs correspondent à votre annonce"
-      : `Au moins ${Math.floor(count / base) * base} besoins d'acheteurs correspondent à votre annonce`;
-  }
-  if (count < base) return `Moins de ${base} besoins d'acheteurs correspondent à votre annonce`;
-  return `Environ ${Math.floor((2 * count + base) / (2 * base)) * base} besoins d'acheteurs correspondent à votre annonce`;
 }
 
 /** « 4 offres correspondent à votre besoin » ; « Au moins … » tant qu'il reste des pages. */

@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, test } from "node:test";
 import { looksLikePhoneNumber } from "../../lib/phone-text";
 import { requireNoPhoneInOfferFields } from "../../lib/server/catalog/validation";
 import { roundCount } from "../../lib/server/metrics/privacy";
+import { NOTIFICATION_CAP_LOCK_NAMESPACE, NOTIFICATION_USER_LOCK_NAMESPACE } from "../../lib/server/notifications/config";
 import {
   DEMO_ADMIN_PHONE,
   DEMO_BUYER_DEMANDS,
@@ -13,6 +16,7 @@ import {
   DEMO_EXTRA_BUYER_COUNT,
   DEMO_OFFERS,
   DEMO_OPENERS,
+  DEMO_SEED_LOCK_NAMESPACE,
   DEMO_VENDOR_CREDIT_XOF,
   DEMO_VENDOR_PHONE,
   checkDemoSeedEnvironment,
@@ -194,5 +198,33 @@ describe("refus en processus enfant : avant toute connexion", () => {
     assert.equal(option.code, 1);
     assert.match(option.output, /aucune option n'existe/);
     for (const result of [production, dev, remote, option]) assert.ok(!/ECONNREFUSED|erreur inattendue/.test(result.output), `aucune connexion tentée : ${result.output}`);
+  });
+});
+
+describe("verrou consultatif de demo:seed (lot D3)", () => {
+  test("espace dédié : jamais celui des notifications, et aucun espace de verrou du dépôt n'est déclaré deux fois", () => {
+    assert.equal(DEMO_SEED_LOCK_NAMESPACE, 1_314_664_960);
+    assert.notEqual(DEMO_SEED_LOCK_NAMESPACE, NOTIFICATION_CAP_LOCK_NAMESPACE);
+    assert.notEqual(DEMO_SEED_LOCK_NAMESPACE, NOTIFICATION_USER_LOCK_NAMESPACE);
+    const root = join(import.meta.dirname, "../..");
+    const declared = new Map<string, string[]>();
+    const walk = (directory: string): void => {
+      for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
+        const path = `${directory}/${entry.name}`;
+        if (entry.isDirectory()) walk(path);
+        else if (/\.(ts|tsx)$/.test(entry.name)) {
+          const text = readFileSync(join(root, path), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+          for (const match of text.matchAll(/\b(?:const|let)\s+([A-Z][A-Z0-9_]*)\s*=\s*(1_?314_?664_?\d{3})\b/g)) {
+            const value = match[2].replace(/_/g, "");
+            declared.set(value, [...(declared.get(value) ?? []), `${path}:${match[1]}`]);
+          }
+        }
+      }
+    };
+    for (const directory of ["lib", "scripts"]) walk(directory);
+    assert.ok(declared.size >= 15, `${declared.size} espaces recensés`);
+    const duplicates = [...declared].filter(([, owners]) => owners.length > 1);
+    assert.deepEqual(duplicates, [], "aucun espace de verrou n'est partagé");
+    assert.deepEqual(declared.get("1314664960"), ["scripts/demo-seed-plan.ts:DEMO_SEED_LOCK_NAMESPACE"]);
   });
 });

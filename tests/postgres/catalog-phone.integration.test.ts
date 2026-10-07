@@ -4,9 +4,9 @@ import { after, before, test } from "node:test";
 import { Pool } from "pg";
 import { requestOtp, verifyOtp, type SendOtpInput } from "../../lib/server/auth";
 import { createDemand, createOffer, createUser, publishOffer, updateOffer } from "../../lib/server/catalog";
-import { CatalogPhoneNumberError } from "../../lib/server/catalog/errors";
+import { CatalogAttributeKeyError, CatalogPhoneNumberError } from "../../lib/server/catalog/errors";
 import { createCatalogHttpHandlers, type CatalogHttpHandlers } from "../../lib/server/catalog/http";
-import { PHONE_IN_OFFER_MESSAGE } from "../../lib/phone-text";
+import { ATTRIBUTE_KEY_MESSAGE, phoneInOfferMessage } from "../../lib/phone-text";
 import { runMigrations } from "../../lib/server/postgres/migrations";
 import { createTemporarySchemaName, openVerifiedIsolatedPool, openVerifiedTestDatabase, quoteTemporarySchema } from "./test-database";
 
@@ -54,7 +54,7 @@ const BASE = { rawText: "iPhone 12 128 Go", category: "Téléphones", brand: "Ap
 test("service : une annonce avec un numéro caché est refusée à la création (rien d'écrit), les formes « / » et « : » comprises ; une annonce ordinaire passe", async () => {
   const before = await offerCount();
   for (const variant of ["WhatsApp 0708091011", "07/08/09/10/11", "07:08:09:10:11", "０７０８０９１０１１", "٠٧٠٨٠٩١٠١١"]) {
-    await assert.rejects(createOffer({ ownerId, ...BASE, variant }, pool), (error: unknown) => error instanceof CatalogPhoneNumberError && error.message === PHONE_IN_OFFER_MESSAGE, variant);
+    await assert.rejects(createOffer({ ownerId, ...BASE, variant }, pool), (error: unknown) => error instanceof CatalogPhoneNumberError && error.field === "variant" && error.message === phoneInOfferMessage("variant"), variant);
   }
   await assert.rejects(createOffer({ ownerId, ...BASE, attributes: { contact: "07 08 09 10 11" } }, pool), CatalogPhoneNumberError);
   await assert.rejects(createOffer({ ownerId, ...BASE, brand: "Apple 0708091011" }, pool), CatalogPhoneNumberError);
@@ -90,11 +90,14 @@ test("HTTP : création, modification et mise en ligne refusées en 400 `phone_nu
   const before = await offerCount();
   const created = await handlers.offers.create(send("POST", "/api/offers", { ...BASE, variant: "WhatsApp 0708091011" }));
   assert.equal(created.status, 400);
-  assert.deepEqual(await created.json(), { error: { code: "phone_number_in_offer", message: "Pas de numéro de téléphone dans l'annonce : l'acheteur vous contactera par noma." } });
+  assert.deepEqual(await created.json(), { error: { code: "phone_number_in_offer", message: "Pas de numéro de téléphone dans l'annonce (champ : variante) : l'acheteur vous contactera par noma.", field: "variant" } });
   assert.equal(created.headers.get("cache-control"), "no-store");
   const slash = await handlers.offers.create(send("POST", "/api/offers", { ...BASE, attributes: { contact: "07/08/09/10/11" } }));
   assert.equal(slash.status, 400);
-  assert.equal((await slash.json()).error.code, "phone_number_in_offer");
+  const slashBody = await slash.json();
+  assert.equal(slashBody.error.code, "phone_number_in_offer");
+  assert.equal(slashBody.error.field, "attributes");
+  assert.equal(slashBody.error.message, "Pas de numéro de téléphone dans l'annonce (champ : attributs) : l'acheteur vous contactera par noma.");
   assert.equal(await offerCount(), before);
 
   const okResponse = await handlers.offers.create(send("POST", "/api/offers", BASE));
@@ -102,7 +105,7 @@ test("HTTP : création, modification et mise en ligne refusées en 400 `phone_nu
   const offer = (await okResponse.json()).offer;
   const patched = await handlers.offers.update(send("PATCH", `/api/offers/${offer.id}`, { expectedContentVersion: offer.contentVersion, variant: "07:08:09:10:11" }), offer.id);
   assert.equal(patched.status, 400);
-  assert.equal((await patched.json()).error.message, PHONE_IN_OFFER_MESSAGE);
+  assert.equal((await patched.json()).error.message, phoneInOfferMessage("variant"));
   const patchedOk = await handlers.offers.update(send("PATCH", `/api/offers/${offer.id}`, { expectedContentVersion: offer.contentVersion, variant: "512 Go" }), offer.id);
   assert.equal(patchedOk.status, 200);
 
@@ -119,4 +122,42 @@ test("les besoins ne sont pas concernés : un acheteur garde la liberté de son 
   const buyer = (await createUser({}, pool)).id;
   const demand = await createDemand({ ownerId: buyer, rawText: "iPhone", category: "Téléphones", brand: "Apple", model: "iPhone 12", variant: "128 Go", status: "draft" }, pool);
   assert.equal(demand.variant, "128 Go");
+});
+
+test("lot D3 : les contournements de l'audit sont refusés (O, « O7 O8 O9 l0 ll », « 07x08x09x10x11 »), les faux refus sont acceptés (dimensions, milliers, références) ; le champ concerné est nommé", async () => {
+  const before = await offerCount();
+  for (const variant of ["07 O8 09 10 11", "O7 O8 O9 l0 ll", "07 \u041e8 09 10 11", "07x08x09x10x11", "+225 07 08 09 10 11"]) {
+    const refused = await handlers.offers.create(send("POST", "/api/offers", { ...BASE, variant }));
+    assert.equal(refused.status, 400, variant);
+    const body = await refused.json();
+    assert.equal(body.error.code, "phone_number_in_offer");
+    assert.equal(body.error.field, "variant");
+    assert.equal(body.error.message, phoneInOfferMessage("variant"));
+  }
+  const located = await handlers.offers.create(send("POST", "/api/offers", { ...BASE, location: "Cocody 07 08 09 10 11" }));
+  assert.equal((await located.json()).error.field, "location");
+  assert.equal(await offerCount(), before, "aucune ligne écrite par un refus");
+  for (const variant of ["Écran 2400×1080", "Réf. 9300-1234", "S/N 12345678", "12 500 000 FCFA", "IMEI 3521 0987 654"]) {
+    const accepted = await handlers.offers.create(send("POST", "/api/offers", { ...BASE, variant, attributes: { resolution: "3840×2160", ean: 4006381333931 } }));
+    assert.equal(accepted.status, 201, variant);
+  }
+});
+
+test("lot D3 : nom d'attribut hors de [a-z_] (« tel_0708 », majuscule, chiffre) : service et HTTP refusent explicitement (400 invalid_attribute_key), rien n'est écrit, le nom saisi n'est jamais répété ; un numéro coupé entre deux attributs n'est pas détecté (limite documentée)", async () => {
+  const before = await offerCount();
+  await assert.rejects(createOffer({ ownerId, ...BASE, attributes: { tel_0708: "09 10 11" } }, pool), (error: unknown) => error instanceof CatalogAttributeKeyError && error.message === ATTRIBUTE_KEY_MESSAGE);
+  const offer = await createOffer({ ownerId, ...BASE, status: "draft" }, pool);
+  await assert.rejects(updateOffer({ id: offer.id, ownerId, expectedContentVersion: offer.contentVersion, changes: { attributes: { Couleur: "noir" } } }, pool), CatalogAttributeKeyError);
+  for (const key of ["tel_0708", "Couleur", "ram8", "prix-neuf"]) {
+    const refused = await handlers.offers.create(send("POST", "/api/offers", { ...BASE, attributes: { [key]: "x" } }));
+    assert.equal(refused.status, 400, key);
+    const text = await refused.text();
+    assert.equal(JSON.parse(text).error.code, "invalid_attribute_key");
+    assert.equal(JSON.parse(text).error.message, ATTRIBUTE_KEY_MESSAGE);
+    assert.equal(text.includes(key), false, "le nom saisi n'est jamais répété");
+  }
+  assert.equal(await offerCount(), before + 1, "seul le brouillon créé plus haut existe");
+  // Limite documentée : un numéro coupé entre plusieurs attributs distincts n'est pas détecté (les valeurs ne sont jamais concaténées).
+  const split = await handlers.offers.create(send("POST", "/api/offers", { ...BASE, attributes: { appel: "07 08 09", suite: "10 11" } }));
+  assert.equal(split.status, 201);
 });

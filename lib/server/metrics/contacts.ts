@@ -47,16 +47,16 @@ export function buildContactLinks(phone: string): OfferContactLinks {
   return { telUrl: `tel:${phone}`, whatsappUrl: `https://wa.me/${phone.slice(1)}` };
 }
 
-type Access = { ok: true; sellerId: string } | { ok: false; reason: "not_found" | "offer_not_available" };
+export type OfferAccess = { ok: true; sellerId: string } | { ok: false; reason: "not_found" | "offer_not_available" };
 
 /**
- * Accès au contact : MÊME prédicat que la lecture des correspondances (`buildMatchingFreshnessPredicate`, correspondance confirmée et fraîche de CE
+ * Accès au contact (exporté : la messagerie, les favoris et les commandes du lot D2 l'utilisent à l'identique) : MÊME prédicat que la lecture des correspondances (`buildMatchingFreshnessPredicate`, correspondance confirmée et fraîche de CE
  * besoin, propriétaire du besoin = l'acheteur). Si ce prédicat échoue parce que l'annonce n'est plus en ligne (en pause, archivée) ou plus disponible
  * (vendue), ET que cet acheteur avait cette annonce parmi ses correspondances confirmées (`h`), le refus est `offer_not_available` (409) : l'acheteur la
  * connaissait déjà. Dans tous les autres cas (annonce jamais correspondante, besoin d'un autre, besoin clos, vendeur lui-même, évaluation périmée d'une
  * annonce restée en ligne) : `not_found` (404 indiscernable).
  */
-async function readAccess(client: PoolClient, input: { viewerId: string; demandId: string; offerId: string }): Promise<Access> {
+export async function readOfferAccess(client: PoolClient, input: { viewerId: string; demandId: string; offerId: string }): Promise<OfferAccess> {
   const freshness = buildMatchingFreshnessPredicate(resolveMatchingFreshnessParams(), 4);
   const fresh = await client.query<{ seller_id: string }>(
     `WITH ${MATCHING_CURRENT_CLOCK_CTE}
@@ -100,7 +100,7 @@ export async function revealOfferContact(input: OfferContactInput): Promise<Offe
     await client.query(`SET LOCAL statement_timeout = '${CONTACT_TRANSACTION_TIMEOUT}'`);
     await client.query("SELECT pg_advisory_xact_lock($1::int, hashtext($2::text))", [CONTACT_LOCK_NAMESPACE, viewerId]);
 
-    const access = await readAccess(client, { viewerId, demandId, offerId });
+    const access = await readOfferAccess(client, { viewerId, demandId, offerId });
     if (!access.ok) throw new MetricsError(access.reason === "offer_not_available" ? "offer_not_available" : "resource_not_found");
 
     const phone = await client.query<{ phone_e164: string }>(

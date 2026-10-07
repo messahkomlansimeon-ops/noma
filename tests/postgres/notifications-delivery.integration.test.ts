@@ -30,7 +30,7 @@ before(async () => {
   target = opened.target;
   await admin.query(`CREATE SCHEMA ${quoted}`);
   pool = await openVerifiedIsolatedPool(target, schema, wide);
-  assert.equal((await runMigrations(pool)).applied.length, 19);
+  assert.equal((await runMigrations(pool)).applied.length, 20);
 });
 
 after(async () => {
@@ -942,8 +942,8 @@ test("étape ignorée sans erreur quand la migration 0019 n'est pas appliquée (
   const old = await openVerifiedIsolatedPool(target, oldSchema);
   try {
     const directory = join(process.cwd(), "database", "migrations");
-    const files = readdirSync(directory).filter((name) => /^\d{4}_.*\.sql$/.test(name) && !name.startsWith("0019_")).sort();
-    assert.equal(files.length, 18, "les 18 migrations d'avant le lot N1, sans la 0019 (exclue par son nom)");
+    const files = readdirSync(directory).filter((name) => /^\d{4}_.*\.sql$/.test(name) && name < "0019_").sort();
+    assert.equal(files.length, 18, "les 18 migrations d'avant le lot N1 (antérieures à la 0019 : la 0020 en dépend)");
     assert.equal(readdirSync(directory).filter((name) => name.startsWith("0019_")).length, 1);
     await old.query("CREATE TABLE noma_schema_migrations (version TEXT PRIMARY KEY, checksum TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)");
     for (const name of files) {

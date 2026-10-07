@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Manrope } from "next/font/google";
 import "./globals.css";
 import { Toast } from "@/components/toast";
+import { APP_TITLE } from "@/lib/site";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -15,7 +16,7 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   title: {
-    default: "noma · Votre recherche, simplifiée",
+    default: APP_TITLE,
     template: "%s · noma",
   },
   description:

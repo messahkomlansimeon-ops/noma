@@ -6,7 +6,7 @@
 import { parseBudgetFcfa } from "../contracts";
 import type { DemandInput, DemandRecord, DemandStatus, Money, OfferInput, OfferRecord, OfferStatus } from "./api";
 
-export type ArtKey = "phone" | "sofa" | "plug" | "ac" | "drill" | "car" | "box";
+export type ArtKey = "phone" | "sofa" | "laptop" | "ac" | "drill" | "car" | "box";
 export type Tone = "sage" | "carrot" | "wash" | "sky" | "forest";
 
 export const CURRENCY = "XOF";
@@ -14,7 +14,7 @@ export const CURRENCY = "XOF";
 export const CATEGORY_OPTIONS: readonly { label: string; art: ArtKey }[] = [
   { label: "Téléphones", art: "phone" },
   { label: "Maison et meubles", art: "sofa" },
-  { label: "Électronique", art: "plug" },
+  { label: "Électronique", art: "laptop" },
   { label: "Climatisation", art: "ac" },
   { label: "Outillage", art: "drill" },
   { label: "Véhicules", art: "car" },

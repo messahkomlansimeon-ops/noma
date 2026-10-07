@@ -94,8 +94,13 @@ export function demandView(demand: BuyerHomeDemand): BuyerDemandView {
 export function notificationView(item: BuyerHomeNotification): BuyerNotificationView {
   return {
     id: item.id,
-    title: item.kind === "new_matches_digest" ? summaryTitle(item.count ?? 0) : (item.title ?? "Nouvelle annonce"),
-    subtitle: item.kind === "new_matches_digest" ? null : formatMoney(item.price),
+    title:
+      item.kind === "new_matches_digest"
+        ? summaryTitle(item.count ?? 0)
+        : item.kind === "new_message"
+          ? `Nouveau message : ${item.title ?? "annonce"}`
+          : (item.title ?? "Nouvelle annonce"),
+    subtitle: item.kind === "new_matches_digest" || item.kind === "new_message" ? null : formatMoney(item.price),
     unread: item.unread,
     href: item.link,
   };

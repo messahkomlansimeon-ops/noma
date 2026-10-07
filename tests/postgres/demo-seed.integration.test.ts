@@ -31,7 +31,7 @@ before(async () => {
   baseUrl = opened.target.connectionString;
   await admin.query(`CREATE DATABASE "${mainDb}"`);
   pool = new Pool({ connectionString: urlFor(mainDb), max: 4 });
-  assert.equal((await runMigrations(pool)).applied.length, 19);
+  assert.equal((await runMigrations(pool)).applied.length, 20);
 });
 
 after(async () => {
@@ -59,6 +59,14 @@ async function snapshot() {
     boosts: await read("SELECT count(*)::text AS n FROM offer_boosts"),
     walletTransactions: await read("SELECT count(*)::text AS n FROM wallet_transactions"),
     outbox: await read("SELECT count(*)::text AS n FROM matching_outbox_events"),
+    // Lot D2.
+    conversations: await read("SELECT count(*)::text AS n FROM conversations"),
+    messages: await read("SELECT count(*)::text AS n FROM messages"),
+    favorites: await read("SELECT count(*)::text AS n FROM favorites"),
+    orders: await read("SELECT count(*)::text AS n FROM orders"),
+    admins: await read("SELECT count(*)::text AS n FROM users WHERE is_admin"),
+    adminActions: await read("SELECT count(*)::text AS n FROM admin_actions"),
+    messageNotifications: await read("SELECT count(*)::text AS n FROM notifications WHERE kind = 'new_message'"),
   };
 }
 
@@ -103,6 +111,33 @@ test("premier passage : comptes aux numéros fixes, 30 annonces publiées, besoi
   }
 });
 
+test("lot D2 : le compte Admin démo est administrateur (journalisé), une conversation de 3 messages avec un vendeur fictif, un favori, une commande proposée au vendeur démo par un acheteur fictif", async () => {
+  const adminId = await userOf(DEMO_ADMIN_PHONE);
+  assert.deepEqual((await pool.query("SELECT id FROM users WHERE is_admin")).rows, [{ id: adminId }], "seul le compte Admin démo est administrateur");
+  assert.deepEqual((await pool.query("SELECT admin_id, source, action, target_user_id FROM admin_actions")).rows, [{ admin_id: null, source: "command", action: "grant_admin", target_user_id: adminId }]);
+
+  const buyerId = await userOf(DEMO_BUYER_PHONE);
+  const vendorId = await userOf(DEMO_VENDOR_PHONE);
+  const conversation = (await pool.query<{ id: string; seller_id: string }>("SELECT id, seller_id FROM conversations WHERE buyer_id = $1", [buyerId])).rows;
+  assert.equal(conversation.length, 1);
+  assert.notEqual(conversation[0].seller_id, vendorId, "le vendeur de la conversation est un vendeur FICTIF");
+  const fictional = (await pool.query<{ phone_e164: string }>("SELECT phone_e164 FROM phone_identities WHERE user_id = $1", [conversation[0].seller_id])).rows[0].phone_e164;
+  assert.match(fictional, /^\+22507888888\d\d$/);
+  const thread = (await pool.query<{ sender_id: string; body: string }>("SELECT sender_id, body FROM messages WHERE conversation_id = $1 ORDER BY id", [conversation[0].id])).rows;
+  assert.deepEqual(thread.map((message) => message.sender_id === buyerId ? "acheteur" : "vendeur"), ["acheteur", "vendeur", "acheteur"]);
+  assert.ok(thread.every((message) => !/\d{4}/.test(message.body)), "aucun numéro dans les messages de démonstration");
+  assert.equal((await pool.query("SELECT 1 FROM notifications WHERE kind = 'new_message'")).rowCount, 0, "l'historique de démonstration ne notifie personne : l'acheteur démo garde ses 3 notifications");
+  assert.equal(await pool.query<{ n: number }>("SELECT count(*)::int AS n FROM messages m JOIN conversations c ON c.id = m.conversation_id WHERE m.sender_id <> $1 AND m.id > c.buyer_last_read_id", [buyerId]).then((r) => r.rows[0].n), 0, "aucun message non lu côté acheteur");
+
+  assert.equal((await pool.query("SELECT 1 FROM favorites WHERE user_id = $1", [buyerId])).rowCount, 1);
+  const orders = (await pool.query<{ status: string; seller_id: string; buyer_id: string; price_amount: string }>("SELECT status, seller_id, buyer_id, price_amount::text FROM orders")).rows;
+  assert.equal(orders.length, 1);
+  assert.equal(orders[0].status, "proposed");
+  assert.equal(orders[0].seller_id, vendorId, "à confirmer par le vendeur démo");
+  assert.notEqual(orders[0].buyer_id, buyerId, "venant d'un acheteur fictif");
+  assert.equal(orders[0].price_amount, "160000");
+});
+
 test("acheteur démo : 3 besoins actifs qui ont des correspondances, 3 notifications non lues (annonces publiées APRÈS ses besoins)", async () => {
   const home = await readBuyerHome({ pool, userId: await userOf(DEMO_BUYER_PHONE) });
   assert.equal(home.activeDemandCount, 3);
@@ -143,6 +178,7 @@ test("rejeu à l'identique : aucun doublon, aucune ouverture ni aucun contact de
   assert.equal(result.code, 0, result.output);
   assert.match(result.output, /0 annonce\(s\) publiée\(s\) \(30 déjà présente\(s\)\), 0 besoin\(s\) activé\(s\) \(14 déjà présent\(s\)\), 0 compte\(s\) créé\(s\) \(21 déjà présent\(s\)\)/);
   assert.match(result.output, /0 ouverture\(s\) et 0 contact\(s\) fictifs écrits, crédits déjà présents, boost déjà actif/);
+  assert.match(result.output, /0 message\(s\) écrit\(s\), favori déjà présent, commande de démonstration déjà active, rôle admin déjà attribué/);
   assert.deepEqual(await snapshot(), before, "l'état de la base est identique au premier passage");
 });
 

@@ -11,6 +11,7 @@ interface SessionRow extends QueryResultRow {
   expires_at: Date;
   revoked_at: Date | null;
   account_status: "active" | "suspended" | "archived";
+  is_admin: boolean;
 }
 
 export async function resolveSession(
@@ -22,7 +23,7 @@ export async function resolveSession(
   const pool = context.pool ?? getPostgresPool();
   const result = await pool.query<SessionRow>(
     `SELECT session.user_id, session.expires_at, session.revoked_at,
-            account.status AS account_status
+            account.status AS account_status, account.is_admin
        FROM auth_sessions AS session
        JOIN users AS account ON account.id = session.user_id
       WHERE session.token_sha256 = $1`,
@@ -40,7 +41,7 @@ export async function resolveSession(
   ) {
     return null;
   }
-  return { userId: session.user_id, expiresAt: session.expires_at };
+  return { userId: session.user_id, expiresAt: session.expires_at, isAdmin: session.is_admin === true };
 }
 
 export async function revokeSession(

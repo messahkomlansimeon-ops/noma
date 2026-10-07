@@ -102,9 +102,6 @@ export function OfferStatsSection({ offer }: { offer: OfferRecord }) {
         </p>
       ) : (
         <>
-          <p className="mt-1 text-[14px] font-bold text-ink" data-testid="stats-matching">
-            {view.matchingNeedsText}
-          </p>
           {view.fewActivity ? (
             <p className="mt-1 text-[12px] font-semibold text-ink-soft" data-testid="stats-few">
               {FEW_STATS_YET}

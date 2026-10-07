@@ -17,18 +17,18 @@ import { TITLE_FALLBACK, demandLink, offerLink, type NotificationPrice } from ".
  * titre, prix, lien, dates. Jamais de téléphone, d'identifiant du vendeur ni de texte libre. Voir NOTIFICATIONS.md.
  */
 
-export type NotificationKind = "new_match" | "new_matches_digest";
+export type NotificationKind = "new_match" | "new_matches_digest" | "new_message";
 
 export interface NotificationItem {
   id: string;
   kind: NotificationKind;
-  /** Titre de l'annonce (new_match) ou null (résumé : le texte « N nouvelles annonces » est construit à partir de `count`). */
+  /** Titre de l'annonce (new_match, new_message) ou null (résumé : le texte « N nouvelles annonces » est construit à partir de `count`). */
   title: string | null;
   price: NotificationPrice | null;
   /** Résumé seulement : nombre d'annonces au-delà du plafond du jour. */
   count: number | null;
   demandId: string;
-  /** new_match : la fiche de l'annonce, dans le contexte du besoin ; résumé : le besoin. */
+  /** new_match : la fiche de l'annonce, dans le contexte du besoin ; résumé : le besoin ; new_message : la conversation (`/messages/{id}`). */
   offerId: string | null;
   link: string;
   createdAt: Date;
@@ -67,12 +67,28 @@ interface NotificationRow {
   item_count: number | null;
   demand_id: string;
   offer_id: string | null;
+  conversation_id: string | null;
   created_at: Date;
   read_at: Date | null;
   cursor_at: string;
 }
 
 function mapRow(row: NotificationRow): NotificationItem {
+  if (row.kind === "new_message" && row.conversation_id !== null) {
+    // « Nouveau message » (lot D2) : titre de l'annonce (liste blanche), lien vers la conversation. Jamais le texte du message ni l'identité de l'autre participant.
+    return {
+      id: row.id,
+      kind: row.kind,
+      title: row.title !== null && looksLikePhoneNumber(row.title) ? TITLE_FALLBACK : row.title,
+      price: null,
+      count: null,
+      demandId: row.demand_id,
+      offerId: null,
+      link: `/messages/${row.conversation_id}`,
+      createdAt: row.created_at,
+      readAt: row.read_at,
+    };
+  }
   const isMatch = row.kind === "new_match" && row.offer_id !== null;
   const amount = row.price_amount === null ? null : Number(row.price_amount);
   return {
@@ -104,7 +120,7 @@ export async function listNotifications(input: { pool: Pool; userId: string; lim
   try {
     await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
     const rows = await client.query<NotificationRow>(
-      `SELECT id, kind, title, price_amount::text AS price_amount, price_currency, item_count, demand_id, offer_id, created_at, read_at,
+      `SELECT id, kind, title, price_amount::text AS price_amount, price_currency, item_count, demand_id, offer_id, conversation_id, created_at, read_at,
               to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at
          FROM notifications
         WHERE user_id = $1::uuid

@@ -245,15 +245,22 @@ export function createAuthHttpHandlers(
       }
     },
 
+    /**
+     * Lecture de la session (lot D3) : TOUJOURS 200 quand la base répond. `{ authenticated: false }` sans session valide (le visiteur anonyme ne provoque plus de 401 dans la console du
+     * navigateur) ; `{ authenticated: true, userId, isAdmin }` sinon, `isAdmin` étant un booléen seulement (le sélecteur d'espace n'affiche l'onglet Admin qu'aux administrateurs ;
+     * l'autorisation réelle reste celle des routes /api/admin/*, qui relisent la base).
+     */
     async session(request) {
       const token = readSingleCookie(request, AUTH_SESSION_COOKIE);
-      if (!token) return unauthorized();
+      if (!token) return jsonResponse(200, { authenticated: false });
       try {
         const result = await resolveSession(token, {
           pool: dependencies.pool,
           now: dependencies.now,
         });
-        return result ? jsonResponse(200, { userId: result.userId }) : unauthorized();
+        return result
+          ? jsonResponse(200, { authenticated: true, userId: result.userId, isAdmin: result.isAdmin === true })
+          : jsonResponse(200, { authenticated: false });
       } catch {
         return serviceUnavailable();
       }

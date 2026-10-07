@@ -1,12 +1,12 @@
-import { ComingSoon } from "@/components/coming-soon";
+"use client";
+
+import { OrdersList } from "@/components/orders/orders-list";
+import { SessionGate } from "@/components/session-gate";
 
 export default function CommandesVendeur() {
   return (
-    <ComingSoon
-      title="Commandes"
-      sentence="Le suivi des commandes arrive bientôt."
-      backHref="/vendeur"
-      backLabel="Retour au tableau de bord"
-    />
+    <SessionGate>
+      <OrdersList space="vendor" />
+    </SessionGate>
   );
 }

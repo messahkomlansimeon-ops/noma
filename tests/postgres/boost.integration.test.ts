@@ -101,14 +101,14 @@ const sqlRow = async <T extends Record<string, unknown>>(text: string, values: u
 
 test("migration 0011 : appliquée sur un schéma temporaire, la relance l'ignore, la ligne par défaut est insérée", async () => {
   const first = firstMigration;
-  assert.equal(first.applied.length, 19);
-  assert.equal(first.applied.at(-1), "0019_notifications")
+  assert.equal(first.applied.length, 20);
+  assert.equal(first.applied.at(-1), "0020_social_orders_admin")
   assert.ok(first.applied.includes("0011_offer_boosts"));
   assert.ok(first.applied.includes("0010_matching_job_leases"));
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 19);
-  assert.equal(rerun.skipped.at(-1), "0019_notifications");
+  assert.equal(rerun.skipped.length, 20);
+  assert.equal(rerun.skipped.at(-1), "0020_social_orders_admin");
 
   const rows = (await pool.query("SELECT key, slot_ratio::text, min_slots, max_slots, max_active_per_seller, max_seller_slot_share::text, max_promoted_share::text, min_relevance::text FROM boost_settings")).rows;
   assert.deepEqual(rows, [{

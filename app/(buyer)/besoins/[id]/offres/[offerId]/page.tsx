@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Phone } from "lucide-react";
 import { IndicatorLine, SponsoredNotice } from "@/components/matches/match-parts";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
+import { FavoriteButton } from "@/components/social/favorite-button";
+import { OfferActions } from "@/components/social/offer-actions";
 import { Thumb } from "@/components/thumb";
 import { TopBar } from "@/components/top-bar";
 import { WhatsAppIcon } from "@/components/ui";
@@ -123,6 +125,7 @@ function Fiche({ demandId, offerId }: { demandId: string; offerId: string }) {
           {view.subtitle ? <div className="text-[13px] text-ink-soft">{view.subtitle}</div> : null}
           {view.dateText ? <div className="text-[12px] text-ink-soft">{view.dateText}</div> : null}
         </div>
+        <FavoriteButton demandId={demandId} offerId={offerId} />
       </div>
 
       <div className="mt-3 text-[13px] font-bold text-ink">{view.compatibility}</div>
@@ -203,6 +206,8 @@ function Fiche({ demandId, offerId }: { demandId: string; offerId: string }) {
           {CONTACT_NOTICE} {CONTACT_HINT}
         </p>
       </section>
+
+      <OfferActions demandId={demandId} offerId={offerId} />
 
       <p className="mt-4 text-center text-[12px] leading-relaxed text-ink-soft">
         Informations telles qu'annoncées par le vendeur. Ni l'état, ni la disponibilité ne sont garantis : confirmez-les avec lui.

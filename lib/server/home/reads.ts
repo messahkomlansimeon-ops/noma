@@ -48,7 +48,7 @@ export interface BuyerHomeDemand {
 
 export interface BuyerHomeNotification {
   id: string;
-  kind: "new_match" | "new_matches_digest";
+  kind: "new_match" | "new_matches_digest" | "new_message";
   title: string | null;
   price: Money | null;
   count: number | null;
@@ -152,7 +152,10 @@ export interface VendorHomeBoost {
 export interface VendorHome {
   contractVersion: typeof VENDOR_HOME_CONTRACT_VERSION;
   counts: { published: number; paused: number; draft: number };
-  /** Total des besoins correspondants aux annonces EN LIGNE, arrondi comme les statistiques d'une annonce. */
+  /**
+   * Nombre de BESOINS DISTINCTS (un besoin qui correspond à plusieurs annonces du vendeur compte une seule fois) correspondant à ses annonces EN LIGNE, arrondi comme les
+   * statistiques d'une annonce. Jamais la somme des couples (annonce, besoin) : 10 couples pour 2 besoins se publient « moins de 5 ».
+   */
   needs: StatCount;
   balance: number;
   currency: "XOF";
@@ -180,8 +183,10 @@ export async function readVendorHome(input: { pool: Pool; userId: string; now?: 
   }
   const published = offers.filter((offer) => offer.status === "published");
 
-  // Besoins correspondants : même prédicat que la lecture des correspondances et que les statistiques d'une annonce (confirmées et fraîches), par annonce.
+  // Besoins correspondants : même prédicat que la lecture des correspondances et que les statistiques d'une annonce (confirmées et fraîches), par annonce ;
+  // le total du vendeur compte les besoins DISTINCTS (lot D3), jamais la somme des couples.
   const needsByOffer = new Map<string, number>();
+  let distinctNeeds = 0;
   if (published.length > 0) {
     const freshness = buildMatchingFreshnessPredicate(resolveMatchingFreshnessParams(), 2);
     const counted = await pool.query<{ offer_id: string; needs: number }>(
@@ -194,6 +199,15 @@ export async function readVendorHome(input: { pool: Pool; userId: string; now?: 
       [published.map((offer) => offer.id), ...freshness.values],
     );
     for (const row of counted.rows) needsByOffer.set(row.offer_id, row.needs);
+    const distinct = await pool.query<{ needs: number }>(
+      `WITH ${MATCHING_CURRENT_CLOCK_CTE}
+       SELECT count(DISTINCT e.demand_id)::int AS needs
+         FROM ${MATCHING_FRESHNESS_FROM}
+        WHERE e.offer_id = ANY($1::uuid[]) AND e.is_confirmed_match = TRUE
+          AND ${freshness.conditions.join("\n          AND ")}`,
+      [published.map((offer) => offer.id), ...freshness.values],
+    );
+    distinctNeeds = distinct.rows[0]?.needs ?? 0;
   }
 
   // Boosts effectifs (mêmes conditions que le classement des résultats), puis leur date de fin.
@@ -208,12 +222,10 @@ export async function readVendorHome(input: { pool: Pool; userId: string; now?: 
   }
 
   const balance = await readWalletBalance(pool, userId);
-  let totalNeeds = 0;
-  for (const needs of needsByOffer.values()) totalNeeds += needs;
   return {
     contractVersion: VENDOR_HOME_CONTRACT_VERSION,
     counts,
-    needs: roundCount(totalNeeds),
+    needs: roundCount(distinctNeeds),
     balance: numberOf(balance),
     currency: "XOF",
     activeBoosts: [...endsByOffer].map(([offerId, endsAt]) => ({ offerId, endsAt })).sort((a, b) => a.endsAt.localeCompare(b.endsAt)),

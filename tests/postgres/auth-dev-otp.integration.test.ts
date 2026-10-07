@@ -160,7 +160,7 @@ if (!configuredUrl?.trim()) {
 
       const session = await handlers.session(new Request(`${ORIGIN}/api/auth/session`, { headers: { cookie } }));
       assert.equal(session.status, 200);
-      assert.deepEqual(await session.json(), { userId: verifiedBody.userId });
+      assert.deepEqual(await session.json(), { authenticated: true, userId: verifiedBody.userId, isAdmin: false });
       assert.equal(lines.length, 1, "aucune autre ligne écrite par le parcours complet");
     });
 

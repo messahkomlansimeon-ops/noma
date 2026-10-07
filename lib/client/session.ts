@@ -89,3 +89,22 @@ export async function runSessionGate(dependencies: GateDependencies): Promise<Ga
   if (decision.kind === "allow") return { kind: "allowed", userId: decision.userId };
   return { kind: "unavailable" };
 }
+
+/**
+ * Lecture de session PARTAGÉE (lot D3) : tant qu'une lecture est en cours, tout appelant suivant reçoit la MÊME promesse (une seule requête au serveur). La garde de session des pages
+ * et le sélecteur d'espace (onglet Admin) lisent la session au même instant : sans ce partage, chaque page ferait une requête de plus. Rien n'est gardé après la réponse : la lecture suivante
+ * repart de zéro (aucune session périmée après une connexion ou une déconnexion). La requête n'est pas annulable par un appelant : chaque appelant ignore la réponse qui ne l'intéresse plus.
+ */
+export function createCoalescedRead<T>(read: () => Promise<T>): () => Promise<T> {
+  let inFlight: Promise<T> | null = null;
+  return () => {
+    if (inFlight !== null) return inFlight;
+    const started = read();
+    inFlight = started;
+    const clear = (): void => {
+      if (inFlight === started) inFlight = null;
+    };
+    started.then(clear, clear);
+    return started;
+  };
+}

@@ -1,12 +1,14 @@
-import { ComingSoon } from "@/components/coming-soon";
+"use client";
+
+import { ConversationsList } from "@/components/conversations-list";
+import { MessagesUnreadSync } from "@/components/messages-badge";
+import { SessionGate } from "@/components/session-gate";
 
 export default function Messages() {
   return (
-    <ComingSoon
-      title="Messages"
-      sentence="La messagerie avec les vendeurs arrive bientôt. Pour le moment, le contact se fait par téléphone ou WhatsApp, depuis la fiche d'une annonce."
-      backHref="/"
-      backLabel="Retour à l'accueil"
-    />
+    <SessionGate>
+      <MessagesUnreadSync initial={false} />
+      <ConversationsList space="buyer" />
+    </SessionGate>
   );
 }

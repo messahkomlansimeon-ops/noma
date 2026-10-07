@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Phone, Store, Wallet } from "lucide-react";
+import { LogOut, MessageCircle, Package, Phone, Store, Wallet } from "lucide-react";
 import { SessionGate, useLogout } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
 import { Badge, MenuRow } from "@/components/ui";
@@ -34,6 +34,8 @@ function ProfilVendeur() {
         </p>
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-white">
+          <MenuRow icon={MessageCircle} label="Messages" href="/vendeur/messages" />
+          <MenuRow icon={Package} label="Commandes" href="/vendeur/commandes" />
           <MenuRow icon={Wallet} label="Mon porte-monnaie" href={walletHref({ next: "/vendeur/profil" })} />
         </div>
 

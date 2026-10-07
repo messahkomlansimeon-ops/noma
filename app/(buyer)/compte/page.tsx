@@ -18,6 +18,7 @@ import {
 import { LogoMark } from "@/components/logo";
 import { NotificationPreferencesCard } from "@/components/notification-preferences-card";
 import { useLogout } from "@/components/session-gate";
+import { useMessagesUnread } from "@/components/messages-badge";
 import { useUnreadCount } from "@/components/unread-badge";
 import { Badge, MenuRow } from "@/components/ui";
 import { useNoma } from "@/lib/store";
@@ -28,6 +29,7 @@ export default function MonCompte() {
   const showToast = useNoma((s) => s.showToast);
   const { logout, pending: loggingOut } = useLogout();
   const unread = useUnreadCount();
+  const messagesUnread = useMessagesUnread();
 
   const soon = () => showToast("Bientôt disponible");
 
@@ -64,7 +66,7 @@ export default function MonCompte() {
         </div>
 
         <div className="mt-4 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">
-          <MenuRow icon={MessageCircle} label="Messages" href="/messages" />
+          <MenuRow icon={MessageCircle} label="Messages" badge={messagesUnread !== null && messagesUnread > 0 ? messagesUnread : undefined} href="/messages" />
           <MenuRow icon={Package} label="Mes commandes" href="/commandes" />
           <MenuRow icon={Wallet} label="Mon porte-monnaie" href="/compte/porte-monnaie" />
           <MenuRow icon={Search} label="Mes recherches suivies" href="/alertes" />

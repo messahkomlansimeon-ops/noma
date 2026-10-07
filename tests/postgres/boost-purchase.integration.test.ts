@@ -318,13 +318,13 @@ async function tamperPurchasedBoost(boostId: string, assignments: string): Promi
 // ═════════════ 1. Migration 0015 ═════════════
 
 test("migration 0015 (suivie de 0016 à 0019) : 19 appliquées, la relance n'en applique aucune, tables, index et déclencheurs présents", async () => {
-  assert.equal(firstMigration.applied.length, 19);
+  assert.equal(firstMigration.applied.length, 20);
   assert.ok(firstMigration.applied.includes("0015_boost_purchases"));
-  assert.equal(firstMigration.applied.at(-1), "0019_notifications");
+  assert.equal(firstMigration.applied.at(-1), "0020_social_orders_admin");
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 19);
-  assert.equal(rerun.skipped.at(-1), "0019_notifications");
+  assert.equal(rerun.skipped.length, 20);
+  assert.equal(rerun.skipped.at(-1), "0020_social_orders_admin");
   assert.equal(await countRows("boost_purchases"), 0);
 
   const columns = (await pool.query<{ column_name: string; is_nullable: string; data_type: string }>(

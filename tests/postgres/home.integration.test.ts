@@ -102,6 +102,37 @@ test("accueil de l'acheteur : au plus 6 besoins montrés (le total réel est ind
   assert.match(home.notifications[1].link, /^\/besoins\/[0-9a-f-]{36}\/offres\/[0-9a-f-]{36}$/);
 });
 
+test("tableau de bord du vendeur (lot D3) : « besoins » compte les besoins DISTINCTS, jamais la somme des couples (annonce, besoin) ; plusieurs annonces semblables ne gonflent pas le total", async () => {
+  const seller = await makePerson(pool);
+  const buyerA = await makePerson(pool);
+  const buyerB = await makePerson(pool);
+  const demandA = await makeDemand(pool, buyerA.id);
+  const demandB = await makeDemand(pool, buyerB.id);
+  const offers = [];
+  for (let index = 0; index < 5; index += 1) offers.push(await makeOffer(pool, seller.id, { price: 300_000 + index }));
+  // 5 annonces semblables × 2 besoins = 10 couples, mais 2 besoins distincts.
+  for (const offer of offers) {
+    await makeMatch(pool, offer, demandA);
+    await makeMatch(pool, offer, demandB);
+  }
+  const pairs = await pool.query<{ n: number }>("SELECT count(*)::int AS n FROM matching_evaluations WHERE offer_id = ANY($1::uuid[]) AND is_confirmed_match = TRUE", [offers.map((offer) => offer.id)]);
+  assert.equal(pairs.rows[0].n, 10, "10 couples (annonce, besoin) confirmés");
+  const home = await readVendorHome({ pool, userId: seller.id });
+  assert.deepEqual(home.needs, { kind: "below", bound: 5 }, "2 besoins distincts : « moins de 5 », pas « environ 10 »");
+  for (const offer of offers) assert.deepEqual(home.offers.find((row) => row.id === offer.id)?.needs, { kind: "below", bound: 5 }, "par annonce : 2 besoins");
+  // 7 besoins distincts de plus, chacun sur une seule des annonces : 9 distincts (« environ 10 ») alors que les couples sont 17.
+  for (let index = 0; index < 7; index += 1) await makeMatch(pool, offers[index % offers.length], (await makeDemand(pool, (await makePerson(pool)).id)));
+  const more = await readVendorHome({ pool, userId: seller.id });
+  assert.deepEqual(more.needs, { kind: "approx", value: 10 }, "9 besoins distincts : « environ 10 »");
+  // Un besoin qui correspond à toutes les annonces ne compte toujours qu'une fois : 5 couples de plus pour le même besoin ne changent rien.
+  const demandC = await makeDemand(pool, (await makePerson(pool)).id);
+  for (const offer of offers) await makeMatch(pool, offer, demandC);
+  assert.deepEqual((await readVendorHome({ pool, userId: seller.id })).needs, { kind: "approx", value: 10 }, "10 besoins distincts : « environ 10 » (et non la somme des couples)");
+  const sum = await pool.query<{ n: number }>("SELECT count(*)::int AS n FROM matching_evaluations WHERE offer_id = ANY($1::uuid[]) AND is_confirmed_match = TRUE", [offers.map((offer) => offer.id)]);
+  assert.equal(sum.rows[0].n, 22, "22 couples : la somme aurait publié « environ 20 »");
+  assert.equal(JSON.stringify(more).includes('"needs":10'), false, "aucun compte exact");
+});
+
 test("tableau de bord du vendeur : annonces par statut (archivées exclues), besoins correspondants ARRONDIS, solde, boosts actifs ; rien des autres vendeurs", async () => {
   const seller = await makePerson(pool);
   const other = await makePerson(pool);

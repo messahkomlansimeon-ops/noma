@@ -10,7 +10,7 @@
 > gagne la section « Ce que produit votre annonce » ; les comptes d'acheteurs du devis (« acheteurs compatibles », « visible auprès de X acheteur(s) ») sont **arrondis** (contrat `boost-quote/v2`) :
 > « moins de 5 acheteurs » de 0 à 4, « environ 15 acheteurs » à partir de 5 (multiple de 5 le plus proche ; « environ 5 » de 5 à 8). Voir `MESURES.md`.
 >
-> **Titre de « Acheteurs intéressés » (lot M1-quater)** : il suit le même arrondi — « Moins de 5 besoins d'acheteurs correspondent à votre annonce » de 1 à 4 besoins, « Environ 10 besoins d'acheteurs correspondent à votre
+> **Titre de « Acheteurs intéressés » (lot M1-quater, SUPPRIMÉ au lot D3 : plus aucun compte au-dessus de la liste, une phrase « Chaque ligne est le besoin d'un acheteur, sans son identité. » ; texte historique ci-dessous)** : il suivait le même arrondi — « Moins de 5 besoins d'acheteurs correspondent à votre annonce » de 1 à 4 besoins, « Environ 10 besoins d'acheteurs correspondent à votre
 > annonce » à partir de 5 (5 à 8 → 5, 9 à 12 → 10…) ; tant qu'il reste des pages : « Au moins N besoins… » (N arrondi vers le bas à 5 près) ; « Aucun besoin d'acheteur ne correspond pour le moment » pour 0 (la liste est alors vide). La **liste
 > des besoins reste affichée** (budget, lieu : c'est le produit). Le facteur demande du devis ne redonne plus un petit nombre d'acheteurs (D' = 5 de 1 à 5 acheteurs, `BOOST-PRICING.md`).
 

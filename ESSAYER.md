@@ -23,11 +23,11 @@ utilisé** (la recharge du porte-monnaie passe par une page de paiement SIMULÉ)
    `npm run dev:try`, voir ci-dessous). La commande ne lit aucun fichier `.env` pour la deviner, et elle refuse de démarrer
    si la base n'est pas sur **votre ordinateur** (`127.0.0.1`, `localhost` ou `::1`).
 
-   **La base d'essai doit être migrée jusqu'au bout : 19 migrations** (de `0001` à `0019`, dont le porte-monnaie `0014`,
+   **La base d'essai doit être migrée jusqu'au bout : 20 migrations** (de `0001` à `0020`, dont le porte-monnaie `0014`,
    l'achat de boost `0015`, la portée visible d'un devis de boost `0016`, son estimation bornée `0017`, les mesures d'efficacité
-   `0018` : ouvertures de la fiche et contacts, et les notifications et le suivi des besoins `0019`). Si votre base d'essai a
+   `0018` : ouvertures de la fiche et contacts, les notifications et le suivi des besoins `0019`, et les favoris, la messagerie en direct, les commandes et l'administration `0020`). Si votre base d'essai a
    été créée avant ces lots, relancez simplement la deuxième commande ci-dessus (elle n'applique que ce qui manque). Contrôle : la
-   commande suivante doit afficher `19`.
+   commande suivante doit afficher `20`.
 
    ```
    docker exec deploy-postgres-1 psql -U noma_local -d noma_essai -tAc "select count(*) from noma_schema_migrations"
