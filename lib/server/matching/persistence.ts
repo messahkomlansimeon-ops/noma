@@ -717,6 +717,13 @@ export const MATCHING_FRESHNESS_FROM = `matching_evaluations e
       CROSS JOIN current_clock c`;
 
 /**
+ * Lot MV1 : le besoin PORTEUR d'une mission d'achat en volume EN PAUSE n'est pas un besoin « vivant » (l'acheteur a suspendu sa recherche) : il ne compte ni dans les comptes de besoins
+ * du vendeur (« environ N besoins », liste des acheteurs intéressés, statistiques), ni dans les devis et la portée du boost. À ajouter (avec `AND`) aux lectures côté VENDEUR et
+ * côté boost, jamais à la lecture de l'acheteur lui-même (sa proposition reste lisible pendant la pause). Alias `d` de `MATCHING_FRESHNESS_FROM`.
+ */
+export const MATCHING_NOT_PAUSED_CARRIER = "NOT EXISTS (SELECT 1 FROM missions mp WHERE mp.demand_id = d.id AND mp.status = 'paused')";
+
+/**
  * Conditions SQL de fraîcheur d'une évaluation (alias e/o/d/uo/ud/c) : dernière tentative non périmée, versions
  * courantes des deux ressources, propriétaires actifs et distincts, statuts éligibles, versions de moteur, hash de
  * configuration, expires_at dans le futur. Les trois paramètres occupent les placeholders `$firstParamIndex` à

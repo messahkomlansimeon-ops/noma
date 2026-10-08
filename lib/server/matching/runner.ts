@@ -12,6 +12,7 @@ import {
   runMatchingJobMaintenance,
 } from "./jobs";
 import { runMarketStep, type MarketStepResult } from "../market/observe";
+import { runMissionsStep, type MissionsStepResult } from "../missions/step";
 import { runNotificationStep, type NotifyHooks, type NotifyStepResult } from "../notifications/deliveries";
 import { resolveNotificationTransport, type NotificationTransport } from "../notifications/transport";
 import { runSubscriptionStep, type SubscriptionStepResult } from "../subscriptions/lifecycle";
@@ -58,6 +59,11 @@ export interface MatchingCycleResult {
    * n'est pas appliquée (étape ignorée sans erreur) ; `noTransport: true` : aucun transport, aucun envoi. Voir NOTIFICATIONS.md.
    */
   notify: NotifyStepResult;
+  /**
+   * Étape « missions » (lot MV1, exécutée AVANT « notify ») : missions d'achat en volume échues passées à « échue », couverture relue, notification de hausse (dans l'application).
+   * `skipped: true` : la migration 0027 n'est pas enregistrée (étape ignorée sans erreur). Voir MISSIONS.md.
+   */
+  missions: MissionsStepResult;
   /** Étape « subscriptions » (lot PRO1, après « notify ») : renouvellements, délais de grâce, fins d'abonnement, expiration des crédits promotionnels. `skipped: true` : migration 0021 absente. Voir OFFRE-PRO.md. */
   subscriptions: SubscriptionStepResult;
   /** Étape « paymentCatchup » (lot PAY1, après « subscriptions », AVANT « market » et « collect » : l'argent d'abord) : rattrape les recharges Sublymus en attente (webhook perdu). `skipped: true` : prestataire fictif ou migration 0026 absente. Budget d'un passage : 20 s. Voir PAIEMENT-WAVE.md. */
@@ -73,9 +79,9 @@ export interface MatchingCycleResult {
    * pas appliquée (étape ignorée sans erreur) ; `noConnectors: true` : aucun connecteur disponible, rien collecté. Une panne d'une source n'est pas une erreur du cycle. Voir COLLECTE-EXTERNE.md.
    */
   collect: CollectStepResult;
-  /** Aucun progrès : rien périmé, aucun boost expiré, rien lu par la projection, rien en maintenance, aucun job exécuté, aucune recharge Sublymus examinée par le rattrapage, aucune surveillance collectée, aucun envoi traité (un utilisateur en erreur ou laissé à un autre processus compte comme « au repos »). */
+  /** Aucun progrès : rien périmé, aucun boost expiré, rien lu par la projection, rien en maintenance, aucun job exécuté, aucune mission échue, relue, notifiée ou libérée, aucune recharge Sublymus examinée par le rattrapage, aucune surveillance collectée, aucun envoi traité (un utilisateur en erreur ou laissé à un autre processus compte comme « au repos »). */
   idle: boolean;
-  /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`, `notify_error_<code>`, `market_error_<code>`, `catchup_error_<code>`, `collect_error_<code>`). */
+  /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`, `mission_<étape>_<code>` ou `missions_error_<code>`, `notify_error_<code>`, `market_error_<code>`, `catchup_error_<code>`, `collect_error_<code>`). */
   errors: string[];
 }
 
@@ -199,6 +205,15 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
     // La base est probablement malade : plus aucun job dans ce cycle. Le bail du job en cours expirera.
     errors.push(`job_error_${errorCodeOf(error)}`);
   }
+  // Étape « missions » (lot MV1) : isolée comme les autres, ignorée sans la migration 0027, exécutée après les jobs (une évaluation née dans ce cycle est lue dans ce cycle) et
+  // AVANT « notify » (qui reste la dernière étape).
+  let missions: MissionsStepResult = { skipped: false, expired: 0, evaluated: 0, changed: 0, notified: 0, released: 0, errors: [] };
+  try {
+    missions = await runMissionsStep({ pool });
+    for (const code of missions.errors) errors.push(code);
+  } catch (error) {
+    errors.push(`missions_error_${errorCodeOf(error)}`);
+  }
   // Étape « notify » (lot N1) : isolée comme l'étape boost, exécutée APRÈS les jobs (une notification née dans ce cycle part dans ce cycle). Sans la migration 0019,
   // elle est ignorée sans erreur ; sans transport, aucun envoi externe n'a lieu.
   let notify: NotifyStepResult = {
@@ -248,6 +263,7 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
     maintenance,
     jobs,
     notify,
+    missions,
     subscriptions,
     paymentCatchup,
     market,
@@ -256,6 +272,7 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
     // une tentative de plus et une attente croissante, `recordUserFailure`) ne comptent pas comme du travail ; sinon un échec permanent ferait tourner la boucle sans pause.
     idle: temporal.expired === 0 && boost.expired === 0 && projected.selected === 0 && maintenance.deadLettered === 0 && jobs.length === 0
       && notify.users - notify.busy - notify.errors.length <= 0 && notify.expired === 0
+      && missions.expired === 0 && missions.changed === 0 && missions.notified === 0 && missions.released === 0
       && subscriptions.renewed + subscriptions.pastDue + subscriptions.ended + subscriptions.promoExpired === 0
       && paymentCatchup.examined === 0
       && collect.watchesProcessed === 0,

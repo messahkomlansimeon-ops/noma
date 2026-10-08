@@ -49,7 +49,7 @@ describe("favoris", () => {
 
 describe("commandes", () => {
   const order = (overrides: Partial<OrderView> = {}): OrderView => ({
-    id: OFFER, role: "buyer", status: "proposed", price: { amount: 150_000, currency: "XOF" }, title: "Apple iPhone 12", offerId: OFFER, demandId: DEMAND, conversationId: null,
+    id: OFFER, role: "buyer", status: "proposed", price: { amount: 150_000, currency: "XOF" }, quantity: 1, title: "Apple iPhone 12", offerId: OFFER, demandId: DEMAND, missionId: null, conversationId: null,
     createdAt: NOW, decidedAt: null, canConfirm: false, canDecline: false, canCancel: true, canMarkDemandSatisfied: false, ...overrides,
   });
 
@@ -85,6 +85,11 @@ describe("commandes", () => {
     assert.equal(seller.needsAction, true);
     assert.equal(seller.href, `/vendeur/commandes/${OFFER}`);
     assert.equal(pendingForSeller([order(), order({ role: "seller", canConfirm: true }), order({ role: "seller", canConfirm: false, status: "confirmed" })]), 1);
+  });
+
+  test("lot MV1 : un achat de plusieurs unités dit la quantité dans la liste ; une seule unité garde le prix seul", () => {
+    assert.match(orderRow(order({ quantity: 3 })).priceText, /^3 × 150\s?000 FCFA$/);
+    assert.match(orderRow(order({ quantity: 1 })).priceText, /^150\s?000 FCFA$/);
   });
 
   test("aucun paiement de l'objet ne passe par noma : c'est écrit ; messages d'action", () => {

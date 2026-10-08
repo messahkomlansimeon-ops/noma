@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import { CatalogValidationError } from "../catalog/errors";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
-import { buildMatchingFreshnessPredicate, MATCHING_FRESHNESS_FROM, resolveMatchingFreshnessParams } from "../matching/persistence";
+import { buildMatchingFreshnessPredicate, MATCHING_FRESHNESS_FROM, MATCHING_NOT_PAUSED_CARRIER, resolveMatchingFreshnessParams } from "../matching/persistence";
 import { withPostgresTransaction, type SqlExecutor } from "../postgres/client";
 import {
   BOOST_DURATION_CODES, BOOST_LOCK_TIMEOUT_MS, BOOST_QUOTE_LOCK_NAMESPACE, BOOST_QUOTE_RATE_LIMIT, BOOST_QUOTE_RATE_NAMESPACE,
@@ -204,7 +204,7 @@ interface ScopeCountsRow {
  * (évaluations que stored-matches servirait côté demande : dernières, non périmées, confirmées, prédicat de fraîcheur partagé),
  * et boost effectif ou futur déjà présent sur l'offre.
  */
-async function readQuoteCounts(executor: SqlExecutor, offerId: string, sellerId: string, scope: BoostScope): Promise<ScopeCountsRow> {
+export async function readQuoteCounts(executor: SqlExecutor, offerId: string, sellerId: string, scope: BoostScope): Promise<ScopeCountsRow> {
   const freshness = buildMatchingFreshnessPredicate(resolveMatchingFreshnessParams(), 6);
   const result = await executor.query<ScopeCountsRow>(
     `WITH current_clock AS (SELECT clock_timestamp() AS fresh_now)
@@ -223,7 +223,8 @@ async function readQuoteCounts(executor: SqlExecutor, offerId: string, sellerId:
            AND ${BOOST_ELIGIBLE_OFFER_SQL} AND o.owner_id <> $5::uuid) AS competing_sellers,
        (SELECT count(DISTINCT e.demand_owner_id)::int FROM ${MATCHING_FRESHNESS_FROM}
          WHERE e.offer_id = $1::uuid AND e.is_confirmed_match = TRUE
-           AND ${freshness.conditions.join("\n           AND ")}) AS compatible_buyers,
+           AND ${freshness.conditions.join("\n           AND ")}
+           AND ${MATCHING_NOT_PAUSED_CARRIER}) AS compatible_buyers,
        EXISTS (SELECT 1 FROM offer_boosts b WHERE b.offer_id = $1::uuid AND b.status = 'active' AND b.ends_at > clock_timestamp()) AS already_boosted`,
     [offerId, scope.category, scope.brand, scope.model, sellerId, ...freshness.values],
   );

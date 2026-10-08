@@ -5,7 +5,7 @@ import {
   countDemandOrganicLists, createOrganicReadCache, readDemandOrganicRanking, type OrganicReadCache,
 } from "../matching/stored-matches";
 import {
-  MATCHING_FRESHNESS_FROM, buildMatchingFreshnessPredicate, resolveMatchingFreshnessParams,
+  MATCHING_FRESHNESS_FROM, MATCHING_NOT_PAUSED_CARRIER, buildMatchingFreshnessPredicate, resolveMatchingFreshnessParams,
 } from "../matching/persistence";
 import { rankEffectiveBoosts, readBoostSettings, readEffectiveBoostDetails, type BoostSettings, type EffectiveBoost } from "./boosts";
 import { computeMaxPromoted, computePromotionStep, isPromotedByBoost } from "./placement";
@@ -94,6 +94,7 @@ async function readCompatibleDemands(client: SqlExecutor, offerId: string, limit
        FROM ${MATCHING_FRESHNESS_FROM}
       WHERE e.offer_id = $1::uuid AND e.is_confirmed_match = TRUE
         AND ${freshness.conditions.join("\n        AND ")}
+        AND ${MATCHING_NOT_PAUSED_CARRIER}
       ORDER BY d.created_at DESC, d.id DESC
       LIMIT $2::int`,
     [offerId, limit, ...freshness.values],

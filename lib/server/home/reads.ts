@@ -6,7 +6,7 @@ import { requireTransactionPool, requireUuid } from "../catalog/validation";
 import { readEffectiveBoostDetails } from "../boost/boosts";
 import { readCoverPhotoIdsSafely } from "../media/read";
 import { countDemandOrganicLists } from "../matching/stored-matches";
-import { MATCHING_CURRENT_CLOCK_CTE, MATCHING_FRESHNESS_FROM, buildMatchingFreshnessPredicate, resolveMatchingFreshnessParams } from "../matching/persistence";
+import { MATCHING_CURRENT_CLOCK_CTE, MATCHING_FRESHNESS_FROM, MATCHING_NOT_PAUSED_CARRIER, buildMatchingFreshnessPredicate, resolveMatchingFreshnessParams } from "../matching/persistence";
 import { roundCount, type StatCount } from "../metrics/privacy";
 import { listNotifications } from "../notifications/inbox";
 import { readWalletBalance } from "../wallet/ledger";
@@ -49,7 +49,7 @@ export interface BuyerHomeDemand {
 
 export interface BuyerHomeNotification {
   id: string;
-  kind: "new_match" | "new_matches_digest" | "new_message";
+  kind: "new_match" | "new_matches_digest" | "new_message" | "mission_coverage";
   title: string | null;
   price: Money | null;
   count: number | null;
@@ -91,6 +91,7 @@ export async function readBuyerHome(input: { pool: Pool; userId: string; now?: D
     `SELECT ${DEMAND_COLUMNS}, count(*) OVER ()::int AS total
        FROM demands
       WHERE owner_id = $1::uuid AND status = 'active' AND archived_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM missions m WHERE m.demand_id = demands.id)
       ORDER BY created_at DESC, id DESC
       LIMIT $2::int`,
     [userId, BUYER_HOME_DEMAND_LIMIT],
@@ -198,6 +199,7 @@ export async function readVendorHome(input: { pool: Pool; userId: string; now?: 
          FROM ${MATCHING_FRESHNESS_FROM}
         WHERE e.offer_id = ANY($1::uuid[]) AND e.is_confirmed_match = TRUE
           AND ${freshness.conditions.join("\n          AND ")}
+          AND ${MATCHING_NOT_PAUSED_CARRIER}
         GROUP BY e.offer_id`,
       [published.map((offer) => offer.id), ...freshness.values],
     );
@@ -207,7 +209,8 @@ export async function readVendorHome(input: { pool: Pool; userId: string; now?: 
        SELECT count(DISTINCT e.demand_id)::int AS needs
          FROM ${MATCHING_FRESHNESS_FROM}
         WHERE e.offer_id = ANY($1::uuid[]) AND e.is_confirmed_match = TRUE
-          AND ${freshness.conditions.join("\n          AND ")}`,
+          AND ${freshness.conditions.join("\n          AND ")}
+          AND ${MATCHING_NOT_PAUSED_CARRIER}`,
       [published.map((offer) => offer.id), ...freshness.values],
     );
     distinctNeeds = distinct.rows[0]?.needs ?? 0;

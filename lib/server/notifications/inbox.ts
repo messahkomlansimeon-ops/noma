@@ -17,7 +17,7 @@ import { TITLE_FALLBACK, demandLink, offerLink, type NotificationPrice } from ".
  * titre, prix, lien, dates. Jamais de téléphone, d'identifiant du vendeur ni de texte libre. Voir NOTIFICATIONS.md.
  */
 
-export type NotificationKind = "new_match" | "new_matches_digest" | "new_message";
+export type NotificationKind = "new_match" | "new_matches_digest" | "new_message" | "mission_coverage";
 
 export interface NotificationItem {
   id: string;
@@ -28,7 +28,7 @@ export interface NotificationItem {
   /** Résumé seulement : nombre d'annonces au-delà du plafond du jour. */
   count: number | null;
   demandId: string;
-  /** new_match : la fiche de l'annonce, dans le contexte du besoin ; résumé : le besoin ; new_message : la conversation (`/messages/{id}`). */
+  /** new_match : la fiche de l'annonce, dans le contexte du besoin ; résumé : le besoin ; new_message : la conversation (`/messages/{id}`) ; mission_coverage : la mission (`/missions/{id}`). */
   offerId: string | null;
   link: string;
   createdAt: Date;
@@ -68,12 +68,29 @@ interface NotificationRow {
   demand_id: string;
   offer_id: string | null;
   conversation_id: string | null;
+  mission_id: string | null;
   created_at: Date;
   read_at: Date | null;
   cursor_at: string;
 }
 
 function mapRow(row: NotificationRow): NotificationItem {
+  if (row.kind === "mission_coverage" && row.mission_id !== null) {
+    // « La couverture de votre mission a augmenté » (lot MV1) : titre assemblé par le serveur (« Apple iPhone 12 : 7 sur 20 », parties nettoyées comme tout titre), quantité couverte
+    // dans `count`, lien vers la mission. Jamais de budget, de vendeur ni de texte libre.
+    return {
+      id: row.id,
+      kind: row.kind,
+      title: row.title !== null && looksLikePhoneNumber(row.title) ? TITLE_FALLBACK : row.title,
+      price: null,
+      count: row.item_count,
+      demandId: row.demand_id,
+      offerId: null,
+      link: `/missions/${row.mission_id}`,
+      createdAt: row.created_at,
+      readAt: row.read_at,
+    };
+  }
   if (row.kind === "new_message" && row.conversation_id !== null) {
     // « Nouveau message » (lot D2) : titre de l'annonce (liste blanche), lien vers la conversation. Jamais le texte du message ni l'identité de l'autre participant.
     return {
@@ -120,7 +137,7 @@ export async function listNotifications(input: { pool: Pool; userId: string; lim
   try {
     await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
     const rows = await client.query<NotificationRow>(
-      `SELECT id, kind, title, price_amount::text AS price_amount, price_currency, item_count, demand_id, offer_id, conversation_id, created_at, read_at,
+      `SELECT id, kind, title, price_amount::text AS price_amount, price_currency, item_count, demand_id, offer_id, conversation_id, mission_id, created_at, read_at,
               to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at
          FROM notifications
         WHERE user_id = $1::uuid

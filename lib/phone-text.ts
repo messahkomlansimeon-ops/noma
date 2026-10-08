@@ -468,6 +468,44 @@ export function looksLikePhoneNumber(value: string): boolean {
 }
 
 /**
+ * Nombres AUTONOMES d'un texte (tout alphabet ramené à ASCII), sous ses deux lectures (sosies lus comme lettres, puis comme chiffres) : une suite de chiffres qui ne touche aucune lettre
+ * ni aucun autre chiffre (« 0708 » dans « iPhone 0708 », « 128 » dans « 128 Go » ; pas « 21 » de « S21 », ni « 5 » de « 5G »). Un chiffre collé à un mot de lettres appartient à un nom de
+ * produit (S21, 5G, A52s), pas à un numéro écrit : ils ne forment pas le squelette numérique.
+ */
+const STANDALONE_NUMBER = /(?<![\p{L}\p{N}])[0-9]+(?![\p{L}\p{N}])/gu;
+
+function digitGroupsOf(value: string): { plain: string[]; lookalike: string[] } {
+  const reading = asciiDigits(analysisText(value));
+  const plain = reading.match(STANDALONE_NUMBER) ?? [];
+  const alternative = lookalikeReading(reading);
+  return { plain, lookalike: alternative === null ? plain : (alternative.match(STANDALONE_NUMBER) ?? []) };
+}
+
+/**
+ * La règle des numéros appliquée à PLUSIEURS champs libres ENSEMBLE (lot MV1-bis, missions d'achat en volume) : un numéro coupé entre deux champs n'échappe pas au contrôle. Un des
+ * trois contrôles suffit à refuser :
+ *  1. chaque texte seul (`looksLikePhoneNumber`) ;
+ *  2. leur CONCATÉNATION, séparés par une espace (« Tél 07 08 » puis « 09 10 11 » : champs voisins) ;
+ *  3. leur SQUELETTE NUMÉRIQUE : seuls les nombres AUTONOMES de chaque texte (une suite de chiffres qui ne touche aucune lettre), dans l'ordre des champs, lettres ôtées (« iPhone 0708 »
+ *     puis « Cocody 091011 » : « 0708 091011 »). Les chiffres collés à un nom (S21, 5G) n'y sont pas : « Galaxy S21 », « 128 Go 5G », « 2023 » ne forment pas un numéro.
+ * Limites assumées : un numéro écrit en toutes lettres, ou dont des morceaux sont dans des champs différents sous forme de lettres et de chiffres mêlés (« zéro sept » + « 08 »), ou
+ * collés à un mot (« iPhone0708 »), n'est pas détecté ; deux champs ou plus qui portent chacun d'autres nombres autonomes entre les morceaux d'un numéro (« 0708 », puis « 12 », « 128 »,
+ * puis « 091011 ») peuvent le masquer (les nombres de ces champs s'intercalent dans le squelette) ; un texte honnête dont les nombres autonomes, mis bout à bout, forment un numéro
+ * (quatre nombres de deux chiffres dont le premier commence par 0, ou 10 chiffres d'un préfixe ivoirien) est refusé.
+ */
+export function looksLikePhoneNumberAcross(values: ReadonlyArray<string | null | undefined>): boolean {
+  const texts = values.filter((value): value is string => typeof value === "string" && value !== "");
+  if (texts.some((text) => looksLikePhoneNumber(text))) return true;
+  if (texts.length < 2) return false;
+  if (looksLikePhoneNumber(texts.join(" "))) return true;
+  const groups = texts.map(digitGroupsOf);
+  const skeleton = (pick: (entry: { plain: string[]; lookalike: string[] }) => string[]): string => groups.flatMap(pick).join(" ");
+  const plain = skeleton((entry) => entry.plain);
+  const lookalike = skeleton((entry) => entry.lookalike);
+  return (plain !== "" && looksLikePhoneNumber(plain)) || (lookalike !== plain && lookalike !== "" && looksLikePhoneNumber(lookalike));
+}
+
+/**
  * Texte vendeur servi à un acheteur : `null` s'il porte un numéro de téléphone (le champ est alors omis de l'affichage), le texte inchangé sinon.
  * Les valeurs absentes restent absentes.
  */

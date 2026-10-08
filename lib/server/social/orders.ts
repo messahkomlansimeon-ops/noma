@@ -5,6 +5,7 @@ import { requireTransactionPool, requireUuid } from "../catalog/validation";
 import { readOfferAccess } from "../metrics/contacts";
 import { readAttributedBoostId } from "../metrics/attribution";
 import { roundCount, type StatCount } from "../metrics/privacy";
+import { linkOrderToMission, lockMissionOfOrder, requireOrderQuantity, settleMissionAfterConfirmation } from "../missions/order-link";
 import { buildNotificationTitle } from "../notifications/content";
 import { withPostgresTransaction } from "../postgres/client";
 import { ORDERS_LIST_LIMIT, ORDER_MAX_PRICE, ORDER_MIN_PRICE, SOCIAL_TRANSACTION_TIMEOUT } from "./config";
@@ -14,6 +15,8 @@ import type { ParticipantRole } from "./conversations";
 /**
  * Commandes (lot D2), ou ventes DÉCLARÉES : l'acheteur déclare « je l'ai acheté » avec un prix convenu (XOF, entier de 1 à 100 000 000) ; la commande est « proposée » ; le
  * vendeur la confirme ou la refuse ; l'acheteur peut l'annuler tant qu'elle n'est pas confirmée. Aucun paiement de l'objet ne passe par noma.
+ *  - lot MV1 : une quantité facultative (entier de 1 à 10 000, 1 par défaut ; le prix convenu est le prix PAR UNITÉ). Sur le besoin porteur d'une mission d'achat en volume,
+ *    la commande est rattachée à la mission (quantité sécurisée = somme des commandes confirmées) et soumise à ses limites ; les règles de transition ne changent pas.
  *  - déclaration : mêmes conditions que le contact (`readOfferAccess`) ; UNE seule commande active (proposée ou confirmée) par (besoin, annonce) : index unique PARTIEL en base ;
  *  - transitions : seule « proposée » évolue ; elle est lue sous verrou (`FOR UPDATE`) puis écrite ; le déclencheur de la migration 0020 refuse toute autre transition ;
  *  - accès : les deux parties seulement, 404 indiscernable pour tout autre ;
@@ -34,10 +37,14 @@ export interface OrderView {
   role: ParticipantRole;
   status: OrderStatus;
   price: { amount: number; currency: "XOF" };
+  /** Quantité achetée (1 par défaut) : le prix convenu est le prix par unité. */
+  quantity: number;
   title: string;
   offerId: string;
   /** Besoin d'origine : connu de l'acheteur seulement. */
   demandId: string | null;
+  /** Mission d'achat en volume d'origine : connue de l'acheteur seulement (le vendeur ne la voit jamais). */
+  missionId: string | null;
   /** Conversation du couple (besoin, annonce), si elle existe. */
   conversationId: string | null;
   createdAt: Date;
@@ -61,6 +68,8 @@ interface OrderRow {
   buyer_id: string;
   seller_id: string;
   price_amount: string;
+  quantity: number;
+  mission_id: string | null;
   status: OrderStatus;
   created_at: Date;
   decided_at: Date | null;
@@ -71,7 +80,7 @@ interface OrderRow {
   conversation_id: string | null;
 }
 
-const ORDER_SELECT = `SELECT r.id, r.demand_id, r.offer_id, r.buyer_id, r.seller_id, r.price_amount::text AS price_amount, r.status, r.created_at, r.decided_at,
+const ORDER_SELECT = `SELECT r.id, r.demand_id, r.offer_id, r.buyer_id, r.seller_id, r.price_amount::text AS price_amount, r.quantity, r.mission_id, r.status, r.created_at, r.decided_at,
         o.brand, o.model, o.variant, d.status AS demand_status,
         (SELECT c.id FROM conversations c WHERE c.demand_id = r.demand_id AND c.offer_id = r.offer_id) AS conversation_id
    FROM orders r JOIN offers o ON o.id = r.offer_id JOIN demands d ON d.id = r.demand_id`;
@@ -84,27 +93,31 @@ function toView(row: OrderRow, userId: string): OrderView {
     role,
     status: row.status,
     price: { amount: Number(row.price_amount), currency: "XOF" },
+    quantity: row.quantity,
     title: buildNotificationTitle(row),
     offerId: row.offer_id,
     demandId: role === "buyer" ? row.demand_id : null,
+    missionId: role === "buyer" ? row.mission_id : null,
     conversationId: row.conversation_id,
     createdAt: row.created_at,
     decidedAt: row.decided_at,
     canConfirm: proposed && role === "seller",
     canDecline: proposed && role === "seller",
     canCancel: proposed && role === "buyer",
-    canMarkDemandSatisfied: role === "buyer" && row.status === "confirmed" && row.demand_status === "active",
+    // Un achat de mission ne clôt pas le besoin à la main : la mission se termine d'elle-même à la quantité totale.
+    canMarkDemandSatisfied: role === "buyer" && row.status === "confirmed" && row.demand_status === "active" && row.mission_id === null,
   };
 }
 
 // ───────────── déclaration ─────────────
 
-export async function declareOrder(input: { pool: Pool; buyerId: string; demandId: string; offerId: string; price: unknown }): Promise<OrderView> {
+export async function declareOrder(input: { pool: Pool; buyerId: string; demandId: string; offerId: string; price: unknown; quantity?: unknown }): Promise<OrderView> {
   const pool = requireTransactionPool(input.pool);
   const buyerId = requireUuid(input.buyerId, "buyerId").toLowerCase();
   const demandId = requireUuid(input.demandId, "demandId").toLowerCase();
   const offerId = requireUuid(input.offerId, "offerId").toLowerCase();
   const price = requireOrderPrice(input.price);
+  const quantity = requireOrderQuantity(input.quantity);
   const orderId = await withPostgresTransaction(async (client) => {
     await client.query(`SET LOCAL statement_timeout = '${SOCIAL_TRANSACTION_TIMEOUT}'`);
     // Un verrou par couple (besoin, annonce) : deux déclarations simultanées s'attendent (l'index unique partiel reste le dernier garde-fou).
@@ -114,11 +127,13 @@ export async function declareOrder(input: { pool: Pool; buyerId: string; demandI
     const active = await client.query("SELECT 1 FROM orders WHERE demand_id = $1::uuid AND offer_id = $2::uuid AND status IN ('proposed', 'confirmed')", [demandId, offerId]);
     if (active.rowCount) throw new SocialError("order_active_exists");
     const boostId = await readAttributedBoostId(client, { offerId, demandId });
+    // Lot MV1 : sur le besoin porteur d'une mission, la commande lui est rattachée (mission active, budgets et quantité respectés ; ligne de la mission verrouillée).
+    const mission = await linkOrderToMission(client, { buyerId, demandId, quantity, priceXof: price });
     try {
       const created = await client.query<{ id: string }>(
-        `INSERT INTO orders (demand_id, offer_id, buyer_id, seller_id, price_amount, boost_id)
-         VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::bigint, $6::uuid) RETURNING id`,
-        [demandId, offerId, buyerId, access.sellerId, price, boostId],
+        `INSERT INTO orders (demand_id, offer_id, buyer_id, seller_id, price_amount, boost_id, quantity, mission_id)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::bigint, $6::uuid, $7::int, $8::uuid) RETURNING id`,
+        [demandId, offerId, buyerId, access.sellerId, price, boostId, quantity, mission.missionId],
       );
       return created.rows[0].id;
     } catch (error) {
@@ -162,6 +177,8 @@ export async function transitionOrder(input: { pool: Pool; userId: string; order
   if (!ORDER_ACTIONS.includes(input.action)) throw new SocialError("action_not_allowed");
   await withPostgresTransaction(async (client) => {
     await client.query(`SET LOCAL statement_timeout = '${SOCIAL_TRANSACTION_TIMEOUT}'`);
+    // Lot MV1 : une confirmation verrouille d'abord la mission de la commande (même ordre de verrous que l'annulation d'une mission), puis la commande.
+    const missionId = input.action === "confirm" ? await lockMissionOfOrder(client, orderId, userId) : null;
     const locked = await client.query<{ buyer_id: string; seller_id: string; status: OrderStatus }>(
       "SELECT buyer_id, seller_id, status FROM orders WHERE id = $1::uuid AND (buyer_id = $2::uuid OR seller_id = $2::uuid) FOR UPDATE",
       [orderId, userId],
@@ -175,6 +192,8 @@ export async function transitionOrder(input: { pool: Pool; userId: string; order
       "UPDATE orders SET status = $2::text, decided_at = clock_timestamp(), updated_at = clock_timestamp() WHERE id = $1::uuid",
       [orderId, NEXT_STATUS[input.action]],
     );
+    // Lot MV1 : la quantité sécurisée de la mission est recomptée ; elle passe à « terminée » quand elle atteint la quantité totale.
+    if (missionId !== null) await settleMissionAfterConfirmation(client, missionId);
   }, pool);
   return readOrder({ pool, userId, orderId });
 }

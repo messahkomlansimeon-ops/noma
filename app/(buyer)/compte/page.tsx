@@ -6,6 +6,7 @@ import {
   CircleHelp,
   CircleUser,
   Heart,
+  Layers,
   LogOut,
   MessageCircle,
   Package,
@@ -68,6 +69,7 @@ export default function MonCompte() {
         <div className="mt-4 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">
           <MenuRow icon={MessageCircle} label="Messages" badge={messagesUnread !== null && messagesUnread > 0 ? messagesUnread : undefined} href="/messages" />
           <MenuRow icon={Package} label="Mes commandes" href="/commandes" />
+          <MenuRow icon={Layers} label="Mes missions" href="/missions" />
           <MenuRow icon={Wallet} label="Mon porte-monnaie" href="/compte/porte-monnaie" />
           <MenuRow icon={Search} label="Mes recherches suivies" href="/alertes" />
           <MenuRow icon={Heart} label="Mes favoris" href="/favoris" />

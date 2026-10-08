@@ -228,6 +228,9 @@ export function createNotificationsHttpHandlers(dependencies: NotificationsHttpD
     if (error instanceof CatalogValidationError) return invalidRequest();
     if (error instanceof CatalogNotFoundError) return resourceNotFound();
     if (error instanceof TrackingNotActiveError) return demandNotActive();
+    // Lot MV1 : le suivi du besoin porteur d'une mission ouverte ne change que par la mission (garde-fou de la base, migration 0027).
+    const raised = error as { code?: unknown; message?: unknown } | null;
+    if (raised?.code === "23001" && raised.message === "mission_carrier_locked") return failure(409, "mission_carrier_locked", "Ce besoin appartient à une mission : modifiez la mission.");
     return unavailable(logCodeOf(error));
   }
 

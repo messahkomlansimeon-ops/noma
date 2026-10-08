@@ -67,9 +67,13 @@ export interface OrderView {
   role: ParticipantRole;
   status: OrderStatus;
   price: { amount: number; currency: "XOF" };
+  /** Quantité achetée (lot MV1, 1 par défaut) : le prix convenu est le prix par unité. */
+  quantity: number;
   title: string;
   offerId: string;
   demandId: string | null;
+  /** Mission d'achat en volume d'origine : connue de l'acheteur seulement (le serveur n'envoie même pas le champ au vendeur : null). */
+  missionId: string | null;
   conversationId: string | null;
   createdAt: string;
   decidedAt: string | null;
@@ -254,6 +258,7 @@ function parseOrder(status: number, value: unknown): OrderView {
   need(
     status,
     isObject(value) && isUuid(value.id) && isObject(value.price) && isCount(value.price.amount) && value.price.currency === "XOF" && isText(value.title, 200) && isUuid(value.offerId) &&
+      isCount(value.quantity) && (value.quantity as number) >= 1 && (value.quantity as number) <= 10_000 && (value.missionId === undefined || value.missionId === null || isUuid(value.missionId)) &&
       (value.demandId === null || isUuid(value.demandId)) && (value.conversationId === null || isUuid(value.conversationId)) && isIso(value.createdAt) && (value.decidedAt === null || isIso(value.decidedAt)) &&
       typeof value.canConfirm === "boolean" && typeof value.canDecline === "boolean" && typeof value.canCancel === "boolean" && typeof value.canMarkDemandSatisfied === "boolean",
   );
@@ -263,9 +268,11 @@ function parseOrder(status: number, value: unknown): OrderView {
     role: parseRole(status, order.role),
     status: parseOrderStatus(status, order.status),
     price: { amount: (order.price as Json).amount as number, currency: "XOF" },
+    quantity: order.quantity as number,
     title: order.title as string,
     offerId: order.offerId as string,
     demandId: order.demandId as string | null,
+    missionId: (order.missionId ?? null) as string | null,
     conversationId: order.conversationId as string | null,
     createdAt: order.createdAt as string,
     decidedAt: order.decidedAt as string | null,
@@ -500,9 +507,11 @@ export function createSocialClient(options: SocialClientOptions = {}) {
     },
 
     orders: {
-      async declare(demandId: string, offerId: string, priceXof: number, requestOptions?: RequestOptions): Promise<OrderView> {
+      /** `quantity` facultative (lot MV1) : entier de 1 à 10 000, 1 par défaut (le prix est le prix par unité). */
+      async declare(demandId: string, offerId: string, priceXof: number, requestOptions?: RequestOptions, quantity?: number): Promise<OrderView> {
         if (!Number.isSafeInteger(priceXof) || priceXof < 1 || priceXof > 100_000_000) throw fixedError(0, "invalid_argument");
-        const { status, json } = await send("POST", `/api/demands/${id(demandId)}/offers/${id(offerId)}/orders`, { priceXof }, requestOptions);
+        if (quantity !== undefined && (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 10_000)) throw fixedError(0, "invalid_argument");
+        const { status, json } = await send("POST", `/api/demands/${id(demandId)}/offers/${id(offerId)}/orders`, quantity === undefined ? { priceXof } : { priceXof, quantity }, requestOptions);
         return parseOrder(status, contract(status, json, ORDERS_CONTRACT_VERSION).order);
       },
       async list(as: ParticipantRole, requestOptions?: RequestOptions): Promise<OrderView[]> {
@@ -612,6 +621,12 @@ export function describeSocialError(error: unknown, context: SocialErrorContext)
     if (error.code === "order_state_conflict") return "Cette commande ne peut plus changer d'état. La page va être actualisée.";
     if (error.code === "action_not_allowed") return "Cette action n'est pas permise pour votre rôle.";
     if (error.code === "offer_not_available") return "Cette annonce n'est plus disponible : aucune commande ne peut être déclarée.";
+    // Lot MV1 : refus de la mission (textes fixes).
+    if (error.code === "invalid_quantity") return "La quantité doit être un nombre entier de 1 à 10 000.";
+    if (error.code === "mission_not_active") return "Cette mission n'est plus active : aucun achat ne peut y être ajouté.";
+    if (error.code === "mission_quantity_exceeded") return "Cette quantité dépasse ce qu'il reste à acheter pour la mission.";
+    if (error.code === "mission_price_over_budget") return "Ce prix dépasse le budget par unité de la mission.";
+    if (error.code === "mission_budget_exceeded") return "Cet achat dépasse le budget total de la mission.";
   }
   if (context === "admin") {
     if (error.status === 404) return "Page introuvable.";

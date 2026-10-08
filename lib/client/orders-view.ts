@@ -92,7 +92,8 @@ export function orderRow(order: OrderView): OrderRowView {
   return {
     id: order.id,
     title: order.title,
-    priceText: formatFcfa(order.price.amount),
+    // Lot MV1 : un achat de plusieurs unités dit la quantité (« 3 × 158 000 FCFA »).
+    priceText: order.quantity > 1 ? `${order.quantity} × ${formatFcfa(order.price.amount)}` : formatFcfa(order.price.amount),
     statusText: statusLabel(order.status, order.role),
     tone: statusTone(order.status),
     dateText: formatDateTimeFr(order.createdAt),

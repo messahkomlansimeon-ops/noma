@@ -42,7 +42,7 @@ before(async () => {
   baseUrl = opened.target.connectionString;
   await admin.query(`CREATE DATABASE "${mainDb}"`);
   pool = new Pool({ connectionString: urlFor(mainDb), max: 4 });
-  assert.equal((await runMigrations(pool)).applied.length, 26);
+  assert.equal((await runMigrations(pool)).applied.length, 27);
 });
 
 after(async () => {
@@ -88,6 +88,9 @@ async function snapshot() {
     // Lot H1 : relevés de prix (synthétiques et du jour).
     priceObservations: await read("SELECT count(*)::text AS n FROM price_observations"),
     priceObservationSales: await read("SELECT count(*)::text AS n FROM price_observations WHERE source = 'sale'"),
+    // Lot MV1.
+    missions: await read("SELECT count(*)::text AS n FROM missions"),
+    missionNotifications: await read("SELECT count(*)::text AS n FROM notifications WHERE kind = 'mission_coverage'"),
   };
 }
 
@@ -106,7 +109,8 @@ test("premier passage : comptes aux numéros fixes, 30 annonces publiées, besoi
   assert.equal(snap.identities, snap.users);
   assert.equal(snap.offers, "30");
   assert.equal(snap.published, "30");
-  assert.equal(snap.demands, String(3 + DEMO_EXTRA_BUYER_COUNT));
+  // Lot MV1 : un besoin actif de plus, le besoin PORTEUR de la mission de démonstration (l'acheteur démo ne le voit pas dans ses besoins).
+  assert.equal(snap.demands, String(3 + DEMO_EXTRA_BUYER_COUNT + 1));
   assert.equal(snap.views, String(DEMO_OPENERS));
   assert.equal(snap.contacts, String(DEMO_CONTACTERS));
   assert.equal(snap.boosts, "1");
@@ -176,6 +180,34 @@ test("lot D2 : le compte Admin démo est administrateur (journalisé), une conve
   assert.equal(orders[0].seller_id, vendorId, "à confirmer par le vendeur démo");
   assert.notEqual(orders[0].buyer_id, buyerId, "venant d'un acheteur fictif");
   assert.equal(orders[0].price_amount, "160000");
+});
+
+test("lot MV1 : une mission d'achat en volume de démonstration, lancée, PARTIELLEMENT couverte (5 sur 10), sans notification ni message ni commande de plus", async () => {
+  const buyerId = await userOf(DEMO_BUYER_PHONE);
+  const missions = (await pool.query<{
+    id: string; status: string; quantity_total: number; unit_budget_xof: string; total_budget_xof: string; covered_quantity: number | null; notified_quantity: number | null; demand_id: string; brand: string; model: string;
+  }>("SELECT id, status, quantity_total, unit_budget_xof::text, total_budget_xof::text, covered_quantity, notified_quantity, demand_id, brand, model FROM missions")).rows;
+  assert.equal(missions.length, 1);
+  const mission = missions[0];
+  assert.deepEqual([mission.status, mission.brand, mission.model, mission.quantity_total, mission.unit_budget_xof], ["active", "Samsung", "Galaxy S21", 10, "135000"]);
+  // Cinq des huit Galaxy S21 correspondent (d'occasion, à 135 000 FCFA ou moins, un exemplaire chacune) : couverture 5 sur 10, relue par l'étape du worker, base posée sans bruit.
+  assert.deepEqual([mission.covered_quantity, mission.notified_quantity], [5, 5]);
+  const owner = await pool.query<{ owner_id: string }>("SELECT owner_id FROM missions WHERE id = $1", [mission.id]);
+  assert.equal(owner.rows[0].owner_id, buyerId);
+  const carrier = await pool.query<{ budget_amount: string | null; quantity: number | null; notify_paused: boolean }>("SELECT budget_amount, quantity, notify_paused FROM demands WHERE id = $1", [mission.demand_id]);
+  assert.deepEqual(carrier.rows[0], { budget_amount: null, quantity: null, notify_paused: true }, "le besoin porteur n'a ni budget ni quantité");
+  assert.equal((await pool.query("SELECT 1 FROM notifications WHERE kind = 'mission_coverage'")).rowCount, 0, "créer une mission ne notifie pas ce que l'acheteur voit déjà");
+  assert.equal((await pool.query("SELECT 1 FROM orders WHERE mission_id IS NOT NULL")).rowCount, 0, "aucun achat de mission n'est écrit à la place de l'acheteur");
+  // La proposition : cinq vendeurs anonymes, une annonce écartée par le budget par unité (140 000 FCFA).
+  const { readMissionProposal } = await import("../../lib/server/missions/proposal");
+  const { proposal } = await readMissionProposal({ pool, ownerId: buyerId, missionId: mission.id });
+  assert.equal(proposal.coveredQuantity, 5);
+  assert.equal(proposal.sellerCount, 5);
+  assert.deepEqual(proposal.reasons, ["not_enough_offers", "unit_budget_too_low"]);
+  assert.ok(proposal.lines.every((line) => line.unitPriceXof <= 135_000));
+  // L'acheteur démo ne voit pas le besoin porteur dans ses besoins.
+  const home = await readBuyerHome({ pool, userId: buyerId });
+  assert.ok(!home.demands.some((demand) => demand.id === mission.demand_id));
 });
 
 test("acheteur démo : 3 besoins actifs qui ont des correspondances, 3 notifications non lues (annonces publiées APRÈS ses besoins)", async () => {
@@ -306,6 +338,7 @@ test("rejeu à l'identique : aucun doublon, aucune ouverture ni aucun contact de
   assert.match(result.output, /offre Pro : vendeur démo déjà abonné/);
   assert.match(result.output, /photos : 0 photo\(s\) synthétique\(s\) ajoutée\(s\) \(30 déjà présente\(s\)\), une par annonce/);
   assert.match(result.output, /historique des prix : 0 relevé\(s\) synthétique\(s\) écrit\(s\) \(annonces et ventes fictives des 90 derniers jours ; déjà présents\)/);
+  assert.match(result.output, /missions d'achat en volume : mission de démonstration \(10 Samsung Galaxy S21, 135.000 FCFA l'unité au plus\) déjà présente/);
   assert.deepEqual(await snapshot(), before, "l'état de la base est identique au premier passage");
 });
 

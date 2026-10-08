@@ -11,6 +11,7 @@ import { useUnauthorizedRedirect } from "@/components/session-gate";
 import { openBrowserStream } from "@/components/social/browser-stream";
 import { TopBar } from "@/components/top-bar";
 import { createMessageSync, type MessageSync, type SyncStatus } from "@/lib/client/message-sync";
+import { missionDraftMessage, type MissionHint } from "@/lib/client/missions-view";
 import {
   COMPOSER_PLACEHOLDER,
   NO_PAYMENT_THROUGH_NOMA,
@@ -52,8 +53,10 @@ const STATUS_TEXT: Record<SyncStatus, string> = {
  * Le fil d'une conversation (lot D2), pour l'acheteur (`space="buyer"`) comme pour le vendeur (`space="vendor"`) : lecture, envoi, réception EN DIRECT (flux SSE puis relecture
  * par « messages après l'id X »), rappel de sécurité la première fois, liens vers l'annonce et la commande. L'autre partie est désignée par son rôle, jamais par une identité.
  * Le texte d'un message est TOUJOURS affiché comme du texte React (jamais interprété comme du HTML).
+ * Lot MV1 : ouverte depuis une ligne de la proposition d'une mission (`hint` : quantité et prix visés, deux entiers lus dans l'adresse), la zone de saisie est PRÉ-REMPLIE d'un message
+ * que l'acheteur peut modifier ; rien ne part tant qu'il n'appuie pas sur « envoyer ».
  */
-export function ConversationScreen({ conversationId, space }: { conversationId: string; space: "buyer" | "vendor" }) {
+export function ConversationScreen({ conversationId, space, hint = null }: { conversationId: string; space: "buyer" | "vendor"; hint?: MissionHint | null }) {
   const router = useRouter();
   const redirectIfUnauthorized = useUnauthorizedRedirect();
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
@@ -69,6 +72,9 @@ export function ConversationScreen({ conversationId, space }: { conversationId: 
   const syncRef = useRef<MessageSync | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const sendingRef = useRef(false);
+  const draftApplied = useRef(false);
+  const hintQuantity = hint?.quantity ?? null;
+  const hintPrice = hint?.priceXof ?? null;
 
   // Fiche de la conversation ; un participant dans l'autre espace est ramené dans le sien.
   useEffect(() => {
@@ -82,6 +88,11 @@ export function ConversationScreen({ conversationId, space }: { conversationId: 
         }
         setDetail(loaded);
         setLoadError(null);
+        // Message pré-rempli (lot MV1 ; une seule fois, et seulement dans une zone de saisie vide) : modifiable, jamais envoyé automatiquement.
+        if (hintQuantity !== null && hintPrice !== null && loaded.role === "buyer" && !draftApplied.current) {
+          draftApplied.current = true;
+          setText((current) => (current === "" ? missionDraftMessage({ title: loaded.title, quantity: hintQuantity, unitPriceXof: hintPrice }) : current));
+        }
       },
       (failure) => {
         if (controller.signal.aborted || redirectIfUnauthorized(failure)) return;
@@ -89,7 +100,7 @@ export function ConversationScreen({ conversationId, space }: { conversationId: 
       },
     );
     return () => controller.abort();
-  }, [conversationId, space, reloadKey, redirectIfUnauthorized, router]);
+  }, [conversationId, space, reloadKey, hintQuantity, hintPrice, redirectIfUnauthorized, router]);
 
   const markRead = useCallback(
     (upToId?: number) => {
@@ -251,7 +262,7 @@ export function ConversationScreen({ conversationId, space }: { conversationId: 
             <span className="text-forest">Voir ›</span>
           </Link>
         ) : null}
-        {detail.canDeclareOrder ? <DeclareOrder demandId={detail.demandId as string} offerId={detail.offerId} /> : null}
+        {detail.canDeclareOrder ? <DeclareOrder demandId={detail.demandId as string} offerId={detail.offerId} initialPrice={hint?.priceXof} initialQuantity={hint?.quantity} /> : null}
         {detail.role === "buyer" ? <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">{NO_PAYMENT_THROUGH_NOMA}</p> : null}
       </div>
 
@@ -292,7 +303,7 @@ export function ConversationScreen({ conversationId, space }: { conversationId: 
                 void send();
               }
             }}
-            rows={1}
+            rows={text.length > 70 ? 3 : 1}
             placeholder={COMPOSER_PLACEHOLDER}
             aria-label="Votre message"
             data-testid="message-input"

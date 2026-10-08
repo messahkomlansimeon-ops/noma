@@ -37,6 +37,12 @@ async function main(): Promise<void> {
       `${result.maintenance.deadLettered} job(s) en dead_letter, ${result.jobs.length} job(s) exécuté(s).`,
     );
     if (result.boost.expired > 0) console.log(`Matching worker : ${result.boost.expired} boost(s) échu(s) marqué(s) expiré(s).`);
+    // Étape « missions » (lot MV1) : une ligne seulement si elle a travaillé (jamais le contenu d'une mission).
+    if (result.missions.expired > 0 || result.missions.changed > 0 || result.missions.notified > 0 || result.missions.released > 0) {
+      console.log(
+        `Matching worker : missions, ${result.missions.expired} échue(s), ${result.missions.evaluated} relue(s) (${result.missions.changed} couverture(s) modifiée(s)), ${result.missions.notified} notification(s), ${result.missions.released} besoin(s) porteur(s) libéré(s).`,
+      );
+    }
     // Étape « notify » (lot N1) : une ligne seulement si elle a travaillé (jamais le contenu d'une notification ni un numéro).
     if (result.notify.users > 0 || result.notify.expired > 0) {
       console.log(

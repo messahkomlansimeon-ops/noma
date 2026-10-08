@@ -122,7 +122,14 @@ export function OrderDetail({ orderId, space }: { orderId: string; space: "buyer
             <h1 className="font-display text-[22px] font-extrabold leading-tight text-ink">{order.title}</h1>
             <div data-testid="order-price" className="font-display text-[26px] font-extrabold text-ink">
               {formatFcfa(order.price.amount)}
+              {order.quantity > 1 ? " l'unité" : ""}
             </div>
+            {order.quantity > 1 ? (
+              // Lot MV1 : un achat en volume dit la quantité et le total ; le vendeur ne voit que cette commande, jamais la mission entière.
+              <div data-testid="order-quantity-line" className="text-[14px] font-semibold text-ink">
+                {order.role === "seller" ? "Quantité demandée" : "Quantité"} : {order.quantity} · Total {formatFcfa(order.price.amount * order.quantity)}
+              </div>
+            ) : null}
             <div className="mt-1">
               <Badge tone={statusTone(order.status)}>
                 <span data-testid="order-status">{statusLabel(order.status, order.role)}</span>
@@ -133,6 +140,11 @@ export function OrderDetail({ orderId, space }: { orderId: string; space: "buyer
               {order.decidedAt ? <KvRow label="Décision le" value={formatDateTimeFr(order.decidedAt)} /> : null}
               <KvRow label={order.role === "buyer" ? "Vendeur" : "Acheteur"} value={order.role === "buyer" ? "Vendeur de l'annonce" : "Acheteur intéressé"} />
             </div>
+            {order.role === "buyer" && order.missionId ? (
+              <Link href={`/missions/${order.missionId}`} data-testid="order-mission-link" className="mt-3 inline-block text-[13px] font-bold text-forest">
+                Voir la mission ›
+              </Link>
+            ) : null}
 
             {notice ? (
               <p role="status" data-testid="order-notice" className="mt-3 rounded-xl bg-sage px-3 py-2 text-[13px] font-semibold text-forest">

@@ -19,6 +19,7 @@ import { RELEVANCE_CONFIG, RELEVANCE_WINDOW } from "./relevance-config";
 import {
   MATCHING_CURRENT_CLOCK_CTE,
   MATCHING_FRESHNESS_FROM,
+  MATCHING_NOT_PAUSED_CARRIER,
   buildMatchingFreshnessPredicate,
   resolveMatchingFreshnessParams,
 } from "./persistence";
@@ -402,6 +403,8 @@ async function fetchRows<TRow extends OfferRow | DemandRow>(client: SqlExecutor,
   }
   values.push(input.rowLimit);
 
+  // Lot MV1 : la liste que VOIT UN VENDEUR (source = son annonce) ne contient pas le besoin porteur d'une mission en pause ; l'acheteur lit toujours le sien.
+  const sellerSide = input.sourceKind === "offer" ? `AND ${MATCHING_NOT_PAUSED_CARRIER}` : "";
   const result = await client.query<CandidateRow<TRow>>(
     `WITH ${MATCHING_CURRENT_CLOCK_CTE}
      SELECT ${input.candidateColumns}, ${EVALUATION_COLUMNS}
@@ -409,6 +412,7 @@ async function fetchRows<TRow extends OfferRow | DemandRow>(client: SqlExecutor,
       WHERE ${sourceColumn} = $1::uuid
         AND e.is_confirmed_match = TRUE
         AND ${freshness.conditions.join("\n        AND ")}
+        ${sellerSide}
         ${cursorCondition}
         ${candidateCondition}
       ORDER BY ${SORT_ORDER}

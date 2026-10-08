@@ -35,7 +35,7 @@ import { getStreamRegistry, openMessageStream, type StreamRegistry } from "./str
  *  - POST   /api/demands/{id}/offers/{offerId}/favorite       : garde l'annonce (accès de la fiche) ;       DELETE /api/favorites/{offerId} : la retire ;   GET /api/favorites
  *  - POST   /api/demands/{id}/offers/{offerId}/conversation   : l'acheteur ouvre (ou retrouve) la conversation ;  GET /api/conversations, /unread, /{id}
  *  - GET|POST /api/conversations/{id}/messages ; POST /api/conversations/{id}/read ; GET /api/conversations/{id}/stream (SSE)
- *  - POST   /api/demands/{id}/offers/{offerId}/orders         : déclare une vente ;  GET /api/orders?as=buyer|seller, /{id} ;  POST /api/orders/{id}/confirm|decline|cancel
+ *  - POST   /api/demands/{id}/offers/{offerId}/orders         : déclare une vente (`priceXof`, et `quantity` facultative : lot MV1) ;  GET /api/orders?as=buyer|seller, /{id} ;  POST /api/orders/{id}/confirm|decline|cancel
  *  - GET    /api/offers/{id}/sales                            : ventes confirmées de SON annonce (arrondies)
  * Toute écriture : origine vérifiée AVANT la session. Réponses `no-store` (le flux aussi), textes fixes, 404 identique pour tout accès refusé. Aucun identifiant ni
  * téléphone de l'autre partie n'est jamais servi : l'autre partie est désignée par son rôle.
@@ -126,9 +126,12 @@ function orderDto(order: OrderView) {
     role: order.role,
     status: order.status,
     price: { amount: order.price.amount, currency: order.price.currency },
+    quantity: order.quantity,
     title: order.title,
     offerId: order.offerId,
     demandId: order.demandId,
+    // Lot MV1 : la mission d'origine n'est dite qu'à l'acheteur ; pour le vendeur le champ n'existe pas (il ne sait même pas qu'une mission existe).
+    ...(order.role === "buyer" ? { missionId: order.missionId } : {}),
     conversationId: order.conversationId,
     createdAt: order.createdAt.toISOString(),
     decidedAt: isoOrNull(order.decidedAt),
@@ -269,8 +272,9 @@ export function createSocialHttpHandlers(dependencies: SocialHandlersDependencie
       declare: (request, demandId, offerId) =>
         guarded(request, { write: true, ids: [demandId, offerId] }, async (userId) => {
           const body = await context.readJsonObject(request, ORDER_BODY_MAX_BYTES);
-          if (body === null || Object.keys(body).some((key) => key !== "priceXof")) return invalidRequest();
-          const order = await declareOrder({ pool: context.poolOf(), buyerId: userId, demandId, offerId, price: body.priceXof });
+          // Lot MV1 : `quantity` facultative (entier de 1 à 10 000, 1 par défaut).
+          if (body === null || Object.keys(body).some((key) => key !== "priceXof" && key !== "quantity")) return invalidRequest();
+          const order = await declareOrder({ pool: context.poolOf(), buyerId: userId, demandId, offerId, price: body.priceXof, quantity: body.quantity });
           return noStoreJson(201, { contractVersion: ORDERS_CONTRACT_VERSION, order: orderDto(order) });
         }),
 

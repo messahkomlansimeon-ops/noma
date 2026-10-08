@@ -274,8 +274,8 @@ export interface OfferContact {
 
 // ─── Notifications et suivi des besoins (notifications/v1, notification-preferences/v1, demand-tracking/v1) ───
 
-export type NotificationKind = "new_match" | "new_matches_digest" | "new_message";
-export const NOTIFICATION_KINDS: readonly NotificationKind[] = ["new_match", "new_matches_digest", "new_message"];
+export type NotificationKind = "new_match" | "new_matches_digest" | "new_message" | "mission_coverage";
+export const NOTIFICATION_KINDS: readonly NotificationKind[] = ["new_match", "new_matches_digest", "new_message", "mission_coverage"];
 
 /** Une notification DANS l'application : liste blanche (titre, prix, lien interne) ; jamais de téléphone, d'identifiant du vendeur ni de texte libre. */
 export interface NotificationItem {
@@ -284,12 +284,12 @@ export interface NotificationItem {
   /** Titre de l'annonce (new_match) ; null pour un résumé. */
   title: string | null;
   price: Money | null;
-  /** Résumé : nombre d'annonces au-delà du plafond du jour ; null sinon. */
+  /** Résumé : nombre d'annonces au-delà du plafond du jour ; mission_coverage : quantité couverte ; null sinon. */
   count: number | null;
   demandId: string;
   /** new_match : l'annonce, dans le contexte du besoin ; null pour un résumé. */
   offerId: string | null;
-  /** Lien INTERNE vers la fiche (new_match), le besoin (résumé) ou la conversation (new_message : `/messages/{id}`). */
+  /** Lien INTERNE vers la fiche (new_match), le besoin (résumé), la conversation (new_message : `/messages/{id}`) ou la mission (mission_coverage : `/missions/{id}`). */
   link: string;
   createdAt: string;
   readAt: string | null;
@@ -1381,6 +1381,24 @@ function parseNotificationItem(status: number, value: unknown): NotificationItem
     }
     return { id: value.id, kind, title: value.title, price: null, count: null, demandId: value.demandId, offerId: null, link: value.link, createdAt: value.createdAt, readAt: value.readAt };
   }
+  if (kind === "mission_coverage") {
+    // Couverture d'une mission (lot MV1) : titre assemblé par le serveur, quantité couverte, lien INTERNE exact vers la mission ; jamais de budget ni de vendeur.
+    if (
+      typeof value.title !== "string" ||
+      value.title.length < 1 ||
+      value.title.length > 160 ||
+      UNSAFE_NOTIFICATION_TEXT.test(value.title) ||
+      value.price !== null ||
+      value.offerId !== null ||
+      typeof value.count !== "number" ||
+      !Number.isSafeInteger(value.count) ||
+      value.count < 1 ||
+      !/^\/missions\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.link)
+    ) {
+      throw fixedError(status, API_INVALID_RESPONSE);
+    }
+    return { id: value.id, kind, title: value.title, price: null, count: value.count, demandId: value.demandId, offerId: null, link: value.link, createdAt: value.createdAt, readAt: value.readAt };
+  }
   if (
     value.title !== null ||
     value.price !== null ||
@@ -1479,7 +1497,7 @@ function parseDemandTracking(status: number, value: unknown): DemandTracking {
 // ─── Lecture stricte des accueils (lot D1) ──────────────────────────────────────────────────────────
 
 const HOME_TEXT_MAX = 200;
-const NOTIFICATION_LINK = /^\/(besoins\/[0-9a-f-]{36}(\/offres\/[0-9a-f-]{36})?|messages\/[0-9a-f-]{36})$/i;
+const NOTIFICATION_LINK = /^\/(besoins\/[0-9a-f-]{36}(\/offres\/[0-9a-f-]{36})?|messages\/[0-9a-f-]{36}|missions\/[0-9a-f-]{36})$/i;
 
 function homeText(status: number, value: unknown): string | null {
   if (value === null) return null;

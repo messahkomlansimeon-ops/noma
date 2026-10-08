@@ -10,6 +10,7 @@ import { isMatchingSchemaReady } from "../lib/server/matching/schema-ready";
 import { createMediaStore } from "../lib/server/media/store";
 import { isMarketMigrationRegistered } from "../lib/server/market/observe";
 import { revealOfferContact } from "../lib/server/metrics/contacts";
+import { createMission } from "../lib/server/missions/missions";
 import { recordOfferView } from "../lib/server/metrics/views";
 import { closePostgresPool, getPostgresPool } from "../lib/server/postgres/client";
 import { openConversation, sendMessage } from "../lib/server/social/conversations";
@@ -32,6 +33,7 @@ import {
   DEMO_EXTRA_BUYER_COUNT,
   DEMO_HISTORY_SELLER_COUNT,
   DEMO_FAVORITE_OFFER_KEY,
+  DEMO_MISSION,
   DEMO_OFFERS,
   DEMO_OPENERS,
   DEMO_ORDER_BUYER_INDEX,
@@ -95,6 +97,8 @@ export interface DemoSeedReport {
   photosExisting: number;
   /** Lot H1 : relevés de prix SYNTHÉTIQUES écrits ce coup-ci (90 jours d'annonces et de ventes fictives entre vendeurs et acheteurs fictifs) ; 0 si déjà présents ou si la migration 0023 n'est pas appliquée. */
   marketObservationsWritten: number;
+  /** Lot MV1 : la mission d'achat en volume de démonstration a été créée et lancée ce coup-ci, était déjà présente, ou n'a pas pu l'être (migration 0027 absente de la base). */
+  mission: "created" | "existing" | "absent";
   /** Cycles du worker du matching exécutés (jusqu'au repos). */
   cycles: number;
   /** Lot EXT1 : surveillances de marché et annonces externes FICTIVES des besoins de l'acheteur démo (collecte avec les deux connecteurs fictifs, sans réseau). */
@@ -281,7 +285,7 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
   const counters: Counters = {
     report: {
       accountsCreated: 0, accountsExisting: 0, offersCreated: 0, offersExisting: 0, demandsCreated: 0, demandsExisting: 0,
-      viewsRecorded: 0, contactsRecorded: 0, creditAdded: false, proSubscribed: false, boost: "existing", adminGranted: false, messagesWritten: 0, favoriteAdded: false, orderDeclared: false, photosAdded: 0, photosExisting: 0, marketObservationsWritten: 0, cycles: 0,
+      viewsRecorded: 0, contactsRecorded: 0, creditAdded: false, proSubscribed: false, boost: "existing", adminGranted: false, messagesWritten: 0, favoriteAdded: false, orderDeclared: false, photosAdded: 0, photosExisting: 0, marketObservationsWritten: 0, mission: "existing", cycles: 0,
       external: { skipped: false, watches: 0, watchesCollected: 0, listingsCreated: 0, listingsKnown: 0, sourceFailures: 0, budgetSkipped: 0 },
     },
   };
@@ -378,6 +382,10 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
 
   // 8. Lot EXT1 : surveillances de marché et annonces d'AUTRES SITES fictives pour les besoins de l'acheteur démo (connecteurs fictifs, aucun réseau ; rejouable).
   report.external = await seedExternalDemo(pool, buyerId);
+  // 9. Lot MV1 : la mission d'achat en volume de l'acheteur démo, créée APRÈS toutes les annonces, l'historique des prix et la collecte externe fictive ; le worker tourne de nouveau jusqu'au repos pour
+  // évaluer son besoin porteur et poser la couverture de départ (sans notification : l'acheteur démo garde exactement ses 3 notifications).
+  report.mission = await ensureDemoMission(pool, buyerId);
+  await runMatchingUntilIdle(pool, counters);
   return report;
 }
 
@@ -422,6 +430,19 @@ export async function seedMarketHistory(pool: Pool, world: { sellerIds: Map<numb
     written += result.rowCount ?? 0;
   }
   return written;
+}
+
+/** La mission de démonstration est retrouvée par son produit, sa quantité et son budget (hors annulée) ; sinon créée et lancée. Sans la migration 0027 : ignorée. */
+async function ensureDemoMission(pool: Pool, buyerId: string): Promise<DemoSeedReport["mission"]> {
+  const present = await pool.query<{ present: boolean }>("SELECT to_regclass('missions') IS NOT NULL AS present");
+  if (present.rows[0]?.present !== true) return "absent";
+  const existing = await pool.query(
+    `SELECT 1 FROM missions WHERE owner_id = $1::uuid AND brand = $2 AND model = $3 AND quantity_total = $4::int AND unit_budget_xof = $5::bigint AND status <> 'cancelled' LIMIT 1`,
+    [buyerId, DEMO_MISSION.brand, DEMO_MISSION.model, DEMO_MISSION.quantity, DEMO_MISSION.unitBudgetXof],
+  );
+  if (existing.rowCount) return "existing";
+  await createMission({ pool, ownerId: buyerId, mission: DEMO_MISSION, activate: true });
+  return "created";
 }
 
 async function seedSocial(
@@ -498,6 +519,10 @@ async function main(): Promise<number> {
       ? "demo:seed : collecte externe ignorée (migration 0025 absente)."
       : `demo:seed : collecte externe (sources FICTIVES, aucun réseau) : ${external.watches} surveillance(s) pour l'acheteur démo, ${external.listingsCreated} annonce(s) externe(s) créée(s) ` +
           `(${external.listingsKnown} déjà présente(s)), ${external.sourceFailures} panne(s) de source, ${external.budgetSkipped} requête(s) refusée(s) par le budget du jour.`,
+  );
+  console.log(
+    `demo:seed : missions d'achat en volume : mission de démonstration (${DEMO_MISSION.quantity} ${DEMO_MISSION.brand} ${DEMO_MISSION.model}, ${DEMO_MISSION.unitBudgetXof.toLocaleString("fr-FR")} FCFA l'unité au plus) ` +
+      `${report.mission === "created" ? "créée et lancée pour l'acheteur démo" : report.mission === "existing" ? "déjà présente" : "NON créée (migration 0027 absente de la base)"}.`,
   );
   console.log("demo:seed : comptes de démonstration (le code de connexion s'affiche dans le terminal de `npm run dev:try`) :");
   console.log("  Acheteur démo : +225 07 00 00 01 01");

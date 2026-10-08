@@ -99,8 +99,10 @@ export function notificationView(item: BuyerHomeNotification): BuyerNotification
         ? summaryTitle(item.count ?? 0)
         : item.kind === "new_message"
           ? `Nouveau message : ${item.title ?? "annonce"}`
-          : (item.title ?? "Nouvelle annonce"),
-    subtitle: item.kind === "new_matches_digest" || item.kind === "new_message" ? null : formatMoney(item.price),
+          : item.kind === "mission_coverage"
+            ? `Mission : ${item.title ?? "achat en volume"}`
+            : (item.title ?? "Nouvelle annonce"),
+    subtitle: item.kind === "new_matches_digest" || item.kind === "new_message" || item.kind === "mission_coverage" ? null : formatMoney(item.price),
     unread: item.unread,
     href: item.link,
   };

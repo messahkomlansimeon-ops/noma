@@ -25,6 +25,7 @@ export const LOAD_MORE_LABEL = "Voir plus";
 export const OPEN_LISTING_LABEL = "Voir l'annonce";
 export const OPEN_NEED_LABEL = "Voir mon besoin";
 export const OPEN_CONVERSATION_LABEL = "Ouvrir la conversation";
+export const OPEN_MISSION_LABEL = "Voir la mission";
 export const UNREAD_SR_LABEL = "non lue";
 
 // ───────────── pastille de la navigation ─────────────
@@ -158,6 +159,19 @@ export function notificationRow(item: NotificationItem): NotificationRowView {
       // Lien reconstruit : seule la forme exacte `/messages/<uuid>` mène à une page.
       href: /^\/messages\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.link) ? item.link : null,
       linkLabel: OPEN_CONVERSATION_LABEL,
+    };
+  }
+  if (item.kind === "mission_coverage") {
+    return {
+      id: item.id,
+      kind: item.kind,
+      title: `Mission : ${item.title ?? "achat en volume"}`,
+      subtitle: "La couverture de votre mission a augmenté.",
+      dateText: date,
+      unread: item.readAt === null,
+      // Lien reconstruit : seule la forme exacte `/missions/<uuid>` mène à une page.
+      href: /^\/missions\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.link) ? item.link : null,
+      linkLabel: OPEN_MISSION_LABEL,
     };
   }
   return {

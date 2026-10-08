@@ -91,7 +91,7 @@ export function BuyerTabBar() {
         { href: "/", label: "Explorer", icon: Search, match: ["/", "/recherche", "/offre", "/comparer", "/partager"] },
         { href: "/favoris", label: "Favoris", icon: Heart, match: ["/favoris"] },
         { href: "/alertes", label: "Alertes", icon: Bell, match: ["/alertes", "/alerte", "/notifications"], unread: true },
-        { href: "/compte", label: "Compte", icon: User, match: ["/compte", "/messages", "/commandes", "/signaler", "/propositions", "/inviter"], messages: true },
+        { href: "/compte", label: "Compte", icon: User, match: ["/compte", "/messages", "/commandes", "/missions", "/signaler", "/propositions", "/inviter"], messages: true },
       ]}
     />
   );

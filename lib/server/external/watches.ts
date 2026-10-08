@@ -31,13 +31,17 @@ interface DemandKeyRow {
 
 /**
  * Les clés produit des besoins ACTIFS (propriétaire actif, besoin non archivé), dédoublonnées après normalisation, triées (ordre de verrouillage stable). `ownerId` restreint aux
- * besoins d'un seul utilisateur (amorçage de démonstration).
+ * besoins d'un seul utilisateur (amorçage de démonstration). Lot MV1 : le besoin porteur d'une mission EN PAUSE n'est pas un besoin vivant, il ne fait pas surveiller de marché.
  */
 export async function readActiveDemandKeys(executor: SqlExecutor, ownerId: string | null = null): Promise<Array<{ text: string; key: ProductKey }>> {
+  // Lot MV1 : sans la table des missions (migration 0027 pas encore appliquée), aucun besoin n'est un besoin porteur : la collecte continue sans erreur.
+  const missions = await executor.query<{ present: boolean }>("SELECT to_regclass('missions') IS NOT NULL AS present");
+  const pausedCarriers = missions.rows[0]?.present === true ? "AND NOT EXISTS (SELECT 1 FROM missions mp WHERE mp.demand_id = d.id AND mp.status = 'paused')" : "";
   const rows = await executor.query<DemandKeyRow>(
     `SELECT d.category, d.brand, d.model, d.variant, d.location_text
        FROM demands d JOIN users u ON u.id = d.owner_id
       WHERE d.status = 'active' AND d.archived_at IS NULL AND u.status = 'active' AND u.archived_at IS NULL
+        ${pausedCarriers}
         AND d.category IS NOT NULL AND d.brand IS NOT NULL AND d.model IS NOT NULL AND ($1::uuid IS NULL OR d.owner_id = $1::uuid)
       GROUP BY d.category, d.brand, d.model, d.variant, d.location_text`,
     [ownerId],

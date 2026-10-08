@@ -6,6 +6,8 @@ import { resolveSession as resolveStoredSession } from "../auth/sessions";
 import type { AuthClock, ResolvedSession, SessionContext } from "../auth/types";
 import { CatalogNotFoundError, CatalogValidationError } from "../catalog/errors";
 import { checkPostOrigin, noStoreJsonResponse, readBodyCapped, readSingleCookie } from "../http/protection";
+import { MissionError } from "../missions/errors";
+import { missionErrorResponse } from "../missions/http-errors";
 import { getPostgresPool } from "../postgres/client";
 import { SocialError } from "./errors";
 
@@ -118,6 +120,8 @@ export function createSocialContext(dependencies: SocialHttpDependencies, servic
     mapError(error) {
       if (error instanceof CatalogValidationError) return invalidRequest();
       if (error instanceof CatalogNotFoundError) return resourceNotFound();
+      // Lot MV1 : un achat rattaché à une mission peut être refusé par la mission (quantité, budget, mission close).
+      if (error instanceof MissionError) return missionErrorResponse(error);
       if (!(error instanceof SocialError)) return null;
       switch (error.code) {
         case "resource_not_found":

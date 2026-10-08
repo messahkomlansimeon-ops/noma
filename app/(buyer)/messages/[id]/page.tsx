@@ -1,10 +1,19 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { Suspense } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { ConversationScreen } from "@/components/conversation-screen";
 import { SessionGate } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
 import { isUuid } from "@/lib/client/api";
+import { parseMissionHint } from "@/lib/client/missions-view";
+
+/** Lot MV1 : depuis une ligne de mission, l'adresse porte la quantité et le prix visés (deux entiers) qui pré-remplissent le message. */
+function ConversationWithHint({ id }: { id: string }) {
+  const search = useSearchParams();
+  const hint = parseMissionHint(search.get("quantite"), search.get("prix"));
+  return <ConversationScreen conversationId={id} space="buyer" hint={hint} />;
+}
 
 export default function Conversation() {
   const params = useParams<{ id: string }>();
@@ -12,7 +21,10 @@ export default function Conversation() {
   return (
     <SessionGate>
       {isUuid(id) ? (
-        <ConversationScreen conversationId={id} space="buyer" />
+        // useSearchParams exige une frontière Suspense pour que le reste de la page reste pré-rendu.
+        <Suspense fallback={null}>
+          <ConversationWithHint id={id} />
+        </Suspense>
       ) : (
         <main>
           <TopBar back="/messages" title="Conversation" />

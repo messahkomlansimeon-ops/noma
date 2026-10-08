@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, test } from "node:test";
 import { looksLikePhoneNumber } from "../../lib/phone-text";
+import { checkMissionInput } from "../../lib/missions-rules";
 import { requireNoPhoneInOfferFields } from "../../lib/server/catalog/validation";
 import { MARKET_TREND_MIN_SELLERS } from "../../lib/server/market/config";
 import { computeMarketStats, type MarketObservation } from "../../lib/server/market/stats";
@@ -17,6 +18,7 @@ import {
   DEMO_CONTACTERS,
   DEMO_EXTRA_BUYER_COUNT,
   DEMO_HISTORY_SELLER_COUNT,
+  DEMO_MISSION,
   DEMO_OFFERS,
   DEMO_OPENERS,
   DEMO_SEED_LOCK_NAMESPACE,
@@ -248,9 +250,12 @@ describe("verrou consultatif de demo:seed (lot D3)", () => {
     // Plage réservée à la collecte externe (lot EXT1) : 981 (analyse par empreinte) et 982 (regroupement entre sources), déclarés une seule fois, dans la configuration du lot.
     assert.deepEqual(declared.get("1314664981"), ["lib/server/external/config.ts:EXTERNAL_ANALYSIS_LOCK_NAMESPACE"]);
     assert.deepEqual(declared.get("1314664982"), ["lib/server/external/config.ts:EXTERNAL_GROUP_LOCK_NAMESPACE"]);
+    // Lot MV1 : l'espace 985 (créations et activations de missions d'un même acheteur) est déclaré une seule fois, dans la configuration du lot.
+    assert.deepEqual(declared.get("1314664985"), ["lib/server/missions/config.ts:MISSION_OWNER_LOCK_NAMESPACE"]);
     // La liste de scripts/demo-seed-plan.ts les mentionne (elle est la référence documentaire des espaces utilisés).
     const plan = readFileSync(join(root, "scripts/demo-seed-plan.ts"), "utf8");
     assert.match(plan, /981 et 982 \(collecte externe/);
+    assert.match(plan, /985 \(missions d'achat en volume/);
   });
 });
 
@@ -445,5 +450,19 @@ describe("historique de prix synthétique (pur, déterministe)", () => {
       assert.equal(new Set(week.map((row) => row.sellerIndex)).size, 7);
       assert.equal(new Set(week.map((row) => row.buyerIndex)).size, 7);
     }
+  });
+});
+
+describe("mission de démonstration (lot MV1)", () => {
+  test("une mission valide pour les règles du produit, sur un produit du marché, sans numéro, partiellement couvrable", () => {
+    const checked = checkMissionInput({ ...DEMO_MISSION });
+    assert.equal(checked.ok, true);
+    assert.equal(DEMO_MISSION.quantity, 10);
+    assert.ok(DEMO_MISSION.totalBudgetXof >= DEMO_MISSION.unitBudgetXof);
+    const offers = DEMO_OFFERS.filter((offer) => offer.brand === DEMO_MISSION.brand && offer.model === DEMO_MISSION.model);
+    const withinBudget = offers.filter((offer) => offer.priceXof <= DEMO_MISSION.unitBudgetXof && offer.condition === DEMO_MISSION.condition);
+    assert.ok(withinBudget.length >= 3 && withinBudget.length < DEMO_MISSION.quantity, `${withinBudget.length} annonce(s) du marché dans le budget : la mission est partiellement couverte`);
+    assert.ok(offers.some((offer) => offer.priceXof > DEMO_MISSION.unitBudgetXof), "au moins une annonce dépasse le budget par unité : la proposition dit pourquoi");
+    for (const text of [DEMO_MISSION.category, DEMO_MISSION.brand, DEMO_MISSION.model, DEMO_MISSION.condition, DEMO_MISSION.location]) assert.equal(looksLikePhoneNumber(text), false);
   });
 });

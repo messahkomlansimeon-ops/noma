@@ -13,6 +13,8 @@
  *      en moins de 3 s, et inversement ; du HTML dans un message reste du texte ; un numéro n'est pas bloqué ; rappel de sécurité la première fois) ; commande déclarée par l'acheteur,
  *      confirmée par le vendeur (ventes confirmées arrondies, besoin proposé satisfait) ; administration : tableau de bord, vendeurs aux numéros masqués, suspension et réactivation
  *      journalisées, réglages en lecture seule ; /admin : page 404 standard de Next pour l'acheteur (sans titre « Administration »), onglet Admin du sélecteur visible seulement pour l'admin.
+ *   9. LOT MV1 : missions d'achat en volume (voir le pas « MV1 » plus bas : mission de démonstration, création avec refus d'un numéro, proposition anonyme, « Écrire » pré-rempli, déclaration,
+ *      confirmation côté vendeur, progression, pause et reprise).
  *   8. LOT D3 : le visiteur anonyme ne provoque aucun 401 ni aucune erreur dans la console du navigateur ; l'onglet Admin n'existe pas pour l'acheteur et le vendeur.
  *   9. LOT PRO1 (à la fin, dans quatre navigateurs : vendeur démo, second vendeur, acheteur, admin) : le vendeur démo est Pro (badge « Vendeur Pro » dans les résultats, texte honnête sur la fiche,
  *      page « Offre Pro » aux prix PROVISOIRES, crédits promotionnels, achat d'un boost payé avec les crédits promotionnels EN PREMIER) ; import de catalogue par CSV (aperçu, application, rejeu, numéro
@@ -765,6 +767,184 @@ async function main(): Promise<void> {
     assert.equal(await buyer.getByTestId("order-satisfy").count(), 0);
     ok("après la confirmation, l'acheteur peut marquer son besoin comme satisfait (jamais automatiquement)");
     // La session de l'administrateur démo reste ouverte : le bloc PRO1 final la réutilise (un second code pour le même numéro serait refusé par le délai de renvoi).
+
+    step("MV1 · Missions d'achat en volume : mission de démonstration, création, proposition, « Écrire » pré-rempli, déclaration, confirmation côté vendeur, progression");
+    // 1. La mission de démonstration (10 Samsung Galaxy S21, 135 000 FCFA l'unité) apparaît dans « Mes missions », partiellement couverte.
+    await buyer.goto(`${BASE}/missions`);
+    await buyer.getByTestId("mission-row").first().waitFor();
+    assert.equal(await buyer.getByTestId("mission-row").count(), 1, "la mission de démonstration seulement");
+    const seededRow = buyer.getByTestId("mission-row").first();
+    assert.match(await seededRow.innerText(), /10 × Samsung Galaxy S21/);
+    assert.match(await seededRow.getByTestId("mission-coverage").innerText(), /La proposition couvre 5 sur 10 \(50 %\)/);
+    assert.match(await seededRow.getByTestId("mission-secured").innerText(), /0 sur 10 achetés/);
+    await checkSwitcherDoesNotOverlap(buyer, "Mes missions");
+    await checkClean(buyer, "Mes missions");
+    await shot(buyer, "30-mes-missions");
+    ok("« Mes missions » : la mission de démonstration (10 Samsung Galaxy S21), proposition couvrant 5 sur 10 (50 %), 0 sur 10 achetés");
+    await seededRow.locator("a").click();
+    await buyer.waitForURL(/\/missions\/[0-9a-f-]{36}$/);
+    // La suspension puis la réactivation d'un vendeur fictif (étape d'administration plus haut) fait recalculer ses annonces par le worker : la proposition, relue en direct, retrouve ses cinq
+    // lignes dès que ce calcul est fini (la liste « Mes missions » garde la couverture lue avant).
+    const seededUntil = Date.now() + 90_000;
+    for (;;) {
+      await buyer.getByTestId("mission-detail").waitFor();
+      await buyer.getByTestId("proposal-coverage").waitFor();
+      if ((await buyer.getByTestId("proposal-line").count()) === 5) break;
+      assert.ok(Date.now() < seededUntil, `la proposition de démonstration n'a que ${await buyer.getByTestId("proposal-line").count()} ligne(s) après 90 s`);
+      await sleep(3_000);
+      await buyer.reload();
+    }
+    assert.equal(await buyer.getByTestId("proposal-line").count(), 5, "cinq vendeurs");
+    const vendors = await buyer.getByTestId("line-vendor").allInnerTexts();
+    assert.deepEqual(vendors.map((text) => text.trim().toLowerCase()), ["vendeur 1", "vendeur 2", "vendeur 3", "vendeur 4", "vendeur 5"], "vendeurs anonymes");
+    const reasons = await buyer.getByTestId("proposal-reasons").innerText();
+    assert.match(reasons, /pas encore assez d'annonces/);
+    assert.match(reasons, /dépassent votre budget par unité/);
+    assert.match(await buyer.getByTestId("no-payment-notice").first().innerText(), /noma ne gère aucun paiement de l'objet/);
+    const seededText = await buyer.evaluate(() => document.body.innerText);
+    assert.equal(/0788888801|07 88 88 88 01|\+225/.test(seededText.replace(/\s/g, " ")), false, "aucun numéro de vendeur dans la proposition");
+    await checkClean(buyer, "page d'une mission");
+    await shot(buyer, "31-mission-demonstration");
+    ok("page de la mission : cinq lignes (Vendeur 1 à 5, sans identité ni numéro), raisons en mots simples, « aucun paiement ne passe par noma »");
+
+    // 2. Création : un numéro de téléphone dans un champ est refusé à l'écran ; puis une mission iPhone 12 (8 voulus, 165 000 FCFA est le prix de l'annonce du vendeur démo).
+    await buyer.goto(`${BASE}/missions/nouvelle`);
+    await buyer.getByTestId("mission-field-category").fill("Téléphones");
+    await buyer.getByTestId("mission-field-brand").fill("Apple");
+    await buyer.getByTestId("mission-field-model").fill("0708091011");
+    await buyer.getByTestId("mission-field-quantity").fill("8");
+    await buyer.getByTestId("mission-field-unitBudgetXof").fill("170 000");
+    await buyer.getByTestId("mission-field-totalBudgetXof").fill("1 400 000");
+    await buyer.getByTestId("mission-field-location").fill("Abidjan");
+    await buyer.getByTestId("mission-submit").click();
+    assert.match(await buyer.getByTestId("mission-problem-model").innerText(), /Pas de numéro de téléphone dans la mission \(champ : modèle\)/);
+    assert.match(buyer.url(), /\/missions\/nouvelle$/, "rien n'est créé");
+    await shot(buyer, "32-mission-numero-refuse");
+    await buyer.getByTestId("mission-field-model").fill("iPhone 12");
+    await buyer.getByTestId("mission-field-quantity").fill("1");
+    await buyer.getByTestId("mission-submit").click();
+    assert.match(await buyer.getByTestId("mission-problem-quantity").innerText(), /nombre entier de 2 à 10 000/);
+    await buyer.getByTestId("mission-field-quantity").fill("8");
+    await buyer.getByTestId("mission-submit").click();
+    await buyer.waitForURL(/\/missions\/[0-9a-f-]{36}$/);
+    await buyer.getByTestId("mission-detail").waitFor();
+    assert.equal(await buyer.getByTestId("mission-title").innerText(), "8 × Apple iPhone 12");
+    assert.match(await buyer.getByTestId("mission-status").innerText(), /En cours/);
+    const missionUrl = buyer.url();
+    ok("création : un numéro de téléphone et une quantité hors bornes sont refusés à l'écran (rien n'est créé) ; la mission « 8 × Apple iPhone 12 » est lancée");
+
+    // 3. La proposition apparaît quand le calcul des correspondances du besoin porteur est terminé (le worker tourne : on relit la page).
+    const lineCount = async (): Promise<number> => buyer.getByTestId("proposal-line").count();
+    const waitedUntil = Date.now() + 120_000;
+    for (;;) {
+      await buyer.reload();
+      await buyer.getByTestId("mission-detail").waitFor();
+      await sleep(1_500);
+      if ((await lineCount()) >= 7) break;
+      assert.ok(Date.now() < waitedUntil, `la proposition n'a que ${await lineCount()} ligne(s) après 120 s`);
+      await sleep(3_000);
+    }
+    assert.equal(await lineCount(), 7, "sept annonces d'iPhone 12 à 170 000 FCFA ou moins (une par vendeur)");
+    assert.match(await buyer.getByTestId("proposal-coverage").innerText(), /La proposition couvre 7 sur 8 \(87 %\)/);
+    const demoLine = buyer.getByTestId("proposal-line").filter({ has: buyer.getByTestId("line-subtotal").filter({ hasText: /^165.000 FCFA$/ }) });
+    assert.equal(await demoLine.count(), 1, "l'annonce du vendeur démo (165 000 FCFA) est l'une des lignes");
+    await checkClean(buyer, "proposition iPhone 12");
+    await shot(buyer, "33-proposition-iphone12");
+    ok("proposition : 7 lignes (vendeurs anonymes), couverture 7 sur 8 (87 %), dont l'annonce du vendeur démo à 165 000 FCFA");
+
+    // 4. « Écrire » : la conversation s'ouvre avec un message PRÉ-REMPLI (quantité et prix visés), modifiable ; rien n'est envoyé.
+    await demoLine.getByTestId("line-write").click();
+    await buyer.waitForURL(/\/messages\/[0-9a-f-]{36}\?quantite=1&prix=165000$/);
+    await buyer.getByTestId("conversation-title").waitFor();
+    const draft = await buyer.getByTestId("message-input").inputValue();
+    assert.match(draft.replace(/\s/g, " "), /^Bonjour, je souhaite acheter 1 unité de « Apple iPhone 12 128 Go » à 165 000 FCFA l'unité\./);
+    assert.equal(/170.?000|1.?400.?000|budget|mission|total/i.test(draft), false, "le message ne dit ni le budget ni la mission");
+    assert.equal(await buyer.getByTestId("message-bubble").count(), 0, "rien n'a été envoyé automatiquement");
+    await shot(buyer, "34-ecrire-prerempli");
+    await buyer.getByTestId("message-input").fill(`${draft} Je peux passer demain.`);
+    assert.equal(await buyer.getByTestId("message-bubble").count(), 0, "modifier le message ne l'envoie pas");
+    await buyer.getByTestId("message-send").click();
+    await buyer.getByTestId("message-bubble").filter({ hasText: "Je peux passer demain." }).waitFor();
+    ok("« Écrire » ouvre la conversation avec le message pré-rempli (quantité et prix visés, ni budget ni mission) ; il est modifiable et ne part que quand l'acheteur l'envoie");
+
+    // 5. « Déclarer l'achat » depuis la ligne : quantité modifiable, prix par unité, « aucun paiement ne passe par noma ».
+    await buyer.goto(missionUrl);
+    await buyer.getByTestId("proposal-line").first().waitFor();
+    const line = buyer.getByTestId("proposal-line").filter({ has: buyer.getByTestId("line-subtotal").filter({ hasText: /^165.000 FCFA$/ }) });
+    await line.getByTestId("line-declare").click();
+    assert.equal(await line.getByTestId("line-declare-quantity").inputValue(), "1");
+    assert.equal(await line.getByTestId("line-declare-price").inputValue(), "165000");
+    assert.match(await line.getByTestId("line-declare-form").innerText(), /noma ne gère aucun paiement de l'objet/);
+    await line.getByTestId("line-declare-quantity").fill("0");
+    assert.equal(await line.getByTestId("line-declare-submit").isDisabled(), true, "quantité 0 : refusée avant l'envoi");
+    await line.getByTestId("line-declare-price").fill("171 000");
+    await line.getByTestId("line-declare-quantity").fill("2");
+    assert.equal(await line.getByTestId("line-declare-submit").isDisabled(), true, "prix au-dessus du budget par unité : refusé avant l'envoi");
+    assert.match(await line.getByTestId("line-problem").innerText(), /Ce prix dépasse votre budget par unité/);
+    await line.getByTestId("line-declare-quantity").fill("9");
+    await line.getByTestId("line-declare-price").fill("165 000");
+    assert.equal(await line.getByTestId("line-declare-submit").isDisabled(), true, "quantité au-delà de ce qu'il reste à acheter : refusée avant l'envoi");
+    assert.match(await line.getByTestId("line-problem").innerText(), /Il ne reste que 8 à acheter/);
+    await line.getByTestId("line-declare-quantity").fill("2");
+    await line.getByTestId("line-declare-submit").click();
+    // L'achat déclaré quitte les lignes de la proposition (elle ne répartit plus que le RESTE) et passe dans « Déjà acheté ou en attente ».
+    await buyer.getByTestId("engaged-line").waitFor();
+    assert.equal(await buyer.getByTestId("engaged-line").count(), 1);
+    assert.match(await buyer.getByTestId("engaged-status").innerText(), /Achat déclaré : 2, en attente du vendeur/);
+    assert.match(await buyer.getByTestId("proposal-engaged").innerText(), /Déjà acheté ou en attente/);
+    assert.equal(await demoLine.count(), 0, "l'annonce déjà commandée n'est pas reproposée");
+    assert.match(await buyer.getByTestId("proposal-committed").innerText(), /2 déjà achetés ou en attente, 6 à acheter/);
+    assert.match(await buyer.getByTestId("mission-secured").innerText(), /0 sur 8 achetés/, "une commande proposée n'est pas sécurisée");
+    assert.match(await buyer.getByTestId("mission-detail").innerText(), /2 en attente de confirmation/);
+    await shot(buyer, "35-achat-declare");
+    ok("achat déclaré (2 × 165 000 FCFA) : un prix au-dessus du budget par unité et une quantité au-delà de ce qu'il reste sont refusés à l'écran ; l'achat passe dans « Déjà acheté ou en attente » (« en attente du vendeur ») et n'est plus reproposé ; 0 sur 8 achetés tant que le vendeur n'a pas confirmé");
+
+    // 6. Côté vendeur : la commande dit la quantité demandée ; jamais la mission, le budget ni les autres vendeurs.
+    await vendor.goto(`${BASE}/vendeur/commandes`);
+    await vendor.getByTestId("order-row").first().waitFor();
+    const missionOrder = vendor.getByTestId("order-row").filter({ hasText: "2 × 165" });
+    assert.equal(await missionOrder.count(), 1);
+    await missionOrder.click();
+    await vendor.waitForURL(/\/vendeur\/commandes\/[0-9a-f-]{36}$/);
+    await vendor.getByTestId("order-detail").waitFor();
+    assert.match((await vendor.getByTestId("order-quantity-line").innerText()).replace(/\s/g, " "), /Quantité demandée : 2 · Total 330 000 FCFA/);
+    const vendorOrderText = (await vendor.evaluate(() => document.body.innerText)).replace(/\s/g, " ");
+    assert.equal(/mission|170 000|1 400 000|Vendeur [0-9]|8 ×/i.test(vendorOrderText), false, `le vendeur ne voit ni la mission, ni le budget, ni les autres vendeurs : « ${vendorOrderText.slice(0, 200)} »`);
+    assert.equal(await vendor.getByTestId("order-mission-link").count(), 0);
+    await checkClean(vendor, "commande de mission côté vendeur");
+    await shot(vendor, "36-commande-mission-vendeur");
+    await vendor.getByTestId("order-confirm").click();
+    await vendor.getByTestId("order-notice").waitFor();
+    assert.match(await vendor.getByTestId("order-status").innerText(), /Confirmée/);
+    ok("le vendeur voit « Quantité demandée : 2 · Total 330 000 FCFA », jamais la mission, le budget ni les autres vendeurs ; il confirme");
+
+    // 7. La progression : 2 sur 8 achetés.
+    await buyer.goto(missionUrl);
+    await buyer.getByTestId("mission-secured").waitFor();
+    assert.match(await buyer.getByTestId("mission-secured").innerText(), /2 sur 8 achetés/);
+    assert.equal(await buyer.getByTestId("mission-secured").locator("xpath=following::*[@role='progressbar'][1]").getAttribute("aria-valuenow"), "25");
+    assert.match(await buyer.getByTestId("mission-order").first().innerText(), /Confirmé/);
+    assert.match(await buyer.getByTestId("engaged-status").innerText(), /Achat confirmé : 2/);
+    assert.match(await buyer.getByTestId("proposal-committed").innerText(), /2 déjà achetés ou en attente, 6 à acheter/);
+    assert.match(await buyer.getByTestId("proposal-coverage").innerText(), /La proposition couvre 8 sur 8 \(100 %\)/, "2 achetés + les 6 autres annonces : la proposition ne répartit que le reste");
+    assert.equal(await buyer.getByTestId("proposal-line").count(), 6, "l'annonce achetée n'est plus une ligne de la proposition");
+    await shot(buyer, "37-progression");
+    await buyer.goto(`${BASE}/missions`);
+    await buyer.getByTestId("mission-row").first().waitFor();
+    const rows = await buyer.getByTestId("mission-row").allInnerTexts();
+    assert.ok(rows.some((text) => /8 × Apple iPhone 12/.test(text) && /2 sur 8 achetés/.test(text)), "la liste montre 2 sur 8 achetés");
+    ok("la quantité sécurisée passe de 0 à 2 sur 8 (barre à 25 %) après la confirmation du vendeur, dans la page de la mission comme dans la liste");
+
+    // 8. Pause puis reprise.
+    await buyer.goto(missionUrl);
+    await buyer.getByTestId("mission-pause").click();
+    await buyer.getByTestId("mission-notice").filter({ hasText: "Mission en pause." }).waitFor();
+    await buyer.getByTestId("mission-resume").waitFor();
+    assert.match(await buyer.getByTestId("mission-status").innerText(), /En pause/);
+    await buyer.getByTestId("mission-resume").click();
+    await buyer.getByTestId("mission-pause").waitFor();
+    assert.match(await buyer.getByTestId("mission-status").innerText(), /En cours/);
+    ok("pause puis reprise de la mission depuis l'écran");
 
     step("Recherche sur d'autres sites (démonstration) : fausses sources, mention visible");
     await buyer.goto(`${BASE}/`);

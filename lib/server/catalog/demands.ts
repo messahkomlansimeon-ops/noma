@@ -109,8 +109,9 @@ export async function listDemandsByOwner(
   const ownerId = requireUuid(ownerIdValue, "ownerId");
   const page = pagination ? requireCatalogPagination(pagination) : null;
   const result = await db.query<DemandRow>(
+    // Lot MV1 : le besoin PORTEUR d'une mission d'achat en volume n'est pas un besoin de l'acheteur (il le voit dans « Mes missions »).
     `SELECT ${DEMAND_COLUMNS} FROM demands
-      WHERE owner_id = $1
+      WHERE owner_id = $1 AND NOT EXISTS (SELECT 1 FROM missions m WHERE m.demand_id = demands.id)
       ORDER BY created_at, id
       ${page ? "LIMIT $2 OFFSET $3" : ""}`,
     page ? [ownerId, page.limit, page.offset] : [ownerId],

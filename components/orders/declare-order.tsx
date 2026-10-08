@@ -14,30 +14,36 @@ import {
   parsePriceInput,
   priceProblem,
 } from "@/lib/client/orders-view";
+import { parseWholeNumber } from "@/lib/client/missions-view";
 import { describeSocialError, social } from "@/lib/client/social-api";
 
 /**
  * « Je l'ai acheté » (lot D2) : l'acheteur déclare une vente avec un prix convenu (FCFA entier, 1 à 100 000 000). La commande passe à « proposée » : le vendeur la confirme
  * ou la refuse. Aucun paiement ne passe par noma : c'est écrit à l'écran, avant le bouton.
+ * Lot MV1 : depuis une ligne de mission, le prix (par unité) et la quantité visés sont proposés d'avance ; le champ « quantité » n'apparaît que dans ce cas.
  */
-export function DeclareOrder({ demandId, offerId }: { demandId: string; offerId: string }) {
+export function DeclareOrder({ demandId, offerId, initialPrice, initialQuantity }: { demandId: string; offerId: string; initialPrice?: number; initialQuantity?: number }) {
   const router = useRouter();
   const redirectIfUnauthorized = useUnauthorizedRedirect();
   const [open, setOpen] = useState(false);
-  const [price, setPrice] = useState("");
+  const [price, setPrice] = useState(initialPrice === undefined ? "" : String(initialPrice));
+  const [quantity, setQuantity] = useState(initialQuantity === undefined ? "" : String(initialQuantity));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
   const parsed = parsePriceInput(price);
   const problem = priceProblem(price);
+  const withQuantity = initialQuantity !== undefined;
+  const parsedQuantity = withQuantity ? parseWholeNumber(quantity) : 1;
+  const quantityOk = parsedQuantity !== null && parsedQuantity >= 1 && parsedQuantity <= 10_000;
 
   const submit = async () => {
-    if (busy.current || parsed === null) return;
+    if (busy.current || parsed === null || !quantityOk) return;
     busy.current = true;
     setPending(true);
     setError(null);
     try {
-      const order = await social.orders.declare(demandId, offerId, parsed);
+      const order = await social.orders.declare(demandId, offerId, parsed, undefined, withQuantity ? (parsedQuantity as number) : undefined);
       router.push(orderPath("buyer", order.id));
     } catch (failure) {
       if (redirectIfUnauthorized(failure)) return;
@@ -61,8 +67,24 @@ export function DeclareOrder({ demandId, offerId }: { demandId: string; offerId:
   }
   return (
     <div className="mt-2 rounded-xl border border-line bg-white p-3.5" data-testid="declare-order-form">
+      {withQuantity ? (
+        <>
+          <label htmlFor="order-quantity" className="text-[13px] font-bold text-ink">
+            Quantité achetée
+          </label>
+          <input
+            id="order-quantity"
+            inputMode="numeric"
+            autoComplete="off"
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
+            data-testid="order-quantity"
+            className="mb-2.5 mt-1.5 w-full rounded-xl border border-line bg-white px-3.5 py-3 text-[15px] text-ink placeholder:text-ink-soft/50"
+          />
+        </>
+      ) : null}
       <label htmlFor="order-price" className="text-[13px] font-bold text-ink">
-        {PRICE_LABEL}
+        {withQuantity ? "Prix convenu par unité (FCFA)" : PRICE_LABEL}
       </label>
       <input
         id="order-price"
@@ -93,7 +115,7 @@ export function DeclareOrder({ demandId, offerId }: { demandId: string; offerId:
         </button>
         <button
           onClick={() => void submit()}
-          disabled={pending || parsed === null}
+          disabled={pending || parsed === null || !quantityOk}
           data-testid="declare-order-submit"
           className="rounded-xl bg-forest px-3 py-2.5 text-[14px] font-bold text-white transition active:scale-[0.99] disabled:opacity-50"
         >

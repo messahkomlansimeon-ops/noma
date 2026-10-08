@@ -8,6 +8,7 @@ import { queryOfferBoostExposureStats, type BoostExposureStatus, type OfferBoost
 import {
   MATCHING_CURRENT_CLOCK_CTE,
   MATCHING_FRESHNESS_FROM,
+  MATCHING_NOT_PAUSED_CARRIER,
   buildMatchingFreshnessPredicate,
   resolveMatchingFreshnessParams,
 } from "../matching/persistence";
@@ -369,7 +370,8 @@ export async function readOfferStatsRaw(input: { pool: Pool; ownerId: string; of
        SELECT count(*)::int AS needs
          FROM ${MATCHING_FRESHNESS_FROM}
         WHERE e.offer_id = $1::uuid AND e.is_confirmed_match = TRUE
-          AND ${freshness.conditions.join("\n          AND ")}`,
+          AND ${freshness.conditions.join("\n          AND ")}
+          AND ${MATCHING_NOT_PAUSED_CARRIER}`,
       [offerId, ...freshness.values],
     );
 

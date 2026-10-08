@@ -27,8 +27,8 @@ export const DEMO_HISTORY_SELLER_COUNT = 6;
  * Espace du verrou consultatif qui sérialise deux `demo:seed`. Constante DÉDIÉE (lot D3) : l'ancienne valeur, 1_314_664_955, était celle du plafond de notifications
  * (`NOTIFICATION_CAP_LOCK_NAMESPACE`) ; deux verrous d'usages différents ne partagent jamais un espace. Liste des espaces utilisés : 1_314_664_945 (migrations), 946 et 947 (matching),
  * 948 et 949 (boost : périmètre, devis), 950 (recharges), 951 (achat de boost), 952 (cadence des devis), 953 (dev:seed), 954 (contacts), 955 et 956 (notifications), 957 à 959 (messagerie,
- * conversations, favoris), 960 (demo:seed), 970 et 971 (photos), 972 (abonnements), 977 (budgets SMS, lot SMS1), 981 et 982 (collecte externe, lot EXT1 : analyse par empreinte, regroupement entre sources ; plage réservée par l'orchestrateur). Un test
- * (`tests/scripts/demo-seed.test.ts`) vérifie qu'aucun espace n'est déclaré deux fois et que 981 et 982 appartiennent à `lib/server/external/config.ts`.
+ * conversations, favoris), 960 (demo:seed), 970 et 971 (photos), 972 (abonnements), 977 (budgets SMS, lot SMS1), 981 et 982 (collecte externe, lot EXT1 : analyse par empreinte, regroupement entre sources ; plage réservée par l'orchestrateur), 985 (missions d'achat en volume, lot MV1 : créations et activations d'un même acheteur). Un test
+ * (`tests/scripts/demo-seed.test.ts`) vérifie qu'aucun espace n'est déclaré deux fois, que 981 et 982 appartiennent à `lib/server/external/config.ts` et que 985 appartient à `lib/server/missions/config.ts`.
  */
 export const DEMO_SEED_LOCK_NAMESPACE = 1_314_664_960;
 /** Repère placé dans le texte de chaque annonce et de chaque besoin de démonstration : c'est lui qui rend la commande rejouable sans doublon. */
@@ -79,6 +79,28 @@ export const DEMO_FAVORITE_OFFER_KEY = "iphone12-v6";
 export const DEMO_ORDER_BUYER_INDEX = 1;
 export const DEMO_ORDER_OFFER_KEY = "iphone12-demo";
 export const DEMO_ORDER_PRICE_XOF = 160_000;
+
+/**
+ * Lot MV1 : la mission d'achat en volume de l'acheteur démo (rejouable : retrouvée par son produit, sa quantité et son budget). « 10 Samsung Galaxy S21 d'occasion, 135 000 FCFA
+ * l'unité au plus » : sur les huit Galaxy S21 du marché de démonstration, cinq correspondent à la mission (d'occasion, à ce prix ou moins : un exemplaire chacune, cinq vendeurs
+ * distincts) ; les autres sont trop chères (140 000 FCFA, l'annonce du vendeur démo) ou reconditionnées (état non comparable à « occasion ») : la mission est PARTIELLEMENT
+ * couverte (5 sur 10) et la proposition dit pourquoi. Le produit n'est PAS l'iPhone 12 (exemple du prompt du lot) : le besoin porteur de la mission s'ajouterait aux besoins qui
+ * correspondent à l'annonce boostée du vendeur démo (iPhone 12) et ferait passer « environ 10 » à « environ 15 » dans le tableau de bord du vendeur, ce que `e2e:demo` et les
+ * essais du lot D1 vérifient.
+ */
+export const DEMO_MISSION = Object.freeze({
+  category: "Téléphones",
+  brand: "Samsung",
+  model: "Galaxy S21",
+  variant: null,
+  condition: "Occasion",
+  quantity: 10,
+  unit: "pièce",
+  unitBudgetXof: 135_000,
+  totalBudgetXof: 1_200_000,
+  location: "Abidjan",
+  deadlineDays: 30,
+});
 
 export type DemoCategory = "Téléphones" | "Électronique" | "Maison et meubles" | "Climatisation";
 

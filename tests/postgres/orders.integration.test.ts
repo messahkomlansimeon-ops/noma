@@ -61,7 +61,7 @@ test("déclarer une vente : commande « proposée », forme en liste blanche, au
   assert.equal(order.canConfirm, false);
   assert.equal(order.canMarkDemandSatisfied, false);
   assert.equal(order.decidedAt, null);
-  assert.deepEqual(Object.keys(order).sort(), ["canCancel", "canConfirm", "canDecline", "canMarkDemandSatisfied", "conversationId", "createdAt", "decidedAt", "demandId", "id", "offerId", "price", "role", "status", "title"]);
+  assert.deepEqual(Object.keys(order).sort(), ["canCancel", "canConfirm", "canDecline", "canMarkDemandSatisfied", "conversationId", "createdAt", "decidedAt", "demandId", "id", "missionId", "offerId", "price", "quantity", "role", "status", "title"]);
   assert.ok(!answer.text.includes(market.seller.userId) && !answer.text.includes(market.seller.phone));
   // Vue du vendeur : le besoin de l'acheteur reste inconnu, les actions sont les siennes.
   const seller = orderOf(await get(order.id as string, market.seller.cookie));

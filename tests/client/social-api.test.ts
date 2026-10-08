@@ -24,7 +24,7 @@ function client(respond: (seen: Seen) => { status: number; body: unknown }) {
 }
 
 const order = (overrides: Record<string, unknown> = {}) => ({
-  id: UUID_A, role: "buyer", status: "proposed", price: { amount: 150_000, currency: "XOF" }, title: "Apple iPhone 12", offerId: UUID_B, demandId: UUID_C, conversationId: null,
+  id: UUID_A, role: "buyer", status: "proposed", price: { amount: 150_000, currency: "XOF" }, quantity: 1, title: "Apple iPhone 12", offerId: UUID_B, demandId: UUID_C, missionId: null, conversationId: null,
   createdAt: NOW, decidedAt: null, canConfirm: false, canDecline: false, canCancel: true, canMarkDemandSatisfied: false, ...overrides,
 });
 
@@ -84,7 +84,11 @@ describe("requêtes", () => {
       `POST /api/demands/${UUID_C}/offers/${UUID_B}/orders`, "GET /api/orders?as=seller", `GET /api/orders/${UUID_A}`, `POST /api/orders/${UUID_A}/confirm`, `GET /api/offers/${UUID_B}/sales`,
     ]);
     assert.deepEqual(calls[0].body, { priceXof: 150_000 });
+    // Lot MV1 : quantité facultative, envoyée seulement si elle est donnée ; hors bornes, refusée avant la requête.
+    await api.orders.declare(UUID_C, UUID_B, 150_000, undefined, 3);
+    assert.deepEqual(calls[calls.length - 1].body, { priceXof: 150_000, quantity: 3 });
     const before = calls.length;
+    for (const quantity of [0, -1, 1.5, 10_001, Number.NaN]) await assert.rejects(() => api.orders.declare(UUID_C, UUID_B, 150_000, undefined, quantity), (error: ApiError) => error.code === "invalid_argument");
     for (const price of [0, -1, 1.5, 100_000_001, Number.NaN]) await assert.rejects(() => api.orders.declare(UUID_C, UUID_B, price), (error: ApiError) => error.code === "invalid_argument");
     await assert.rejects(() => api.orders.act(UUID_A, "supprimer" as never), (error: ApiError) => error.code === "invalid_argument");
     await assert.rejects(() => api.orders.list("autre" as never), (error: ApiError) => error.code === "invalid_argument");
@@ -114,6 +118,20 @@ describe("réponses relues champ par champ", () => {
     const extra = client(() => ({ status: 200, body: { contractVersion: "orders/v1", order: order({ buyerPhone: "+2250700000101", sellerId: UUID_C }) } }));
     const parsed = await extra.api.orders.get(UUID_A);
     assert.ok(!JSON.stringify(parsed).includes("+2250700000101") && !JSON.stringify(parsed).includes("sellerId"));
+    // Lot MV1 : quantité obligatoire (1 à 10 000), mission d'origine facultative (le serveur ne l'envoie pas au vendeur).
+    for (const quantity of [0, -2, 1.5, 10_001, "3", undefined]) {
+      const bad = client(() => ({ status: 200, body: { contractVersion: "orders/v1", order: order({ quantity }) } }));
+      await assert.rejects(() => bad.api.orders.get(UUID_A), (error: ApiError) => error.code === "invalid_response", String(quantity));
+    }
+    const sellerBody = order({ role: "seller", demandId: null });
+    delete (sellerBody as Record<string, unknown>).missionId;
+    const forSeller = client(() => ({ status: 200, body: { contractVersion: "orders/v1", order: sellerBody } }));
+    assert.equal((await forSeller.api.orders.get(UUID_A)).missionId, null);
+    const withMission = client(() => ({ status: 200, body: { contractVersion: "orders/v1", order: order({ quantity: 4, missionId: UUID_B }) } }));
+    const mission = await withMission.api.orders.get(UUID_A);
+    assert.deepEqual([mission.quantity, mission.missionId], [4, UUID_B]);
+    const badMission = client(() => ({ status: 200, body: { contractVersion: "orders/v1", order: order({ missionId: "pas-un-uuid" }) } }));
+    await assert.rejects(() => badMission.api.orders.get(UUID_A), (error: ApiError) => error.code === "invalid_response");
     const badMessage = client(() => ({ status: 200, body: { contractVersion: "conversations/v1", messages: [{ id: 0, mine: true, body: "x", createdAt: NOW }], hasMore: false } }));
     await assert.rejects(() => badMessage.api.conversations.messages(UUID_A), (error: ApiError) => error.code === "invalid_response");
   });

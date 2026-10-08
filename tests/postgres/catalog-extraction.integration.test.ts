@@ -101,6 +101,7 @@ if (!configuredUrl?.trim()) {
         "0024_sms_sends",
         "0025_external_collection",
         "0026_sublymus_payments",
+        "0027_missions",
       ]);
     });
 
