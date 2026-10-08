@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PhotoPicker } from "@/components/photos/photo-picker";
+import { MarketHint } from "@/components/market/market-hint";
 import { TopBar } from "@/components/top-bar";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
 import { FieldLabel, Input, Segmented, Switch, Textarea } from "@/components/ui";
@@ -239,6 +240,7 @@ export function NouvelleAnnonceForm({
               </span>
             </div>
             <FieldError message={errors.price} />
+            <MarketHint category={category} brand={brand} model={model} variant={variant} condition={condition} />
           </div>
 
           <div>

@@ -97,6 +97,7 @@ if (!configuredUrl?.trim()) {
         "0020_social_orders_admin",
         "0021_pro_subscriptions",
         "0022_offer_photos",
+        "0023_price_observations",
       ]);
     });
 

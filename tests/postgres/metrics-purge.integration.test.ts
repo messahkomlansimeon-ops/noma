@@ -33,6 +33,12 @@ after(async () => {
 });
 
 const count = async (table: string): Promise<number> => (await pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`)).rows[0].n;
+/**
+ * Lot H1 : `purgeMetrics` compte aussi les relevés de prix (`price_observations`, rétention de 3 ans). Les annonces créées par ces essais en écrivent d'office (déclencheur de la
+ * migration 0023) ; les essais ci-dessous portent sur les TROIS tables de mesures d'origine, qu'ils lisent par cette vue ; la purge des relevés a ses propres essais
+ * (tests/postgres/market-purge.integration.test.ts).
+ */
+const legacy = (value: { boost_exposures: number; offer_views: number; offer_contacts: number }) => ({ boost_exposures: value.boost_exposures, offer_views: value.offer_views, offer_contacts: value.offer_contacts });
 const counts = async () => ({ boost_exposures: await count("boost_exposures"), offer_views: await count("offer_views"), offer_contacts: await count("offer_contacts") });
 
 // Instant de référence fixe : 2032-06-15 12:00 UTC. Rétention 400 jours → premier jour conservé : 2031-05-12 (2032-06-15 − 400 j).
@@ -81,7 +87,7 @@ test(`rétention : ${METRICS_RETENTION_DAYS} jours (constante) ; premier jour co
   await insertRows(seeded, 0, 400);
   const result = await purgeMetrics({ pool, apply: false, now: NOW });
   assert.equal(result.cutoffDay, KEPT_FROM);
-  assert.deepEqual(result.counts, { boost_exposures: 0, offer_views: 0, offer_contacts: 0 }, "400 jours pile : conservé");
+  assert.deepEqual(legacy(result.counts), { boost_exposures: 0, offer_views: 0, offer_contacts: 0 }, "400 jours pile : conservé");
 });
 
 test("simulation : compte les lignes de PLUS de 400 jours dans les trois tables et ne supprime RIEN", async () => {
@@ -94,7 +100,7 @@ test("simulation : compte les lignes de PLUS de 400 jours dans les trois tables 
   assert.deepEqual(before, { boost_exposures: 4, offer_views: 4, offer_contacts: 4 });
   const result = await purgeMetrics({ pool, apply: false, now: NOW });
   assert.equal(result.apply, false);
-  assert.deepEqual(result.counts, { boost_exposures: 2, offer_views: 2, offer_contacts: 2 });
+  assert.deepEqual(legacy(result.counts), { boost_exposures: 2, offer_views: 2, offer_contacts: 2 });
   assert.deepEqual(await counts(), before, "rien n'est supprimé en simulation");
   // La simulation est le défaut de la fonction aussi : apply est explicite et obligatoire pour supprimer.
   assert.deepEqual((await purgeMetrics({ pool, apply: false, now: NOW })).counts, result.counts);
@@ -106,7 +112,7 @@ test("application : supprime au-delà de 400 jours, bornes 399 / 400 / 401 jours
   for (const [index, age] of ages.entries()) await insertRows(seeded, index, age);
   const result = await purgeMetrics({ pool, apply: true, now: NOW });
   assert.equal(result.apply, true);
-  assert.deepEqual(result.counts, { boost_exposures: 2, offer_views: 2, offer_contacts: 2 }, "401 et 800 jours supprimés");
+  assert.deepEqual(legacy(result.counts), { boost_exposures: 2, offer_views: 2, offer_contacts: 2 }, "401 et 800 jours supprimés");
   assert.deepEqual(await counts(), { boost_exposures: 3, offer_views: 3, offer_contacts: 3 });
   const kept = async (table: string, column: string) => (await pool.query<{ age: number }>(
     `SELECT ($1::date - (${column} AT TIME ZONE 'UTC')::date)::int AS age FROM ${table} ORDER BY age`, ["2032-06-15"])).rows.map((row) => row.age);
@@ -114,7 +120,7 @@ test("application : supprime au-delà de 400 jours, bornes 399 / 400 / 401 jours
   assert.deepEqual(await kept("offer_views", "viewed_day::timestamp"), [1, 399, 400]);
   assert.deepEqual(await kept("offer_contacts", "last_contact_at"), [1, 399, 400]);
   // Idempotent : une seconde application ne supprime plus rien.
-  assert.deepEqual((await purgeMetrics({ pool, apply: true, now: NOW })).counts, { boost_exposures: 0, offer_views: 0, offer_contacts: 0 });
+  assert.deepEqual(legacy((await purgeMetrics({ pool, apply: true, now: NOW })).counts), { boost_exposures: 0, offer_views: 0, offer_contacts: 0 });
 });
 
 test("contacts : le jour du DERNIER contact décide (un premier contact ancien révélé de nouveau récemment est conservé)", async () => {

@@ -5,7 +5,7 @@
  *
  * Numéros (aucun SMS n'est jamais envoyé : la connexion par code n'existe que sur ce poste, le code s'affiche dans le terminal de `dev:try`) :
  *   Acheteur démo +225 07 00 00 01 01 · Vendeur démo +225 07 00 00 02 02 · Admin démo +225 07 00 00 03 03 (rôle administrateur, attribué par `admin:grant`)
- *   Vendeurs fictifs +225 07 88 88 88 01 à 07 · acheteurs fictifs +225 07 66 66 66 01 à 11 : des numéros qui n'appartiennent à personne.
+ *   Vendeurs fictifs +225 07 88 88 88 01 à 07 · acheteurs fictifs +225 07 66 66 66 01 à 11 · vendeurs fictifs de l'historique des prix seulement +225 07 55 55 55 01 à 06 : des numéros qui n'appartiennent à personne.
  */
 import { createHash } from "node:crypto";
 import { checkSeedEnvironment, type SeedEnvironmentCheck } from "./dev-seed-plan";
@@ -16,6 +16,12 @@ export const DEMO_ADMIN_PHONE = "+2250700000303";
 
 export const DEMO_VENDOR_PHONE_PREFIX = "+22507888888";
 export const DEMO_EXTRA_BUYER_PHONE_PREFIX = "+22507666666";
+/**
+ * Lot H1 (intégration) : comptes fictifs « de l'historique des prix » : ils n'ont ni annonce, ni besoin, ni conversation ; ils ne servent que de vendeurs distincts aux relevés de prix
+ * synthétiques, pour que les produits phares comptent plus de vendeurs par semaine que le seuil d'un point de tendance (20, `MARKET_TREND_MIN_SELLERS`) : 24 vendeurs, car 22 laissaient 5 combinaisons (produit phare, jour de lancement) sur 120 sans un point de tendance (prix atypiques écartés).
+ */
+export const DEMO_HISTORY_SELLER_PHONE_PREFIX = "+22507555555";
+export const DEMO_HISTORY_SELLER_COUNT = 6;
 
 /**
  * Espace du verrou consultatif qui sérialise deux `demo:seed`. Constante DÉDIÉE (lot D3) : l'ancienne valeur, 1_314_664_955, était celle du plafond de notifications
@@ -242,6 +248,12 @@ export function demoVendorPhone(index: number): string {
 export function demoExtraBuyerPhone(index: number): string {
   if (!Number.isInteger(index) || index < 1 || index > DEMO_EXTRA_BUYER_COUNT) throw new RangeError("index d'acheteur fictif hors de 1 à 11");
   return `${DEMO_EXTRA_BUYER_PHONE_PREFIX}${String(index).padStart(2, "0")}`;
+}
+
+/** Numéro E.164 du vendeur fictif de l'historique des prix n° `index` (1 à 6). */
+export function demoHistorySellerPhone(index: number): string {
+  if (!Number.isInteger(index) || index < 1 || index > DEMO_HISTORY_SELLER_COUNT) throw new RangeError("index de vendeur d'historique hors de 1 à 6");
+  return `${DEMO_HISTORY_SELLER_PHONE_PREFIX}${String(index).padStart(2, "0")}`;
 }
 
 /** Numéro du vendeur n° `index` : 0 = vendeur démo, 1 à 7 = vendeurs fictifs. */

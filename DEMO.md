@@ -134,7 +134,7 @@ Elle **ne refuse pas** les prix à milliers et leurs fourchettes (« 12 500 000 
 - le **paiement** : la recharge passe par un prestataire fictif et une page « SIMULATION — aucun argent réel » ;
 - les **SMS** : le code de connexion s'affiche dans le terminal ; les envois de notification n'existent qu'en ligne de terminal (`NOMA_DEV_NOTIFY_CONSOLE=1`) ;
 - les **sources de la recherche externe** : annonces fictives, aucun site contacté ;
-- les **vendeurs et acheteurs fictifs** du marché de démonstration (numéros `+225 07 88 88 88 01` à `07`, et `+225 07 66 66 66 01` à `11`, qui n'appartiennent à personne) ;
+- les **vendeurs et acheteurs fictifs** du marché de démonstration (numéros `+225 07 88 88 88 01` à `07`, `+225 07 66 66 66 01` à `11`, et les six comptes fictifs de l'historique des prix `+225 07 55 55 55 01` à `06`, qui n'appartiennent à personne) ;
 - les **ouvertures et contacts** des acheteurs fictifs ;
 - le **vendeur de la conversation** de démonstration (un vendeur fictif), l'**acheteur fictif** de la commande à confirmer et leurs messages.
 

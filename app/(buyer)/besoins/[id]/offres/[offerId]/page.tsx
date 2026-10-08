@@ -7,6 +7,7 @@ import { Phone } from "lucide-react";
 import { IndicatorLine, SponsoredNotice } from "@/components/matches/match-parts";
 import { ProBadge } from "@/components/pro-badge";
 import { PhotoGallery } from "@/components/photos/photo-gallery";
+import { MarketCard } from "@/components/market/market-card";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { FavoriteButton } from "@/components/social/favorite-button";
 import { OfferActions } from "@/components/social/offer-actions";
@@ -21,6 +22,7 @@ import {
   type OfferDetail,
 } from "@/lib/client/api";
 import { artForCategory } from "@/lib/client/catalog-view";
+import { marketQueryFromProduct } from "@/lib/client/market-view";
 import {
   CONTACT_BUTTON_LABEL,
   CONTACT_HINT,
@@ -112,6 +114,8 @@ function Fiche({ demandId, offerId }: { demandId: string; offerId: string }) {
 
   const view = offerDetailView(detail);
   const links = contact.kind === "done" ? contactLinks(contact.contact) : null;
+  // Lot H1 : « Prix du marché » pour CE produit (sans catégorie, marque ou modèle, il n'y a pas de marché : pas d'encart).
+  const marketQuery = marketQueryFromProduct(detail.item.candidate);
   return (
     <article data-testid="offer-detail" data-sponsored={view.sponsored ? "true" : "false"}>
       {view.sponsoredBadge ? <SponsoredNotice badge={view.sponsoredBadge} notice={view.sponsoredNotice} /> : null}
@@ -157,6 +161,8 @@ function Fiche({ demandId, offerId }: { demandId: string; offerId: string }) {
           ))}
         </dl>
       ) : null}
+
+      {marketQuery ? <MarketCard query={marketQuery} /> : null}
 
       <section aria-labelledby="contact-title" className="mt-5 rounded-2xl bg-sage p-4">
         <h2 id="contact-title" className="text-[15px] font-extrabold text-forest">

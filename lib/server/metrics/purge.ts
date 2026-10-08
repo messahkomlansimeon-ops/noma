@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Pool } from "pg";
 import { requireTransactionPool } from "../catalog/validation";
+import { MARKET_RETENTION_DAYS } from "../market/config";
 import { METRICS_RETENTION_DAYS, PURGE_PRODUCTION_VARIABLE } from "./config";
 
 /**
@@ -15,12 +16,16 @@ export interface PurgeTableCounts {
   boost_exposures: number;
   offer_views: number;
   offer_contacts: number;
+  /** Lot H1 : relevés de prix (historique du marché), conservés 3 ans (1 095 jours, jour UTC du relevé). 0 quand la migration 0023 n'est pas appliquée. */
+  price_observations: number;
 }
 
 export interface PurgeResult {
   apply: boolean;
   /** Premier jour UTC conservé (les lignes d'un jour STRICTEMENT antérieur sont concernées). */
   cutoffDay: string;
+  /** Idem pour les relevés de prix (rétention de 3 ans, `MARKET_RETENTION_DAYS`). */
+  marketCutoffDay: string;
   /** Simulation : lignes qui seraient supprimées. Application : lignes supprimées. */
   counts: PurgeTableCounts;
 }
@@ -28,10 +33,11 @@ export interface PurgeResult {
 /** Lignes supprimées par instruction : jamais un verrou long sur un journal volumineux. */
 export const PURGE_BATCH_SIZE = 5_000;
 
-const TABLES: ReadonlyArray<{ table: keyof PurgeTableCounts; dayExpression: string }> = [
+const TABLES: ReadonlyArray<{ table: keyof PurgeTableCounts; dayExpression: string; market?: true }> = [
   { table: "boost_exposures", dayExpression: "served_day" },
   { table: "offer_views", dayExpression: "viewed_day" },
   { table: "offer_contacts", dayExpression: "(last_contact_at AT TIME ZONE 'UTC')::date" },
+  { table: "price_observations", dayExpression: "observed_on", market: true },
 ];
 
 /**
@@ -58,31 +64,41 @@ export function purgeEnvironmentRefusal(
  * Simule (`apply` faux, lecture seule) ou applique (`apply` vrai) la purge. `now` (réservé aux tests) fixe l'instant de référence ; sinon l'horloge de
  * la base. L'application supprime par lots (`PURGE_BATCH_SIZE`) jusqu'à épuisement, une table après l'autre.
  */
-export async function purgeMetrics(input: { pool: Pool; apply: boolean; now?: Date; retentionDays?: number }): Promise<PurgeResult> {
+export async function purgeMetrics(input: { pool: Pool; apply: boolean; now?: Date; retentionDays?: number; marketRetentionDays?: number }): Promise<PurgeResult> {
   const pool = requireTransactionPool(input.pool);
   const retentionDays = input.retentionDays ?? METRICS_RETENTION_DAYS;
   if (!Number.isSafeInteger(retentionDays) || retentionDays < 1) throw new RangeError("retentionDays doit être un entier strictement positif.");
+  const marketRetentionDays = input.marketRetentionDays ?? MARKET_RETENTION_DAYS;
+  if (!Number.isSafeInteger(marketRetentionDays) || marketRetentionDays < 1) throw new RangeError("marketRetentionDays doit être un entier strictement positif.");
   const reference = input.now ?? null;
-  const cutoff = await pool.query<{ cutoff: string }>(
-    "SELECT (((COALESCE($1::timestamptz, clock_timestamp())) AT TIME ZONE 'UTC')::date - $2::int)::text AS cutoff",
-    [reference, retentionDays],
+  const cutoff = await pool.query<{ cutoff: string; market_cutoff: string; market_ready: boolean }>(
+    `SELECT (((COALESCE($1::timestamptz, clock_timestamp())) AT TIME ZONE 'UTC')::date - $2::int)::text AS cutoff,
+            (((COALESCE($1::timestamptz, clock_timestamp())) AT TIME ZONE 'UTC')::date - $3::int)::text AS market_cutoff,
+            to_regclass('price_observations') IS NOT NULL AS market_ready`,
+    [reference, retentionDays, marketRetentionDays],
   );
   const cutoffDay = cutoff.rows[0].cutoff;
-  const counts: PurgeTableCounts = { boost_exposures: 0, offer_views: 0, offer_contacts: 0 };
-  for (const { table, dayExpression } of TABLES) {
+  const marketCutoffDay = cutoff.rows[0].market_cutoff;
+  const counts: PurgeTableCounts = { boost_exposures: 0, offer_views: 0, offer_contacts: 0, price_observations: 0 };
+  for (const { table, dayExpression, market } of TABLES) {
+    // Les relevés de prix : sans la migration 0023, rien à purger (jamais une erreur) ; leur propre rétention (3 ans).
+    if (market && !cutoff.rows[0].market_ready) continue;
+    const dayLimit = market ? marketCutoffDay : cutoffDay;
     if (!input.apply) {
-      const found = await pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table} WHERE ${dayExpression} < $1::date`, [cutoffDay]);
+      const found = await pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table} WHERE ${dayExpression} < $1::date`, [dayLimit]);
       counts[table] = found.rows[0].n;
       continue;
     }
     for (;;) {
       const removed = await pool.query(
         `DELETE FROM ${table} WHERE ctid IN (SELECT ctid FROM ${table} WHERE ${dayExpression} < $1::date LIMIT $2::int)`,
-        [cutoffDay, PURGE_BATCH_SIZE],
+        [dayLimit, PURGE_BATCH_SIZE],
       );
       counts[table] += removed.rowCount ?? 0;
       if ((removed.rowCount ?? 0) < PURGE_BATCH_SIZE) break;
     }
+    // Le journal du relevé quotidien suit la même rétention (une ligne par jour : jamais compté).
+    if (market && input.apply) await pool.query("DELETE FROM price_observation_runs WHERE day < $1::date", [dayLimit]);
   }
-  return { apply: input.apply, cutoffDay, counts };
+  return { apply: input.apply, cutoffDay, marketCutoffDay, counts };
 }

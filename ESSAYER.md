@@ -23,11 +23,11 @@ utilisé** (la recharge du porte-monnaie passe par une page de paiement SIMULÉ)
    `npm run dev:try`, voir ci-dessous). La commande ne lit aucun fichier `.env` pour la deviner, et elle refuse de démarrer
    si la base n'est pas sur **votre ordinateur** (`127.0.0.1`, `localhost` ou `::1`).
 
-   **La base d'essai doit être migrée jusqu'au bout : 22 migrations** (de `0001` à `0020`, puis `0021` et `0022` ; dont le porte-monnaie `0014`,
+   **La base d'essai doit être migrée jusqu'au bout : 23 migrations** (de `0001` à `0020`, puis `0021`, `0022` et `0023` ; dont le porte-monnaie `0014`,
    l'achat de boost `0015`, la portée visible d'un devis de boost `0016`, son estimation bornée `0017`, les mesures d'efficacité
-   `0018` : ouvertures de la fiche et contacts, les notifications et le suivi des besoins `0019`, les favoris, la messagerie en direct, les commandes et l'administration `0020`, l'offre Pro : plans, abonnements, crédits promotionnels, import de catalogue `0021`, et les photos des annonces `0022`). Si votre base d'essai a
+   `0018` : ouvertures de la fiche et contacts, les notifications et le suivi des besoins `0019`, les favoris, la messagerie en direct, les commandes et l'administration `0020`, l'offre Pro : plans, abonnements, crédits promotionnels, import de catalogue `0021`, les photos des annonces `0022`, et l'historique des prix demandés `0023`). Si votre base d'essai a
    été créée avant ces lots, relancez simplement la deuxième commande ci-dessus (elle n'applique que ce qui manque). Contrôle : la
-   commande suivante doit afficher `22`.
+   commande suivante doit afficher `23`.
 
    ```
    docker exec deploy-postgres-1 psql -U noma_local -d noma_essai -tAc "select count(*) from noma_schema_migrations"
@@ -156,6 +156,17 @@ second compte (deux numéros différents, par exemple `07 00 00 00 42` et `07 00
     attend alors 7 h). Ce qui ne peut pas partir est **reporté**, jamais perdu pour cause de plafond ; un envoi en attente depuis plus de 48 h sort du canal externe (la notification reste dans l'application).
     Enfin, tout est revérifié au moment d'envoyer (besoin encore actif et suivi, annonce encore en ligne et toujours correspondante, choix encore actif). Un besoin satisfait ou
     archivé annule les envois en attente. Sans `NOMA_DEV_NOTIFY_CONSOLE=1`, ou hors développement, **aucun envoi n'a lieu** (le choix est enregistré, rien n'est envoyé).
+13. **Acheteur et vendeur** : **voir les prix demandés dans les annonces** (`HISTORIQUE-PRIX.md`). Sur la fiche d'une annonce, l'encart **« Prix demandés dans les annonces »** donne la **médiane** des prix demandés par les
+    vendeurs pour ce produit (« Ce sont des prix demandés par les vendeurs, pas des prix payés »), « La moitié des prix demandés est entre X et Y » (à partir de 10 vendeurs ; en dessous, la médiane seule), des effectifs
+    **arrondis** (« environ 15 annonces d'environ 10 vendeurs », jamais un compte exact), les annonces aux prix atypiques écartées, la période (« Sur les 90 derniers jours » ; boutons 30 jours / 90 jours / 1 an), contre quoi le prix est
+    comparé (« Comparé à : iPhone 12 128 Go, tous états confondus » : ce qui n'est pas précisé est toujours dit) et, quand le marché est assez grand (20 vendeurs par semaine), une mini-courbe de la médiane par semaine.
+    **Aucun prix de vente n'est publié**, ni sur la fiche ni dans le formulaire : les ventes sont déclarées par l'acheteur et confirmées par le vendeur sans vérification. **Une seule valeur compte par vendeur** (la médiane de ses annonces) : un vendeur qui publie dix annonces ne pèse pas plus qu'un
+    autre. **Sous les seuils, l'écran dit « Pas assez de données » et ne montre aucun chiffre** : il faut au moins **5 vendeurs différents**. Pour remplir l'encart tout de suite, lancez
+    `npm run demo:seed` (étape de démonstration, base `noma_essai`) : il écrit **90 jours de relevés SYNTHÉTIQUES** (annonces de 24 vendeurs fictifs et ventes fictives, rejouable sans doublon) ; ce sont des
+    données de démonstration, pas des prix réels. Côté vendeur, sur « Nouvelle annonce », dès que la catégorie, la marque et le modèle sont saisis, une ligne verte sous le prix dit « Prix demandés dans les annonces pour ce
+    produit : médiane 162 500 FCFA (environ 65 annonces d'environ 20 vendeurs, 90 jours). Comparé à : iPhone 12 128 Go, Occasion. » (rien sous les seuils ; décochez l'état : « … tous états confondus »). Chaque annonce publiée est relevée une
+    fois par jour par le worker (et à chaque changement de prix) ; un jour où le worker n'a pas tourné reste un trou. L'administrateur voit le tableau **« Marché »** (`/admin/marche`) : les prix demandés par produit et un
+    **nombre arrondi** de ventes confirmées (« environ 15 ventes confirmées »), jamais un prix de vente.
 
 13. **Vendeur et acheteur** : **photos des annonces**. Sur la page d'une annonce du vendeur, section « Photos » : « Ajouter des photos » (JPEG, PNG ou WebP, 5 Mo au plus, 4 100 pixels au plus de chaque côté et 12,5 mégapixels au plus, 6 photos au plus), aperçu et barre de progression, « Mettre en couverture », reculer/avancer, suppression en deux temps ; le rappel « N'écrivez pas votre numéro sur les photos : l'acheteur vous contacte par noma. » est affiché. Dans le formulaire « Nouvelle annonce », le champ « Photos (facultatif) » fait de même : les photos partent après la création de l'annonce. Côté acheteur, la **vignette de couverture** apparaît dans les résultats et la **galerie** sur la fiche. Les informations cachées dans une photo (lieu GPS, date, appareil, profil de couleur) sont retirées avant le stockage ; un fichier qui n'est pas une vraie photo JPEG, PNG ou WebP est refusé avec une phrase simple. Les fichiers sont rangés dans le dossier `NOMA_MEDIA_DIR` (par défaut `data/media`, ignoré par git) ; `npm run media:gc` (simulation par défaut, `-- --apply` pour supprimer) nettoie les fichiers orphelins. Un autre compte (sans correspondance avec l'annonce) qui ouvre l'adresse d'une photo obtient « introuvable ». Limite : un numéro écrit DANS une photo n'est pas détecté. Voir `PHOTOS.md`.
 

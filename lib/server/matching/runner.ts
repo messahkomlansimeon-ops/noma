@@ -11,6 +11,7 @@ import {
   requireWorkerId,
   runMatchingJobMaintenance,
 } from "./jobs";
+import { runMarketStep, type MarketStepResult } from "../market/observe";
 import { runNotificationStep, type NotifyHooks, type NotifyStepResult } from "../notifications/deliveries";
 import { resolveNotificationTransport, type NotificationTransport } from "../notifications/transport";
 import { runSubscriptionStep, type SubscriptionStepResult } from "../subscriptions/lifecycle";
@@ -57,9 +58,15 @@ export interface MatchingCycleResult {
   notify: NotifyStepResult;
   /** Étape « subscriptions » (lot PRO1, après « notify ») : renouvellements, délais de grâce, fins d'abonnement, expiration des crédits promotionnels. `skipped: true` : migration 0021 absente. Voir OFFRE-PRO.md. */
   subscriptions: SubscriptionStepResult;
+  /**
+   * Étape « market » (lot H1, exécutée après « notify ») : relevé quotidien des prix affichés des annonces publiées (une fois par jour UTC, jour courant seulement : aucun rattrapage).
+   * `skipped: true` : la migration 0023 n'est pas enregistrée (étape ignorée sans erreur). Elle ne compte jamais dans `idle` : un relevé quotidien n'est pas du travail
+   * qui doit relancer la boucle. Voir HISTORIQUE-PRIX.md.
+   */
+  market: MarketStepResult;
   /** Aucun progrès : rien périmé, aucun boost expiré, rien lu par la projection, rien en maintenance, aucun job exécuté, aucun envoi traité (un utilisateur en erreur ou laissé à un autre processus compte comme « au repos »). */
   idle: boolean;
-  /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`, `notify_error_<code>`). */
+  /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`, `notify_error_<code>`, `market_error_<code>`). */
   errors: string[];
 }
 
@@ -85,6 +92,8 @@ export interface RunMatchingCycleOptions {
   notificationNow?: () => Date;
   /** Crochets de l'étape « notify » : réservés aux tests. */
   notificationHooks?: NotifyHooks;
+  /** Instant de l'étape « market » (jour UTC du relevé) : réservé aux tests ; sinon l'horloge de la base. */
+  marketNow?: () => Date;
 }
 
 function requireBoundedInteger(value: unknown, field: string, min: number, max: number): number {
@@ -196,6 +205,13 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
   } catch (error) {
     errors.push(`subscriptions_error_${errorCodeOf(error)}`);
   }
+  // Étape « market » (lot H1) : isolée comme les autres, exécutée en dernier. Sans la migration 0023, ignorée sans erreur ; une erreur de l'étape ne change rien aux autres.
+  let market: MarketStepResult = { observed: 0, skipped: false, alreadyDone: false };
+  try {
+    market = await runMarketStep({ pool, now: options.marketNow?.() });
+  } catch (error) {
+    errors.push(`market_error_${errorCodeOf(error)}`);
+  }
   return {
     temporal,
     boost,
@@ -204,6 +220,7 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
     jobs,
     notify,
     subscriptions,
+    market,
     // Au repos : l'utilisateur laissé à un autre processus (busy) ET l'utilisateur en erreur (une erreur de l'étape notify compte comme « au repos » : ses lignes ont
     // une tentative de plus et une attente croissante, `recordUserFailure`) ne comptent pas comme du travail ; sinon un échec permanent ferait tourner la boucle sans pause.
     idle: temporal.expired === 0 && boost.expired === 0 && projected.selected === 0 && maintenance.deadLettered === 0 && jobs.length === 0

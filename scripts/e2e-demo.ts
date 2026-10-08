@@ -18,6 +18,11 @@
  *      page « Offre Pro » aux prix PROVISOIRES, crédits promotionnels, achat d'un boost payé avec les crédits promotionnels EN PREMIER) ; import de catalogue par CSV (aperçu, application, rejeu, numéro
  *      de téléphone refusé) ; un second vendeur, sans le droit, est refusé à l'import, recharge son porte-monnaie par le paiement simulé puis souscrit à l'offre Pro (double clic : un seul débit),
  *      reçoit ses crédits promotionnels et le badge ; administration /admin/offres (abonnés arrondis, revenus du mois, nouvelle version), refusée à l'acheteur (page 404 standard) ; wallet:check sans écart.
+ *  10. LOT H1, H1-bis et H1-ter : `demo:seed` écrit 90 jours de relevés de prix synthétiques (rejouable : 0 relevé au rejeu) ; la fiche d'une annonce montre l'encart « Prix demandés dans les annonces »
+ *      REMPLI (médiane, fourchette « la moitié des prix demandés est entre … », effectif « environ N annonces d'environ M vendeurs », période, comparabilité, phrase sur ce que contiennent les chiffres, mini-courbe
+ *      SVG de 12 semaines, bouton de période), SANS aucune ligne de ventes ni « prix du marché » ; le formulaire d'annonce du vendeur affiche « Prix demandés dans les annonces pour ce
+ *      produit : médiane X (environ N annonces d'environ M vendeurs, 90 jours). Comparé à : … », dit « tous états confondus » quand l'état est décoché et disparaît pour un produit sans données ; /admin/marche
+ *      (administrateur seulement) donne par produit les prix demandés et un NOMBRE arrondi de ventes confirmées, jamais un prix de vente.
  * Captures dans NOMA_E2E_SHOTS (défaut /var/tmp/noma-d1-shots).
  *
  * Variables : NOMA_E2E_BASE_URL (relais, défaut http://localhost:3212), NOMA_E2E_SERVER_LOG, NOMA_E2E_DATABASE_URL (noma_e2e, pour demo:seed), NOMA_E2E_SHOTS, NOMA_E2E_CHROME.
@@ -136,14 +141,17 @@ async function main(): Promise<void> {
   assert.match(first, /offre Pro : vendeur démo abonné \(crédits promotionnels émis\)/);
   assert.match(first, /photos : 30 photo\(s\) synthétique\(s\) ajoutée\(s\) \(0 déjà présente\(s\)\), une par annonce/);
   const created = Number(/: (\d+) annonce\(s\) publiée\(s\)/.exec(first)?.[1]);
+  const history = Number(/historique des prix : (\d+) relevé\(s\) synthétique\(s\) écrit\(s\)/.exec(first)?.[1]);
+  assert.ok(history > 1_000, `historique des prix synthétique écrit (${history} relevés)`);
   info(first.split("\n")[0]);
   const second = await demoSeedByAdministration();
-  assert.match(second, /0 annonce\(s\) publiée\(s\) \(30 déjà présente\(s\)\), 0 besoin\(s\) activé\(s\) \(14 déjà présent\(s\)\), 0 compte\(s\) créé\(s\) \(21 déjà présent\(s\)\)/);
+  assert.match(second, /0 annonce\(s\) publiée\(s\) \(30 déjà présente\(s\)\), 0 besoin\(s\) activé\(s\) \(14 déjà présent\(s\)\), 0 compte\(s\) créé\(s\) \(27 déjà présent\(s\)\)/);
   assert.match(second, /0 ouverture\(s\) et 0 contact\(s\) fictifs écrits, crédits déjà présents, boost déjà actif/);
   assert.match(second, /0 message\(s\) écrit\(s\), favori déjà présent, commande de démonstration déjà active, rôle admin déjà attribué/);
+  assert.match(second, /historique des prix : 0 relevé\(s\) synthétique\(s\) écrit\(s\) \(annonces et ventes fictives des 90 derniers jours ; déjà présents\)/);
   assert.match(second, /offre Pro : vendeur démo déjà abonné/, "rejeu : le vendeur démo n'est jamais abonné deux fois");
   assert.match(second, /photos : 0 photo\(s\) synthétique\(s\) ajoutée\(s\) \(30 déjà présente\(s\)\), une par annonce/);
-  ok(`premier passage : ${created} annonce(s) ; rejeu : 0 annonce, 0 besoin, 0 compte, 0 ouverture, 0 contact, crédits et boost déjà présents`);
+  ok(`premier passage : ${created} annonce(s) et ${history} relevé(s) de prix synthétiques ; rejeu : 0 annonce, 0 besoin, 0 compte, 0 ouverture, 0 contact, crédits et boost déjà présents`);
 
   const browser = await chromium.launch({ executablePath: CHROME });
   const shot = (page: Page, name: string) => page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
@@ -244,6 +252,47 @@ async function main(): Promise<void> {
     ok("lot PH1 : la fiche montre la galerie (une photo) de l'annonce, décodée par le navigateur");
     await checkClean(buyer, "fiche");
     await shot(buyer, "04-fiche-acheteur");
+
+    step("H1 · Fiche : l'encart « Prix demandés dans les annonces » est rempli (médiane, fourchette, période, comparabilité, mini-courbe) et ne montre AUCUNE vente");
+    const marketCard = buyer.getByTestId("market-card");
+    await marketCard.waitFor();
+    await buyer.waitForFunction(() => document.querySelector('[data-testid="market-card"]')?.getAttribute("data-state") === "ready", undefined, { timeout: 60_000 });
+    const marketText = (await marketCard.innerText()).replace(/[\u00a0\u202f]/g, " ");
+    assert.match(marketText, /Prix demandés dans les annonces/);
+    assert.equal(/prix du marché/i.test(marketText), false, "jamais « prix du marché »");
+    assert.match(marketText, /Sur les 90 derniers jours/);
+    const clean = async (testId: string): Promise<string> => (await buyer.getByTestId(testId).innerText()).replace(/[\u00a0\u202f]/g, " ");
+    const listingsMedian = await clean("market-listings-median");
+    assert.match(listingsMedian, /^\d{3} \d{3} FCFA$/, "médiane des prix demandés");
+    assert.equal(Number(listingsMedian.replace(/\D/g, "")) % 500, 0, `${listingsMedian} : arrondi à 500 FCFA`);
+    assert.match(await clean("market-listings-range"), /^La moitié des prix demandés est entre \d{3} \d{3} FCFA et \d{3} \d{3} FCFA$/);
+    const countText = await clean("market-listings-count");
+    assert.match(countText, /^environ \d+ annonces d'environ \d+ vendeurs$/);
+    // Lot H1-ter : l'unité est le vendeur. Le produit phare de la démonstration compte assez de vendeurs fictifs distincts (au moins 20 affichés, le minimum d'un point de tendance ; la démonstration en donne 24) pour que la tendance s'affiche.
+    assert.ok(Number(/d'environ (\d+) vendeurs/.exec(countText)?.[1]) >= 20, `${countText} : au moins 20 vendeurs pour le produit phare`);
+    assert.equal(await clean("market-listings-compared"), "Comparé à : iPhone 12 128 Go, Occasion");
+    assert.equal(await clean("market-asking-note"), "Ce sont des prix demandés par les vendeurs, pas des prix payés.");
+    assert.equal(await clean("market-note"), "Calculé sur au moins 5 vendeurs différents, une seule valeur par vendeur (la médiane de ses annonces), prix atypiques écartés, chiffres arrondis (prix à 500 FCFA, effectifs à 5 près).");
+    assert.equal(/Aucune annonce ni vente n'est montrée/.test(marketText), false, "l'ancienne phrase inexacte n'existe plus");
+    const listingsBlock = await clean("market-listings");
+    assert.equal(/\b(?<!environ )(?<!moins de )\d+ (annonces|vendeurs)\b/.test(listingsBlock), false, "jamais un effectif exact (annonces ou vendeurs, dans le bloc des annonces)");
+    assert.equal(/\b(minimum|maximum|le moins cher|le plus cher)\b/i.test(marketText), false, "ni minimum ni maximum");
+    assert.equal(await buyer.locator('[data-testid^="market-sales"]').count(), 0, "aucun élément de ventes");
+    assert.equal(/ventes? confirmées?/i.test(marketText), false, "aucune ligne « Ventes confirmées »");
+    const listingsTrend = buyer.getByTestId("market-listings-trend");
+    await listingsTrend.waitFor();
+    assert.equal(Number(await listingsTrend.getAttribute("data-points")), 12, "mini-courbe : 12 semaines (au moins 20 vendeurs par semaine)");
+    assert.ok((await listingsTrend.evaluate((svg) => svg.querySelectorAll("path").length)) >= 1 && (await listingsTrend.getAttribute("aria-label"))?.startsWith("Tendance"), "tracé SVG et texte alternatif");
+    await buyer.getByTestId("market-period-30").click();
+    await buyer.waitForFunction(() => document.querySelector('[data-testid="market-period"]')?.textContent === "Sur les 30 derniers jours", undefined, { timeout: 30_000 });
+    await buyer.getByTestId("market-period-365").click();
+    await buyer.waitForFunction(() => document.querySelector('[data-testid="market-period"]')?.textContent === "Sur la dernière année", undefined, { timeout: 30_000 });
+    await buyer.getByTestId("market-period-90").click();
+    await buyer.waitForFunction(() => document.querySelector('[data-testid="market-period"]')?.textContent === "Sur les 90 derniers jours", undefined, { timeout: 30_000 });
+    assert.equal(UUID.test(marketText), false, "aucun identifiant dans l'encart");
+    ok(`encart « Prix demandés dans les annonces » : médiane ${listingsMedian} (arrondie à 500), fourchette, effectif « environ N annonces d'environ M vendeurs », période, comparabilité, phrase sur les chiffres, mini-courbe de 12 semaines, aucune vente ; 30 jours, 365 jours puis 90 jours`);
+    await checkClean(buyer, "fiche avec les prix demandés");
+    await shot(buyer, "04b-fiche-prix-du-marche");
     await buyer.getByTestId("contact-button").click();
     await buyer.locator('a[href^="tel:"]').first().waitFor();
     const contactText = await buyer.evaluate(() => document.body.innerText);
@@ -310,6 +359,32 @@ async function main(): Promise<void> {
     ok("statistiques : « environ 10 » acheteurs, « environ 5 » contacts, aucun pourcentage sans « environ », aucun compte exact");
     await checkClean(vendor, "statistiques de l'annonce");
     await shot(vendor, "08-statistiques-vendeur");
+
+    step("H1 · Formulaire d'annonce : l'indication « Prix demandés dans les annonces pour ce produit »");
+    await vendor.goto(`${BASE}/vendeur/annonces/nouvelle`);
+    await vendor.getByRole("heading", { name: "Nouvelle annonce" }).waitFor();
+    assert.equal(await vendor.getByTestId("market-hint").count(), 0, "pas d'indication tant que le produit n'est pas saisi");
+    await vendor.getByRole("button", { name: "Téléphones", exact: true }).click();
+    await vendor.getByPlaceholder("Apple", { exact: true }).fill("Apple");
+    await vendor.getByPlaceholder("iPhone 12", { exact: true }).fill("iPhone 12");
+    await vendor.getByPlaceholder("128 Go", { exact: true }).fill("128 Go");
+    const hint = vendor.getByTestId("market-hint");
+    await hint.waitFor({ timeout: 60_000 });
+    const hintText = (await hint.innerText()).replace(/[\u00a0\u202f]/g, " ");
+    assert.match(hintText, /^Prix demandés dans les annonces pour ce produit : médiane \d{3} \d{3} FCFA \(environ \d+ annonces d'environ \d+ vendeurs, 90 jours\)\. Comparé à : iPhone 12 128 Go, Occasion\.$/);
+    assert.equal(/prix du marché/i.test(hintText), false, "jamais « prix du marché »");
+    assert.equal(Number(/médiane ([\d ]+) FCFA/.exec(hintText)?.[1].replace(/\D/g, "")) % 500, 0, "médiane arrondie à 500 FCFA");
+    await checkClean(vendor, "formulaire d'annonce avec l'indication des prix demandés");
+    await shot(vendor, "08b-formulaire-prix-demandes");
+    // L'état décoché : « tous états confondus » est dit.
+    await vendor.getByRole("button", { name: "Occasion", exact: true }).click();
+    await vendor.waitForFunction(() => /tous états confondus\.$/.test(document.querySelector('[data-testid="market-hint"]')?.textContent ?? ""), undefined, { timeout: 60_000 });
+    const openHint = (await vendor.getByTestId("market-hint").innerText()).replace(/[\u00a0\u202f]/g, " ");
+    assert.match(openHint, /Comparé à : iPhone 12 128 Go, tous états confondus\.$/);
+    // Un produit sans données : l'indication disparaît.
+    await vendor.getByPlaceholder("iPhone 12", { exact: true }).fill("Zzz 99 inconnu");
+    await hint.waitFor({ state: "detached", timeout: 60_000 });
+    ok(`formulaire : « ${hintText} » ; « tous états confondus » quand l'état est décoché ; elle disparaît pour un produit sans données`);
 
     step("Vendeur démo : achat d'un boost avec les crédits (Galaxy S21), puis « Sponsorisé » côté acheteur");
     await vendor.goto(`${BASE}/vendeur`);
@@ -529,7 +604,7 @@ async function main(): Promise<void> {
     assert.equal(((await adminPage.locator('[data-role-switcher] a[href="/admin"]').textContent()) ?? "").trim(), "Admin");
     ok("l'onglet Admin du sélecteur d'espace est visible pour l'administrateur");
     const tile = async (key: string): Promise<string> => (await adminPage.locator(`[data-tile="${key}"] [data-tile-value]`).innerText()).replace(/\s/g, " ");
-    assert.equal(await tile("accounts"), "21", "21 comptes : 3 de démonstration, 7 vendeurs et 11 acheteurs fictifs");
+    assert.equal(await tile("accounts"), "27", "27 comptes : 3 de démonstration, 7 vendeurs, 11 acheteurs et 6 vendeurs d'historique fictifs");
     assert.equal(await tile("offers"), "30");
     assert.equal(await tile("boosts"), "2", "deux boosts actifs (celui de la démonstration et l'achat du Galaxy S21)");
     assert.ok(Number(await tile("matches")) > 30, "correspondances confirmées");
@@ -577,6 +652,22 @@ async function main(): Promise<void> {
     await adminPage.goto(`${BASE}/admin/dossiers`);
     await adminPage.getByText("Bientôt disponible").first().waitFor();
     ok("réglages du boost en lecture seule ; « Dossiers » reste « Bientôt disponible »");
+    step("H1 · Administration : le tableau « Marché » (prix demandés, NOMBRE arrondi de ventes confirmées, aucun prix de vente)");
+    await adminPage.goto(`${BASE}/admin`);
+    await adminPage.getByTestId("admin-market-link").click();
+    await adminPage.getByTestId("admin-market-table").waitFor();
+    assert.ok((await adminPage.locator("[data-market-row]").count()) >= 10 && (await adminPage.locator("[data-market-row]").count()) <= 20, "au plus 20 produits");
+    const iphoneRow = adminPage.locator("[data-market-row]").filter({ hasText: "Apple iPhone 12 · 128 Go · Occasion" }).first();
+    await iphoneRow.waitFor();
+    assert.match((await iphoneRow.getByTestId("admin-market-listings").innerText()).replace(/[\u00a0\u202f]/g, " "), /\d{3} \d{3} FCFA\s+environ \d+ annonces d'environ \d+ vendeurs/);
+    const salesCell = (await iphoneRow.getByTestId("admin-market-sales").innerText()).replace(/[\u00a0\u202f]/g, " ");
+    assert.match(salesCell, /^environ \d+ ventes confirmées$/, "un nombre arrondi de ventes");
+    assert.equal(/FCFA|\d{4,}/.test(salesCell), false, "aucun prix de vente");
+    const tableText = await adminPage.getByTestId("admin-market").innerText();
+    assert.match(tableText, /les prix de vente ne sont pas publiés/);
+    await checkClean(adminPage, "tableau Marché de l'administration");
+    await shot(adminPage, "28b-admin-marche");
+    ok("tableau « Marché » : prix demandés par produit, « environ N ventes confirmées » sans aucun prix");
     // L'acheteur n'est pas administrateur : page 404 STANDARD de Next (notFound()), statut 404, sans titre « Administration » ni sélecteur d'espace (lot D3).
     const refusal = await buyer.goto(`${BASE}/admin`);
     assert.equal(refusal?.status(), 404, "statut HTTP 404 pour un compte ordinaire");
@@ -590,13 +681,17 @@ async function main(): Promise<void> {
     info(`texte de la page 404 : « ${refusedText.replace(/\s+/g, " ").trim()} »`);
     const apiStatuses = await buyer.evaluate(async () => {
       const results: number[] = [];
-      for (const path of ["/api/admin/summary", "/api/admin/vendors", "/api/admin/actions", "/api/admin/settings"]) results.push((await fetch(path)).status);
+      for (const path of ["/api/admin/summary", "/api/admin/vendors", "/api/admin/actions", "/api/admin/settings", "/api/admin/market"]) results.push((await fetch(path)).status);
       return results;
     });
-    assert.deepEqual(apiStatuses, [404, 404, 404, 404], "les routes d'administration répondent 404 à un compte ordinaire");
+    assert.deepEqual(apiStatuses, [404, 404, 404, 404, 404], "les routes d'administration (dont /api/admin/market, les ventes confirmées) répondent 404 à un compte ordinaire");
     const subPage = await buyer.goto(`${BASE}/admin/vendeurs`);
     assert.equal(subPage?.status(), 404);
     await buyer.getByText("This page could not be found.").waitFor();
+    const marketPage = await buyer.goto(`${BASE}/admin/marche`);
+    assert.equal(marketPage?.status(), 404);
+    await buyer.getByText("This page could not be found.").waitFor();
+    assert.equal(await buyer.getByTestId("admin-market-table").count(), 0, "l'acheteur ne voit pas le tableau « Marché »");
     // Une page qui n'existe pas donne la MÊME page : l'existence de l'espace ne se devine pas.
     const unknown = await buyer.goto(`${BASE}/cette-page-n-existe-pas`);
     assert.equal(unknown?.status(), 404);

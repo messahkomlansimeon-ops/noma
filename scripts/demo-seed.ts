@@ -7,6 +7,7 @@ import { BOOST_ERROR_MESSAGES, BoostError, grantOfferBoost } from "../lib/server
 import { runMatchingCycle } from "../lib/server/matching/runner";
 import { isMatchingSchemaReady } from "../lib/server/matching/schema-ready";
 import { createMediaStore } from "../lib/server/media/store";
+import { isMarketMigrationRegistered } from "../lib/server/market/observe";
 import { revealOfferContact } from "../lib/server/metrics/contacts";
 import { recordOfferView } from "../lib/server/metrics/views";
 import { closePostgresPool, getPostgresPool } from "../lib/server/postgres/client";
@@ -17,6 +18,7 @@ import { declareOrder } from "../lib/server/social/orders";
 import { readUserEntitlements } from "../lib/server/subscriptions/entitlements";
 import { subscribeToPlan } from "../lib/server/subscriptions/lifecycle";
 import { recordWalletTransaction } from "../lib/server/wallet/ledger";
+import { buildDemoMarketHistory, marketSellerId } from "./demo-market-plan";
 import {
   DEMO_ADMIN_PHONE,
   DEMO_BOOST_DURATION,
@@ -27,6 +29,7 @@ import {
   DEMO_CONVERSATION_MESSAGES,
   DEMO_CONVERSATION_OFFER_KEY,
   DEMO_EXTRA_BUYER_COUNT,
+  DEMO_HISTORY_SELLER_COUNT,
   DEMO_FAVORITE_OFFER_KEY,
   DEMO_OFFERS,
   DEMO_OPENERS,
@@ -45,6 +48,7 @@ import {
   demandRawText,
   demoAccountId,
   demoExtraBuyerPhone,
+  demoHistorySellerPhone,
   demoMarker,
   extraBuyerDemand,
   offerRawText,
@@ -88,6 +92,8 @@ export interface DemoSeedReport {
   /** Lot PH1 : photos synthétiques ajoutées ce coup-ci (une par annonce) et déjà présentes. */
   photosAdded: number;
   photosExisting: number;
+  /** Lot H1 : relevés de prix SYNTHÉTIQUES écrits ce coup-ci (90 jours d'annonces et de ventes fictives entre vendeurs et acheteurs fictifs) ; 0 si déjà présents ou si la migration 0023 n'est pas appliquée. */
+  marketObservationsWritten: number;
   /** Cycles du worker du matching exécutés (jusqu'au repos). */
   cycles: number;
 }
@@ -272,7 +278,7 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
   const counters: Counters = {
     report: {
       accountsCreated: 0, accountsExisting: 0, offersCreated: 0, offersExisting: 0, demandsCreated: 0, demandsExisting: 0,
-      viewsRecorded: 0, contactsRecorded: 0, creditAdded: false, proSubscribed: false, boost: "existing", adminGranted: false, messagesWritten: 0, favoriteAdded: false, orderDeclared: false, photosAdded: 0, photosExisting: 0, cycles: 0,
+      viewsRecorded: 0, contactsRecorded: 0, creditAdded: false, proSubscribed: false, boost: "existing", adminGranted: false, messagesWritten: 0, favoriteAdded: false, orderDeclared: false, photosAdded: 0, photosExisting: 0, marketObservationsWritten: 0, cycles: 0,
     },
   };
   const { report } = counters;
@@ -283,7 +289,7 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
     return ensured.userId;
   };
 
-  // 1. Comptes : les trois comptes de démonstration, 7 vendeurs fictifs, 12 acheteurs fictifs.
+  // 1. Comptes : les trois comptes de démonstration, 7 vendeurs fictifs, 11 acheteurs fictifs, 6 vendeurs fictifs de l'historique des prix.
   const buyerId = await account(DEMO_BUYER_PHONE);
   const vendorId = await account(DEMO_VENDOR_PHONE);
   await account(DEMO_ADMIN_PHONE);
@@ -293,6 +299,9 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
   for (let index = 1; index <= 7; index += 1) sellerIds.set(index, await account(vendorPhoneOf(index as 1)));
   const extraBuyerIds: string[] = [];
   for (let index = 1; index <= DEMO_EXTRA_BUYER_COUNT; index += 1) extraBuyerIds.push(await account(demoExtraBuyerPhone(index)));
+  // Lot H1 : six comptes fictifs sans annonce ni besoin, vendeurs distincts de l'historique de prix synthétique seulement.
+  const historySellerIds: string[] = [];
+  for (let index = 1; index <= DEMO_HISTORY_SELLER_COUNT; index += 1) historySellerIds.push(await account(demoHistorySellerPhone(index)));
 
   // 2. Annonces publiées AVANT les besoins.
   const offerIds = new Map<string, string>();
@@ -359,7 +368,53 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
 
   // 6. Lot D2 : conversation, favori et commande de démonstration (vrais services : mêmes contrôles d'accès que l'application ; rejouable sans doublon).
   await seedSocial(pool, report, { offerIds, demandIds, buyerId, sellerIds, extraBuyerIds });
+
+  // 7. Lot H1 : 90 jours de relevés de prix synthétiques (annonces et ventes fictives), pour que l'encart « Prix du marché » soit rempli.
+  report.marketObservationsWritten = await seedMarketHistory(pool, { sellerIds, extraBuyerIds, historySellerIds });
   return report;
+}
+
+const MARKET_BATCH = 2_000;
+
+/**
+ * Historique de prix SYNTHÉTIQUE (lots H1 et H1-ter) : écrit directement dans `price_observations` (un relevé est un fait historique : aucune annonce ni commande réelle ne lui correspond),
+ * avec les comptes FICTIFS comme vendeurs (1 à 24, voir `marketSellerId`) et acheteurs (1 à 11). Rejouable : `ON CONFLICT DO NOTHING` sur (source, identifiant fictif, jour). Sans la migration 0023 : ignoré.
+ */
+export async function seedMarketHistory(pool: Pool, world: { sellerIds: Map<number, string>; extraBuyerIds: string[]; historySellerIds: string[] }): Promise<number> {
+  if (!(await isMarketMigrationRegistered(pool))) {
+    console.error("demo:seed : la migration 0023 (historique des prix) n'est pas appliquée : aucun relevé de prix synthétique n'a été écrit.");
+    return 0;
+  }
+  const today = (await pool.query<{ today: string }>("SELECT to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS today")).rows[0].today;
+  const rows = buildDemoMarketHistory(today);
+  let written = 0;
+  for (let start = 0; start < rows.length; start += MARKET_BATCH) {
+    const batch = rows.slice(start, start + MARKET_BATCH);
+    const result = await pool.query(
+      `INSERT INTO price_observations (source, reference_id, observed_on, category_key, brand_key, model_key, variant_key, condition_key, label, price_xof, seller_id, buyer_id)
+       SELECT r.source, r.reference_id, r.day, price_key_part(r.category), price_key_part(r.brand), price_key_part(r.model), price_key_part(r.variant), price_key_part(r.condition),
+              r.label, r.price, r.seller_id, r.buyer_id
+         FROM unnest($1::text[], $2::uuid[], $3::date[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::text[], $10::bigint[], $11::uuid[], $12::uuid[])
+              AS r(source, reference_id, day, category, brand, model, variant, condition, label, price, seller_id, buyer_id)
+       ON CONFLICT (source, reference_id, observed_on) DO NOTHING`,
+      [
+        batch.map((row) => row.source),
+        batch.map((row) => row.referenceId),
+        batch.map((row) => row.day),
+        batch.map((row) => row.group.category),
+        batch.map((row) => row.group.brand),
+        batch.map((row) => row.group.model),
+        batch.map((row) => row.group.variant),
+        batch.map((row) => row.group.condition),
+        batch.map((row) => row.group.label),
+        batch.map((row) => row.priceXof),
+        batch.map((row) => marketSellerId(world, row.sellerIndex)),
+        batch.map((row) => (row.buyerIndex === null ? null : world.extraBuyerIds[row.buyerIndex - 1])),
+      ],
+    );
+    written += result.rowCount ?? 0;
+  }
+  return written;
 }
 
 async function seedSocial(
@@ -427,6 +482,9 @@ async function main(): Promise<number> {
   );
   console.log(`demo:seed : offre Pro : vendeur démo ${report.proSubscribed ? "abonné (crédits promotionnels émis)" : "déjà abonné"}.`);
   console.log(`demo:seed : photos : ${report.photosAdded} photo(s) synthétique(s) ajoutée(s) (${report.photosExisting} déjà présente(s)), une par annonce.`);
+  console.log(
+    `demo:seed : historique des prix : ${report.marketObservationsWritten} relevé(s) synthétique(s) écrit(s) (annonces et ventes fictives des 90 derniers jours ; ${report.marketObservationsWritten === 0 ? "déjà présents" : "nouveaux"}).`,
+  );
   console.log("demo:seed : comptes de démonstration (le code de connexion s'affiche dans le terminal de `npm run dev:try`) :");
   console.log("  Acheteur démo : +225 07 00 00 01 01");
   console.log("  Vendeur démo  : +225 07 00 00 02 02");

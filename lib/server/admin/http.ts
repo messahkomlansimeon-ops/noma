@@ -2,6 +2,8 @@ import "server-only";
 
 import { noStoreJsonResponse } from "../http/protection";
 import { UUID, createSocialContext, failure, hasUnexpectedQuery, invalidRequest, logCodeOf, resourceNotFound, type SocialHttpDependencies } from "../social/http-common";
+import { marketAdminDto } from "../market/http";
+import { readAdminMarket } from "../market/reads";
 import { setUserStatusByAdmin, type VendorAction } from "./actions";
 import { AdminError } from "./errors";
 import {
@@ -21,7 +23,8 @@ import {
  *  - GET  /api/admin/vendors?limit&offset       : vendeurs (numéros masqués sauf les deux derniers chiffres) ;
  *  - POST /api/admin/vendors/{id}/suspend|reactivate : confirmation côté écran, journalisé ;
  *  - GET  /api/admin/actions                    : journal d'administration ;
- *  - GET  /api/admin/settings                   : réglages du boost par catégorie (lecture seule).
+ *  - GET  /api/admin/settings                   : réglages du boost par catégorie (lecture seule) ;
+ *  - GET  /api/admin/market                     : les 20 clés produit les plus relevées (lot H1), mêmes seuils et arrondis que /api/market.
  */
 
 export interface AdminHttpHandlers {
@@ -30,6 +33,7 @@ export interface AdminHttpHandlers {
   vendorAction(request: Request, userId: string, action: string): Promise<Response>;
   actions(request: Request): Promise<Response>;
   settings(request: Request): Promise<Response>;
+  market(request: Request): Promise<Response>;
 }
 
 export function createAdminHttpHandlers(dependencies: SocialHttpDependencies = {}): AdminHttpHandlers {
@@ -129,6 +133,12 @@ export function createAdminHttpHandlers(dependencies: SocialHttpDependencies = {
       guarded(request, { write: false }, async () => {
         if (hasUnexpectedQuery(request)) return invalidRequest();
         return noStoreJsonResponse(200, { contractVersion: ADMIN_CONTRACT_VERSION, settings: await readAdminBoostSettings({ pool: context.poolOf() }) });
+      }),
+
+    market: (request) =>
+      guarded(request, { write: false }, async () => {
+        if (hasUnexpectedQuery(request)) return invalidRequest();
+        return noStoreJsonResponse(200, marketAdminDto(await readAdminMarket(context.poolOf())));
       }),
   };
 }

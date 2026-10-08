@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { Pool } from "pg";
 import { readBuyerHome, readVendorHome } from "../../lib/server/home/reads";
+import { readAdminMarket, readMarketStats } from "../../lib/server/market/reads";
 import { readOfferStats } from "../../lib/server/metrics/stats";
 import { runMigrations } from "../../lib/server/postgres/migrations";
 import { listStoredOfferMatchesForDemand } from "../../lib/server/matching/stored-matches";
@@ -13,7 +14,7 @@ import { readProBadges, readUserEntitlements } from "../../lib/server/subscripti
 import { readPromoSummary } from "../../lib/server/subscriptions/promo";
 import { checkWalletIntegrity } from "../../lib/server/wallet/check";
 import { readWalletBalance } from "../../lib/server/wallet/ledger";
-import { DEMO_ADMIN_PHONE, DEMO_BUYER_PHONE, DEMO_CONTACTERS, DEMO_EXTRA_BUYER_COUNT, DEMO_OFFERS, DEMO_OPENERS, DEMO_VENDOR_CREDIT_XOF, DEMO_VENDOR_PHONE, demoMarker } from "../../scripts/demo-seed-plan";
+import { DEMO_ADMIN_PHONE, DEMO_BUYER_PHONE, DEMO_CONTACTERS, DEMO_EXTRA_BUYER_COUNT, DEMO_HISTORY_SELLER_COUNT, DEMO_OFFERS, DEMO_OPENERS, DEMO_VENDOR_CREDIT_XOF, DEMO_VENDOR_PHONE, demoMarker } from "../../scripts/demo-seed-plan";
 import { runScript } from "./run-script";
 import { openVerifiedTestDatabase } from "./test-database";
 
@@ -41,7 +42,7 @@ before(async () => {
   baseUrl = opened.target.connectionString;
   await admin.query(`CREATE DATABASE "${mainDb}"`);
   pool = new Pool({ connectionString: urlFor(mainDb), max: 4 });
-  assert.equal((await runMigrations(pool)).applied.length, 22);
+  assert.equal((await runMigrations(pool)).applied.length, 23);
 });
 
 after(async () => {
@@ -84,6 +85,9 @@ async function snapshot() {
     // Lot PH1.
     photos: await read("SELECT count(*)::text AS n FROM offer_photos"),
     photoFiles: String((await readdir(mediaDir)).length),
+    // Lot H1 : relevés de prix (synthétiques et du jour).
+    priceObservations: await read("SELECT count(*)::text AS n FROM price_observations"),
+    priceObservationSales: await read("SELECT count(*)::text AS n FROM price_observations WHERE source = 'sale'"),
   };
 }
 
@@ -98,7 +102,7 @@ test("premier passage : comptes aux numéros fixes, 30 annonces publiées, besoi
   assert.match(result.output, /Admin démo {4}: \+225 07 00 00 03 03/);
 
   const snap = await snapshot();
-  assert.equal(snap.users, String(3 + 7 + DEMO_EXTRA_BUYER_COUNT));
+  assert.equal(snap.users, String(3 + 7 + DEMO_EXTRA_BUYER_COUNT + DEMO_HISTORY_SELLER_COUNT), "3 comptes de démonstration, 7 vendeurs, 11 acheteurs et 6 vendeurs d'historique fictifs");
   assert.equal(snap.identities, snap.users);
   assert.equal(snap.offers, "30");
   assert.equal(snap.published, "30");
@@ -235,15 +239,73 @@ test("vendeur démo : abonné à l'offre Pro par la VRAIE souscription (droits P
   assert.deepEqual((await checkWalletIntegrity(pool)).violations, [], "wallet:check vert");
 });
 
+test("lot H1 : 90 jours de relevés de prix synthétiques entre vendeurs et acheteurs FICTIFS ; l'encart « Prix demandés dans les annonces » est rempli (clé exacte, fourchette, tendance à la baisse) ; les ventes ne sont qu'un nombre arrondi pour l'administration", async () => {
+  const today = (await pool.query<{ d: string }>("SELECT to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS d")).rows[0].d;
+  const days = (await pool.query<{ n: number; first: string; last: string }>(
+    "SELECT count(DISTINCT observed_on)::int AS n, to_char(min(observed_on), 'YYYY-MM-DD') AS first, to_char(max(observed_on), 'YYYY-MM-DD') AS last FROM price_observations WHERE source = 'listing'")).rows[0];
+  assert.equal(days.n, 90, "89 jours synthétiques + le jour des vraies annonces");
+  assert.equal(days.last, today);
+  assert.equal((await pool.query("SELECT 1 FROM price_observations WHERE observed_on < $1::date - 89", [today])).rowCount, 0, "rien au-delà de 90 jours");
+  // Les relevés synthétiques n'ont ni annonce ni commande correspondante ; leurs acteurs sont des comptes fictifs (vendeurs 1 à 24 : les 7 comptes vendeurs, 11 comptes acheteurs fictifs et 6 comptes fictifs d'historique ; acheteurs 1 à 11), jamais les comptes de démonstration.
+  const orphan = (await pool.query<{ n: number }>("SELECT count(*)::int AS n FROM price_observations p WHERE p.source = 'listing' AND NOT EXISTS (SELECT 1 FROM offers o WHERE o.id = p.reference_id)")).rows[0].n;
+  assert.ok(orphan > 1_000, `${orphan} relevés d'annonces fictives`);
+  assert.equal((await pool.query("SELECT 1 FROM price_observations p WHERE p.source = 'sale' AND EXISTS (SELECT 1 FROM orders o WHERE o.id = p.reference_id)")).rowCount, 0, "les ventes synthétiques ne sont pas des commandes");
+  const demoAccounts = [await userOf(DEMO_BUYER_PHONE), await userOf(DEMO_VENDOR_PHONE), await userOf(DEMO_ADMIN_PHONE)];
+  assert.equal((await pool.query("SELECT 1 FROM price_observations p WHERE p.observed_on < $2::date AND (p.seller_id = ANY($1::uuid[]) OR p.buyer_id = ANY($1::uuid[]))", [demoAccounts, today])).rowCount, 0, "aucun compte de démonstration dans l'historique synthétique");
+  const sellers = (await pool.query<{ phone_e164: string }>("SELECT DISTINCT i.phone_e164 FROM price_observations p JOIN phone_identities i ON i.user_id = p.seller_id WHERE p.observed_on < $1::date", [today])).rows;
+  assert.ok(sellers.length >= 22 && sellers.every((row) => /^\+22507(888888|666666|555555)\d\d$/.test(row.phone_e164)), `${sellers.length} vendeurs fictifs distincts (au moins 22 : de la marge au-dessus du minimum de 20 d'un point de tendance)`);
+  // Les deux produits phares ont chacun au moins 22 vendeurs fictifs distincts ; les autres produits en ont moins que le seuil de la tendance.
+  const perProduct = (await pool.query<{ model_key: string; n: number }>(
+    "SELECT model_key, count(DISTINCT seller_id)::int AS n FROM price_observations WHERE source = 'listing' AND observed_on < $1::date AND variant_key = '128 go' AND condition_key = 'occasion' AND model_key IN ('iphone 12', 'galaxy s21') GROUP BY model_key ORDER BY model_key", [today])).rows;
+  assert.deepEqual(perProduct.map((row) => row.model_key), ["galaxy s21", "iphone 12"]);
+  for (const row of perProduct) assert.ok(row.n >= 22, `${row.model_key} : ${row.n} vendeurs fictifs distincts`);
+  const buyers = (await pool.query<{ phone_e164: string }>("SELECT DISTINCT i.phone_e164 FROM price_observations p JOIN phone_identities i ON i.user_id = p.buyer_id")).rows;
+  assert.ok(buyers.length >= 5 && buyers.every((row) => /^\+22507666666\d\d$/.test(row.phone_e164)));
+
+  // L'encart de la fiche d'un iPhone 12 128 Go d'occasion (la démonstration) : prix demandés publiés pour 30, 90 et 365 jours, clé exacte, fourchette, tendance hebdomadaire.
+  const query = { category: "Téléphones", brand: "Apple", model: "iPhone 12", variant: "128 Go", condition: "Occasion" } as const;
+  for (const periodDays of [30, 90, 365] as const) {
+    const stats = await readMarketStats(pool, { ...query, periodDays });
+    assert.equal(stats.listings.status, "published", `annonces ${periodDays} j`);
+    if (stats.listings.status !== "published") continue;
+    assert.equal(stats.listings.comparedTo.scope, "exact");
+    assert.ok(stats.listings.median >= 140_000 && stats.listings.median <= 185_000, `médiane des prix demandés ${stats.listings.median}`);
+    assert.notEqual(stats.listings.range, null, "au moins 10 vendeurs : une fourchette");
+    assert.deepEqual(Object.keys(stats).sort(), ["listings", "period"], "aucune statistique de vente");
+  }
+  const ninety = await readMarketStats(pool, { ...query, periodDays: 90 });
+  if (ninety.listings.status === "published") {
+    assert.equal(ninety.listings.trend.length, 12);
+    assert.ok(ninety.listings.trend.every((point) => point.median !== null), "24 annonces fictives en parallèle, une par vendeur : toutes les semaines ont 20 vendeurs au moins");
+    const known = ninety.listings.trend.map((point) => point.median as number);
+    assert.ok(known[0] > known[known.length - 1], "tendance à la baisse");
+  }
+  // Un produit à une seule annonce de démonstration (HP Pavilion) a aussi ses prix demandés (sans courbe : 12 vendeurs fictifs en tout, moins de 20 par semaine).
+  const hp = await readMarketStats(pool, { category: "Électronique", brand: "HP", model: "Pavilion 15", variant: "8 Go · 512 Go", condition: "Occasion", periodDays: 90 });
+  assert.equal(hp.listings.status, "published");
+  if (hp.listings.status === "published") {
+    assert.ok(hp.listings.trend.every((point) => point.median === null));
+  }
+  // Administration : le tableau « Marché » donne, par produit, un NOMBRE arrondi de ventes confirmées (les ventes synthétiques), jamais un prix de vente.
+  const admin = await readAdminMarket(pool);
+  const iphoneRow = admin.rows.find((row) => row.label === "Apple iPhone 12 · 128 Go · Occasion");
+  assert.ok(iphoneRow, "le produit principal figure au tableau");
+  assert.ok(iphoneRow?.confirmedSales.kind === "approx" && iphoneRow.confirmedSales.value >= 50, `ventes confirmées : ${JSON.stringify(iphoneRow?.confirmedSales)}`);
+  // La sortie ne porte aucun identifiant des comptes fictifs.
+  const text = JSON.stringify([ninety, admin]);
+  for (const id of (await pool.query<{ id: string }>("SELECT id FROM users")).rows.map((row) => row.id)) assert.equal(text.includes(id), false);
+});
+
 test("rejeu à l'identique : aucun doublon, aucune ouverture ni aucun contact de plus, un seul crédit, un seul boost", async () => {
   const before = await snapshot();
   const result = await seed();
   assert.equal(result.code, 0, result.output);
-  assert.match(result.output, /0 annonce\(s\) publiée\(s\) \(30 déjà présente\(s\)\), 0 besoin\(s\) activé\(s\) \(14 déjà présent\(s\)\), 0 compte\(s\) créé\(s\) \(21 déjà présent\(s\)\)/);
+  assert.match(result.output, /0 annonce\(s\) publiée\(s\) \(30 déjà présente\(s\)\), 0 besoin\(s\) activé\(s\) \(14 déjà présent\(s\)\), 0 compte\(s\) créé\(s\) \(27 déjà présent\(s\)\)/);
   assert.match(result.output, /0 ouverture\(s\) et 0 contact\(s\) fictifs écrits, crédits déjà présents, boost déjà actif/);
   assert.match(result.output, /0 message\(s\) écrit\(s\), favori déjà présent, commande de démonstration déjà active, rôle admin déjà attribué/);
   assert.match(result.output, /offre Pro : vendeur démo déjà abonné/);
   assert.match(result.output, /photos : 0 photo\(s\) synthétique\(s\) ajoutée\(s\) \(30 déjà présente\(s\)\), une par annonce/);
+  assert.match(result.output, /historique des prix : 0 relevé\(s\) synthétique\(s\) écrit\(s\) \(annonces et ventes fictives des 90 derniers jours ; déjà présents\)/);
   assert.deepEqual(await snapshot(), before, "l'état de la base est identique au premier passage");
 });
 

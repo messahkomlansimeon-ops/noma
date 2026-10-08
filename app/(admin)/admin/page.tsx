@@ -43,6 +43,9 @@ export default function Admin() {
               <Link href="/admin/vendeurs" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
                 Vendeurs et journal d&apos;administration ›
               </Link>
+              <Link href="/admin/marche" data-testid="admin-market-link" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
+                Marché : prix observés ›
+              </Link>
               <Link href="/admin/reglages" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
                 Réglages du boost (lecture seule) ›
               </Link>
