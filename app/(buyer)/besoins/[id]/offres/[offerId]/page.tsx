@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Phone } from "lucide-react";
 import { IndicatorLine, SponsoredNotice } from "@/components/matches/match-parts";
+import { ProBadge } from "@/components/pro-badge";
+import { PhotoGallery } from "@/components/photos/photo-gallery";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { FavoriteButton } from "@/components/social/favorite-button";
 import { OfferActions } from "@/components/social/offer-actions";
@@ -113,6 +115,7 @@ function Fiche({ demandId, offerId }: { demandId: string; offerId: string }) {
   return (
     <article data-testid="offer-detail" data-sponsored={view.sponsored ? "true" : "false"}>
       {view.sponsoredBadge ? <SponsoredNotice badge={view.sponsoredBadge} notice={view.sponsoredNotice} /> : null}
+      <PhotoGallery photos={detail.details.photos ?? []} title={view.title} />
       <div className="flex items-center gap-3">
         <Thumb art={artForCategory(detail.item.candidate.category)} className="size-20" iconClassName="size-10" />
         <div className="min-w-0 flex-1">
@@ -124,6 +127,7 @@ function Fiche({ demandId, offerId }: { demandId: string; offerId: string }) {
           </div>
           {view.subtitle ? <div className="text-[13px] text-ink-soft">{view.subtitle}</div> : null}
           {view.dateText ? <div className="text-[12px] text-ink-soft">{view.dateText}</div> : null}
+          {view.proBadge ? <div className="mt-1.5"><ProBadge withNotice /></div> : null}
         </div>
         <FavoriteButton demandId={demandId} offerId={offerId} />
       </div>

@@ -509,9 +509,11 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
   const guide = readFileSync(fileURLToPath(new URL("../../ESSAYER.md", import.meta.url)), "utf8");
   const normalized = guide.replace(/\s+/g, " ");
 
-  test("le guide dit (lots P2, P2-bis, P3, M1, N1 et D2) : base à 20 migrations, recharge simulée, achat de boost, « aucun argent réel », « Sponsorisé »", () => {
+  test("le guide dit (lots P2, P2-bis, P3, M1, N1 et D2) : base à 22 migrations, recharge simulée, achat de boost, « aucun argent réel », « Sponsorisé »", () => {
     for (const expected of [
-      "20 migrations",
+      "22 migrations",
+      "0022",
+      "0021",
       "0020",
       "0019",
       "0018",
@@ -635,7 +637,9 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
     const notificationStep = normalized.indexOf("voir une notification");
     const smsStep = normalized.indexOf("activer l'envoi par SMS simulé");
     assert.ok(seedStep !== -1 && notificationStep > seedStep && smsStep > notificationStep, "les notifications viennent après les annonces d'exemple, l'envoi simulé après les notifications");
-    assert.equal(/20 migrations/.test(normalized), true);
+    assert.equal(/22 migrations/.test(normalized), true);
+    assert.equal(/\b21 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations (21)");
+    assert.equal(/\b20 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations (20)");
     assert.equal(/\b19 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations (19)");
   });
 

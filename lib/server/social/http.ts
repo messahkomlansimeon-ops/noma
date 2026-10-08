@@ -85,6 +85,7 @@ function favoriteDto(item: FavoriteItem) {
     available: item.available,
     openable: item.openable,
     createdAt: item.createdAt.toISOString(),
+    ...(item.coverPhotoId === undefined ? {} : { coverPhotoId: item.coverPhotoId }),
   };
 }
 

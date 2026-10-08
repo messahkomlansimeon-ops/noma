@@ -160,6 +160,8 @@ if (!configuredUrl?.trim()) {
         "0018_offer_metrics",
         "0019_notifications",
         "0020_social_orders_admin",
+        "0021_pro_subscriptions",
+        "0022_offer_photos",
       ]);
     });
 

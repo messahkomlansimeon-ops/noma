@@ -27,6 +27,7 @@ function needMatch(index: number): StoredMatch {
     indicators: { availability: null, price: null, confidence: { level: "high", score: 91, accountAgeBand: "gte_30d", factors: [] } },
     relevance: 80,
     sponsored: false,
+    proBadge: false,
   };
 }
 

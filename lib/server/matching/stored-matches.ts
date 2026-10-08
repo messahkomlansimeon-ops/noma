@@ -113,6 +113,11 @@ export interface StoredMatchItem<TCandidate extends OfferRecord | DemandRecord> 
    * ailleurs : tri par score, sens offre, éléments non promus. N'expose ni identifiant de boost, ni dates, ni vendeur.
    */
   sponsored: boolean;
+  /**
+   * Lot PRO1 : le vendeur de l'annonce a un abonnement Pro EN VIGUEUR portant le droit `badge_pro` (sens demande seulement ; faux dans le sens offre). Lu côté serveur à chaque
+   * lecture ; n'expose ni le plan, ni les dates, ni l'identité du vendeur. Ce n'est pas une garantie de qualité et ne change ni la pertinence ni le classement.
+   */
+  proBadge: boolean;
 }
 
 export interface StoredMatchesPage<
@@ -423,6 +428,8 @@ interface RankedItem<TCandidate extends OfferRecord | DemandRecord> {
 interface OwnerFacts {
   createdAt: Date;
   phoneVerified: boolean;
+  /** Lot PRO1 : abonnement Pro en vigueur avec le droit `badge_pro` (règle unique `subscription_effective_version`). */
+  proBadge: boolean;
 }
 
 /**
@@ -434,13 +441,14 @@ async function readOwnerFacts(client: SqlExecutor, ownerIds: readonly string[], 
   const facts = known ?? new Map<string, OwnerFacts>();
   const missing = [...new Set(ownerIds)].filter((id) => !facts.has(id));
   if (missing.length === 0) return facts;
-  const result = await client.query<{ id: string; created_at: Date; phone_verified: boolean }>(
+  const result = await client.query<{ id: string; created_at: Date; phone_verified: boolean; pro_badge: boolean }>(
     `SELECT u.id, u.created_at,
-            EXISTS (SELECT 1 FROM phone_identities p WHERE p.user_id = u.id AND p.verified_at IS NOT NULL) AS phone_verified
+            EXISTS (SELECT 1 FROM phone_identities p WHERE p.user_id = u.id AND p.verified_at IS NOT NULL) AS phone_verified,
+            COALESCE((SELECT 'badge_pro' = ANY(v.entitlements) FROM plan_versions v WHERE v.id = subscription_effective_version(u.id)), FALSE) AS pro_badge
        FROM users u WHERE u.id = ANY($1::uuid[])`,
     [missing],
   );
-  for (const row of result.rows) facts.set(row.id, { createdAt: row.created_at, phoneVerified: row.phone_verified });
+  for (const row of result.rows) facts.set(row.id, { createdAt: row.created_at, phoneVerified: row.phone_verified, proBadge: row.pro_badge === true });
   return facts;
 }
 
@@ -492,7 +500,7 @@ async function buildItems<TCandidate extends OfferRecord | DemandRecord, TRow ex
 
   return input.rows.map((row, index): RankedItem<TCandidate> => {
     const candidate = candidates[index];
-    const owner = owners.get(candidate.ownerId) ?? { createdAt: input.now, phoneVerified: false };
+    const owner = owners.get(candidate.ownerId) ?? { createdAt: input.now, phoneVerified: false, proBadge: false };
     let indicators: StoredMatchIndicators;
     if (senseIsDemandSource) {
       const offer = candidate as OfferRecord;
@@ -553,6 +561,8 @@ async function buildItems<TCandidate extends OfferRecord | DemandRecord, TRow ex
         indicators,
         relevance: relevance ?? 0,
         sponsored: false,
+        // Le badge n'existe que sur une ANNONCE (sens demande) : le sens offre sert des besoins d'acheteurs.
+        proBadge: senseIsDemandSource && owner.proBadge,
       },
     };
   });

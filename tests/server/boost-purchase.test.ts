@@ -29,7 +29,7 @@ test("configuration de code : espaces de verrou tous distincts, sources d'un boo
   assert.equal(BOOST_PURCHASE_HTTP_BODY_MAX_BYTES, 2048);
 });
 
-test("les listes du code sont EXACTEMENT celles de la migration 0015 (source d'un boost, types de transaction, durées)", () => {
+test("les listes du code sont EXACTEMENT celles des migrations 0015 et 0021 (source d'un boost, types de transaction, durées)", () => {
   const sql = source("database/migrations/0015_boost_purchases.sql");
   const list = (constraint: string): string[] => {
     const match = new RegExp(`${constraint}\\s+CHECK \\((?:source|kind|duration_code) IN \\(([^)]*)\\)`, "m").exec(sql.replace(/\n\s+/g, " "));
@@ -37,9 +37,14 @@ test("les listes du code sont EXACTEMENT celles de la migration 0015 (source d'u
     return [...match[1].matchAll(/'([a-z0-9_]+)'/g)].map((entry) => entry[1]);
   };
   assert.deepEqual(list("chk_offer_boosts_source"), [...BOOST_RECORD_SOURCES]);
-  assert.deepEqual(list("chk_wallet_transactions_kind"), [...WALLET_TRANSACTION_KINDS]);
   assert.deepEqual(list("chk_boost_purchases_duration_code"), [...BOOST_DURATION_CODES]);
-  assert.deepEqual([...WALLET_TRANSACTION_KINDS], ["topup", "adjustment", "boost_purchase", "boost_refund"]);
+  // Les types de transaction : la dernière définition de la contrainte est celle de la migration 0021 (lot PRO1), qui ajoute les trois types de l'offre Pro à ceux de 0015.
+  assert.deepEqual(list("chk_wallet_transactions_kind"), ["topup", "adjustment", "boost_purchase", "boost_refund"]);
+  const proSql = source("database/migrations/0021_pro_subscriptions.sql").replace(/\n\s+/g, " ");
+  const proKinds = /chk_wallet_transactions_kind\s+CHECK \(kind IN \(([^)]*)\)/m.exec(proSql);
+  assert.ok(proKinds, "contrainte chk_wallet_transactions_kind introuvable dans 0021");
+  assert.deepEqual([...proKinds[1].matchAll(/'([a-z0-9_]+)'/g)].map((entry) => entry[1]), [...WALLET_TRANSACTION_KINDS]);
+  assert.deepEqual([...WALLET_TRANSACTION_KINDS], ["topup", "adjustment", "boost_purchase", "boost_refund", "subscription_charge", "subscription_refund", "promo_expiry"]);
 });
 
 test("erreurs de domaine de l'achat : un message fixe par code, sans donnée (ni identifiant, ni montant)", () => {
@@ -153,8 +158,15 @@ test("achat : le prix est celui de la cotation (jamais recalculé), le débit n'
   assert.ok(at("placeOfferBoostInTransaction(client, {") < at("postWalletTransaction(client, {"), "le débit est dans le rappel beforeInsert du placement");
   assert.ok(at("beforeInsert: async () => {") < at("postWalletTransaction(client, {"));
   assert.ok(at("postWalletTransaction(client, {") < at("INSERT INTO boost_purchases"));
-  assert.match(body, /const amount = price\.amount;/);
-  assert.match(body, /amount: -amount/);
+  // Lot PRO1 : le prix à répartir est EXACTEMENT celui de la cotation ; les crédits promotionnels (émissions verrouillées dans le rappel beforeInsert, avant les comptes) sont
+  // dépensés EN PREMIER, le débit des crédits payés ne porte que sur le reste. Aucun montant n'est recalculé.
+  assert.match(body, /splitBoostPrice\(price\.amount, grants\)/);
+  assert.match(body, /amount: -split\.paid/);
+  assert.match(body, /amount: -split\.promo/);
+  assert.ok(at("beforeInsert: async () => {") < at("lockSpendablePromoGrants(client, sellerId)"));
+  assert.ok(at("lockSpendablePromoGrants(client, sellerId)") < at("splitBoostPrice(price.amount, grants)"));
+  assert.ok(at("splitBoostPrice(price.amount, grants)") < at("postWalletTransaction(client, {"), "la répartition précède le débit");
+  assert.ok(at("INSERT INTO boost_purchases") < at("recordPromoSpends(client"), "les dépenses promotionnelles s'inscrivent après la ligne d'achat (clé étrangère)");
   // Dans le placement partagé, le rappel de débit est appelé APRÈS les contrôles de places et AVANT l'INSERT du boost.
   const boosts = source("lib/server/boost/boosts.ts");
   const placement = boosts.slice(boosts.indexOf("export async function placeOfferBoostInTransaction("), boosts.indexOf("export async function grantOfferBoost("));

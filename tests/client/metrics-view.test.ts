@@ -246,7 +246,7 @@ function detail(overrides: Partial<OfferDetail> = {}, item: Partial<StoredMatch>
         price: { position: "below_market", score: 100, deltaPercent: -12, sampleSize: 8, factors: [] },
         confidence: { level: "high", score: 91, accountAgeBand: "gte_30d", factors: ["phone_verified"] },
       },
-      relevance: 88.5, sponsored: false, ...item,
+      relevance: 88.5, sponsored: false, proBadge: false, ...item,
     },
     details: { createdAt: "2031-10-12T09:00:00.000Z", attributes: [{ key: "etat_batterie", value: "89 %" }, { key: "couleur", value: "noir" }] },
     readAt: "2031-10-12T10:00:00.000Z",

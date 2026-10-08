@@ -46,6 +46,9 @@ export default function Admin() {
               <Link href="/admin/reglages" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
                 Réglages du boost (lecture seule) ›
               </Link>
+              <Link href="/admin/offres" data-testid="admin-offers-link" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
+                Offres Pro : plans et abonnements ›
+              </Link>
             </div>
           </div>
         );

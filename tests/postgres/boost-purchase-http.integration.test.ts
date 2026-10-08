@@ -472,7 +472,8 @@ test("201 à l'achat (DTO exact, montants entiers, aucune fuite), 200 au rejeu d
   assert.deepEqual(keys(created.json), ["balanceXof", "contractVersion", "purchase"]);
   const body = created.json as { contractVersion: string; purchase: Record<string, unknown>; balanceXof: number };
   assert.equal(body.contractVersion, BOOST_PURCHASE_CONTRACT_VERSION);
-  assert.deepEqual(keys(body.purchase), ["amountXof", "durationCode", "endsAt", "id", "quoteId", "reused", "startsAt"]);
+  assert.deepEqual(keys(body.purchase), ["amountXof", "durationCode", "endsAt", "id", "promoAmountXof", "quoteId", "reused", "startsAt"]);
+  assert.equal(body.purchase.promoAmountXof, 0, "vendeur sans abonnement : aucun crédit promotionnel dépensé");
   assert.match(String(body.purchase.id), /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.equal(body.purchase.quoteId, w.quoteId);
   assert.equal(body.purchase.durationCode, "24h");
@@ -509,7 +510,7 @@ test("201 à l'achat (DTO exact, montants entiers, aucune fuite), 200 au rejeu d
   assert.deepEqual(keys(history.json), ["contractVersion", "purchases"]);
   const purchases = (history.json as { purchases: Array<Record<string, unknown>> }).purchases;
   assert.equal(purchases.length, 1);
-  assert.deepEqual(keys(purchases[0]), ["amountXof", "createdAt", "durationCode", "endsAt", "id", "quoteId", "refundedAt", "startsAt"]);
+  assert.deepEqual(keys(purchases[0]), ["amountXof", "createdAt", "durationCode", "endsAt", "id", "promoAmountXof", "quoteId", "refundedAt", "startsAt"]);
   assert.equal(purchases[0].id, body.purchase.id);
   assert.equal(purchases[0].refundedAt, null);
   for (const secret of [row.boost_id, row.transaction_id, seller.userId, w.offer.id, request.idempotencyKey, "RAW_SECRET_TEXT"]) assert.ok(!history.text.includes(secret), `fuite « ${secret} » dans l'historique`);
@@ -526,7 +527,8 @@ test("201 à l'achat (DTO exact, montants entiers, aucune fuite), 200 au rejeu d
   const second = await walletReply();
   const afterRefund = (second.json as { transactions: Array<{ kind: string; amountXof: number }> }).transactions;
   assert.deepEqual([afterRefund[0].kind, afterRefund[0].amountXof], ["boost_refund", 2300]);
-  assert.deepEqual(keys(afterRefund[0]), ["amountXof", "createdAt", "id", "kind"], "DTO du portefeuille inchangé : aucune métadonnée, aucune référence");
+  assert.deepEqual(keys(afterRefund[0]), ["amountXof", "createdAt", "id", "kind", "promoAmountXof"], "DTO du portefeuille : aucune métadonnée, aucune référence ; seul champ ajouté (lot PRO1) : la part promotionnelle");
+  assert.equal((afterRefund[0] as unknown as { promoAmountXof: number }).promoAmountXof, 0);
   const replayAfterRefund = await post(w.offer.id, { body: request });
   assert.equal(replayAfterRefund.status, 200, "le rejeu d'un achat remboursé renvoie l'achat");
   const historyAfter = (await list(w.offer.id)).json as { purchases: Array<Record<string, unknown>> };

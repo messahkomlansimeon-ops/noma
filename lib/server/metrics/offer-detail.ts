@@ -3,6 +3,7 @@ import "server-only";
 import type { JsonObject, JsonValue } from "../catalog/types";
 import { mapStoredMatchItem, type StoredMatchItemDto } from "../matching/http-dto";
 import type { StoredOfferDetail } from "../matching/stored-matches";
+import type { PublicPhoto } from "../media/read";
 import { hasUnsafeCharacters, looksLikePhoneNumber } from "./public-text";
 
 /**
@@ -65,6 +66,8 @@ export interface OfferDetailDto {
     /** Date de CRÉATION de l'annonce (le modèle ne conserve pas de date de mise en ligne distincte). */
     createdAt: string;
     attributes: PublicAttribute[];
+    /** Lot PH1 : photos de l'annonce (identifiant et dimensions), dans l'ordre ; ajoutées par la route, seulement quand l'annonce en a. */
+    photos?: PublicPhoto[];
   };
   readAt: string;
 }

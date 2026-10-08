@@ -13,6 +13,7 @@ import {
 } from "./jobs";
 import { runNotificationStep, type NotifyHooks, type NotifyStepResult } from "../notifications/deliveries";
 import { resolveNotificationTransport, type NotificationTransport } from "../notifications/transport";
+import { runSubscriptionStep, type SubscriptionStepResult } from "../subscriptions/lifecycle";
 import { projectOutboxBatch, type ProjectOutboxBatchResult } from "./projection";
 import { runTemporalExpirySweep } from "./temporal";
 import { runUserReactivationSweep, type UserReactivationSweepResult } from "./sweeps";
@@ -54,6 +55,8 @@ export interface MatchingCycleResult {
    * n'est pas appliquée (étape ignorée sans erreur) ; `noTransport: true` : aucun transport, aucun envoi. Voir NOTIFICATIONS.md.
    */
   notify: NotifyStepResult;
+  /** Étape « subscriptions » (lot PRO1, après « notify ») : renouvellements, délais de grâce, fins d'abonnement, expiration des crédits promotionnels. `skipped: true` : migration 0021 absente. Voir OFFRE-PRO.md. */
+  subscriptions: SubscriptionStepResult;
   /** Aucun progrès : rien périmé, aucun boost expiré, rien lu par la projection, rien en maintenance, aucun job exécuté, aucun envoi traité (un utilisateur en erreur ou laissé à un autre processus compte comme « au repos »). */
   idle: boolean;
   /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`, `notify_error_<code>`). */
@@ -186,6 +189,13 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
   } catch (error) {
     errors.push(`notify_error_${errorCodeOf(error)}`);
   }
+  let subscriptions: SubscriptionStepResult = { skipped: false, renewed: 0, pastDue: 0, ended: 0, unchanged: 0, pausedOffers: 0, promoExpired: 0, promoExpiredXof: 0, errors: [] };
+  try {
+    subscriptions = await runSubscriptionStep({ pool });
+    for (const code of subscriptions.errors) errors.push(code);
+  } catch (error) {
+    errors.push(`subscriptions_error_${errorCodeOf(error)}`);
+  }
   return {
     temporal,
     boost,
@@ -193,10 +203,12 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
     maintenance,
     jobs,
     notify,
+    subscriptions,
     // Au repos : l'utilisateur laissé à un autre processus (busy) ET l'utilisateur en erreur (une erreur de l'étape notify compte comme « au repos » : ses lignes ont
     // une tentative de plus et une attente croissante, `recordUserFailure`) ne comptent pas comme du travail ; sinon un échec permanent ferait tourner la boucle sans pause.
     idle: temporal.expired === 0 && boost.expired === 0 && projected.selected === 0 && maintenance.deadLettered === 0 && jobs.length === 0
-      && notify.users - notify.busy - notify.errors.length <= 0 && notify.expired === 0,
+      && notify.users - notify.busy - notify.errors.length <= 0 && notify.expired === 0
+      && subscriptions.renewed + subscriptions.pastDue + subscriptions.ended + subscriptions.promoExpired === 0,
     errors,
   };
 }

@@ -159,7 +159,7 @@ Une annonce confirmée et fraîche mais au-delà des 200 correspondances triées
 
 **DTO** (`contractVersion: "demand-offer/v1"`, liste blanche) : `item` (l'élément de correspondance **exactement tel que la liste des résultats le sert** : fiche produit épurée —
 catégorie, marque, modèle, variante, état, quantité, localisation, prix, disponibilité —, compatibilité, indicateurs en clair, pertinence, `sponsored`), `details.createdAt`
-et `details.attributes`, `readAt`. **Jamais** : identifiant ou téléphone du vendeur, texte brut de l'annonce (la description peut contenir un numéro), métadonnées d'extraction,
+et `details.attributes`, `readAt` (lot PH1 : `details.photos`, identifiant et dimensions des photos dans l'ordre, et `item.coverPhotoId`, **seulement quand l'annonce a des photos** ; les fichiers sont servis par `GET /api/media/{id}` selon le même droit d'accès, voir `PHOTOS.md`). **Jamais** : identifiant ou téléphone du vendeur, texte brut de l'annonce (la description peut contenir un numéro), métadonnées d'extraction,
 identifiant de boost, identifiant d'un tiers. `sponsored` est **relu** : le placement est recalculé à chaque lecture (pertinence, boosts effectifs, quota, ancienneté, même
 fonction `applyBoost` que la liste), jamais déduit d'un paramètre du client ; la lecture de la fiche n'ajoute aucune apparition au journal d'exposition.
 

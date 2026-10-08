@@ -22,6 +22,12 @@ TOUTES : `no-store`, origine vérifiée sur les écritures (**avant** la session
 
 L'onglet **Admin** du sélecteur d'espace (Acheteur / Vendeur / Admin) n'est affiché qu'aux administrateurs : le sélecteur lit `GET /api/auth/session`, qui répond **toujours 200** (`{ "authenticated": false }` sans session valide, `{ "authenticated": true, "userId": …, "isAdmin": … }` sinon ; `isAdmin` est un booléen seulement). Le visiteur anonyme ne provoque donc plus de 401 dans la console du navigateur. Ce n'est qu'une commodité d'interface : l'autorisation réelle reste celle des routes `/api/admin/*`, qui relisent la base.
 
+## Offres Pro (lot PRO1)
+
+`/admin/offres` (lien depuis l'aperçu) et `GET /api/admin/plans`, `POST /api/admin/plans/{code}/versions` : versions des plans en lecture seule, création d'une nouvelle version, abonnés arrondis à 5
+près, revenus d'abonnement du mois. La page est sous le gabarit gardé de l'espace d'administration (page 404 standard de Next pour tout non-administrateur, aucun onglet Admin) ; les routes
+répondent le même 404. Prix **provisoires** : une nouvelle version ne s'applique qu'aux nouvelles souscriptions, **les abonnés actuels gardent leur prix**. Voir `OFFRE-PRO.md`.
+
 ## Limites assumées
 
 - Un `404` JSON rapide sur `/api/admin/*` révèle l'existence des routes (pas de données) : la réponse est identique pour tout non-administrateur, mais elle diffère de celle d'une URL inconnue servie par Next.

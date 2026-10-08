@@ -118,13 +118,22 @@ function topupDto(intent: PaymentIntent): TopupDto {
 interface WalletTransactionDto {
   id: string;
   kind: WalletHistoryItem["kind"];
+  /** Crédits PAYÉS, signé du côté de l'utilisateur. */
   amountXof: number;
+  /** Crédits PROMOTIONNELS (lot PRO1), signé du côté de l'utilisateur ; 0 si l'opération n'y touche pas. */
+  promoAmountXof: number;
   createdAt: string;
 }
 
 /** Jamais : identifiant de compte, référence, métadonnées, écritures de la contrepartie. */
 function transactionDto(item: WalletHistoryItem): WalletTransactionDto {
-  return { id: item.id, kind: item.kind, amountXof: jsonInteger(item.amount), createdAt: item.createdAt.toISOString() };
+  return {
+    id: item.id,
+    kind: item.kind,
+    amountXof: jsonInteger(item.amount),
+    promoAmountXof: jsonInteger(item.promoAmount),
+    createdAt: item.createdAt.toISOString(),
+  };
 }
 
 // ───────────── lecture stricte des entrées ─────────────
@@ -314,6 +323,8 @@ export function createWalletHttpHandlers(dependencies: WalletHttpDependencies = 
           return noStoreJsonResponse(200, {
             contractVersion: WALLET_CONTRACT_VERSION,
             balanceXof: jsonInteger(overview.balance),
+            promoBalanceXof: jsonInteger(overview.promoBalance),
+            promoExpiresAt: overview.promoExpiresAt === null ? null : overview.promoExpiresAt.toISOString(),
             transactions: overview.items.map(transactionDto),
             nextCursor: overview.nextCursor,
           });

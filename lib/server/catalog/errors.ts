@@ -68,3 +68,17 @@ export class CatalogStatusTransitionError extends Error {
     this.targetStatus = targetStatus;
   }
 }
+
+/**
+ * La limite d'annonces EN LIGNE du plan de l'utilisateur est atteinte (lot PRO1) : publier ou remettre en ligne une annonce de plus est refusé, rien n'est écrit. La limite vient
+ * de la version du plan en vigueur (Gratuit : 10 ; Pro : 100, valeurs provisoires), lue côté serveur.
+ */
+export class OfferLimitError extends Error {
+  readonly limit: number;
+
+  constructor(limit: number) {
+    super(`Limite de ${limit} annonces en ligne atteinte.`);
+    this.name = "OfferLimitError";
+    this.limit = limit;
+  }
+}

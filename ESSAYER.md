@@ -23,11 +23,11 @@ utilisé** (la recharge du porte-monnaie passe par une page de paiement SIMULÉ)
    `npm run dev:try`, voir ci-dessous). La commande ne lit aucun fichier `.env` pour la deviner, et elle refuse de démarrer
    si la base n'est pas sur **votre ordinateur** (`127.0.0.1`, `localhost` ou `::1`).
 
-   **La base d'essai doit être migrée jusqu'au bout : 20 migrations** (de `0001` à `0020`, dont le porte-monnaie `0014`,
+   **La base d'essai doit être migrée jusqu'au bout : 22 migrations** (de `0001` à `0020`, puis `0021` et `0022` ; dont le porte-monnaie `0014`,
    l'achat de boost `0015`, la portée visible d'un devis de boost `0016`, son estimation bornée `0017`, les mesures d'efficacité
-   `0018` : ouvertures de la fiche et contacts, les notifications et le suivi des besoins `0019`, et les favoris, la messagerie en direct, les commandes et l'administration `0020`). Si votre base d'essai a
+   `0018` : ouvertures de la fiche et contacts, les notifications et le suivi des besoins `0019`, les favoris, la messagerie en direct, les commandes et l'administration `0020`, l'offre Pro : plans, abonnements, crédits promotionnels, import de catalogue `0021`, et les photos des annonces `0022`). Si votre base d'essai a
    été créée avant ces lots, relancez simplement la deuxième commande ci-dessus (elle n'applique que ce qui manque). Contrôle : la
-   commande suivante doit afficher `20`.
+   commande suivante doit afficher `22`.
 
    ```
    docker exec deploy-postgres-1 psql -U noma_local -d noma_essai -tAc "select count(*) from noma_schema_migrations"
@@ -156,6 +156,8 @@ second compte (deux numéros différents, par exemple `07 00 00 00 42` et `07 00
     attend alors 7 h). Ce qui ne peut pas partir est **reporté**, jamais perdu pour cause de plafond ; un envoi en attente depuis plus de 48 h sort du canal externe (la notification reste dans l'application).
     Enfin, tout est revérifié au moment d'envoyer (besoin encore actif et suivi, annonce encore en ligne et toujours correspondante, choix encore actif). Un besoin satisfait ou
     archivé annule les envois en attente. Sans `NOMA_DEV_NOTIFY_CONSOLE=1`, ou hors développement, **aucun envoi n'a lieu** (le choix est enregistré, rien n'est envoyé).
+
+13. **Vendeur et acheteur** : **photos des annonces**. Sur la page d'une annonce du vendeur, section « Photos » : « Ajouter des photos » (JPEG, PNG ou WebP, 5 Mo au plus, 4 100 pixels au plus de chaque côté et 12,5 mégapixels au plus, 6 photos au plus), aperçu et barre de progression, « Mettre en couverture », reculer/avancer, suppression en deux temps ; le rappel « N'écrivez pas votre numéro sur les photos : l'acheteur vous contacte par noma. » est affiché. Dans le formulaire « Nouvelle annonce », le champ « Photos (facultatif) » fait de même : les photos partent après la création de l'annonce. Côté acheteur, la **vignette de couverture** apparaît dans les résultats et la **galerie** sur la fiche. Les informations cachées dans une photo (lieu GPS, date, appareil, profil de couleur) sont retirées avant le stockage ; un fichier qui n'est pas une vraie photo JPEG, PNG ou WebP est refusé avec une phrase simple. Les fichiers sont rangés dans le dossier `NOMA_MEDIA_DIR` (par défaut `data/media`, ignoré par git) ; `npm run media:gc` (simulation par défaut, `-- --apply` pour supprimer) nettoie les fichiers orphelins. Un autre compte (sans correspondance avec l'annonce) qui ouvre l'adresse d'une photo obtient « introuvable ». Limite : un numéro écrit DANS une photo n'est pas détecté. Voir `PHOTOS.md`.
 
 ## La recherche rapide de la page d'accueil
 

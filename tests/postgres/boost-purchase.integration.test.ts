@@ -318,13 +318,13 @@ async function tamperPurchasedBoost(boostId: string, assignments: string): Promi
 // ═════════════ 1. Migration 0015 ═════════════
 
 test("migration 0015 (suivie de 0016 à 0019) : 19 appliquées, la relance n'en applique aucune, tables, index et déclencheurs présents", async () => {
-  assert.equal(firstMigration.applied.length, 20);
+  assert.equal(firstMigration.applied.length, 22);
   assert.ok(firstMigration.applied.includes("0015_boost_purchases"));
-  assert.equal(firstMigration.applied.at(-1), "0020_social_orders_admin");
+  assert.equal(firstMigration.applied.at(-1), "0022_offer_photos");
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 20);
-  assert.equal(rerun.skipped.at(-1), "0020_social_orders_admin");
+  assert.equal(rerun.skipped.length, 22);
+  assert.equal(rerun.skipped.at(-1), "0022_offer_photos");
   assert.equal(await countRows("boost_purchases"), 0);
 
   const columns = (await pool.query<{ column_name: string; is_nullable: string; data_type: string }>(
@@ -333,6 +333,8 @@ test("migration 0015 (suivie de 0016 à 0019) : 19 appliquées, la relance n'en 
     ["id", "NO", "uuid"], ["seller_id", "NO", "uuid"], ["offer_id", "NO", "uuid"], ["quote_id", "NO", "uuid"], ["boost_id", "NO", "uuid"],
     ["transaction_id", "NO", "uuid"], ["amount_xof", "NO", "bigint"], ["duration_code", "NO", "text"], ["idempotency_key", "NO", "uuid"],
     ["created_at", "NO", "timestamp with time zone"], ["refunded_at", "YES", "timestamp with time zone"], ["refund_transaction_id", "YES", "uuid"],
+    // Lot PRO1 (migration 0021) : part payée en crédits promotionnels, et part payée en crédits (calculée).
+    ["promo_xof", "NO", "bigint"], ["paid_xof", "YES", "bigint"],
   ]);
   const constraints = (await pool.query<{ conname: string }>(
     "SELECT conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid JOIN pg_namespace n ON n.oid = t.relnamespace WHERE n.nspname = $1 AND t.relname = 'boost_purchases' ORDER BY conname", [schema])).rows.map((row) => row.conname);
@@ -355,7 +357,9 @@ test("migration 0015 (suivie de 0016 à 0019) : 19 appliquées, la relance n'en 
   const index = (await pool.query<{ indexdef: string }>("SELECT indexdef FROM pg_indexes WHERE schemaname = $1 AND indexname = 'idx_boost_purchases_offer'", [schema])).rows[0];
   assert.match(index.indexdef, /\(offer_id, created_at DESC\)/);
   // Les comptes système existent toujours (0014 inchangée) et aucune écriture n'a été créée par la migration.
-  assert.deepEqual((await pool.query("SELECT kind FROM wallet_accounts ORDER BY kind")).rows.map((row) => row.kind).slice(0, 2), ["boost_revenue", "provider_clearing"]);
+  // (Lot PRO1 : la migration 0021 ajoute quatre comptes système ; on vérifie les deux de 0014 et le total.)
+  assert.deepEqual((await pool.query("SELECT kind FROM wallet_accounts ORDER BY kind")).rows.map((row) => row.kind),
+    ["boost_revenue", "promo_consumed", "promo_expired", "promo_issuance", "provider_clearing", "subscription_revenue"]);
 });
 
 /** Exécute `operation` dans une transaction ANNULÉE (ou validée) ; renvoie l'échec SQL (code, contrainte) ou null. */
@@ -824,7 +828,7 @@ test("achat nominal : prix = montant de la cotation, durée de la cotation, boos
   // L'historique du vendeur (sans identifiant de boost ni de transaction) et le portefeuille (montant signé côté utilisateur).
   const history = await listOfferBoostPurchases({ pool, sellerId: world.sellerId, offerId: world.offer.id, limit: 10 });
   assert.equal(history.length, 1);
-  assert.deepEqual(Object.keys(history[0]).sort(), ["amount", "createdAt", "durationCode", "endsAt", "id", "quoteId", "refundedAt", "startsAt"]);
+  assert.deepEqual(Object.keys(history[0]).sort(), ["amount", "createdAt", "durationCode", "endsAt", "id", "promoAmount", "quoteId", "refundedAt", "startsAt"]);
   assert.equal(history[0].id, result.purchase.id);
   assert.equal(history[0].amount, big(2300));
   assert.equal(history[0].startsAt.getTime(), boost.startsAt.getTime());
@@ -1370,7 +1374,7 @@ test("wallet:check ROUGE sur chaque corruption injectée d'un achat ou d'un remb
     await off(client, "boost_purchases", GUARD);
     await client.query("UPDATE boost_purchases SET amount_xof = amount_xof + 100 WHERE id = $1", [purchase.id]);
   }, ["boost_purchase_mismatch", "boost_purchase_quote_mismatch", "boost_revenue_mismatch"]);
-  assert.deepEqual(Object.keys(altered.violations.find((v) => v.code === "boost_purchase_mismatch")!.examples[0]).sort(), ["amount", "purchase_id", "transaction_id"]);
+  assert.deepEqual(Object.keys(altered.violations.find((v) => v.code === "boost_purchase_mismatch")!.examples[0]).sort(), ["amount", "promo_amount", "purchase_id", "transaction_id"]);
   assert.deepEqual(Object.keys(altered.violations.find((v) => v.code === "boost_purchase_quote_mismatch")!.examples[0]).sort(), ["amount", "purchase_id", "quote_amount", "quote_id"]);
 
   await exactly("ligne d'achat effacée : transaction et boost orphelins", async (client) => {

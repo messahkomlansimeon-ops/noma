@@ -362,10 +362,13 @@ async function main(): Promise<void> {
     const offerTitle = `Samsung Galaxy S21 ${tag} · offre de A`;
 
     step(`Vendeur concurrent C (par l'API, à travers le relais) : ${RIVAL_OFFERS} offres « ${product.brand} ${product.model} » de 100 000 à 163 000 FCFA`);
-    const rival = new RelaySession("vendeur concurrent C");
-    const rivalApi = rival.client();
-    await loginWithOtp(rival, uniquePhone("53"));
+    // Lot PRO1 : un vendeur de l'offre Gratuit a au plus 10 annonces en ligne : les 22 offres concurrentes sont publiées par TROIS comptes concurrents (7 ou 8 chacun).
+    const rivals = [new RelaySession("vendeur concurrent C"), new RelaySession("vendeur concurrent C2"), new RelaySession("vendeur concurrent C3")];
+    await loginWithOtp(rivals[0], uniquePhone("53"));
+    await loginWithOtp(rivals[1], uniquePhone("54"));
+    await loginWithOtp(rivals[2], uniquePhone("56"));
     for (let index = 0; index < RIVAL_OFFERS; index += 1) {
+      const rivalApi = rivals[index % rivals.length].client();
       const built = buildOfferInput({
         title: `${product.brand} ${product.model} · offre ${index + 1}`,
         description: "",
@@ -382,7 +385,7 @@ async function main(): Promise<void> {
       const created = await rivalApi.offers.create(built.input);
       await rivalApi.offers.publish(created.id, created.contentVersion);
     }
-    ok(`${RIVAL_OFFERS} offres publiées par C`);
+    ok(`${RIVAL_OFFERS} offres publiées par C, C2 et C3 (moins de 10 chacun : limite de l'offre Gratuit)`);
 
     step("Vendeur A (navigateur) : publie l'offre la plus chère, puis regarde la page de son annonce");
     const sellerContext = await browser.newContext({ ...VIEWPORT });
@@ -1969,7 +1972,7 @@ async function main(): Promise<void> {
     ok("« Mettre en pause » : « Suivi en pause », bouton « Reprendre », et la phrase « Vos résultats restent à jour, mais vous ne recevez plus de notification pour ce besoin. »");
     await shot(nPage, "54-suivi-en-pause");
     const nSecond = await nPublish("A2", "55 000");
-    await refreshUntil(nPage, "la deuxième annonce dans les résultats du besoin (le matching continue pendant la pause)", async () => (await nPage.getByTestId("match-card").count()) >= 2);
+    await refreshUntil(nPage, "la deuxième annonce dans les résultats du besoin (le matching continue pendant la pause)", async () => (await nPage.getByTestId("match-card").count()) >= 3);
     ok("pendant la pause, la nouvelle annonce apparaît dans les résultats : le matching continue");
     await sleep(2_000);
     await nPage.goto(`${BASE}/alertes`);

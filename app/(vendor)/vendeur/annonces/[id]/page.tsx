@@ -1,7 +1,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { PhotoManager } from "@/components/photos/photo-manager";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { Thumb } from "@/components/thumb";
 import { TopBar } from "@/components/top-bar";
@@ -11,6 +12,7 @@ import { InterestedBuyers } from "@/components/vendor/interested-buyers";
 import { OfferSalesSection } from "@/components/vendor/offer-sales";
 import { OfferStatsSection } from "@/components/vendor/offer-stats";
 import { ApiError, api, describeApiError, isUuid, type OfferRecord } from "@/lib/client/api";
+import type { OfferPhoto } from "@/lib/client/photos-api";
 import {
   OFFER_STATUS_VIEW,
   artForCategory,
@@ -25,6 +27,8 @@ function Annonce({ offerId }: { offerId: string }) {
   const [offer, setOffer] = useState<OfferRecord | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [coverId, setCoverId] = useState<string | null>(null);
+  const onPhotosChanged = useCallback((photos: OfferPhoto[]) => setCoverId(photos.find((photo) => photo.position === 0)?.id ?? null), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -76,7 +80,7 @@ function Annonce({ offerId }: { offerId: string }) {
     <>
       <div className="rounded-2xl border border-line bg-white p-3.5">
         <div className="flex items-center gap-3">
-          <Thumb art={artForCategory(offer.category)} className="size-14" iconClassName="size-7" />
+          <Thumb art={artForCategory(offer.category)} className="size-14" iconClassName="size-7" photoId={coverId} />
           <div className="min-w-0 flex-1">
             <div className="text-[15px] font-bold text-ink">{recordTitle(offer)}</div>
             {price ? (
@@ -92,6 +96,7 @@ function Annonce({ offerId }: { offerId: string }) {
         {summary ? <div className="mt-1.5 text-[12px] text-ink-soft">{summary}</div> : null}
       </div>
 
+      <PhotoManager offerId={offer.id} readOnly={offer.status === "archived"} onChange={onPhotosChanged} />
       <InterestedBuyers offer={offer} />
       <OfferStatsSection offer={offer} />
       <OfferSalesSection offerId={offer.id} />

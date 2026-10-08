@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Megaphone } from "lucide-react";
+import { ProBadge } from "@/components/pro-badge";
 import { Thumb } from "@/components/thumb";
 import { Badge, type BadgeTone } from "@/components/ui";
 import { artForCategory } from "@/lib/client/catalog-view";
@@ -69,11 +70,12 @@ export function BuyerMatchCard({ item, detailHref }: { item: StoredMatch; detail
     >
       {row.sponsoredBadge ? <SponsoredNotice badge={row.sponsoredBadge} notice={row.sponsoredNotice} /> : null}
       <div className="flex items-center gap-3">
-        <Thumb art={artForCategory(item.candidate.category)} className="size-14" iconClassName="size-7" />
+        <Thumb art={artForCategory(item.candidate.category)} className="size-14" iconClassName="size-7" photoId={item.coverPhotoId} />
         <div className="min-w-0 flex-1">
           <div className="text-[15px] font-bold text-ink">{row.title}</div>
           <div className="font-display text-[18px] font-extrabold text-ink">{row.priceText}</div>
           {row.subtitle ? <div className="text-[12px] text-ink-soft">{row.subtitle}</div> : null}
+          {row.proBadge ? <div className="mt-1"><ProBadge /></div> : null}
         </div>
       </div>
       <CompatibilityBar text={row.compatibility} percent={row.compatibilityPercent} />

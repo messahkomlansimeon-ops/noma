@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Pool } from "pg";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
+import { readCoverPhotoIdsSafely } from "../media/read";
 import { readOfferAccess } from "../metrics/contacts";
 import {
   MATCHING_CURRENT_CLOCK_CTE,
@@ -30,6 +31,8 @@ export interface FavoriteItem {
   /** La fiche peut s'ouvrir dans le contexte du besoin d'origine (correspondance encore confirmée et fraîche). */
   openable: boolean;
   createdAt: Date;
+  /** Lot PH1 : photo de couverture, seulement pour une annonce en ligne dont la fiche s'ouvre (le fichier n'est servi qu'à qui a accès à l'annonce) ; absente sinon. */
+  coverPhotoId?: string;
 }
 
 export async function addFavorite(input: { pool: Pool; userId: string; demandId: string; offerId: string }): Promise<{ created: boolean }> {
@@ -97,6 +100,7 @@ export async function listFavorites(input: { pool: Pool; userId: string }): Prom
     [rows.rows.map((row) => row.demand_id), rows.rows.map((row) => row.offer_id), ...freshness.values, userId],
   );
   const openable = new Set(open.rows.map((row) => `${row.demand_id}:${row.offer_id}`));
+  const covers = await readCoverPhotoIdsSafely(pool, rows.rows.filter((row) => row.available && openable.has(`${row.demand_id}:${row.offer_id}`)).map((row) => row.offer_id));
   return rows.rows.map((row) => ({
     offerId: row.offer_id,
     demandId: row.demand_id,
@@ -106,5 +110,6 @@ export async function listFavorites(input: { pool: Pool; userId: string }): Prom
     available: row.available,
     openable: openable.has(`${row.demand_id}:${row.offer_id}`),
     createdAt: row.created_at,
+    ...(covers.has(row.offer_id) ? { coverPhotoId: covers.get(row.offer_id) as string } : {}),
   }));
 }

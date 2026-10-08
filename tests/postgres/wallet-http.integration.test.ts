@@ -350,7 +350,7 @@ test("origine : vérifiée AVANT la session sur les POST (aucune résolution de 
 test("GET /api/wallet : solde et historique de l'utilisateur de la session, DTO en liste blanche, montants en entiers JSON signés, rien d'un autre compte", async () => {
   const empty = await getWallet("", { cookie: bob.cookie });
   assert.equal(empty.status, 200);
-  assert.deepEqual(empty.json, { contractVersion: WALLET_CONTRACT_VERSION, balanceXof: 0, transactions: [], nextCursor: null });
+  assert.deepEqual(empty.json, { contractVersion: WALLET_CONTRACT_VERSION, balanceXof: 0, promoBalanceXof: 0, promoExpiresAt: null, transactions: [], nextCursor: null });
 
   const { intent } = await createIntent(alice, 2500);
   const ledgerBefore = await getWallet();
@@ -359,13 +359,16 @@ test("GET /api/wallet : solde et historique de l'utilisateur de la session, DTO 
   const wallet = await getWallet();
   assert.equal(wallet.status, 200);
   const body = asObject(wallet.json);
-  assert.deepEqual(keys(body), sorted(["contractVersion", "balanceXof", "transactions", "nextCursor"]));
+  assert.deepEqual(keys(body), sorted(["contractVersion", "balanceXof", "promoBalanceXof", "promoExpiresAt", "transactions", "nextCursor"]));
+  assert.equal(body.promoBalanceXof, 0, "aucun crédit promotionnel sans abonnement");
+  assert.equal(body.promoExpiresAt, null);
   assert.equal(body.contractVersion, "wallet/v1");
   assert.equal(body.balanceXof, 2500);
   assert.equal(typeof body.balanceXof, "number");
   const transactions = body.transactions as Array<Record<string, unknown>>;
   assert.equal(transactions.length, 1);
-  assert.deepEqual(keys(transactions[0]), sorted(["id", "kind", "amountXof", "createdAt"]));
+  assert.deepEqual(keys(transactions[0]), sorted(["id", "kind", "amountXof", "promoAmountXof", "createdAt"]));
+  assert.equal(transactions[0].promoAmountXof, 0);
   assert.equal(transactions[0].kind, "topup");
   assert.equal(transactions[0].amountXof, 2500);
   assert.ok(Number.isInteger(transactions[0].amountXof));

@@ -5,7 +5,8 @@ import type { Pool, PoolClient } from "pg";
 import { CatalogValidationError } from "../catalog/errors";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
 import { withPostgresTransaction } from "../postgres/client";
-import { postWalletTransaction } from "../wallet/ledger";
+import { postWalletTransaction, type LedgerEntryInput } from "../wallet/ledger";
+import { lockSpendablePromoGrants, recordPromoSpends, splitBoostPrice, type BoostPriceSplit } from "../subscriptions/promo";
 import {
   BOOST_LOCK_TIMEOUT_MS, BOOST_PURCHASE_LOCK_NAMESPACE, type BoostDurationCode,
 } from "./boost-config";
@@ -31,8 +32,9 @@ import {
  *   4. verrou consultatif de PÉRIMÈTRE (clé produit) — attribution et achat ;
  *   5. ligne de l'achat, FOR UPDATE — remboursement seulement ;
  *   6. lignes de boost de l'offre (échéance, annulation) ;
+ *   6b. (lot PRO1) émissions de crédits promotionnelles du vendeur, FOR UPDATE (achat et remboursement) ;
  *   7. comptes du grand livre, par identifiant croissant (écritures insérées dans cet ordre : voir ledger.ts) ;
- *   8. insertion de la ligne d'achat (ou mise à jour, au remboursement).
+ *   8. insertion de la ligne d'achat (ou mise à jour, au remboursement), puis des mouvements promotionnels.
  * La revérification de la portée de l'achat (lot P3) est une LECTURE faite sous 1 et 4, avant 7 : elle ne prend aucun verrou de plus.
  * Une attente de verrou est bornée par `lock_timeout` (BOOST_LOCK_TIMEOUT_MS).
  */
@@ -45,8 +47,10 @@ export interface BoostPurchaseRecord {
   boostId: string;
   transactionId: string;
   durationCode: BoostDurationCode;
-  /** XOF entiers (jamais de flottant). */
+  /** XOF entiers (jamais de flottant) : le prix TOTAL de la cotation (part payée + part promotionnelle). */
   amount: bigint;
+  /** Part payée en crédits promotionnels (lot PRO1) ; le reste, `amount − promoAmount`, est payé en crédits. */
+  promoAmount: bigint;
   idempotencyKey: string;
   createdAt: Date;
   refundedAt: Date | null;
@@ -67,8 +71,11 @@ export interface BoostRefundResult {
   boost: OfferBoostRecord;
   /** Vrai si CE remboursement a annulé un boost encore actif ; faux si le boost était déjà annulé ou expiré. */
   boostCancelled: boolean;
-  /** Montant intégral recrédité. */
+  /** Montant intégral recrédité (part payée rendue en crédits ; part promotionnelle rendue en crédits promotionnels si l'émission est encore valable, perdue sinon). */
   refundedAmount: bigint;
+  /** Part promotionnelle de l'achat, et ce qui en a été rendu au sous-compte promotionnel (le reste est perdu : émission échue). */
+  promoAmount: bigint;
+  promoRestoredAmount: bigint;
   /** Solde du vendeur après le remboursement. */
   balance: bigint;
 }
@@ -78,6 +85,7 @@ export interface BoostPurchaseHistoryItem {
   quoteId: string;
   durationCode: BoostDurationCode;
   amount: bigint;
+  promoAmount: bigint;
   startsAt: Date;
   endsAt: Date;
   createdAt: Date;
@@ -127,6 +135,7 @@ interface PurchaseRow {
   boost_id: string;
   transaction_id: string;
   amount_xof: string;
+  promo_xof: string;
   duration_code: BoostDurationCode;
   idempotency_key: string;
   created_at: Date;
@@ -136,7 +145,7 @@ interface PurchaseRow {
 
 /** Colonnes d'un achat, préfixées par l'alias de table (`p.`) ou sans préfixe (clause RETURNING). */
 const purchaseColumns = (prefix: string): string => `${prefix}id, ${prefix}seller_id, ${prefix}offer_id, ${prefix}quote_id, ${prefix}boost_id,
-  ${prefix}transaction_id, ${prefix}amount_xof::text AS amount_xof, ${prefix}duration_code, ${prefix}idempotency_key, ${prefix}created_at,
+  ${prefix}transaction_id, ${prefix}amount_xof::text AS amount_xof, ${prefix}promo_xof::text AS promo_xof, ${prefix}duration_code, ${prefix}idempotency_key, ${prefix}created_at,
   ${prefix}refunded_at, ${prefix}refund_transaction_id`;
 const PURCHASE_COLUMNS = purchaseColumns("p.");
 const PURCHASE_RETURNING = purchaseColumns("");
@@ -151,6 +160,7 @@ function mapPurchase(row: PurchaseRow): BoostPurchaseRecord {
     transactionId: row.transaction_id,
     durationCode: row.duration_code,
     amount: BigInt(row.amount_xof),
+    promoAmount: BigInt(row.promo_xof),
     idempotencyKey: row.idempotency_key,
     createdAt: row.created_at,
     refundedAt: row.refunded_at,
@@ -230,9 +240,10 @@ async function assertQuotePurchasable(
  *     MÊMES règles et codes que `grantOfferBoost` (`placeOfferBoostInTransaction`) ; puis PORTÉE revérifiée sous le verrou du périmètre
  *     (lot P3, `no_visible_effect` : aucun acheteur ne verrait l'offre monter, démontré ; lot P3-bis, `reach_check_unavailable` : vérification non terminée dans le budget, rien démontré ; avant le débit) ;
  *  5. le prix est EXACTEMENT le montant de la cotation et la durée celle de la cotation ; le boost commence à clock_timestamp() ;
- *  6. débit : transaction `boost_purchase` (vendeur −montant, `boost_revenue` +montant) ; solde insuffisant → WalletError
- *     `insufficient_balance` et RIEN n'est écrit ;
- *  7. boost (source `purchase`) puis ligne `boost_purchases`.
+ *  6. débit : transaction `boost_purchase`. Les crédits PROMOTIONNELS du vendeur (émissions non expirées, verrouillées) sont dépensés EN PREMIER, les crédits payés
+ *     complètent : vendeur −payé / `boost_revenue` +payé, `user_promo` −promo / `promo_consumed` +promo. Le chemin est le MÊME avec ou sans crédits promotionnels (places,
+ *     plafond vendeur, portée : avant le débit). Solde insuffisant (promotionnel + payé) → WalletError `insufficient_balance` et RIEN n'est écrit ;
+ *  7. boost (source `purchase`), ligne `boost_purchases`, puis les mouvements de dépense promotionnelle.
  * Rejouer la requête (même clé) ne débite pas deux fois ; 20 rejeux simultanés donnent un seul achat.
  */
 export async function purchaseOfferBoost(input: {
@@ -272,6 +283,7 @@ export async function purchaseOfferBoost(input: {
     // 4 à 7.
     const purchaseId = randomUUID();
     let transactionId: string | undefined;
+    let split: BoostPriceSplit | undefined;
     const placed = await placeOfferBoostInTransaction(client, {
       offerId,
       ownerId: sellerId,
@@ -294,15 +306,21 @@ export async function purchaseOfferBoost(input: {
         if (isReachUndetermined(reach)) throw new BoostError("reach_check_unavailable");
         if (reach.reachableBuyers === 0) throw new BoostError("no_visible_effect");
         if (input.hooks?.beforeDebit) await input.hooks.beforeDebit();
-        const amount = price.amount;
+        // Crédits promotionnels EN PREMIER (lot PRO1) : émissions dépensables verrouillées (avant les comptes), répartition pure, puis le grand livre.
+        const grants = await lockSpendablePromoGrants(client, sellerId);
+        split = splitBoostPrice(price.amount, grants);
+        const entries: LedgerEntryInput[] = [];
+        if (split.paid > BigInt(0)) {
+          entries.push({ account: { kind: "user", ownerId: sellerId }, amount: -split.paid }, { account: { kind: "boost_revenue" }, amount: split.paid });
+        }
+        if (split.promo > BigInt(0)) {
+          entries.push({ account: { kind: "user_promo", ownerId: sellerId }, amount: -split.promo }, { account: { kind: "promo_consumed" }, amount: split.promo });
+        }
         const posted = await postWalletTransaction(client, {
           kind: "boost_purchase",
           reference: `boost_purchase:${purchaseId}`,
           metadata: { boostPurchaseId: purchaseId, quoteId },
-          entries: [
-            { account: { kind: "user", ownerId: sellerId }, amount: -amount },
-            { account: { kind: "boost_revenue" }, amount },
-          ],
+          entries,
         });
         transactionId = posted.id;
         if (input.hooks?.afterDebit) await input.hooks.afterDebit();
@@ -310,15 +328,16 @@ export async function purchaseOfferBoost(input: {
     });
 
     const inserted = await client.query<PurchaseRow>(
-      `INSERT INTO boost_purchases (id, seller_id, offer_id, quote_id, boost_id, transaction_id, amount_xof, duration_code, idempotency_key)
-       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid, $6::uuid, $7::bigint, $8, $9::uuid)
+      `INSERT INTO boost_purchases (id, seller_id, offer_id, quote_id, boost_id, transaction_id, amount_xof, promo_xof, duration_code, idempotency_key)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid, $6::uuid, $7::bigint, $8::bigint, $9, $10::uuid)
        RETURNING ${PURCHASE_RETURNING}`,
-      [purchaseId, sellerId, offerId, quoteId, placed.boost.id, transactionId, price.amount.toString(), price.durationCode, idempotencyKey],
+      [purchaseId, sellerId, offerId, quoteId, placed.boost.id, transactionId, price.amount.toString(), (split as BoostPriceSplit).promo.toString(), price.durationCode, idempotencyKey],
     ).catch((error: unknown) => {
       const details = error as { code?: string; constraint?: string };
       if (details.code === "23505" && details.constraint === "uq_boost_purchases_quote") throw new BoostError("quote_already_used");
       throw error;
     });
+    await recordPromoSpends(client, { purchaseId, transactionId: transactionId as string, allocations: (split as BoostPriceSplit).allocations });
     return {
       purchase: mapPurchase(inserted.rows[0]), boost: placed.boost, balance: await readUserBalance(client, sellerId), reused: false,
     };
@@ -358,15 +377,49 @@ export async function refundBoostPurchase(input: {
     const cancel = await cancelOfferBoostInTransaction(client, { boostId: purchase.boostId, ownerId: purchase.sellerId });
     if (input.hooks?.beforeLedger) await input.hooks.beforeLedger();
 
+    // Part promotionnelle (lot PRO1) : chaque dépense est restituée à SON émission si elle est encore valable (sinon elle est perdue : promo_expired). Émissions verrouillées
+    // (avant les comptes) ; les mouvements sont inscrits après la transaction du grand livre et AVANT le passage de l'achat en « remboursé » (la garde de la base les relit).
+    const paidPart = purchase.amount - purchase.promoAmount;
+    const returns: Array<{ grantId: string; amount: bigint; kind: "restore" | "lapse" }> = [];
+    if (purchase.promoAmount > BigInt(0)) {
+      const spends = await client.query<{ grant_id: string; amount_xof: string }>(
+        "SELECT grant_id, amount_xof::text AS amount_xof FROM promo_movements WHERE purchase_id = $1::uuid AND kind = 'spend' ORDER BY grant_id, id",
+        [purchase.id],
+      );
+      const grantIds = [...new Set(spends.rows.map((row) => row.grant_id))].sort();
+      const valid = await client.query<{ id: string; valid: boolean }>(
+        `SELECT id, (expired_at IS NULL AND expires_at > clock_timestamp()) AS valid FROM promo_grants WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE`,
+        [grantIds],
+      );
+      const stillValid = new Map(valid.rows.map((row) => [row.id, row.valid]));
+      for (const spend of spends.rows) {
+        returns.push({ grantId: spend.grant_id, amount: BigInt(spend.amount_xof), kind: stillValid.get(spend.grant_id) === true ? "restore" : "lapse" });
+      }
+    }
+    const restored = returns.filter((entry) => entry.kind === "restore").reduce((sum, entry) => sum + entry.amount, BigInt(0));
+    const lapsed = returns.filter((entry) => entry.kind === "lapse").reduce((sum, entry) => sum + entry.amount, BigInt(0));
+    const refundEntries: LedgerEntryInput[] = [];
+    if (paidPart > BigInt(0)) {
+      refundEntries.push({ account: { kind: "boost_revenue" }, amount: -paidPart }, { account: { kind: "user", ownerId: purchase.sellerId }, amount: paidPart });
+    }
+    if (purchase.promoAmount > BigInt(0)) {
+      refundEntries.push({ account: { kind: "promo_consumed" }, amount: -purchase.promoAmount });
+      if (restored > BigInt(0)) refundEntries.push({ account: { kind: "user_promo", ownerId: purchase.sellerId }, amount: restored });
+      if (lapsed > BigInt(0)) refundEntries.push({ account: { kind: "promo_expired" }, amount: lapsed });
+    }
     const posted = await postWalletTransaction(client, {
       kind: "boost_refund",
       reference: `boost_refund:${purchase.id}`,
       metadata: { boostPurchaseId: purchase.id, reasonCode },
-      entries: [
-        { account: { kind: "boost_revenue" }, amount: -purchase.amount },
-        { account: { kind: "user", ownerId: purchase.sellerId }, amount: purchase.amount },
-      ],
+      entries: refundEntries,
     });
+    for (const entry of returns) {
+      await client.query(
+        `INSERT INTO promo_movements (id, grant_id, kind, amount_xof, purchase_id, transaction_id)
+         VALUES (gen_random_uuid(), $1::uuid, $2, $3::bigint, $4::uuid, $5::uuid)`,
+        [entry.grantId, entry.kind, entry.amount.toString(), purchase.id, posted.id],
+      );
+    }
     const updated = await client.query<PurchaseRow>(
       `UPDATE boost_purchases SET refunded_at = clock_timestamp(), refund_transaction_id = $2::uuid
         WHERE id = $1::uuid AND refunded_at IS NULL
@@ -379,6 +432,8 @@ export async function refundBoostPurchase(input: {
       boost: cancel.boost,
       boostCancelled: cancel.cancelled,
       refundedAmount: purchase.amount,
+      promoAmount: purchase.promoAmount,
+      promoRestoredAmount: restored,
       balance: await readUserBalance(client, purchase.sellerId),
     };
   }, pool);
@@ -414,7 +469,7 @@ export async function listOfferBoostPurchases(input: {
     return rows.rows.map((row) => {
       const purchase = mapPurchase(row);
       return {
-        id: purchase.id, quoteId: purchase.quoteId, durationCode: purchase.durationCode, amount: purchase.amount,
+        id: purchase.id, quoteId: purchase.quoteId, durationCode: purchase.durationCode, amount: purchase.amount, promoAmount: purchase.promoAmount,
         startsAt: row.starts_at, endsAt: row.ends_at, createdAt: purchase.createdAt, refundedAt: purchase.refundedAt,
       };
     });

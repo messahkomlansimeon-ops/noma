@@ -1,12 +1,13 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { getPostgresPool, withPostgresTransaction, type SqlExecutor } from "../postgres/client";
 import {
   ArchivedCatalogResourceError,
   CatalogNotFoundError,
   CatalogOwnershipError,
+  CatalogPhoneNumberError,
   CatalogStatusTransitionError,
   CatalogValidationError,
   StaleContentVersionError,
@@ -20,6 +21,7 @@ import {
 } from "./shared";
 import { invalidateMatchesForOffer } from "../matching/persistence";
 import { recordOfferMutation } from "../matching/outbox";
+import { assertCanPublishOffer, lockUserEntitlements } from "../subscriptions/entitlements";
 import type {
   AvailabilityStatus,
   CatalogPagination,
@@ -257,6 +259,8 @@ async function transitionOfferStatus(
   const targetPool = requireTransactionPool(pool);
 
   return withPostgresTransaction(async (client) => {
+    // Lot PRO1 : le verrou de l'utilisateur est pris AVANT la ligne de l'annonce (ordre des verrous : voir subscriptions/config.ts).
+    if (targetStatus === "published") await lockUserEntitlements(client, ownerId);
     const result = await client.query<OfferRow>(
       `SELECT ${OFFER_COLUMNS} FROM offers WHERE id = $1 FOR UPDATE`,
       [id],
@@ -281,24 +285,86 @@ async function transitionOfferStatus(
     if (!allowedSources.includes(row.status)) {
       throw new CatalogStatusTransitionError("offre", row.status, targetStatus);
     }
+    // Lot PRO1 : mettre une annonce en ligne (publication, remise en ligne après une pause) compte dans la limite du plan ; la mettre en pause ne coûte rien.
+    if (targetStatus === "published") await assertCanPublishOffer(client, ownerId);
 
     if (options?.beforeUpdate) {
       await options.beforeUpdate();
     }
 
-    const updateResult = await client.query<OfferRow>(
-      `UPDATE offers
-          SET status = $2,
-              content_version = content_version + 1,
-              updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
-       RETURNING ${OFFER_COLUMNS}`,
-      [id, targetStatus],
-    );
-    await invalidateMatchesForOffer(client, id, "offer_updated");
-    await recordOfferMutation(client, mapOffer(updateResult.rows[0]), mapOffer(row));
-    return mapOffer(updateResult.rows[0]);
+    return applyOfferStatus(client, row, targetStatus);
   }, targetPool);
+}
+
+/**
+ * Raison d'une mise en pause décidée par le SYSTÈME (lot PRO1) : la fin d'un abonnement met en pause les annonces au-delà de la limite du plan Gratuit (`plan_limit`). Une pause du
+ * vendeur n'a pas de raison. La colonne `offers.paused_reason` n'a de sens que pendant la pause (la base l'efface dès que le statut change).
+ */
+export type OfferPauseReason = "plan_limit";
+
+/** Écrit le nouveau statut d'une annonce DÉJÀ verrouillée et contrôlée : version de contenu, invalidation des correspondances, événement de l'outbox (une seule copie, partagée). */
+async function applyOfferStatus(client: PoolClient, row: OfferRow, targetStatus: "published" | "paused", pausedReason: OfferPauseReason | null = null): Promise<OfferRecord> {
+  const updateResult = await client.query<OfferRow>(
+    `UPDATE offers
+        SET status = $2,
+            paused_reason = $3::text,
+            content_version = content_version + 1,
+            updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+     RETURNING ${OFFER_COLUMNS}`,
+    [row.id, targetStatus, targetStatus === "paused" ? pausedReason : null],
+  );
+  await invalidateMatchesForOffer(client, row.id, "offer_updated");
+  await recordOfferMutation(client, mapOffer(updateResult.rows[0]), mapOffer(row));
+  return mapOffer(updateResult.rows[0]);
+}
+
+/**
+ * Met en pause, DANS la transaction de l'appelant, une annonce publiée (fin d'un abonnement : les annonces au-delà de la limite du plan Gratuit, lot PRO1). Même chemin que
+ * `pauseOffer` (version de contenu, correspondances invalidées, événement de l'outbox), sans version attendue : c'est le système qui décide. La raison (`plan_limit`) est ÉCRITE : elle
+ * seule permet de remettre l'annonce en ligne à une souscription ultérieure. Renvoie null si l'annonce n'est plus publiée.
+ */
+export async function pauseOfferInTransaction(client: PoolClient, offerId: string, reason: OfferPauseReason | null = null): Promise<OfferRecord | null> {
+  const found = await client.query<OfferRow>(`SELECT ${OFFER_COLUMNS} FROM offers WHERE id = $1 FOR UPDATE`, [requireUuid(offerId, "id")]);
+  const row = found.rows[0];
+  if (!row || row.status !== "published" || row.archived_at !== null) return null;
+  return applyOfferStatus(client, row, "paused", reason);
+}
+
+/**
+ * Verrouille (FOR UPDATE) les annonces de l'utilisateur mises en pause PAR LE SYSTÈME à la fin d'un abonnement (`paused_reason = 'plan_limit'`, non archivées), les plus RÉCENTES
+ * d'abord. Jamais une annonce que le vendeur a mise en pause lui-même (raison absente). À appeler sous le verrou de l'utilisateur, avant les comptes du grand livre (ordre des verrous).
+ */
+export async function lockPlanLimitPausedOffers(client: PoolClient, ownerId: string): Promise<string[]> {
+  const result = await client.query<{ id: string }>(
+    `SELECT id FROM offers
+      WHERE owner_id = $1::uuid AND status = 'paused' AND paused_reason = 'plan_limit' AND archived_at IS NULL
+      ORDER BY created_at DESC, id DESC
+      FOR UPDATE`,
+    [requireUuid(ownerId, "ownerId")],
+  );
+  return result.rows.map((row) => row.id);
+}
+
+/**
+ * Remet en ligne, DANS la transaction de l'appelant, une annonce mise en pause par le système (`plan_limit`) : même chemin que la publication (version de contenu, correspondances,
+ * événement de l'outbox) et même contrôle des numéros de téléphone. Renvoie null (rien n'est écrit) si l'annonce n'est plus dans cet état ou ne passe plus la règle des numéros.
+ * La limite du plan est vérifiée PAR L'APPELANT (il connaît la place restante).
+ */
+export async function republishPlanLimitOfferInTransaction(client: PoolClient, offerId: string): Promise<OfferRecord | null> {
+  const found = await client.query<OfferRow & { paused_reason: string | null }>(`SELECT ${OFFER_COLUMNS}, paused_reason FROM offers WHERE id = $1 FOR UPDATE`, [requireUuid(offerId, "id")]);
+  const row = found.rows[0];
+  if (!row || row.status !== "paused" || row.archived_at !== null || row.paused_reason !== "plan_limit") return null;
+  try {
+    requireNoPhoneInOfferFields({
+      category: row.category, brand: row.brand, model: row.model, variant: row.variant,
+      condition: row.condition_text, unit: row.unit, location: row.location_text, attributes: row.attributes as JsonObject | null,
+    });
+  } catch (error) {
+    if (error instanceof CatalogPhoneNumberError) return null;
+    throw error;
+  }
+  return applyOfferStatus(client, row, "published");
 }
 
 /**

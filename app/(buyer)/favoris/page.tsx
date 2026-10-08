@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Heart } from "lucide-react";
+import { PhotoCover } from "@/components/photos/photo-cover";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
 import { Badge } from "@/components/ui";
@@ -100,6 +101,7 @@ function Favorites() {
                 return (
                   <li key={row.offerId} data-testid="favorite-row" data-available={row.available ? "true" : "false"} className="rounded-2xl border border-line bg-white p-3.5">
                     <div className="flex items-start gap-3">
+                      {row.coverPhotoId ? <PhotoCover photoId={row.coverPhotoId} className="size-14" fallback={null} /> : null}
                       <div className="min-w-0 flex-1">
                         <div className="text-[15px] font-bold text-ink">{row.title}</div>
                         {row.priceText ? <div className="font-display text-[18px] font-extrabold text-ink">{row.priceText}</div> : null}

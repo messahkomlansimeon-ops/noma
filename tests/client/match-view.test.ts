@@ -62,6 +62,7 @@ function offerMatch(overrides: Partial<StoredMatch> = {}): StoredMatch {
     indicators: baseIndicators(),
     relevance: 88.5,
     sponsored: false,
+    proBadge: false,
     ...overrides,
   };
 }

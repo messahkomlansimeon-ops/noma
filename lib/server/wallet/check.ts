@@ -30,6 +30,23 @@ import { requireWalletPool } from "./ledger";
  *   balance(boost_revenue) = somme(amount_xof des achats) - somme(amount_xof des achats remboursés)
  *                            + somme(amount des écritures de boost_revenue appartenant à des transactions de type 'adjustment')
  * (toute autre écriture de boost_revenue rompt l'égalité).
+ *
+ * Offre Pro (lot PRO1) : le portefeuille a un SOUS-COMPTE PROMOTIONNEL par utilisateur (`user_promo`) et quatre comptes système (`subscription_revenue`, `promo_issuance`,
+ * `promo_consumed`, `promo_expired`). Contrôles ajoutés (voir OFFRE-PRO.md) :
+ *  - un achat de boost peut être payé en partie par des crédits promotionnels : `boost_purchase_mismatch` et `boost_refund_mismatch` vérifient les écritures attendues (part payée :
+ *    vendeur / boost_revenue ; part promotionnelle : user_promo / promo_consumed, et au remboursement user_promo ou promo_expired) ; `boost_revenue_mismatch` ne compte que la part PAYÉE ;
+ *  - un solde promotionnel n'est jamais négatif (`negative_promo_balance`), égal à la somme des restes de ses émissions (`promo_balance_mismatch`), un reste d'émission n'est jamais
+ *    négatif (`promo_remaining_negative`) ;
+ *  - chaque émission correspond à sa période et à son écriture (`promo_grant_mismatch`, `promo_grant_missing`) ; chaque expiration est écrite au grand livre pour le reste exact
+ *    (`promo_expiry_mismatch`, `promo_expiry_incomplete`), jamais avant l'échéance (`promo_expired_early`), jamais une dépense après l'expiration (`promo_spent_after_expiry`) ;
+ *  - les mouvements promotionnels d'un achat couvrent exactement sa part promotionnelle (`promo_purchase_mismatch`, `promo_movement_mismatch`) ;
+ *  - aucun type de transaction ne touche un compte promotionnel hors de son rôle (`promo_account_misuse` : ni recharge, ni ajustement, ni retrait) ;
+ *  - soldes des comptes système (formules exactes) : `promo_issuance` = − émissions ; `promo_consumed` = dépenses − restitutions − pertes ; `promo_expired` = expirations + pertes ;
+ *    `subscription_revenue` = périodes payées − périodes remboursées ;
+ *  - périodes d'abonnement : écritures du débit (`subscription_period_mismatch`), du remboursement (`subscription_refund_mismatch`), transactions orphelines, état de l'abonnement égal à sa
+ *    dernière période (`subscription_state_mismatch`).
+ * Avertissements : `promo_expiry_overdue` (une émission échue depuis plus de 15 minutes n'est pas encore expirée : le worker retarde) et `subscription_overdue` (un abonnement échu depuis
+ * plus d'une heure n'est pas encore traité).
  */
 
 export type WalletCheckCode =
@@ -55,13 +72,38 @@ export type WalletCheckCode =
   | "boost_refund_transaction_orphan"
   | "boost_refund_mismatch"
   | "refunded_purchase_boost_active"
-  | "boost_revenue_mismatch";
+  | "boost_revenue_mismatch"
+  | "negative_promo_balance"
+  | "promo_balance_mismatch"
+  | "promo_remaining_negative"
+  | "promo_grant_mismatch"
+  | "promo_grant_missing"
+  | "promo_expiry_mismatch"
+  | "promo_expiry_incomplete"
+  | "promo_expired_early"
+  | "promo_spent_after_expiry"
+  | "promo_purchase_mismatch"
+  | "promo_movement_mismatch"
+  | "promo_account_misuse"
+  | "promo_issuance_mismatch"
+  | "promo_consumed_mismatch"
+  | "promo_expired_mismatch"
+  | "subscription_revenue_mismatch"
+  | "subscription_period_mismatch"
+  | "subscription_charge_transaction_orphan"
+  | "subscription_refund_mismatch"
+  | "subscription_refund_transaction_orphan"
+  | "promo_expiry_transaction_orphan"
+  | "subscription_state_mismatch"
+  | "subscription_live_duplicate";
 
 export type WalletCheckWarningCode =
   | "succeeded_event_rejected_amount"
   | "succeeded_event_rejected_state"
   | "succeeded_event_rejected_unknown_intent"
-  | "adjustment_credits_user_account";
+  | "adjustment_credits_user_account"
+  | "promo_expiry_overdue"
+  | "subscription_overdue";
 
 export interface WalletCheckViolation {
   code: WalletCheckCode;
@@ -120,9 +162,10 @@ const CHECKS: ReadonlyArray<{ code: WalletCheckCode; sql: string }> = [
   {
     // Exactement un compte de chaque type système (aucun manquant, aucun en double).
     code: "system_account_invalid",
+    // Les comptes de l'offre Pro (lot PRO1) sont recréés à la demande : au plus un de chacun (zéro est permis, aucune écriture n'ayant pu les toucher).
     sql: `SELECT k.kind AS kind, (SELECT count(*) FROM wallet_accounts a WHERE a.kind = k.kind)::text AS found
-            FROM (VALUES ('provider_clearing'), ('boost_revenue')) AS k(kind)
-           WHERE (SELECT count(*) FROM wallet_accounts a WHERE a.kind = k.kind) <> 1`,
+            FROM (VALUES ('provider_clearing', 1), ('boost_revenue', 1), ('subscription_revenue', 0), ('promo_issuance', 0), ('promo_consumed', 0), ('promo_expired', 0)) AS k(kind, minimum)
+           WHERE (SELECT count(*) FROM wallet_accounts a WHERE a.kind = k.kind) NOT BETWEEN k.minimum AND 1`,
   },
   {
     // Partie double globale : tous les soldes ensemble valent zéro.
@@ -216,17 +259,12 @@ const CHECKS: ReadonlyArray<{ code: WalletCheckCode; sql: string }> = [
              AND (SELECT count(*) FROM boost_purchases p WHERE p.transaction_id = t.id AND t.reference = 'boost_purchase:' || p.id::text) <> 1`,
   },
   {
-    // Chaque achat a sa transaction : deux écritures exactement, vendeur −montant, boost_revenue +montant.
+    // Chaque achat a sa transaction : part payée (vendeur −payé, boost_revenue +payé) et part promotionnelle (user_promo −promo, promo_consumed +promo), rien d'autre
+    // (lot PRO1 : la règle exacte est celle de la fonction `boost_purchase_ledger_matches_v2`).
     code: "boost_purchase_mismatch",
-    sql: `SELECT p.id::text AS purchase_id, COALESCE(t.id::text, '') AS transaction_id, p.amount_xof::text AS amount
+    sql: `SELECT p.id::text AS purchase_id, COALESCE(t.id::text, '') AS transaction_id, p.amount_xof::text AS amount, p.promo_xof::text AS promo_amount
             FROM boost_purchases p LEFT JOIN wallet_transactions t ON t.id = p.transaction_id
-           WHERE NOT (
-                 t.id IS NOT NULL AND t.kind = 'boost_purchase' AND t.reference = 'boost_purchase:' || p.id::text
-             AND (SELECT count(*) FROM wallet_entries e WHERE e.transaction_id = t.id) = 2
-             AND EXISTS (SELECT 1 FROM wallet_entries e JOIN wallet_accounts a ON a.id = e.account_id
-                          WHERE e.transaction_id = t.id AND a.kind = 'user' AND a.owner_id = p.seller_id AND e.amount = -p.amount_xof)
-             AND EXISTS (SELECT 1 FROM wallet_entries e JOIN wallet_accounts a ON a.id = e.account_id
-                          WHERE e.transaction_id = t.id AND a.kind = 'boost_revenue' AND e.amount = p.amount_xof))`,
+           WHERE t.id IS NULL OR NOT boost_purchase_ledger_matches_v2(t.id, 'boost_purchase', p.id, p.seller_id, p.paid_xof, p.promo_xof)`,
   },
   {
     // Le prix payé est celui de la cotation (disponible, de la même offre, du même vendeur, de la même durée).
@@ -274,17 +312,14 @@ const CHECKS: ReadonlyArray<{ code: WalletCheckCode; sql: string }> = [
                    WHERE p.refund_transaction_id = t.id AND p.refunded_at IS NOT NULL AND t.reference = 'boost_refund:' || p.id::text) <> 1`,
   },
   {
-    // Chaque achat remboursé a son remboursement INTÉGRAL : deux écritures, boost_revenue −montant, vendeur +montant.
+    // Chaque achat remboursé a son remboursement INTÉGRAL : part payée rendue (boost_revenue −payé, vendeur +payé) et part promotionnelle (promo_consumed −promo ; rendue au
+    // sous-compte si l'émission était valable, sinon perdue : promo_expired), règle exacte de `boost_purchase_ledger_matches_v2`.
     code: "boost_refund_mismatch",
     sql: `SELECT p.id::text AS purchase_id, COALESCE(t.id::text, '') AS refund_transaction_id, p.amount_xof::text AS amount
             FROM boost_purchases p LEFT JOIN wallet_transactions t ON t.id = p.refund_transaction_id
            WHERE (p.refunded_at IS NOT NULL OR p.refund_transaction_id IS NOT NULL) AND NOT (
-                 p.refunded_at IS NOT NULL AND t.id IS NOT NULL AND t.kind = 'boost_refund' AND t.reference = 'boost_refund:' || p.id::text
-             AND (SELECT count(*) FROM wallet_entries e WHERE e.transaction_id = t.id) = 2
-             AND EXISTS (SELECT 1 FROM wallet_entries e JOIN wallet_accounts a ON a.id = e.account_id
-                          WHERE e.transaction_id = t.id AND a.kind = 'boost_revenue' AND e.amount = -p.amount_xof)
-             AND EXISTS (SELECT 1 FROM wallet_entries e JOIN wallet_accounts a ON a.id = e.account_id
-                          WHERE e.transaction_id = t.id AND a.kind = 'user' AND a.owner_id = p.seller_id AND e.amount = p.amount_xof))`,
+                 p.refunded_at IS NOT NULL AND t.id IS NOT NULL
+             AND boost_purchase_ledger_matches_v2(t.id, 'boost_refund', p.id, p.seller_id, p.paid_xof, p.promo_xof))`,
   },
   {
     // Un achat remboursé n'a plus de boost actif (il a été annulé, ou était déjà expiré ou annulé).
@@ -299,13 +334,208 @@ const CHECKS: ReadonlyArray<{ code: WalletCheckCode; sql: string }> = [
     sql: `SELECT q.balance::text AS balance, (q.purchases_total - q.refunds_total + q.adjustments_total)::text AS expected,
                 q.purchases_total::text AS purchases_total, q.refunds_total::text AS refunds_total, q.adjustments_total::text AS adjustments_total
             FROM (SELECT COALESCE((SELECT sum(a.balance) FROM wallet_accounts a WHERE a.kind = 'boost_revenue'), 0) AS balance,
-                         COALESCE((SELECT sum(p.amount_xof) FROM boost_purchases p), 0) AS purchases_total,
-                         COALESCE((SELECT sum(p.amount_xof) FROM boost_purchases p WHERE p.refunded_at IS NOT NULL), 0) AS refunds_total,
+                         COALESCE((SELECT sum(p.paid_xof) FROM boost_purchases p), 0) AS purchases_total,
+                         COALESCE((SELECT sum(p.paid_xof) FROM boost_purchases p WHERE p.refunded_at IS NOT NULL), 0) AS refunds_total,
                          COALESCE((SELECT sum(e.amount) FROM wallet_entries e
                                      JOIN wallet_accounts a ON a.id = e.account_id
                                      JOIN wallet_transactions t ON t.id = e.transaction_id
                                     WHERE a.kind = 'boost_revenue' AND t.kind = 'adjustment'), 0) AS adjustments_total) q
            WHERE q.balance <> q.purchases_total - q.refunds_total + q.adjustments_total`,
+  },
+  // ───────────── offre Pro : crédits promotionnels (lot PRO1) ─────────────
+  {
+    code: "negative_promo_balance",
+    sql: `SELECT id::text AS account_id, balance::text AS balance FROM wallet_accounts WHERE kind = 'user_promo' AND balance < 0`,
+  },
+  {
+    // Solde promotionnel = somme des restes des émissions de son propriétaire (reste = montant + restitutions − dépenses − expiré).
+    code: "promo_balance_mismatch",
+    sql: `SELECT a.id::text AS account_id, a.balance::text AS balance, COALESCE(r.total, 0)::text AS expected
+            FROM wallet_accounts a
+            LEFT JOIN (SELECT g.user_id, sum(promo_grant_remaining(g.id)) AS total FROM promo_grants g GROUP BY g.user_id) r ON r.user_id = a.owner_id
+           WHERE a.kind = 'user_promo' AND a.balance <> COALESCE(r.total, 0)`,
+  },
+  {
+    code: "promo_remaining_negative",
+    sql: `SELECT g.id::text AS grant_id, promo_grant_remaining(g.id)::text AS remaining FROM promo_grants g WHERE promo_grant_remaining(g.id) < 0`,
+  },
+  {
+    // Chaque émission : sa période (même utilisateur, mêmes crédits, début et échéance de la période, même transaction) et ses deux écritures (user_promo +montant, promo_issuance −montant).
+    code: "promo_grant_mismatch",
+    sql: `SELECT g.id::text AS grant_id, g.period_id::text AS period_id, g.amount_xof::text AS amount
+            FROM promo_grants g LEFT JOIN subscription_periods p ON p.id = g.period_id
+           WHERE NOT (
+                 p.id IS NOT NULL AND p.user_id = g.user_id AND p.promo_credits_xof = g.amount_xof AND p.starts_at = g.granted_at AND p.ends_at = g.expires_at
+             AND p.transaction_id = g.grant_transaction_id
+             AND EXISTS (SELECT 1 FROM wallet_entries e JOIN wallet_accounts a ON a.id = e.account_id
+                          WHERE e.transaction_id = g.grant_transaction_id AND a.kind = 'user_promo' AND a.owner_id = g.user_id AND e.amount = g.amount_xof)
+             AND EXISTS (SELECT 1 FROM wallet_entries e JOIN wallet_accounts a ON a.id = e.account_id
+                          WHERE e.transaction_id = g.grant_transaction_id AND a.kind = 'promo_issuance' AND e.amount = -g.amount_xof))`,
+  },
+  {
+    // Une période qui a émis des crédits promotionnels a son émission.
+    code: "promo_grant_missing",
+    sql: `SELECT p.id::text AS period_id, p.promo_credits_xof::text AS amount
+            FROM subscription_periods p
+           WHERE p.promo_credits_xof > 0 AND NOT EXISTS (SELECT 1 FROM promo_grants g WHERE g.period_id = p.id)`,
+  },
+  {
+    // Une émission close : si le reste retiré est positif, sa transaction (promo_expiry, ou le remboursement de la période) retire exactement ce reste du sous-compte
+    // (user_promo −reste, promo_expired +reste) ; un `promo_expiry` ne compte que ces deux écritures.
+    code: "promo_expiry_mismatch",
+    sql: `SELECT g.id::text AS grant_id, g.expired_xof::text AS expired, COALESCE(g.expiry_transaction_id::text, '') AS transaction_id
+            FROM promo_grants g LEFT JOIN wallet_transactions t ON t.id = g.expiry_transaction_id
+           WHERE g.expired_at IS NOT NULL AND g.expired_xof > 0 AND NOT (
+                 t.id IS NOT NULL
+             AND ((g.expiry_reason = 'period_end' AND t.kind = 'promo_expiry' AND t.reference = 'promo_expiry:' || g.id::text
+                   AND (SELECT count(*) FROM wallet_entries e WHERE e.transaction_id = t.id) = 2)
+               OR (g.expiry_reason = 'refund' AND t.kind = 'subscription_refund'))
+             AND EXISTS (SELECT 1 FROM wallet_entries e JOIN wallet_accounts a ON a.id = e.account_id
+                          WHERE e.transaction_id = t.id AND a.kind = 'user_promo' AND a.owner_id = g.user_id AND e.amount = -g.expired_xof)
+             AND EXISTS (SELECT 1 FROM wallet_entries e JOIN wallet_accounts a ON a.id = e.account_id
+                          WHERE e.transaction_id = t.id AND a.kind = 'promo_expired' AND e.amount = g.expired_xof))`,
+  },
+  {
+    // Une émission close n'a plus de reste.
+    code: "promo_expiry_incomplete",
+    sql: `SELECT g.id::text AS grant_id, promo_grant_remaining(g.id)::text AS remaining FROM promo_grants g WHERE g.expired_at IS NOT NULL AND promo_grant_remaining(g.id) <> 0`,
+  },
+  {
+    // Une expiration de fin de période n'est jamais écrite avant l'échéance (jamais d'effacement anticipé).
+    code: "promo_expired_early",
+    sql: `SELECT g.id::text AS grant_id FROM promo_grants g WHERE g.expiry_reason = 'period_end' AND g.expired_at < g.expires_at`,
+  },
+  {
+    // Aucune dépense après l'échéance de l'émission ni après son expiration.
+    code: "promo_spent_after_expiry",
+    sql: `SELECT m.id::text AS movement_id, g.id::text AS grant_id
+            FROM promo_movements m JOIN promo_grants g ON g.id = m.grant_id
+           WHERE m.kind = 'spend' AND (m.created_at >= g.expires_at OR (g.expired_at IS NOT NULL AND m.created_at >= g.expired_at))`,
+  },
+  {
+    // La part promotionnelle d'un achat est couverte par ses dépenses ; remboursé : par autant de restitutions et de pertes, jamais avant.
+    code: "promo_purchase_mismatch",
+    sql: `SELECT p.id::text AS purchase_id, p.promo_xof::text AS promo_amount,
+                COALESCE(sum(m.amount_xof) FILTER (WHERE m.kind = 'spend'), 0)::text AS spent,
+                COALESCE(sum(m.amount_xof) FILTER (WHERE m.kind IN ('restore', 'lapse')), 0)::text AS returned
+            FROM boost_purchases p LEFT JOIN promo_movements m ON m.purchase_id = p.id
+           GROUP BY p.id
+          HAVING COALESCE(sum(m.amount_xof) FILTER (WHERE m.kind = 'spend'), 0) <> p.promo_xof
+              OR COALESCE(sum(m.amount_xof) FILTER (WHERE m.kind IN ('restore', 'lapse')), 0) <> CASE WHEN p.refunded_at IS NOT NULL THEN p.promo_xof ELSE 0 END`,
+  },
+  {
+    // Un mouvement porte la transaction de l'achat (dépense) ou du remboursement (restitution, perte) du MÊME vendeur que son émission.
+    code: "promo_movement_mismatch",
+    sql: `SELECT m.id::text AS movement_id, m.kind AS kind, m.amount_xof::text AS amount
+            FROM promo_movements m
+            JOIN promo_grants g ON g.id = m.grant_id
+            JOIN boost_purchases p ON p.id = m.purchase_id
+           WHERE NOT (p.seller_id = g.user_id
+                      AND ((m.kind = 'spend' AND m.transaction_id = p.transaction_id) OR (m.kind IN ('restore', 'lapse') AND m.transaction_id = p.refund_transaction_id)))`,
+  },
+  {
+    // Un compte promotionnel ou de revenus d'abonnement n'est touché que par les types de transaction de son rôle, dans le bon sens (même règle que le déclencheur de la base).
+    code: "promo_account_misuse",
+    sql: `SELECT e.id::text AS entry_id, t.id::text AS transaction_id, t.kind AS transaction_kind, a.kind AS account_kind, e.amount::text AS amount
+            FROM wallet_entries e
+            JOIN wallet_accounts a ON a.id = e.account_id
+            JOIN wallet_transactions t ON t.id = e.transaction_id
+           WHERE a.kind IN ('user_promo', 'promo_issuance', 'promo_consumed', 'promo_expired', 'subscription_revenue')
+             AND NOT COALESCE(CASE a.kind
+                   WHEN 'user_promo' THEN (t.kind IN ('subscription_charge', 'boost_refund') AND e.amount > 0)
+                                       OR (t.kind IN ('boost_purchase', 'promo_expiry', 'subscription_refund') AND e.amount < 0)
+                   WHEN 'promo_issuance' THEN t.kind = 'subscription_charge' AND e.amount < 0
+                   WHEN 'promo_consumed' THEN (t.kind = 'boost_purchase' AND e.amount > 0) OR (t.kind = 'boost_refund' AND e.amount < 0)
+                   WHEN 'promo_expired' THEN t.kind IN ('promo_expiry', 'subscription_refund', 'boost_refund') AND e.amount > 0
+                   WHEN 'subscription_revenue' THEN (t.kind = 'subscription_charge' AND e.amount > 0) OR (t.kind = 'subscription_refund' AND e.amount < 0)
+                 END, FALSE)`,
+  },
+  {
+    // promo_issuance = − somme des émissions.
+    code: "promo_issuance_mismatch",
+    sql: `SELECT q.balance::text AS balance, (-q.granted)::text AS expected
+            FROM (SELECT COALESCE((SELECT sum(a.balance) FROM wallet_accounts a WHERE a.kind = 'promo_issuance'), 0) AS balance,
+                         COALESCE((SELECT sum(g.amount_xof) FROM promo_grants g), 0) AS granted) q
+           WHERE q.balance <> -q.granted`,
+  },
+  {
+    // promo_consumed = dépenses − restitutions − pertes.
+    code: "promo_consumed_mismatch",
+    sql: `SELECT q.balance::text AS balance, (q.spent - q.restored - q.lapsed)::text AS expected
+            FROM (SELECT COALESCE((SELECT sum(a.balance) FROM wallet_accounts a WHERE a.kind = 'promo_consumed'), 0) AS balance,
+                         COALESCE((SELECT sum(m.amount_xof) FROM promo_movements m WHERE m.kind = 'spend'), 0) AS spent,
+                         COALESCE((SELECT sum(m.amount_xof) FROM promo_movements m WHERE m.kind = 'restore'), 0) AS restored,
+                         COALESCE((SELECT sum(m.amount_xof) FROM promo_movements m WHERE m.kind = 'lapse'), 0) AS lapsed) q
+           WHERE q.balance <> q.spent - q.restored - q.lapsed`,
+  },
+  {
+    // promo_expired = expirations (et annulations par remboursement de période) + pertes.
+    code: "promo_expired_mismatch",
+    sql: `SELECT q.balance::text AS balance, (q.expired + q.lapsed)::text AS expected
+            FROM (SELECT COALESCE((SELECT sum(a.balance) FROM wallet_accounts a WHERE a.kind = 'promo_expired'), 0) AS balance,
+                         COALESCE((SELECT sum(g.expired_xof) FROM promo_grants g), 0) AS expired,
+                         COALESCE((SELECT sum(m.amount_xof) FROM promo_movements m WHERE m.kind = 'lapse'), 0) AS lapsed) q
+           WHERE q.balance <> q.expired + q.lapsed`,
+  },
+  {
+    // subscription_revenue = périodes payées − périodes remboursées.
+    code: "subscription_revenue_mismatch",
+    sql: `SELECT q.balance::text AS balance, (q.charged - q.refunded)::text AS expected
+            FROM (SELECT COALESCE((SELECT sum(a.balance) FROM wallet_accounts a WHERE a.kind = 'subscription_revenue'), 0) AS balance,
+                         COALESCE((SELECT sum(p.price_xof) FROM subscription_periods p), 0) AS charged,
+                         COALESCE((SELECT sum(p.price_xof) FROM subscription_periods p WHERE p.refunded_at IS NOT NULL), 0) AS refunded) q
+           WHERE q.balance <> q.charged - q.refunded`,
+  },
+  {
+    // Chaque période a son débit : vendeur −prix, subscription_revenue +prix, et l'émission promotionnelle de la période (user_promo +crédits, promo_issuance −crédits).
+    code: "subscription_period_mismatch",
+    sql: `SELECT p.id::text AS period_id, COALESCE(t.id::text, '') AS transaction_id, p.price_xof::text AS amount
+            FROM subscription_periods p LEFT JOIN wallet_transactions t ON t.id = p.transaction_id
+           WHERE t.id IS NULL OR NOT subscription_period_ledger_matches(t.id, 'subscription_charge', p.id, p.user_id, p.price_xof, p.promo_credits_xof)`,
+  },
+  {
+    code: "subscription_charge_transaction_orphan",
+    sql: `SELECT t.id::text AS transaction_id, t.reference AS reference
+            FROM wallet_transactions t
+           WHERE t.kind = 'subscription_charge'
+             AND (SELECT count(*) FROM subscription_periods p WHERE p.transaction_id = t.id AND t.reference = 'subscription_charge:' || p.id::text) <> 1`,
+  },
+  {
+    // Chaque période remboursée a son remboursement INTÉGRAL (et le reste promotionnel inutilisé annulé, le cas échéant).
+    code: "subscription_refund_mismatch",
+    sql: `SELECT p.id::text AS period_id, COALESCE(t.id::text, '') AS refund_transaction_id, p.price_xof::text AS amount
+            FROM subscription_periods p LEFT JOIN wallet_transactions t ON t.id = p.refund_transaction_id
+           WHERE (p.refunded_at IS NOT NULL OR p.refund_transaction_id IS NOT NULL) AND NOT (
+                 p.refunded_at IS NOT NULL AND t.id IS NOT NULL
+             AND subscription_period_ledger_matches(t.id, 'subscription_refund', p.id, p.user_id, p.price_xof,
+                   COALESCE((SELECT max(g.expired_xof) FROM promo_grants g WHERE g.period_id = p.id AND g.expiry_transaction_id = t.id), 0)))`,
+  },
+  {
+    code: "subscription_refund_transaction_orphan",
+    sql: `SELECT t.id::text AS transaction_id, t.reference AS reference
+            FROM wallet_transactions t
+           WHERE t.kind = 'subscription_refund'
+             AND (SELECT count(*) FROM subscription_periods p
+                   WHERE p.refund_transaction_id = t.id AND p.refunded_at IS NOT NULL AND t.reference = 'subscription_refund:' || p.id::text) <> 1`,
+  },
+  {
+    code: "promo_expiry_transaction_orphan",
+    sql: `SELECT t.id::text AS transaction_id, t.reference AS reference
+            FROM wallet_transactions t
+           WHERE t.kind = 'promo_expiry'
+             AND (SELECT count(*) FROM promo_grants g WHERE g.expiry_transaction_id = t.id AND t.reference = 'promo_expiry:' || g.id::text) <> 1`,
+  },
+  {
+    // Un abonnement a la version, le début et la fin de sa DERNIÈRE période payée.
+    code: "subscription_state_mismatch",
+    sql: `SELECT s.id::text AS subscription_id, s.status AS status
+            FROM subscriptions s
+            LEFT JOIN LATERAL (SELECT * FROM subscription_periods p WHERE p.subscription_id = s.id ORDER BY p.number DESC LIMIT 1) lp ON TRUE
+           WHERE lp.id IS NULL OR s.plan_version_id <> lp.plan_version_id OR s.current_period_start <> lp.starts_at OR s.current_period_end <> lp.ends_at`,
+  },
+  {
+    code: "subscription_live_duplicate",
+    sql: `SELECT user_id::text AS user_id, count(*)::text AS live FROM subscriptions WHERE status IN ('active', 'past_due') GROUP BY user_id HAVING count(*) > 1`,
   },
 ];
 
@@ -338,6 +568,21 @@ const WARNINGS: ReadonlyArray<{ code: WalletCheckWarningCode; sql: string }> = [
             JOIN wallet_transactions t ON t.id = e.transaction_id
            WHERE t.kind = 'adjustment' AND a.kind = 'user' AND e.amount > 0
            ORDER BY t.created_at DESC, t.id DESC, e.id DESC`,
+  },
+  {
+    // Lot PRO1 : une émission promotionnelle échue depuis plus de 15 minutes n'est pas encore expirée (le worker retarde) : le reste n'est pas dépensable (l'échéance prime),
+    // mais l'expiration n'est pas encore écrite au grand livre.
+    code: "promo_expiry_overdue",
+    sql: `SELECT g.id::text AS grant_id, g.expires_at::text AS expires_at, promo_grant_remaining(g.id)::text AS remaining
+            FROM promo_grants g WHERE g.expired_at IS NULL AND g.expires_at < clock_timestamp() - interval '15 minutes'
+           ORDER BY g.expires_at, g.id`,
+  },
+  {
+    // Lot PRO1 : un abonnement échu depuis plus d'une heure n'est pas encore traité (renouvellement, grâce ou fin) : le worker retarde.
+    code: "subscription_overdue",
+    sql: `SELECT s.id::text AS subscription_id, s.status AS status, s.current_period_end::text AS period_end
+            FROM subscriptions s WHERE s.status IN ('active', 'past_due') AND s.current_period_end < clock_timestamp() - interval '1 hour'
+           ORDER BY s.current_period_end, s.id`,
   },
 ];
 

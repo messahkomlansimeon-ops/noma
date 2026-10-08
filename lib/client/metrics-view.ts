@@ -66,6 +66,8 @@ export interface OfferDetailView {
   sponsored: boolean;
   sponsoredBadge: string | null;
   sponsoredNotice: string | null;
+  /** Lot PRO1 : le vendeur a un abonnement Pro en vigueur (badge « Vendeur Pro », jamais une garantie de qualité). */
+  proBadge: boolean;
   /** « Annonce du 12 octobre 2026 » (date de création : le modèle ne conserve pas de date de mise en ligne distincte). */
   dateText: string | null;
   attributes: { label: string; value: string }[];
@@ -102,6 +104,7 @@ export function offerDetailView(detail: OfferDetail): OfferDetailView {
     sponsored: item.sponsored === true,
     sponsoredBadge: item.sponsored === true ? SPONSORED_BADGE_LABEL : null,
     sponsoredNotice: item.sponsored === true ? SPONSORED_NOTICE : null,
+    proBadge: item.proBadge === true,
     dateText: date === null ? null : `Annonce du ${date}`,
     attributes: detail.details.attributes.map((attribute: OfferPublicAttribute) => ({ label: attributeLabel(attribute.key), value: attribute.value })),
   };

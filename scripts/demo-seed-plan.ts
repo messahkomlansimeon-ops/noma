@@ -33,6 +33,22 @@ export const DEMO_SEED_USAGE = "Usage : npm run demo:seed (aucune option) ; DATA
 export const DEMO_VENDOR_CREDIT_XOF = 25_000;
 /** Référence du crédit (unique : le crédit n'est écrit qu'une fois). */
 export const DEMO_VENDOR_CREDIT_REFERENCE = "adjustment:demo-seed-vendor-credit";
+/**
+ * Lot PRO1 : le vendeur démo est abonné à l'offre Pro (badge « Vendeur Pro », 5 000 FCFA de crédits promotionnels, import de catalogue). L'abonnement se paie avec les VRAIS services
+ * (`subscribeToPlan`) : le crédit d'abonnement est ajouté en plus du crédit de démonstration, pour que le solde de crédits du vendeur reste DEMO_VENDOR_CREDIT_XOF après l'abonnement.
+ * Une référence de crédit et une clé d'idempotence par abonnement (n° 1, 2… : un abonnement terminé depuis se renouvelle à la ré-exécution), jamais de doublon.
+ */
+export const DEMO_PRO_PLAN_CODE = "pro" as const;
+/** Préfixe de la référence du crédit d'abonnement du vendeur démo (le seed relit le prix RÉEL du plan, PROVISOIRE, avant de créditer). */
+export const DEMO_VENDOR_PRO_CREDIT_PREFIX = "adjustment:demo-seed-vendor-pro-";
+
+/** Clé d'idempotence (UUID de forme) de l'abonnement n° `sequence` du vendeur démo. */
+export function demoProSubscriptionKey(vendorId: string, sequence: number): string {
+  const hex = createHash("sha256").update(`noma-demo-seed-pro:${vendorId}:${sequence}`).digest("hex");
+  const variant = ((parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, "0");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${variant}${hex.slice(18, 20)}-${hex.slice(20, 32)}`;
+}
+
 /** Durée du boost du vendeur démo. */
 export const DEMO_BOOST_DURATION = "7d" as const;
 

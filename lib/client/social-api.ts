@@ -7,6 +7,7 @@
 
 import { API_ABORTED, API_INVALID_ID, API_INVALID_RESPONSE, API_NETWORK_ERROR, ApiError, isUuid, type Money, type RequestOptions } from "./api";
 import { checkMessageBody } from "../messages-text";
+import { parseCoverPhotoId } from "./photos-refs";
 
 export const FAVORITES_CONTRACT_VERSION = "favorites/v1";
 export const CONVERSATIONS_CONTRACT_VERSION = "conversations/v1";
@@ -27,6 +28,8 @@ export interface FavoriteItem {
   available: boolean;
   openable: boolean;
   createdAt: string;
+  /** Lot PH1 : photo de couverture (le fichier est servi par `/api/media/{id}`) ; absente quand l'annonce n'a pas de photo ou n'est plus ouvrable. */
+  coverPhotoId?: string;
 }
 
 export interface ConversationSummary {
@@ -196,7 +199,7 @@ function parseOrderStatus(status: number, value: unknown): OrderStatus {
 function parseFavorite(status: number, value: unknown): FavoriteItem {
   need(status, isObject(value) && isUuid(value.offerId) && isUuid(value.demandId) && isText(value.title, 200) && typeof value.available === "boolean" && typeof value.openable === "boolean" && isIso(value.createdAt));
   const item = value as Json;
-  return { offerId: item.offerId as string, demandId: item.demandId as string, title: item.title as string, price: parseMoney(status, item.price), available: item.available as boolean, openable: item.openable as boolean, createdAt: item.createdAt as string };
+  return { offerId: item.offerId as string, demandId: item.demandId as string, title: item.title as string, price: parseMoney(status, item.price), available: item.available as boolean, openable: item.openable as boolean, createdAt: item.createdAt as string, ...(parseCoverPhotoId(item.coverPhotoId) === null ? {} : { coverPhotoId: parseCoverPhotoId(item.coverPhotoId) as string }) };
 }
 
 function parseSummary(status: number, value: unknown): ConversationSummary {

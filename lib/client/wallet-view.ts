@@ -93,7 +93,23 @@ export const TRANSACTION_LABELS: Readonly<Record<string, string>> = Object.freez
   boost_purchase: "Achat de boost",
   boost_refund: "Remboursement de boost",
   adjustment: "Ajustement",
+  // Lot PRO1 : offre Pro et crédits promotionnels.
+  subscription_charge: "Abonnement Pro",
+  subscription_refund: "Remboursement d'abonnement",
+  promo_expiry: "Expiration de crédits promotionnels",
 });
+
+/** Lot PRO1 : le porte-monnaie distingue les crédits (payés) et les crédits promotionnels. */
+export const PAID_CREDITS_LABEL = "Crédits";
+export const PROMO_CREDITS_LABEL = "Crédits promotionnels";
+export const PROMO_CREDITS_NOTE =
+  "Les crédits promotionnels sont dépensés en premier sur vos boosts. Ils ne sont ni remboursables ni retirables, et ils expirent à la date indiquée.";
+
+/** « jusqu'au 06/11/2026 à 17:01 » ; null s'il n'y a plus de crédits promotionnels ou pas d'échéance connue. */
+export function promoExpiryText(promoBalanceXof: number, promoExpiresAt: string | null, timeZone?: string): string | null {
+  if (!(promoBalanceXof > 0) || promoExpiresAt === null) return null;
+  return `jusqu'au ${formatDateTimeFr(promoExpiresAt, timeZone)}`;
+}
 
 export const UNKNOWN_TRANSACTION_LABEL = "Opération";
 
@@ -112,19 +128,28 @@ export function amountTone(amountXof: number): AmountTone {
 export interface WalletRow {
   key: string;
   label: string;
-  /** Montant signé : « +2 000 FCFA » ou « −1 300 FCFA ». */
+  /** Montant signé en crédits payés : « +2 000 FCFA » ou « −1 300 FCFA » ; pour une opération purement promotionnelle, le montant promotionnel. */
   amountText: string;
   tone: AmountTone;
   dateText: string;
+  /** Lot PRO1 : la part en crédits promotionnels (« −5 000 FCFA promotionnels »), ou « crédits promotionnels » si c'est le seul montant ; null si l'opération n'y touche pas. */
+  promoText: string | null;
 }
 
 export function walletRow(transaction: WalletTransaction, timeZone?: string): WalletRow {
+  const promo = Number.isSafeInteger(transaction.promoAmountXof) ? transaction.promoAmountXof : 0;
+  const paid = transaction.amountXof;
+  // Une opération purement promotionnelle (paid = 0) montre son montant promotionnel comme montant principal.
+  const primary = paid === 0 && promo !== 0 ? promo : paid;
+  let promoText: string | null = null;
+  if (promo !== 0) promoText = paid === 0 ? "crédits promotionnels" : `${formatSignedFcfa(promo)} promotionnels`;
   return {
     key: transaction.id,
     label: transactionLabel(transaction.kind),
-    amountText: formatSignedFcfa(transaction.amountXof),
-    tone: amountTone(transaction.amountXof),
+    amountText: formatSignedFcfa(primary),
+    tone: amountTone(primary),
     dateText: formatDateTimeFr(transaction.createdAt, timeZone),
+    promoText,
   };
 }
 
@@ -537,7 +562,8 @@ export type BuyState =
   /** Le solde n'est pas (encore) connu : on n'achète pas à l'aveugle. */
   | { kind: "balance_unknown" }
   | { kind: "insufficient"; balanceXof: number; missingXof: number; text: string; detail: string }
-  | { kind: "ready"; amountXof: number; balanceXof: number; balanceAfterXof: number };
+  // `promoXof` (lot PRO1) : la part payée en crédits promotionnels, dépensés EN PREMIER ; absent quand il n'y en a pas. `balanceAfterXof` est le solde de crédits payés après l'achat.
+  | { kind: "ready"; amountXof: number; balanceXof: number; balanceAfterXof: number; promoXof?: number };
 
 export interface BuyInputs {
   quote: Pick<BoostQuote, "status" | "amount" | "currency"> | null;
@@ -545,6 +571,8 @@ export interface BuyInputs {
   expired: boolean;
   /** Solde connu en FCFA, ou `null` s'il n'a pas pu être lu. */
   balanceXof: number | null;
+  /** Lot PRO1 : crédits promotionnels dépensables (absent ou nul : aucun). Ils paient le boost EN PREMIER, les crédits complètent. */
+  promoBalanceXof?: number | null;
 }
 
 export const BUY_LABELS = Object.freeze({
@@ -567,6 +595,7 @@ export const BALANCE_UNKNOWN_TEXT = "Votre solde n'a pas pu être lu : l'achat e
  */
 export function buyState(input: BuyInputs): BuyState {
   const { quote, expired, balanceXof } = input;
+  const promoBalance = Number.isSafeInteger(input.promoBalanceXof) && (input.promoBalanceXof as number) > 0 ? (input.promoBalanceXof as number) : 0;
   if (
     quote === null ||
     quote.status !== "available" ||
@@ -579,17 +608,20 @@ export function buyState(input: BuyInputs): BuyState {
   }
   if (expired) return { kind: "expired" };
   if (balanceXof === null || !Number.isSafeInteger(balanceXof) || balanceXof < 0) return { kind: "balance_unknown" };
-  if (balanceXof < quote.amount) {
-    const missingXof = quote.amount - balanceXof;
+  if (balanceXof + promoBalance < quote.amount) {
+    const missingXof = quote.amount - balanceXof - promoBalance;
     return {
       kind: "insufficient",
       balanceXof,
       missingXof,
-      text: `Solde insuffisant (${formatFcfa(balanceXof)})`,
+      text: promoBalance > 0 ? `Solde insuffisant (${formatFcfa(balanceXof)} et ${formatFcfa(promoBalance)} de crédits promotionnels)` : `Solde insuffisant (${formatFcfa(balanceXof)})`,
       detail: `Il vous manque ${formatFcfa(missingXof)} pour ce boost.`,
     };
   }
-  return { kind: "ready", amountXof: quote.amount, balanceXof, balanceAfterXof: balanceXof - quote.amount };
+  // Les crédits promotionnels d'abord, les crédits payés pour le reste : la même répartition que le serveur.
+  const promoXof = Math.min(promoBalance, quote.amount);
+  const base = { kind: "ready" as const, amountXof: quote.amount, balanceXof, balanceAfterXof: balanceXof - (quote.amount - promoXof) };
+  return promoXof > 0 ? { ...base, promoXof } : base;
 }
 
 /** Le bouton « Acheter » est actif seulement à l'état « ready » et hors requête en cours. */
@@ -640,8 +672,17 @@ export const BOOST_SUCCESS_NOTE =
   "Votre boost est actif : votre annonce peut monter dans les résultats des acheteurs concernés, avec le badge « Sponsorisé », parmi des offres déjà pertinentes. Ce n'est pas une garantie de position ni de vente.";
 
 /** Texte de la confirmation, avant tout paiement. */
-export function purchaseConfirmationText(input: { amountXof: number; durationCode: BoostDurationCode; balanceXof: number }): string {
-  const after = input.balanceXof - input.amountXof;
+export function purchaseConfirmationText(input: { amountXof: number; durationCode: BoostDurationCode; balanceXof: number; promoXof?: number }): string {
+  const promo = input.promoXof !== undefined && input.promoXof > 0 ? input.promoXof : 0;
+  const after = input.balanceXof - (input.amountXof - promo);
+  if (promo > 0) {
+    const paid = input.amountXof - promo;
+    return (
+      `Vous allez payer ${formatFcfa(input.amountXof)} pour un boost de ${durationLabel(input.durationCode)} : ` +
+      `${formatFcfa(promo)} de crédits promotionnels (dépensés en premier)${paid > 0 ? ` et ${formatFcfa(paid)} de vos crédits` : ""}. ` +
+      `Solde de crédits après achat : ${formatFcfa(after)}.`
+    );
+  }
   return (
     `Vous allez payer ${formatFcfa(input.amountXof)} pour un boost de ${durationLabel(input.durationCode)}. ` +
     `Solde après achat : ${formatFcfa(after)}.`

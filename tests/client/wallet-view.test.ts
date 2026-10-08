@@ -137,6 +137,7 @@ describe("dates en français", () => {
       quoteId: "44444444-4444-4444-8444-444444444444",
       durationCode: "3d",
       amountXof: 1_300,
+      promoAmountXof: 0,
       startsAt: "2031-01-01T17:01:00.000Z",
       endsAt: "2031-01-04T17:01:00.000Z",
       createdAt: "2031-01-01T17:01:02.000Z",
@@ -168,8 +169,8 @@ describe("historique du porte-monnaie en mots simples", () => {
   });
 
   test("ligne : libellé, montant signé et teinte, date ; aucun code brut", () => {
-    const credit: WalletTransaction = { id: "a1111111-1111-4111-8111-111111111111", kind: "topup", amountXof: 2_000, createdAt: "2031-01-01T10:00:00.000Z" };
-    const debit: WalletTransaction = { id: "b2222222-2222-4222-8222-222222222222", kind: "boost_purchase", amountXof: -1_300, createdAt: "2031-01-01T11:00:00.000Z" };
+    const credit: WalletTransaction = { id: "a1111111-1111-4111-8111-111111111111", kind: "topup", amountXof: 2_000, promoAmountXof: 0, createdAt: "2031-01-01T10:00:00.000Z" };
+    const debit: WalletTransaction = { id: "b2222222-2222-4222-8222-222222222222", kind: "boost_purchase", amountXof: -1_300, promoAmountXof: 0, createdAt: "2031-01-01T11:00:00.000Z" };
     const row = walletRow(credit, "UTC");
     assert.equal(row.key, credit.id);
     assert.equal(row.label, "Recharge");
@@ -184,7 +185,7 @@ describe("historique du porte-monnaie en mots simples", () => {
   });
 
   test("pages fusionnées sans doublon, ordre du serveur conservé", () => {
-    const tx = (id: string): WalletTransaction => ({ id, kind: "topup", amountXof: 500, createdAt: "2031-01-01T10:00:00.000Z" });
+    const tx = (id: string): WalletTransaction => ({ id, kind: "topup", amountXof: 500, promoAmountXof: 0, createdAt: "2031-01-01T10:00:00.000Z" });
     const merged = mergeTransactionPages([tx("a"), tx("b")], [tx("b"), tx("c"), tx("c"), tx("d")]);
     assert.deepEqual(merged.map((entry) => entry.id), ["a", "b", "c", "d"]);
     assert.deepEqual(mergeTransactionPages([], []), []);
@@ -839,7 +840,7 @@ describe("achat : suites d'un échec dont le résultat est inconnu, bouton penda
   });
 
   test("type de transaction inconnu : « Opération » avec son montant signé, jamais le code brut", () => {
-    const row = walletRow({ id: "c3333333-3333-4333-8333-333333333333", kind: "unknown", amountXof: -750, createdAt: "2031-01-01T10:00:00.000Z" }, "UTC");
+    const row = walletRow({ id: "c3333333-3333-4333-8333-333333333333", kind: "unknown", amountXof: -750, promoAmountXof: 0, createdAt: "2031-01-01T10:00:00.000Z" }, "UTC");
     assert.equal(row.label, "Opération");
     assert.match(row.amountText, /^−750 FCFA$/);
     assert.equal(row.tone, "debit");

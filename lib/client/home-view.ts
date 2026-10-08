@@ -145,6 +145,8 @@ export interface VendorOfferRow {
   boostText: string | null;
   /** Page de l'annonce : acheteurs intéressés, statistiques, boost. */
   href: string;
+  /** Lot PH1 : photo de couverture de l'annonce ; absente quand elle n'a pas de photo (l'icône reste). */
+  coverPhotoId?: string;
 }
 
 export interface VendorHomeView {
@@ -178,6 +180,7 @@ export function vendorOfferRow(offer: VendorHomeOffer): VendorOfferRow {
     needsText: offer.status === "published" ? `${needsText(offer.needs)} correspondent` : null,
     boostText: offer.boostEndsAt === null ? null : boostUntil(offer.boostEndsAt),
     href: `/vendeur/annonces/${offer.id}`,
+    ...(offer.coverPhotoId === undefined ? {} : { coverPhotoId: offer.coverPhotoId }),
   };
 }
 

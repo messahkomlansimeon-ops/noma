@@ -726,12 +726,19 @@ async function main(): Promise<void> {
   const payProduct = { category: "Téléphones", brand: "Google", model: `Pixel 7 ${payTag}` };
   const jsonHeaders = { "content-type": "application/json" };
   const payRivalOffers: OfferRecord[] = [];
+  // Lot PRO1 : un vendeur de l'offre Gratuit a au plus 10 annonces en ligne ; C en a déjà 8 (scénario « mise en avant »). Les 8 offres du scénario d'achat sont donc publiées par
+  // un SECOND vendeur concurrent C2 (même nombre d'offres, un seul vendeur concurrent : les facteurs du devis sont ceux du scénario d'origine).
+  const rival2 = new RelaySession("vendeur concurrent C2");
+  const rival2Api = rival2.client();
+  const rival2Phone = uniquePhone("64");
+  let rival2Id = "";
   let payTarget: OfferRecord = undefined as unknown as OfferRecord;
   let payDemand: DemandRecord = undefined as unknown as DemandRecord;
   let payQuote: BoostQuote = undefined as unknown as BoostQuote;
   const TOPUP_AMOUNT = 5_000;
 
-  await step(`Achat : produit « ${payProduct.brand} ${payProduct.model} », 8 offres du vendeur C, l'offre de A est la plus chère, besoin de B`, async () => {
+  await step(`Achat : produit « ${payProduct.brand} ${payProduct.model} », 8 offres d'un vendeur concurrent C2, l'offre de A est la plus chère, besoin de B`, async () => {
+    rival2Id = await loginWithOtp(rival2, rival2Phone);
     for (let index = 0; index < 8; index += 1) {
       const built = buildOfferInput({
         title: `${payProduct.brand} ${payProduct.model} · offre ${index + 1}`,
@@ -746,8 +753,8 @@ async function main(): Promise<void> {
         available: true,
       });
       assert.ok(built.ok);
-      const created = await rivalApi.offers.create(built.input);
-      payRivalOffers.push(await rivalApi.offers.publish(created.id, created.contentVersion));
+      const created = await rival2Api.offers.create(built.input);
+      payRivalOffers.push(await rival2Api.offers.publish(created.id, created.contentVersion));
     }
     const built = buildOfferInput({
       title: `${payProduct.brand} ${payProduct.model} · offre de A`,
@@ -781,7 +788,7 @@ async function main(): Promise<void> {
     assert.ok(demandBuilt.ok);
     const demandCreated = await buyerApi.demands.create(demandBuilt.input);
     payDemand = await buyerApi.demands.activate(demandCreated.id, demandCreated.contentVersion);
-    ok("C : 8 offres publiées ; A : offre à 190 000 FCFA ; B : besoin actif (budget 250 000 FCFA)");
+    ok("C2 : 8 offres publiées ; A : offre à 190 000 FCFA ; B : besoin actif (budget 250 000 FCFA)");
     const wanted = [payTarget.id, ...payRivalOffers.map((candidate) => candidate.id)];
     const seen = await pollUntil(
       "les 9 offres dans les résultats de B",
@@ -964,7 +971,7 @@ async function main(): Promise<void> {
     assert.equal(after[0].candidateId, payTarget.id, "l'offre sponsorisée passe en tête");
     ok(`résultats de B : l'offre de A (190 000 FCFA, la plus chère) est « sponsorisée » et passe en tête (${after.length} offres)`);
     const rawText = await rawAllPages(buyer, `/api/demands/${payDemand.id}/stored-matches?sort=relevance`);
-    for (const forbidden of ["boost", "Boost", "endsAt", "purchase", sellerId, rivalId, sellerPhone, rivalPhone]) {
+    for (const forbidden of ["boost", "Boost", "endsAt", "purchase", sellerId, rivalId, rival2Id, sellerPhone, rivalPhone, rival2Phone]) {
       assert.equal(rawText.includes(forbidden), false, `le DTO de B ne contient pas « ${forbidden} »`);
     }
     ok("le DTO de B n'expose ni achat, ni boost, ni date, ni identité : seulement « sponsored »");

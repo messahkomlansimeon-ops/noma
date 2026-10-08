@@ -6,6 +6,7 @@ import { grantAdmin } from "../lib/server/admin/grant";
 import { BOOST_ERROR_MESSAGES, BoostError, grantOfferBoost } from "../lib/server/boost/boosts";
 import { runMatchingCycle } from "../lib/server/matching/runner";
 import { isMatchingSchemaReady } from "../lib/server/matching/schema-ready";
+import { createMediaStore } from "../lib/server/media/store";
 import { revealOfferContact } from "../lib/server/metrics/contacts";
 import { recordOfferView } from "../lib/server/metrics/views";
 import { closePostgresPool, getPostgresPool } from "../lib/server/postgres/client";
@@ -13,6 +14,8 @@ import { openConversation, sendMessage } from "../lib/server/social/conversation
 import { SocialError } from "../lib/server/social/errors";
 import { addFavorite } from "../lib/server/social/favorites";
 import { declareOrder } from "../lib/server/social/orders";
+import { readUserEntitlements } from "../lib/server/subscriptions/entitlements";
+import { subscribeToPlan } from "../lib/server/subscriptions/lifecycle";
 import { recordWalletTransaction } from "../lib/server/wallet/ledger";
 import {
   DEMO_ADMIN_PHONE,
@@ -31,11 +34,14 @@ import {
   DEMO_ORDER_OFFER_KEY,
   DEMO_ORDER_PRICE_XOF,
   DEMO_SEED_LOCK_NAMESPACE,
+  DEMO_PRO_PLAN_CODE,
   DEMO_SEED_USAGE,
   DEMO_VENDOR_CREDIT_REFERENCE,
   DEMO_VENDOR_CREDIT_XOF,
   DEMO_VENDOR_PHONE,
+  DEMO_VENDOR_PRO_CREDIT_PREFIX,
   checkDemoSeedEnvironment,
+  demoProSubscriptionKey,
   demandRawText,
   demoAccountId,
   demoExtraBuyerPhone,
@@ -46,6 +52,7 @@ import {
   type DemoDemand,
   type DemoOffer,
 } from "./demo-seed-plan";
+import { seedDemoPhotos } from "./demo-seed-photos";
 
 /**
  * `npm run demo:seed` (lot D1) : peuple une base d'ESSAI (`noma_essai`) d'un marché de démonstration réaliste, REJOUABLE, pour présenter noma à des investisseurs :
@@ -70,12 +77,17 @@ export interface DemoSeedReport {
   viewsRecorded: number;
   contactsRecorded: number;
   creditAdded: boolean;
+  /** Lot PRO1 : le vendeur démo a été abonné à l'offre Pro ce coup-ci (faux : déjà abonné). */
+  proSubscribed: boolean;
   boost: "granted" | "existing" | "refused";
   /** Lot D2 : rôle d'administrateur attribué ce coup-ci, messages écrits, favori et commande de démonstration créés ce coup-ci. */
   adminGranted: boolean;
   messagesWritten: number;
   favoriteAdded: boolean;
   orderDeclared: boolean;
+  /** Lot PH1 : photos synthétiques ajoutées ce coup-ci (une par annonce) et déjà présentes. */
+  photosAdded: number;
+  photosExisting: number;
   /** Cycles du worker du matching exécutés (jusqu'au repos). */
   cycles: number;
 }
@@ -189,6 +201,36 @@ async function ensureVendorCredit(pool: Pool, vendorId: string): Promise<boolean
   return true;
 }
 
+/**
+ * Lot PRO1 : abonne le vendeur démo à l'offre Pro par le VRAI service (`subscribeToPlan` : débit des crédits, revenus d'abonnement, crédits promotionnels, période d'un mois). Rejouable :
+ * un vendeur déjà abonné (droits Pro en vigueur) n'est jamais abonné deux fois ; sinon, le crédit du prix du plan est ajouté (une fois par abonnement) pour que son solde de crédits de
+ * démonstration reste intact, puis l'abonnement est souscrit avec une clé d'idempotence propre à cet abonnement (une reprise après interruption ne débite jamais deux fois).
+ */
+async function ensureVendorPro(pool: Pool, vendorId: string): Promise<boolean> {
+  if ((await readUserEntitlements(pool, vendorId)).source === "subscription") return false;
+  const price = await pool.query<{ price: string }>(
+    "SELECT v.monthly_price_xof::text AS price FROM plan_versions v JOIN plans p ON p.id = v.plan_id WHERE p.code = $1 ORDER BY v.version DESC LIMIT 1",
+    [DEMO_PRO_PLAN_CODE],
+  );
+  if (!price.rows[0]) throw new Error("le plan Pro n'existe pas : la base d'essai n'est pas migrée jusqu'au bout");
+  const sequence = (await pool.query<{ n: number }>("SELECT count(*)::int + 1 AS n FROM subscriptions WHERE user_id = $1::uuid", [vendorId])).rows[0].n;
+  const reference = `${DEMO_VENDOR_PRO_CREDIT_PREFIX}${sequence}`;
+  const credited = await pool.query("SELECT 1 FROM wallet_transactions WHERE reference = $1", [reference]);
+  if (!credited.rowCount) {
+    await recordWalletTransaction(pool, {
+      kind: "adjustment",
+      reference,
+      metadata: { reasonCode: "demo_seed" },
+      entries: [
+        { account: { kind: "boost_revenue" }, amount: -BigInt(price.rows[0].price) },
+        { account: { kind: "user", ownerId: vendorId }, amount: BigInt(price.rows[0].price) },
+      ],
+    });
+  }
+  await subscribeToPlan({ pool, userId: vendorId, planCode: DEMO_PRO_PLAN_CODE, idempotencyKey: demoProSubscriptionKey(vendorId, sequence) });
+  return true;
+}
+
 async function ensureBoost(pool: Pool, offerId: string, ownerId: string): Promise<"granted" | "existing" | "refused"> {
   const active = await pool.query("SELECT 1 FROM offer_boosts WHERE offer_id = $1::uuid AND status = 'active' AND ends_at > clock_timestamp()", [offerId]);
   if (active.rowCount) return "existing";
@@ -230,7 +272,7 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
   const counters: Counters = {
     report: {
       accountsCreated: 0, accountsExisting: 0, offersCreated: 0, offersExisting: 0, demandsCreated: 0, demandsExisting: 0,
-      viewsRecorded: 0, contactsRecorded: 0, creditAdded: false, boost: "existing", adminGranted: false, messagesWritten: 0, favoriteAdded: false, orderDeclared: false, cycles: 0,
+      viewsRecorded: 0, contactsRecorded: 0, creditAdded: false, proSubscribed: false, boost: "existing", adminGranted: false, messagesWritten: 0, favoriteAdded: false, orderDeclared: false, photosAdded: 0, photosExisting: 0, cycles: 0,
     },
   };
   const { report } = counters;
@@ -282,8 +324,19 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
   await publishOffers(DEMO_OFFERS.filter((offer) => offer.afterDemands === true));
   await runMatchingUntilIdle(pool, counters);
 
+  // Lot PH1 : une photo synthétique par annonce (vrai service d'envoi ; rejouable sans doublon ; n'influence ni le matching ni les notifications).
+  const photos = await seedDemoPhotos({
+    pool,
+    store: createMediaStore(process.env),
+    offers: DEMO_OFFERS.map((offer) => ({ offer, offerId: offerIds.get(offer.key) as string, ownerId: sellerIds.get(offer.vendor) as string })),
+  });
+  report.photosAdded = photos.added;
+  report.photosExisting = photos.existing;
+
   // 5. Le vendeur démo : crédits, boost de son iPhone 12, ouvertures et contacts d'acheteurs fictifs.
   report.creditAdded = await ensureVendorCredit(pool, vendorId);
+  // Lot PRO1 : le vendeur démo est abonné à l'offre Pro (crédit d'abonnement en plus, puis vraie souscription).
+  report.proSubscribed = await ensureVendorPro(pool, vendorId);
   const boostedOffer = DEMO_OFFERS.find((offer) => offer.boosted === true) as DemoOffer;
   const boostedOfferId = offerIds.get(boostedOffer.key) as string;
   report.boost = await ensureBoost(pool, boostedOfferId, vendorId);
@@ -372,6 +425,8 @@ async function main(): Promise<number> {
     `demo:seed : messagerie, favoris, commandes et administration : ${report.messagesWritten} message(s) écrit(s), favori ${report.favoriteAdded ? "ajouté" : "déjà présent"}, ` +
       `commande de démonstration ${report.orderDeclared ? "proposée au vendeur démo" : "déjà active"}, rôle admin ${report.adminGranted ? "attribué au compte Admin démo" : "déjà attribué"}.`,
   );
+  console.log(`demo:seed : offre Pro : vendeur démo ${report.proSubscribed ? "abonné (crédits promotionnels émis)" : "déjà abonné"}.`);
+  console.log(`demo:seed : photos : ${report.photosAdded} photo(s) synthétique(s) ajoutée(s) (${report.photosExisting} déjà présente(s)), une par annonce.`);
   console.log("demo:seed : comptes de démonstration (le code de connexion s'affiche dans le terminal de `npm run dev:try`) :");
   console.log("  Acheteur démo : +225 07 00 00 01 01");
   console.log("  Vendeur démo  : +225 07 00 00 02 02");

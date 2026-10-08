@@ -60,7 +60,7 @@ before(async () => {
   admin = opened.pool;
   await admin.query(`CREATE SCHEMA ${quoted}`);
   pool = await openVerifiedIsolatedPool(opened.target, schema);
-  assert.equal((await runMigrations(pool)).applied.length, 20);
+  assert.equal((await runMigrations(pool)).applied.length, 22);
   handlers = createMatchingHttpHandlers({ pool, now: () => clock.now() });
   buyer = await login();
   seller = await login();
@@ -713,12 +713,13 @@ test("HTTP : forme exacte des indicateurs et de la pertinence, et aucune fuite (
     assert.equal(body.truncated, false);
     assert.equal(body.items.length, 3);
     for (const item of body.items) {
-      assert.deepEqual(Object.keys(item).sort(), ["candidate", "candidateContentVersion", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "evaluation", "indicators", "relevance", "score", "scoring", "sponsored"]);
+      assert.deepEqual(Object.keys(item).sort(), ["candidate", "candidateContentVersion", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "evaluation", "indicators", "proBadge", "relevance", "score", "scoring", "sponsored"]);
       assert.deepEqual(Object.keys(item.indicators).sort(), ["availability", "confidence", "price"]);
       assert.deepEqual(Object.keys(item.indicators.availability).sort(), ["confirmedAgeHours", "factors", "level", "score"]);
       assert.deepEqual(Object.keys(item.indicators.price).sort(), ["deltaPercent", "factors", "position", "sampleSize", "score"]);
       assert.deepEqual(Object.keys(item.indicators.confidence).sort(), ["accountAgeBand", "factors", "level", "score"]);
       assert.equal(typeof item.relevance, "number");
+      assert.equal(item.proBadge, false, "aucun vendeur abonné ici : jamais de badge Pro");
       assert.ok(["lt_7d", "7d_30d", "gte_30d"].includes(item.indicators.confidence.accountAgeBand));
       assert.ok(item.indicators.confidence.factors.every((factor: string) => /^[a-z0-9_]+$/.test(factor)));
       assert.equal(item.indicators.price.position, "above_market");
@@ -1243,7 +1244,7 @@ test("boost HTTP : forme exacte avec sponsored (booléen), aucune fuite (identif
     assert.equal(body.contractVersion, "matching-stored-http/v1");
     assert.equal(body.items.length, 14);
     for (const item of body.items) {
-      assert.deepEqual(Object.keys(item).sort(), ["candidate", "candidateContentVersion", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "evaluation", "indicators", "relevance", "score", "scoring", "sponsored"]);
+      assert.deepEqual(Object.keys(item).sort(), ["candidate", "candidateContentVersion", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "evaluation", "indicators", "proBadge", "relevance", "score", "scoring", "sponsored"]);
       assert.equal(typeof item.sponsored, "boolean");
     }
     const sponsored = body.items.map((item: { sponsored: boolean }, position: number) => (item.sponsored ? position : -1)).filter((position: number) => position >= 0);

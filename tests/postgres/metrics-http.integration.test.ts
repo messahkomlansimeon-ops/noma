@@ -208,8 +208,9 @@ test("fiche : DTO en LISTE BLANCHE — clés exactes, ni téléphone, ni identif
   const page = await listStoredOfferMatchesForDemand(w.buyer.userId, w.demandId, { sort: "relevance" }, pool);
   assert.ok(page.items.length === 1);
   assert.deepEqual(sortedKeys(body.item), sortedKeys({
-    candidateId: 1, candidateContentVersion: 1, candidate: 1, compatibilityStatus: 1, score: 1, coverage: 1, evaluation: 1, scoring: 1, evaluatedAt: 1, indicators: 1, relevance: 1, sponsored: 1,
+    candidateId: 1, candidateContentVersion: 1, candidate: 1, compatibilityStatus: 1, score: 1, coverage: 1, evaluation: 1, scoring: 1, evaluatedAt: 1, indicators: 1, relevance: 1, sponsored: 1, proBadge: 1,
   }));
+  assert.equal(body.item.proBadge, false, "vendeur sans abonnement : aucun badge");
   assert.deepEqual(sortedKeys(body.item.candidate), sortedKeys({
     id: 1, contentVersion: 1, category: 1, brand: 1, model: 1, variant: 1, condition: 1, quantity: 1, unit: 1, location: 1, deadlineAt: 1, price: 1, availabilityStatus: 1,
   }));

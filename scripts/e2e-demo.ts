@@ -14,6 +14,10 @@
  *      confirmée par le vendeur (ventes confirmées arrondies, besoin proposé satisfait) ; administration : tableau de bord, vendeurs aux numéros masqués, suspension et réactivation
  *      journalisées, réglages en lecture seule ; /admin : page 404 standard de Next pour l'acheteur (sans titre « Administration »), onglet Admin du sélecteur visible seulement pour l'admin.
  *   8. LOT D3 : le visiteur anonyme ne provoque aucun 401 ni aucune erreur dans la console du navigateur ; l'onglet Admin n'existe pas pour l'acheteur et le vendeur.
+ *   9. LOT PRO1 (à la fin, dans quatre navigateurs : vendeur démo, second vendeur, acheteur, admin) : le vendeur démo est Pro (badge « Vendeur Pro » dans les résultats, texte honnête sur la fiche,
+ *      page « Offre Pro » aux prix PROVISOIRES, crédits promotionnels, achat d'un boost payé avec les crédits promotionnels EN PREMIER) ; import de catalogue par CSV (aperçu, application, rejeu, numéro
+ *      de téléphone refusé) ; un second vendeur, sans le droit, est refusé à l'import, recharge son porte-monnaie par le paiement simulé puis souscrit à l'offre Pro (double clic : un seul débit),
+ *      reçoit ses crédits promotionnels et le badge ; administration /admin/offres (abonnés arrondis, revenus du mois, nouvelle version), refusée à l'acheteur (page 404 standard) ; wallet:check sans écart.
  * Captures dans NOMA_E2E_SHOTS (défaut /var/tmp/noma-d1-shots).
  *
  * Variables : NOMA_E2E_BASE_URL (relais, défaut http://localhost:3212), NOMA_E2E_SERVER_LOG, NOMA_E2E_DATABASE_URL (noma_e2e, pour demo:seed), NOMA_E2E_SHOTS, NOMA_E2E_CHROME.
@@ -22,7 +26,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { E2E_BASE, E2E_SERVER_LOG, awaitOtpLine, demoSeedByAdministration, waitForValue } from "./e2e-common";
+import { E2E_BASE, E2E_SERVER_LOG, awaitOtpLine, demoSeedByAdministration, waitForValue, walletCheckByAdministration } from "./e2e-common";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require("../poc/node_modules/playwright") as typeof import("../poc/node_modules/playwright");
@@ -106,17 +110,39 @@ async function checkSwitcherDoesNotOverlap(page: Page, label: string): Promise<v
   ok(`${label} : le sélecteur d'espace (Acheteur / Vendeur / Admin) ne recouvre aucun titre ni bouton`);
 }
 
+/** Taille décodée par le navigateur de chaque image qui répond au sélecteur (chargement forcé : les vignettes sont paresseuses). */
+async function decodedSizes(page: Page, selector: string): Promise<Array<[number, number]>> {
+  return page.locator(selector).evaluateAll(async (nodes) =>
+    Promise.all(
+      nodes.map(async (node) => {
+        const image = node as HTMLImageElement;
+        image.loading = "eager";
+        try {
+          await image.decode();
+        } catch {
+          return [0, 0] as [number, number];
+        }
+        return [image.naturalWidth, image.naturalHeight] as [number, number];
+      }),
+    ),
+  );
+}
+
 async function main(): Promise<void> {
   step("demo:seed sur la base noma_e2e, puis rejeu à l'identique");
   const first = await demoSeedByAdministration();
   assert.match(first, /demo:seed : base « noma_e2e » : (\d+) annonce\(s\) publiée\(s\)/);
   assert.match(first, /3 message\(s\) écrit\(s\), favori ajouté, commande de démonstration proposée au vendeur démo, rôle admin attribué au compte Admin démo/);
+  assert.match(first, /offre Pro : vendeur démo abonné \(crédits promotionnels émis\)/);
+  assert.match(first, /photos : 30 photo\(s\) synthétique\(s\) ajoutée\(s\) \(0 déjà présente\(s\)\), une par annonce/);
   const created = Number(/: (\d+) annonce\(s\) publiée\(s\)/.exec(first)?.[1]);
   info(first.split("\n")[0]);
   const second = await demoSeedByAdministration();
   assert.match(second, /0 annonce\(s\) publiée\(s\) \(30 déjà présente\(s\)\), 0 besoin\(s\) activé\(s\) \(14 déjà présent\(s\)\), 0 compte\(s\) créé\(s\) \(21 déjà présent\(s\)\)/);
   assert.match(second, /0 ouverture\(s\) et 0 contact\(s\) fictifs écrits, crédits déjà présents, boost déjà actif/);
   assert.match(second, /0 message\(s\) écrit\(s\), favori déjà présent, commande de démonstration déjà active, rôle admin déjà attribué/);
+  assert.match(second, /offre Pro : vendeur démo déjà abonné/, "rejeu : le vendeur démo n'est jamais abonné deux fois");
+  assert.match(second, /photos : 0 photo\(s\) synthétique\(s\) ajoutée\(s\) \(30 déjà présente\(s\)\), une par annonce/);
   ok(`premier passage : ${created} annonce(s) ; rejeu : 0 annonce, 0 besoin, 0 compte, 0 ouverture, 0 contact, crédits et boost déjà présents`);
 
   const browser = await chromium.launch({ executablePath: CHROME });
@@ -189,6 +215,15 @@ async function main(): Promise<void> {
     const sponsored = buyer.getByTestId("match-card").filter({ hasText: "Sponsorisé" });
     assert.equal(await sponsored.count(), 1, "UNE annonce Sponsorisée (le boost du vendeur démo)");
     ok("9 correspondances, dont une « Sponsorisé » (l'annonce boostée du vendeur démo)");
+    // Lot PRO1 : le vendeur démo est abonné Pro : son annonce porte le badge « Vendeur Pro » (texte honnête au survol), aucune autre.
+    assert.equal(await buyer.getByTestId("pro-badge").count(), 1, "UN badge « Vendeur Pro » : l'annonce du vendeur démo");
+    assert.equal(await sponsored.getByTestId("pro-badge").count(), 1, "le badge est sur l'annonce du vendeur démo");
+    assert.equal(await sponsored.getByTestId("pro-badge").locator("span[title]").getAttribute("title"), "Abonné à l'offre Pro de noma. Ce n'est pas une garantie de qualité.");
+    ok("badge « Vendeur Pro » sur l'annonce du vendeur démo seulement, texte honnête au survol");
+    // Lot PH1 : chaque carte porte la vignette de la photo synthétique de l'annonce, réellement décodée par le navigateur.
+    assert.equal(await buyer.getByTestId("photo-cover").count(), 9, "une vignette par carte");
+    assert.deepEqual(await decodedSizes(buyer, '[data-testid="match-card"] [data-testid="photo-cover"]'), Array.from({ length: 9 }, () => [480, 360]));
+    ok("lot PH1 : les 9 cartes montrent la vignette de leur annonce (PNG synthétique 480 × 360 décodé par le navigateur)");
     await checkClean(buyer, "résultats");
     await shot(buyer, "03-resultats-acheteur");
     await sponsored.getByTestId("match-detail-link").click();
@@ -201,6 +236,12 @@ async function main(): Promise<void> {
     assert.equal(/0700000202|07 00 00 02 02|\+225/.test(ficheText.replace(/\s/g, " ")), false, "la fiche ne montre jamais le numéro du vendeur");
     assert.equal(await buyer.locator('a[href^="tel:"], a[href*="wa.me"]').count(), 0, "ni lien d'appel ni lien WhatsApp avant le contact");
     ok("fiche : titre, prix, attributs, « Sponsorisé », aucun numéro ni lien d'appel avant le contact");
+    assert.equal(await buyer.getByTestId("pro-badge").count(), 1);
+    assert.equal((await buyer.getByTestId("pro-badge-notice").innerText()).trim(), "Abonné à l'offre Pro de noma. Ce n'est pas une garantie de qualité.");
+    ok("fiche : badge « Vendeur Pro » avec, écrit dessous, « Abonné à l'offre Pro de noma. Ce n'est pas une garantie de qualité. »");
+    await buyer.getByTestId("photo-gallery").waitFor();
+    assert.deepEqual(await decodedSizes(buyer, '[data-testid="gallery-main"]'), [[480, 360]]);
+    ok("lot PH1 : la fiche montre la galerie (une photo) de l'annonce, décodée par le navigateur");
     await checkClean(buyer, "fiche");
     await shot(buyer, "04-fiche-acheteur");
     await buyer.getByTestId("contact-button").click();
@@ -245,6 +286,8 @@ async function main(): Promise<void> {
     assert.match(dashboardText, /moins de 5 besoins correspondent/);
     assert.equal(/(?<!environ )(?<!moins de )\b\d+ besoins/.test(dashboardText), false, "jamais un compte exact");
     ok("4 annonces en ligne, besoins correspondants arrondis (« environ 15 », « environ 10 », « moins de 5 »), solde 25 000 FCFA, boost actif");
+    assert.deepEqual(await decodedSizes(vendor, '[data-vendor-offers] [data-testid="photo-cover"]'), Array.from({ length: 4 }, () => [480, 360]));
+    ok("lot PH1 : les 4 annonces du tableau de bord montrent leur vignette (photo synthétique décodée)");
     await checkSwitcherDoesNotOverlap(vendor, "tableau de bord vendeur");
     await checkClean(vendor, "tableau de bord vendeur");
     await shot(vendor, "07-tableau-de-bord-vendeur");
@@ -279,10 +322,17 @@ async function main(): Promise<void> {
     assert.equal(await vendor.getByTestId("boost-buy").isEnabled(), true, "« Acheter » actif : le solde de 25 000 FCFA couvre le prix");
     assert.match(await vendor.getByTestId("boost-quote").innerText(), /Mise en avant visible auprès de/);
     await shot(vendor, "09-boost-devis-vendeur");
+    // Lot PRO1 : le vendeur démo est Pro : ses 5 000 FCFA de crédits promotionnels paient le boost EN PREMIER.
+    const boostPrice = Number((await vendor.getByTestId("boost-amount").innerText()).replace(/[^\d]/g, ""));
+    assert.ok(boostPrice > 0 && boostPrice < 25_000, `prix du boost lu : ${boostPrice}`);
+    const promoUsed = Math.min(boostPrice, 5_000);
+    assert.match((await vendor.getByTestId("boost-promo-balance").innerText()).replace(/\s/g, " "), /et 5 000 FCFA de crédits promotionnels \(dépensés en premier\)/);
     await vendor.getByTestId("boost-buy").click();
+    const confirmText = (await vendor.getByTestId("boost-confirm-text").innerText()).replace(/\s/g, " ");
+    assert.match(confirmText, /de crédits promotionnels \(dépensés en premier\)/, "la confirmation dit que les crédits promotionnels sont dépensés en premier");
     await vendor.getByTestId("boost-confirm-button").click();
     await vendor.getByTestId("boost-success").waitFor({ timeout: 60_000 });
-    ok("devis du boost du Galaxy S21 disponible (effet visible démontré), achat avec les crédits, « Boost actif »");
+    ok(`devis du boost du Galaxy S21 disponible (effet visible démontré), achat payé d'abord avec les crédits promotionnels (${promoUsed} FCFA sur ${boostPrice}), « Boost actif »`);
     await shot(vendor, "10-boost-achete-vendeur");
     await buyer.goto(`${BASE}/`);
     await buyer.locator("[data-buyer-demands] a", { hasText: "Galaxy S21" }).first().click();
@@ -567,7 +617,7 @@ async function main(): Promise<void> {
     await buyer.getByTestId("order-notice").filter({ hasText: "Votre besoin est marqué comme satisfait." }).waitFor();
     assert.equal(await buyer.getByTestId("order-satisfy").count(), 0);
     ok("après la confirmation, l'acheteur peut marquer son besoin comme satisfait (jamais automatiquement)");
-    await adminContext.close();
+    // La session de l'administrateur démo reste ouverte : le bloc PRO1 final la réutilise (un second code pour le même numéro serait refusé par le délai de renvoi).
 
     step("Recherche sur d'autres sites (démonstration) : fausses sources, mention visible");
     await buyer.goto(`${BASE}/`);
@@ -582,6 +632,224 @@ async function main(): Promise<void> {
     ok("la recherche fonctionne avec les fausses sources, porte la mention « Recherche sur d'autres sites (démonstration) », sans comparaison ni fiche factice");
     await buyer.getByRole("button", { name: "Arrêter" }).click({ timeout: 2_000 }).catch(() => undefined);
     await shot(buyer, "11-recherche-demonstration");
+
+    // ── LOT PRO1 : offre Pro, crédits promotionnels, import de catalogue ───────────────────────────────
+    const fr = (text: string): string => text.replace(/\s/g, " ");
+    const priceFor = (paidAfter: number): string => `${paidAfter.toLocaleString("fr-FR")} FCFA`.replace(/\s/g, " ");
+    step("PRO1 · Porte-monnaie du vendeur démo : crédits et crédits promotionnels séparés, le boost payé d'abord en crédits promotionnels");
+    const promoLeft = 5_000 - promoUsed;
+    const paidLeft = 25_000 - (boostPrice - promoUsed);
+    await vendor.goto(`${BASE}/compte/porte-monnaie`);
+    await vendor.getByTestId("wallet-balance").waitFor();
+    assert.equal(fr(await vendor.getByTestId("wallet-balance").innerText()), priceFor(paidLeft), "crédits payés : seul le reste du prix a été débité");
+    assert.equal(fr(await vendor.getByTestId("wallet-promo-balance").innerText()), priceFor(promoLeft), "crédits promotionnels restants");
+    if (promoLeft > 0) assert.match(fr(await vendor.getByTestId("wallet-promo-expiry").innerText()), /^jusqu'au \d\d\/\d\d\/\d{4} à \d\d:\d\d$/);
+    assert.match(await vendor.getByTestId("wallet-promo").innerText(), /ni remboursables ni retirables/);
+    const boostRow = vendor.locator('[data-testid="wallet-row"][data-kind="boost_purchase"]').first();
+    assert.match(fr(await boostRow.getByTestId("wallet-row-promo").innerText()), /promotionnels|crédits promotionnels/);
+    const subscriptionRow = vendor.locator('[data-testid="wallet-row"][data-kind="subscription_charge"]').first();
+    await subscriptionRow.waitFor();
+    assert.equal(await vendor.locator('[data-testid="wallet-row"][data-kind="subscription_charge"]').count(), 1, "une seule souscription du vendeur démo");
+    await checkClean(vendor, "porte-monnaie du vendeur démo");
+    await shot(vendor, "30-porte-monnaie-promotionnel");
+    ok(`porte-monnaie : crédits ${priceFor(paidLeft)} et crédits promotionnels ${priceFor(promoLeft)} séparés, règles dites, ligne de l'abonnement et du boost avec leur part promotionnelle`);
+
+    step("PRO1 · Page « Offre Pro » du vendeur démo : état, comparaison aux prix provisoires, crédits promotionnels");
+    await vendor.goto(`${BASE}/vendeur/offre-pro`);
+    await vendor.getByTestId("pro-status").waitFor();
+    assert.equal(await vendor.getByTestId("pro-status").getAttribute("data-source"), "subscription");
+    assert.match(await vendor.getByTestId("pro-status").innerText(), /Offre Pro active/);
+    assert.match(fr(await vendor.getByTestId("pro-status").innerText()), /Renouvellement automatique : 10 000 FCFA le \d\d\/\d\d\/\d{4}, avec vos crédits\./);
+    assert.equal(fr(await vendor.getByTestId("pro-promo-amount").innerText()), priceFor(promoLeft));
+    assert.match(await vendor.getByTestId("pro-prices-notice").innerText(), /^Prix provisoires/);
+    const table = fr(await vendor.getByTestId("pro-plan-table").innerText());
+    assert.match(table, /Gratuit/);
+    assert.match(table, /10 000 FCFA par mois/);
+    assert.match(table, /100 au plus/);
+    assert.equal(await vendor.getByTestId("pro-subscribe").count(), 0, "déjà abonné : aucun bouton de souscription");
+    await vendor.getByTestId("pro-import-link").waitFor();
+    await checkClean(vendor, "page Offre Pro");
+    await shot(vendor, "31-offre-pro-vendeur-demo");
+    ok("offre Pro active, renouvellement automatique annoncé, crédits promotionnels restants, tableau Gratuit / Pro aux prix PROVISOIRES, lien d'import (droit présent)");
+
+    step("PRO1 · Import de catalogue (vendeur démo) : aperçu à blanc, application, rejeu, numéro de téléphone refusé");
+    const CSV = [
+      "titre,description,categorie,marque,modele,variante,etat,localisation,prix,disponible",
+      "Casque audio Sony WH-1000XM4,Très bon état avec sa housse,Électronique,Sony,WH-1000XM4,,Occasion,Cocody,95000,oui",
+      "Enceinte portable,,Électronique,07 08 09 10 11,,,,,35000,oui",
+      "Clavier mécanique,,Électronique,Logitech,,,,,abc,oui",
+    ].join("\n");
+    await vendor.goto(`${BASE}/vendeur/annonces/import`);
+    await vendor.getByTestId("import-text").fill(CSV);
+    assert.equal(await vendor.getByTestId("import-apply").isEnabled(), false, "pas d'application avant l'aperçu");
+    await vendor.getByTestId("import-preview").click();
+    const report = vendor.getByTestId("import-report");
+    await report.waitFor();
+    assert.equal(await report.getAttribute("data-mode"), "preview");
+    assert.match(await report.innerText(), /Aperçu : rien n'a encore été créé/);
+    assert.match(fr(await vendor.getByTestId("import-summary").innerText()), /1 annonce serait créée et 2 lignes seraient refusées\./);
+    const rejectedText = fr(await vendor.getByTestId("import-rejected").innerText());
+    assert.match(rejectedText, /Ligne 3 : pas de numéro de téléphone dans l'annonce/);
+    assert.match(rejectedText, /Ligne 4 : le prix n'est pas valide\./);
+    assert.equal(/0708091011|07 08 09 10 11|abc|Enceinte|Clavier/.test(rejectedText), false, "le rapport ne reprend aucune donnée du fichier");
+    await checkClean(vendor, "aperçu de l'import");
+    await shot(vendor, "32-import-apercu");
+    assert.equal(await vendor.getByTestId("import-apply").isEnabled(), true);
+    // Un texte modifié efface l'aperçu : on n'applique jamais un fichier qu'on n'a pas prévisualisé.
+    await vendor.getByTestId("import-text").fill(`${CSV}\n`);
+    assert.equal(await vendor.getByTestId("import-apply").isEnabled(), false);
+    await vendor.getByTestId("import-text").fill(CSV);
+    await vendor.getByTestId("import-preview").click();
+    await vendor.getByTestId("import-report").waitFor();
+    await vendor.getByTestId("import-apply").click();
+    await vendor.waitForFunction(() => document.querySelector('[data-testid="import-report"]')?.getAttribute("data-mode") === "apply");
+    assert.match(fr(await vendor.getByTestId("import-summary").innerText()), /1 annonce créée et 2 lignes refusées\./);
+    await vendor.getByTestId("import-listings-link").waitFor();
+    await shot(vendor, "33-import-applique");
+    await vendor.getByTestId("import-preview").click();
+    await vendor.waitForFunction(() => document.querySelector('[data-testid="import-report"]')?.getAttribute("data-replayed") === "true");
+    assert.match(await vendor.getByTestId("import-report").innerText(), /Ce fichier a déjà été importé/);
+    assert.equal(await vendor.getByTestId("import-apply").isEnabled(), false, "un fichier déjà importé ne se réapplique pas");
+    await vendor.goto(`${BASE}/vendeur`);
+    await vendor.locator("[data-vendor-offers] a", { hasText: "Casque audio Sony" }).first().waitFor();
+    assert.equal(await vendor.locator('[data-vendor-offers] a[href^="/vendeur/annonces/"]').count(), 5, "l'annonce importée est en ligne : 5 annonces");
+    ok("import CSV : aperçu (1 créée, 2 refusées dont un numéro de téléphone), application, rejeu « déjà importé » sans rien recréer, l'annonce est en ligne");
+
+    step("PRO1 · Second vendeur sans le droit : import refusé, solde insuffisant, recharge simulée, souscription (double clic : un seul débit), crédits promotionnels, badge");
+    const secondContext = await browser.newContext({ ...VIEWPORT });
+    const second2 = await secondContext.newPage();
+    second2.setDefaultTimeout(60_000);
+    watch(second2);
+    await loginViaUi(second2, "07 88 88 88 01", "/vendeur/offre-pro", (url) => url.pathname === "/vendeur/offre-pro");
+    await second2.getByTestId("pro-status").waitFor();
+    assert.equal(await second2.getByTestId("pro-status").getAttribute("data-source"), "free");
+    assert.match(await second2.getByTestId("pro-status").innerText(), /Vous êtes sur l'offre Gratuit/);
+    assert.match(fr(await second2.getByTestId("pro-status").innerText()), /\d+ annonces? en ligne sur 10/);
+    await second2.getByTestId("pro-insufficient").waitFor();
+    assert.equal(await second2.getByTestId("pro-subscribe").isDisabled(), true, "solde insuffisant : « Passer à l'offre Pro » est inactif");
+    assert.match(await second2.getByTestId("pro-insufficient").innerText(), /Solde insuffisant \(0 FCFA\)/);
+    assert.equal(await second2.getByTestId("pro-import-link").count(), 0, "pas de lien d'import sans le droit");
+    await shot(second2, "34-offre-pro-second-vendeur");
+    await second2.goto(`${BASE}/vendeur/annonces/import`);
+    await second2.getByTestId("import-text").fill(CSV);
+    await second2.getByTestId("import-preview").click();
+    await second2.getByTestId("import-error").waitFor();
+    assert.match(await second2.getByTestId("import-error").innerText(), /L'import de catalogue est réservé à l'offre Pro\./);
+    assert.equal(await second2.getByTestId("import-report").count(), 0, "rien n'est importé sans le droit");
+    ok("second vendeur : « Solde insuffisant (0 FCFA) », bouton inactif, aucun lien d'import ; import refusé : « réservé à l'offre Pro »");
+    // Recharge de 10 000 FCFA par le paiement simulé.
+    await second2.goto(`${BASE}/compte/porte-monnaie?recharger=1`);
+    await second2.getByTestId("topup-preset-10000").click();
+    await second2.getByTestId("topup-submit").click();
+    await second2.waitForURL(/\/paiement-simule\/[0-9a-f-]{36}/);
+    await second2.getByTestId("sim-confirm").click();
+    await second2.getByTestId("sim-result").waitFor();
+    assert.equal(await second2.getByTestId("sim-result").getAttribute("data-kind"), "succeeded");
+    await second2.goto(`${BASE}/vendeur/offre-pro`);
+    await second2.getByTestId("pro-subscribe").waitFor();
+    await second2.waitForFunction(() => document.querySelector('[data-testid="pro-subscribe"]')?.hasAttribute("disabled") === false);
+    await second2.getByTestId("pro-subscribe").click();
+    await second2.getByTestId("pro-confirmation").waitFor();
+    assert.match(fr(await second2.getByTestId("pro-confirmation").innerText()), /Vous allez payer 10 000 FCFA avec vos crédits pour un mois d'offre Pro\. Solde après paiement : 0 FCFA\. Vous recevez 5 000 FCFA de crédits promotionnels pour cette période\./);
+    assert.match(await second2.getByTestId("pro-confirmation").innerText(), /Prix provisoires/);
+    await shot(second2, "35-offre-pro-confirmation");
+    // Double clic : le bouton se désactive, un seul débit.
+    await second2.getByTestId("pro-confirm").dblclick();
+    await second2.getByTestId("pro-done").waitFor({ timeout: 60_000 });
+    assert.match(await second2.getByTestId("pro-done").innerText(), /Votre abonnement est actif/);
+    assert.equal(await second2.getByTestId("pro-status").getAttribute("data-source"), "subscription");
+    assert.equal(fr(await second2.getByTestId("pro-promo-amount").innerText()), "5 000 FCFA");
+    assert.match(await second2.getByTestId("pro-promo-expiry").innerText(), /valables jusqu'au/);
+    await second2.getByTestId("pro-import-link").waitFor();
+    assert.equal(fr(await second2.getByTestId("pro-balance").innerText()), "0 FCFA", "UN seul débit de 10 000 FCFA");
+    await second2.goto(`${BASE}/compte/porte-monnaie`);
+    await second2.getByTestId("wallet-balance").waitFor();
+    assert.equal(fr(await second2.getByTestId("wallet-balance").innerText()), "0 FCFA");
+    assert.equal(fr(await second2.getByTestId("wallet-promo-balance").innerText()), "5 000 FCFA");
+    assert.equal(await second2.locator('[data-testid="wallet-row"][data-kind="subscription_charge"]').count(), 1, "une seule ligne d'abonnement : jamais deux débits");
+    assert.match(fr(await second2.locator('[data-testid="wallet-row"][data-kind="subscription_charge"]').innerText()), /Abonnement Pro[\s\S]*−10 000 FCFA[\s\S]*\+5 000 FCFA promotionnels/);
+    await shot(second2, "36-porte-monnaie-abonnement");
+    ok("recharge simulée de 10 000 FCFA, souscription avec confirmation (prix provisoires), double clic : UN débit, 5 000 FCFA de crédits promotionnels avec leur échéance, lien d'import");
+    // Le second vendeur peut maintenant importer (aperçu seulement).
+    await second2.goto(`${BASE}/vendeur/annonces/import`);
+    await second2.getByTestId("import-text").fill("titre,prix\nLampe de bureau,8000");
+    await second2.getByTestId("import-preview").click();
+    await second2.getByTestId("import-report").waitFor();
+    assert.match(fr(await second2.getByTestId("import-summary").innerText()), /1 annonce serait créée et 0 ligne serait refusée\./);
+    ok("après la souscription, le droit d'import est ouvert (aperçu)");
+
+    step("PRO1 · Badge « Vendeur Pro » côté acheteur : les deux vendeurs abonnés (le vendeur démo et le second vendeur), aucun autre");
+    await buyer.goto(`${BASE}/`);
+    await buyer.locator("[data-buyer-demands] a", { hasText: "Galaxy S21" }).first().click();
+    await buyer.waitForURL(/\/besoins\/[0-9a-f-]{36}$/);
+    await buyer.getByTestId("match-card").first().waitFor();
+    // L'administration (étape D2) a suspendu puis réactivé le vendeur démo : ses annonces reviennent dans les résultats dès que le worker a rejoué ses évaluations.
+    for (let attempt = 0; attempt < 30 && (await buyer.getByTestId("match-card").count()) < 8; attempt += 1) {
+      await sleep(2_000);
+      await buyer.reload();
+      await buyer.getByTestId("match-card").first().waitFor();
+    }
+    assert.equal(await buyer.getByTestId("match-card").count(), 8);
+    assert.equal(await buyer.getByTestId("pro-badge").count(), 2, "deux annonces de vendeurs Pro parmi les huit : celle du vendeur démo et celle du second vendeur (abonné à l'instant)");
+    assert.equal(await buyer.getByTestId("match-card").filter({ hasText: "Sponsorisé" }).getByTestId("pro-badge").count(), 1, "le badge est sur l'annonce du vendeur démo (boostée)");
+    assert.equal(await buyer.getByTestId("match-card").filter({ hasNotText: "Sponsorisé" }).getByTestId("pro-badge").count(), 1, "l'autre badge est sur l'annonce du second vendeur, qui était sans badge avant sa souscription");
+    await checkClean(buyer, "résultats avec badge Pro");
+    await shot(buyer, "37-resultats-badge-pro");
+    ok("côté acheteur : 8 annonces Galaxy S21, deux badges « Vendeur Pro » (le vendeur démo et le second vendeur, abonné à l'instant), aucun autre");
+    await secondContext.close();
+
+    step("PRO1 · Administration des offres : /admin/offres (abonnés arrondis, revenus du mois, nouvelle version) ; refusée à l'acheteur");
+    const proAdmin = adminPage;
+    await proAdmin.goto(`${BASE}/admin`);
+    await proAdmin.getByTestId("admin-dashboard").waitFor();
+    await proAdmin.getByTestId("admin-offers-link").click();
+    await proAdmin.waitForURL("**/admin/offres");
+    await proAdmin.getByTestId("admin-offers").waitFor();
+    assert.match(await proAdmin.getByTestId("admin-offers-provisional").innerText(), /^Prix provisoires/);
+    assert.match(fr(await proAdmin.getByTestId("admin-offers-provisional").innerText()), /Les abonnés actuels gardent leur prix|les abonnés actuels gardent leur prix/, "l'administration dit que les abonnés actuels gardent leur prix");
+    const subscribersTile = fr(await proAdmin.locator('[data-tile="subscribers"] [data-tile-value]').innerText());
+    assert.equal(subscribersTile, "moins de 5", "deux abonnés : arrondis à 5 près, présentés « moins de 5 » (jamais le compte exact, jamais « environ 0 »)");
+    assert.equal(fr(await proAdmin.locator('[data-tile="revenue"] [data-tile-value]').innerText()), "20 000 FCFA", "revenus d'abonnement du mois : deux abonnements de 10 000 FCFA");
+    assert.equal(await proAdmin.locator('[data-testid="admin-version"]').count(), 2, "une version du plan Gratuit et une du plan Pro");
+    const adminText = fr(await proAdmin.getByTestId("admin-offers").innerText());
+    assert.match(adminText, /Version 1 · Pro/);
+    assert.match(adminText, /10 000 FCFA par mois · crédits promotionnels : 5 000 FCFA par mois · 100 au plus annonces en ligne/);
+    await checkClean(proAdmin, "administration des offres");
+    await shot(proAdmin, "38-admin-offres");
+    // Nouvelle version du plan Pro : s'applique aux renouvellements, pas à la période déjà payée.
+    await proAdmin.getByTestId("new-version-plan").selectOption("pro");
+    await proAdmin.getByTestId("new-version-name").fill("Pro");
+    await proAdmin.getByTestId("new-version-monthlyPriceXof").fill("12000");
+    await proAdmin.getByTestId("new-version-promoCreditsXof").fill("6000");
+    await proAdmin.getByTestId("new-version-maxOnlineOffers").fill("150");
+    await proAdmin.getByTestId("new-version-right-badge_pro").check();
+    await proAdmin.getByTestId("new-version-right-catalog_import").check();
+    await proAdmin.getByTestId("new-version-submit").click();
+    await proAdmin.getByTestId("new-version-message").filter({ hasText: "Nouvelle version créée" }).waitFor();
+    await proAdmin.locator('[data-testid="admin-version"][data-version="2"]').waitFor();
+    assert.match(fr(await proAdmin.locator('[data-testid="admin-version"][data-version="2"]').innerText()), /12 000 FCFA par mois · crédits promotionnels : 6 000 FCFA par mois · 150 au plus annonces en ligne/);
+    assert.match(fr(await proAdmin.locator('[data-testid="admin-version"][data-version="1"]').filter({ hasText: "Version 1 · Pro" }).innerText()), /10 000 FCFA par mois · crédits promotionnels : 5 000 FCFA par mois/, "la version 1 est inchangée");
+    assert.equal(await proAdmin.locator('[data-testid="admin-version"] input, [data-testid="admin-version"] button').count(), 0, "une version publiée n'a aucun champ ni bouton de modification");
+    await shot(proAdmin, "39-admin-offres-nouvelle-version");
+    await vendor.goto(`${BASE}/vendeur/offre-pro`);
+    await vendor.getByTestId("pro-status").waitFor();
+    assert.match(fr(await vendor.getByTestId("pro-status").innerText()), /Renouvellement automatique : 10 000 FCFA le/, "les abonnés actuels gardent leur prix : la version 2 à 12 000 FCFA ne s'applique qu'aux nouvelles souscriptions");
+    assert.equal(/12 000/.test(fr(await vendor.getByTestId("pro-status").innerText())), false, "l'écran de l'abonné n'annonce jamais le prix de la version 2");
+    ok("administration : abonnés « moins de 5 » (arrondi à 5 près), revenus du mois 20 000 FCFA, versions en lecture seule, nouvelle version créée (v1 inchangée) ; l'abonné existant garde son prix : renouvellement annoncé à 10 000 FCFA, pas à 12 000");
+    // Lot D3 : /admin/offres est sous le gabarit de l'espace d'administration : page 404 STANDARD de Next pour l'acheteur, sans titre ni sélecteur d'espace (donc aucun onglet Admin).
+    const offersRefusal = await buyer.goto(`${BASE}/admin/offres`);
+    assert.equal(offersRefusal?.status(), 404, "statut HTTP 404 pour un compte ordinaire");
+    await buyer.getByText("This page could not be found.").waitFor();
+    const offersRefusedText = await buyer.evaluate(() => document.body.innerText);
+    assert.equal(/Offres Pro|Prix provisoires|Abonnés|Administration|Page introuvable/.test(offersRefusedText), false, "aucun texte de l'administration des offres sur la page 404");
+    assert.equal(await buyer.locator("[data-role-switcher]").count(), 0, "ni sélecteur d'espace ni onglet Admin");
+    const planStatuses = await buyer.evaluate(async () => [(await fetch("/api/admin/plans")).status, (await fetch("/api/admin/plans/pro/versions", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status]);
+    assert.deepEqual(planStatuses, [404, 404], "l'acheteur reçoit le 404 indiscernable sur les routes d'administration des offres");
+    ok("/admin/offres refusée à l'acheteur : page 404 standard (statut 404, sans titre ni onglet Admin) et 404 sur les routes d'administration des offres");
+    await adminContext.close();
+    const checkOutput = await walletCheckByAdministration();
+    assert.match(checkOutput, /aucun écart/);
+    ok("wallet:check : aucun écart après les abonnements, les crédits promotionnels, le boost et l'import");
 
     assert.deepEqual(pageErrors, [], "aucune exception de page");
     assert.deepEqual(consoleErrors, [], "aucune erreur de console");

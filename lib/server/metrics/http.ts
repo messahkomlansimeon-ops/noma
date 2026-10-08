@@ -7,6 +7,7 @@ import { resolveSession as resolveStoredSession } from "../auth/sessions";
 import type { AuthClock, ResolvedSession, SessionContext } from "../auth/types";
 import { CatalogValidationError } from "../catalog/errors";
 import { checkPostOrigin, noStoreJsonResponse, readBodyCapped, readSingleCookie } from "../http/protection";
+import { readOfferPhotoRefsSafely } from "../media/read";
 import { readStoredOfferForDemand, type StoredOfferDetail } from "../matching/stored-matches";
 import { getPostgresPool } from "../postgres/client";
 import { CONTACT_DAILY_SELLER_LIMIT } from "./config";
@@ -178,6 +179,9 @@ export function createMetricsHttpHandlers(dependencies: MetricsHttpDependencies 
         }
         if (detail === null) return resourceNotFound();
         const body = mapOfferDetailToDto(detail);
+        // Lot PH1 : galerie de l'annonce (l'accès est prouvé par la lecture de la fiche ci-dessus ; décor : une erreur de lecture donne une fiche sans galerie).
+        const photos = await readOfferPhotoRefsSafely(poolOf(), detail.item.candidateId);
+        if (photos.length > 0) body.details.photos = photos;
         // Ouverture : enregistrée APRÈS l'envoi de la réponse (`after()`), dans une transaction courte et séparée : un journal lent (table verrouillée) ne retarde
         // JAMAIS la fiche. Toute erreur est attrapée, seul son code est journalisé (un seul code par ouverture perdue) : le journal ne change JAMAIS la réponse.
         // Le vendeur d'une annonce n'est jamais compté (recordOfferView). Une ouverture que le délai de 2 s abandonne n'est pas rejouée (compteur).

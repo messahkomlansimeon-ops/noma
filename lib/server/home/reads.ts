@@ -4,6 +4,7 @@ import type { Pool } from "pg";
 import { DEMAND_COLUMNS, OFFER_COLUMNS, mapDemand, mapOffer, type DemandRow, type OfferRow } from "../catalog/shared";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
 import { readEffectiveBoostDetails } from "../boost/boosts";
+import { readCoverPhotoIdsSafely } from "../media/read";
 import { countDemandOrganicLists } from "../matching/stored-matches";
 import { MATCHING_CURRENT_CLOCK_CTE, MATCHING_FRESHNESS_FROM, buildMatchingFreshnessPredicate, resolveMatchingFreshnessParams } from "../matching/persistence";
 import { roundCount, type StatCount } from "../metrics/privacy";
@@ -142,6 +143,8 @@ export interface VendorHomeOffer {
   needs: StatCount;
   /** Boost actif : date de fin ; sinon null. */
   boostEndsAt: string | null;
+  /** Lot PH1 : photo de couverture (identifiant ; le fichier est servi par `/api/media/{id}`), présente seulement quand l'annonce a des photos. */
+  coverPhotoId?: string;
 }
 
 export interface VendorHomeBoost {
@@ -222,6 +225,8 @@ export async function readVendorHome(input: { pool: Pool; userId: string; now?: 
   }
 
   const balance = await readWalletBalance(pool, userId);
+  // Lot PH1 : couvertures des annonces montrées (les siennes ; décor : sans effet si la lecture échoue).
+  const covers = await readCoverPhotoIdsSafely(pool, offers.slice(0, VENDOR_HOME_OFFER_LIMIT).map((offer) => offer.id));
   return {
     contractVersion: VENDOR_HOME_CONTRACT_VERSION,
     counts,
@@ -240,6 +245,7 @@ export async function readVendorHome(input: { pool: Pool; userId: string; now?: 
       price: offer.price === null ? null : { amount: offer.price.amount, currency: offer.price.currency },
       needs: roundCount(needsByOffer.get(offer.id) ?? 0),
       boostEndsAt: endsByOffer.get(offer.id) ?? null,
+      ...(covers.has(offer.id) ? { coverPhotoId: covers.get(offer.id) as string } : {}),
     })),
     readAt: at.toISOString(),
   };

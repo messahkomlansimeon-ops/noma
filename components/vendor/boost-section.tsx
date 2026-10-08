@@ -64,7 +64,7 @@ interface QuoteEntry {
 
 type WalletState =
   | { status: "loading" }
-  | { status: "ready"; balanceXof: number }
+  | { status: "ready"; balanceXof: number; promoBalanceXof: number }
   | { status: "error"; message: string };
 
 /** Un achat dont le résultat est INCONNU (réponse perdue) : `verified` = une relecture a abouti et n'y a trouvé aucun achat pour ce devis. */
@@ -146,7 +146,7 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
     if (!eligible) return;
     const controller = new AbortController();
     api.wallet.overview({ limit: 1 }, { signal: controller.signal }).then(
-      (overview) => setWallet({ status: "ready", balanceXof: overview.balanceXof }),
+      (overview) => setWallet({ status: "ready", balanceXof: overview.balanceXof, promoBalanceXof: overview.promoBalanceXof }),
       (failure) => {
         if (controller.signal.aborted || redirectIfUnauthorized(failure)) return;
         setWallet({ status: "error", message: describeApiError(failure, "wallet") });
@@ -224,7 +224,7 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
       }
       const receivedAtMs = monotonicNow();
       setNow(receivedAtMs);
-      if (walletResult.status === "fulfilled") setWallet({ status: "ready", balanceXof: walletResult.value.balanceXof });
+      if (walletResult.status === "fulfilled") setWallet({ status: "ready", balanceXof: walletResult.value.balanceXof, promoBalanceXof: walletResult.value.promoBalanceXof });
       if (quotesResult.status === "fulfilled") {
         const quotes = quotesResult.value;
         setHistory({ quotes, receivedAtMs });
@@ -305,6 +305,8 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
     quote: entry?.quote ?? null,
     expired: quoteExpired,
     balanceXof: wallet.status === "ready" ? wallet.balanceXof : null,
+    // Lot PRO1 : les crédits promotionnels paient le boost EN PREMIER (même répartition que le serveur).
+    promoBalanceXof: wallet.status === "ready" ? wallet.promoBalanceXof : null,
   });
 
   const askToBuy = () => {
@@ -327,7 +329,11 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
         quoteId: quote.id,
         idempotencyKey: keys.current.keyFor(quote.id),
       });
-      setWallet({ status: "ready", balanceXof: result.balanceXof });
+      setWallet((current) => ({
+        status: "ready",
+        balanceXof: result.balanceXof,
+        promoBalanceXof: current.status === "ready" ? Math.max(0, current.promoBalanceXof - result.purchase.promoAmountXof) : 0,
+      }));
       applyPurchaseSuccess(result.purchase.endsAt);
       setHistoryKey((key) => key + 1);
       setPurchasesKey((key) => key + 1);
@@ -555,6 +561,11 @@ function WalletLine({
     <div data-testid="boost-balance" className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-wash px-3.5 py-2.5 text-[13px]">
       <span className="text-ink-soft">
         Votre solde : <strong data-testid="boost-balance-amount" className="text-ink">{formatFcfa(wallet.balanceXof)}</strong>
+        {wallet.promoBalanceXof > 0 ? (
+          <span data-testid="boost-promo-balance" className="block">
+            et <strong className="text-ink">{formatFcfa(wallet.promoBalanceXof)}</strong> de crédits promotionnels (dépensés en premier)
+          </span>
+        ) : null}
       </span>
       <span className="flex shrink-0 items-center gap-3">
         <button data-testid="boost-balance-refresh" onClick={onRefresh} className="font-bold text-forest underline">
@@ -688,7 +699,7 @@ function BuyArea({
     return (
       <div data-testid="boost-confirm" role="group" aria-label="Confirmer l'achat" className="mt-4 rounded-xl border border-carrot/40 bg-carrot-soft/50 p-3.5">
         <p data-testid="boost-confirm-text" className="text-[14px] font-semibold text-ink">
-          {purchaseConfirmationText({ amountXof: state.amountXof, durationCode: quote.durationCode, balanceXof: state.balanceXof })}
+          {purchaseConfirmationText({ amountXof: state.amountXof, durationCode: quote.durationCode, balanceXof: state.balanceXof, promoXof: state.promoXof })}
         </p>
         <div className="mt-3 flex gap-2">
           <button

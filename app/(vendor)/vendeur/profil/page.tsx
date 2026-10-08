@@ -1,9 +1,10 @@
 "use client";
 
-import { LogOut, MessageCircle, Package, Phone, Store, Wallet } from "lucide-react";
+import { BadgeCheck, LogOut, MessageCircle, Package, Phone, Store, Upload, Wallet } from "lucide-react";
 import { SessionGate, useLogout } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
 import { Badge, MenuRow } from "@/components/ui";
+import { IMPORT_PAGE_PATH, PRO_PAGE_PATH, PRO_PAGE_TITLE } from "@/lib/client/pro-view";
 import { walletHref } from "@/lib/client/wallet-view";
 
 function ProfilVendeur() {
@@ -37,6 +38,8 @@ function ProfilVendeur() {
           <MenuRow icon={MessageCircle} label="Messages" href="/vendeur/messages" />
           <MenuRow icon={Package} label="Commandes" href="/vendeur/commandes" />
           <MenuRow icon={Wallet} label="Mon porte-monnaie" href={walletHref({ next: "/vendeur/profil" })} />
+          <MenuRow icon={BadgeCheck} label={PRO_PAGE_TITLE} href={PRO_PAGE_PATH} />
+          <MenuRow icon={Upload} label="Importer un catalogue" href={IMPORT_PAGE_PATH} />
         </div>
 
         <button

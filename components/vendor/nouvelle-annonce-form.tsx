@@ -2,16 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { PhotoPicker } from "@/components/photos/photo-picker";
 import { TopBar } from "@/components/top-bar";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
 import { FieldLabel, Input, Segmented, Switch, Textarea } from "@/components/ui";
-import { api, describeApiError, type OfferRecord } from "@/lib/client/api";
+import { ApiError, api, describeApiError, type OfferRecord } from "@/lib/client/api";
 import {
   CATEGORY_OPTIONS,
   CONDITION_OPTIONS,
   FIELD_LIMITS,
   buildOfferInput,
 } from "@/lib/client/catalog-view";
+import { photosApi } from "@/lib/client/photos-api";
+import { uploadPicked, type PickedPhoto } from "@/lib/client/photos-queue";
 import { useNoma } from "@/lib/store";
 
 type Submitting = "publish" | "draft" | null;
@@ -52,6 +55,7 @@ export function NouvelleAnnonceForm({
   const [available, setAvailable] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState<Submitting>(null);
+  const [photos, setPhotos] = useState<PickedPhoto[]>([]);
 
   const finish = () => {
     if (embedded) onDone?.();
@@ -87,6 +91,25 @@ export function NouvelleAnnonceForm({
       if (redirectIfUnauthorized(failure)) return;
       showToast(describeApiError(failure, "catalog"));
       return;
+    }
+
+    // Lot PH1 : les photos choisies partent une à une maintenant que l'annonce existe (une photo refusée n'arrête pas les autres ni ne perd l'annonce).
+    if (photos.length > 0) {
+      const summary = await uploadPicked(created.id, photos, photosApi, setPhotos);
+      if (summary.unauthorized) {
+        setSubmitting(null);
+        redirectIfUnauthorized(new ApiError(401, "authentication_required", "Authentification requise."));
+        return;
+      }
+      if (summary.failed > 0) {
+        // Sans toutes ses photos, l'annonce reste en brouillon : elles se rajoutent depuis la page de l'annonce, qui se publie ensuite.
+        onSaved?.(created);
+        showToast("Brouillon enregistré, mais des photos n'ont pas pu être envoyées. Ajoutez-les depuis la page de l'annonce, puis publiez.");
+        setSubmitting(null);
+        if (embedded) onDone?.();
+        else router.push(`/vendeur/annonces/${created.id}`);
+        return;
+      }
     }
 
     if (mode === "draft") {
@@ -242,6 +265,8 @@ export function NouvelleAnnonceForm({
             <span className="text-[14px] font-semibold text-ink">Disponible</span>
             <Switch checked={available} onChange={setAvailable} />
           </div>
+
+          <PhotoPicker items={photos} onChange={setPhotos} disabled={submitting !== null} />
         </div>
 
         <button

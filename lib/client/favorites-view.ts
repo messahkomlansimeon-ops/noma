@@ -25,6 +25,8 @@ export interface FavoriteRowView {
   available: boolean;
   /** Fiche dans le contexte du besoin d'origine, ou null (annonce retirée, correspondance perdue). */
   href: string | null;
+  /** Lot PH1 : photo de couverture ; absente quand l'annonce n'a pas de photo (rien n'est affiché à sa place). */
+  coverPhotoId?: string;
 }
 
 export function favoriteRow(item: FavoriteItem): FavoriteRowView {
@@ -36,6 +38,7 @@ export function favoriteRow(item: FavoriteItem): FavoriteRowView {
     statusText: item.available ? "En ligne" : `Cette annonce ${GONE_TEXT}.`,
     available: item.available,
     href: item.available && item.openable ? `/besoins/${item.demandId}/offres/${item.offerId}` : null,
+    ...(item.coverPhotoId === undefined ? {} : { coverPhotoId: item.coverPhotoId }),
   };
 }
 

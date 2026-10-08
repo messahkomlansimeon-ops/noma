@@ -18,6 +18,7 @@ import {
   CatalogPhoneNumberError,
   CatalogStatusTransitionError,
   CatalogValidationError,
+  OfferLimitError,
   StaleContentVersionError,
 } from "./errors";
 import {
@@ -64,6 +65,9 @@ import {
 } from "./validation";
 
 export const CATALOG_HTTP_BODY_MAX_BYTES = 32 * 1_024;
+
+/** Refus de publication au-delà de la limite d'annonces en ligne du plan (lot PRO1). */
+export const OFFER_LIMIT_MESSAGE = "Vous avez atteint le nombre maximal d'annonces en ligne de votre offre. Mettez une annonce en pause ou passez à l'offre Pro.";
 
 type Environment = Record<string, string | undefined>;
 type PublicCatalogRecord = OfferRecord | DemandRecord;
@@ -139,6 +143,8 @@ function mapCatalogError(error: unknown): Response {
   }
   // Un nom d'attribut hors de [a-z_] (lot D3) : refus explicite, sans répéter le nom saisi.
   if (error instanceof CatalogAttributeKeyError) return catalogError(400, "invalid_attribute_key", error.message);
+  // Lot PRO1 : la limite d'annonces EN LIGNE du plan est atteinte (texte fixe, jamais le nombre ni une donnée de la base).
+  if (error instanceof OfferLimitError) return catalogError(409, "offer_limit_reached", OFFER_LIMIT_MESSAGE);
   if (error instanceof CatalogValidationError) return invalidRequest();
   if (error instanceof CatalogNotFoundError || error instanceof CatalogOwnershipError) {
     return catalogError(404, "resource_not_found", "Ressource introuvable.");

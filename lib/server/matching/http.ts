@@ -19,6 +19,8 @@ import {
 } from "./service";
 import { mapEvaluatedMatchesPageToDto, mapStoredMatchesPageToDto } from "./http-dto";
 import { listStoredDemandMatchesForOffer, listStoredOfferMatchesForDemand } from "./stored-matches";
+import { attachCoverPhotos } from "../media/read";
+import { getPostgresPool } from "../postgres/client";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -189,7 +191,10 @@ export function createMatchingHttpHandlers(
             { limit, cursor, sort },
             dependencies.pool,
           );
-          return noStoreJsonResponse(200, mapStoredMatchesPageToDto(page));
+          const dto = mapStoredMatchesPageToDto(page);
+          // Lot PH1 : vignette de couverture des annonces de la liste (décor : sans effet sur la réponse si la lecture échoue).
+          await attachCoverPhotos(dependencies.pool ?? getPostgresPool(), dto.items);
+          return noStoreJsonResponse(200, dto);
         } catch (error) {
           return mapMatchingError(error);
         }

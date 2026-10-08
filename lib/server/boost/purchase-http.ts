@@ -104,6 +104,8 @@ interface PurchaseDto {
   quoteId: string;
   durationCode: BoostDurationCode;
   amountXof: number;
+  /** Part payée en crédits promotionnels (lot PRO1) ; le reste est payé en crédits. */
+  promoAmountXof: number;
   startsAt: string;
   endsAt: string;
 }
@@ -115,6 +117,7 @@ function purchaseDto(result: BoostPurchaseResult): PurchaseDto {
     quoteId: result.purchase.quoteId,
     durationCode: result.purchase.durationCode,
     amountXof: jsonInteger(result.purchase.amount),
+    promoAmountXof: jsonInteger(result.purchase.promoAmount),
     startsAt: result.boost.startsAt.toISOString(),
     endsAt: result.boost.endsAt.toISOString(),
   };
@@ -127,6 +130,7 @@ function historyDto(item: BoostPurchaseHistoryItem) {
     quoteId: item.quoteId,
     durationCode: item.durationCode,
     amountXof: jsonInteger(item.amount),
+    promoAmountXof: jsonInteger(item.promoAmount),
     startsAt: item.startsAt.toISOString(),
     endsAt: item.endsAt.toISOString(),
     createdAt: item.createdAt.toISOString(),

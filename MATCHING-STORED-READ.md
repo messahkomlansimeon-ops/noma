@@ -24,7 +24,7 @@ Réponse (`contractVersion: "matching-stored-http/v1"`) : `source` (fiche produi
 `readAt`, `nextCursor`, `hasMore`, `limit`, `truncated` (lot 2H1). Chaque item a la forme de l'item en direct (`candidateId`,
 `candidateContentVersion`, `candidate`, `compatibilityStatus`, `score`, `coverage`, `evaluation`, `scoring`) plus
 `evaluatedAt`, `indicators` (`availability`, `price`, `confidence`) et `relevance` (lot 2H1 : champs ajoutés, même
-`contractVersion`, voir `MATCHING-RELEVANCE.md`). Les résumés sont relus depuis les colonnes `evaluation_summary` (`criteriaSummary`),
+`contractVersion`, voir `MATCHING-RELEVANCE.md`). Lot PH1 : chaque item de la liste d'un besoin porte en plus `coverPhotoId` (identifiant de la photo de couverture ; le fichier est servi par `GET /api/media/{id}`), ajouté par la route **seulement quand l'annonce a des photos** (voir `PHOTOS.md`). Les résumés sont relus depuis les colonnes `evaluation_summary` (`criteriaSummary`),
 `scoring_summary` et `preferences_summary` ; `score` et `coverage` viennent de colonnes `NUMERIC(9,6)` : **arrondis
 à 6 décimales**. Liste blanche stricte, champ par champ : jamais d'identifiant de propriétaire, de texte brut,
 d'`evaluation_details`, de `scoring_config`, de clé d'idempotence ni de hash de tentative (ces colonnes ne sont

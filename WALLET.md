@@ -194,6 +194,29 @@ brut, de requête, de montant ni d'identifiant.
 - `npm run wallet:expire-intents [-- --limit N]` — appelle `expirePaymentIntents` (1 à 1000, 200 par défaut). Sûr en parallèle.
   Le worker pourra l'appeler plus tard : il n'est **pas** branché au runner dans ce lot.
 
+## Offre Pro : sous-compte promotionnel et abonnements (lot PRO1)
+
+Le lot PRO1 (migration **0021**, `OFFRE-PRO.md`) ajoute au grand livre, **sans modifier les écritures existantes** :
+
+- **comptes** : `user_promo` (sous-compte PROMOTIONNEL de chaque utilisateur, distinct de `user`, jamais négatif : même `CHECK` de solde non négatif), et les comptes système
+  `subscription_revenue` (revenus d'abonnement), `promo_issuance` (crédits promotionnels émis : négatif à chaque émission), `promo_consumed` (dépensés sur des boosts) et `promo_expired`
+  (expirés ou perdus) ;
+- **types de transaction** : `subscription_charge` (débit du prix ET émission des crédits promotionnels de la période, UNE transaction), `subscription_refund` (remboursement intégral d'une
+  période), `promo_expiry` (expiration écrite du reste d'une émission) ; `boost_purchase` et `boost_refund` peuvent porter des écritures promotionnelles. Métadonnées : deux clés de plus,
+  `subscriptionPeriodId` et `promoGrantId` (UUID), forme exacte imposée (`chk_wallet_transactions_pro`) ;
+- **garde d'usage des comptes** : un compte promotionnel ou de revenus d'abonnement n'est touché que par les types de transaction de son rôle, dans le bon sens (déclencheur
+  `wallet_guard_account_usage`, doublé dans `validateWalletTransactionInput`) : **ni recharge, ni ajustement, ni retrait ne touche un crédit promotionnel** ;
+- **historique** (`GET /api/wallet`) : une ligne par transaction, avec `amountXof` (crédits payés) et `promoAmountXof` (crédits promotionnels), et `promoBalanceXof`/`promoExpiresAt` ;
+- **`wallet:check` étendu** (écarts, exit 1) : `negative_promo_balance`, `promo_balance_mismatch`, `promo_remaining_negative`, `promo_grant_mismatch`, `promo_grant_missing`,
+  `promo_expiry_mismatch`, `promo_expiry_incomplete`, `promo_expired_early`, `promo_spent_after_expiry`, `promo_purchase_mismatch`, `promo_movement_mismatch`, `promo_account_misuse`,
+  `promo_issuance_mismatch`, `promo_consumed_mismatch`, `promo_expired_mismatch`, `subscription_revenue_mismatch`, `subscription_period_mismatch`,
+  `subscription_charge_transaction_orphan`, `subscription_refund_mismatch`, `subscription_refund_transaction_orphan`, `promo_expiry_transaction_orphan`, `subscription_state_mismatch`,
+  `subscription_live_duplicate` ; `boost_purchase_mismatch` et `boost_refund_mismatch` vérifient les écritures promotionnelles et `boost_revenue_mismatch` ne compte que la part payée ;
+  `system_account_invalid` accepte désormais jusqu'à un compte de chacun des quatre nouveaux types système (jamais plus d'un). Avertissements : `promo_expiry_overdue`, `subscription_overdue`.
+
+Les **crédits promotionnels** de ce lot répondent à la ligne « crédits promotionnels séparés » de « Ce qui n'existe pas encore » : séparés, non remboursables, non retirables, expirés par une
+écriture. Le traitement juridique et comptable des crédits reste à valider (ci-dessous).
+
 ## Exploitation
 
 - `NOMA_AUTH_ORIGIN` est obligatoire pour les POST (comme les autres routes). La migration 0014 doit être appliquée.
@@ -234,7 +257,7 @@ brut, de requête, de montant ni d'identifiant.
 - **Vrai prestataire** (Mobile Money) : décision du propriétaire. Il faudra un adaptateur (signature réelle, identifiants réels,
   rapprochement quotidien avec le relevé du prestataire) qui réutilise `applyProviderEvent`.
 - **Traitement juridique et comptable des crédits** (nature des crédits, TVA, durée de validité, remboursabilité, crédits
-  promotionnels séparés, obligations de conservation) : **à valider** avant tout paiement réel.
+  promotionnels séparés (**sous-compte et expiration écrite faits au lot PRO1**, leur traitement juridique restant à valider), obligations de conservation) : **à valider** avant tout paiement réel.
 - **Branchement de `expirePaymentIntents` au worker**, limites de débit propres aux routes, alerte sur `wallet:check` rouge.
 
 ## Limites

@@ -162,7 +162,7 @@ function Dashboard() {
                 href={offer.href}
                 className="flex items-center gap-3 rounded-2xl border border-line bg-white p-3.5 transition hover:bg-wash/40"
               >
-                <Thumb art={offer.art} className="size-12" iconClassName="size-6" />
+                <Thumb art={offer.art} className="size-12" iconClassName="size-6" photoId={offer.coverPhotoId} />
                 <span className="min-w-0 flex-1">
                   <span className="line-clamp-2 text-[15px] font-bold text-ink">{offer.title}</span>
                   {offer.subtitle ? <span className="block truncate text-[12px] text-ink-soft">{offer.subtitle}</span> : null}

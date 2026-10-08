@@ -19,6 +19,7 @@
  */
 
 import { ATTRIBUTE_KEY_MESSAGE, OFFER_TEXT_FIELDS, phoneInOfferMessage, type OfferTextField } from "../phone-text";
+import { parseCoverPhotoId, parsePhotoRefs, type PhotoRef } from "./photos-refs";
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 export type JsonObject = { [key: string]: JsonValue };
@@ -149,6 +150,10 @@ export interface StoredMatch {
   relevance: number;
   /** Vrai seulement pour un élément qui a gagné des places grâce à un boost (tri `relevance`, sens besoin). */
   sponsored: boolean;
+  /** Lot PRO1 : le vendeur a un abonnement Pro en vigueur (badge « Vendeur Pro », sens besoin). Ce n'est pas une garantie de qualité. */
+  proBadge: boolean;
+  /** Lot PH1 : photo de couverture de l'annonce (le fichier est servi par `/api/media/{id}`) ; absente quand l'annonce n'a pas de photo. */
+  coverPhotoId?: string;
 }
 
 export interface StoredMatchesPage {
@@ -252,6 +257,8 @@ export interface OfferDetail {
     /** Date de CRÉATION de l'annonce (le modèle ne conserve pas de date de mise en ligne distincte). */
     createdAt: string;
     attributes: OfferPublicAttribute[];
+    /** Lot PH1 : photos de l'annonce (identifiant et dimensions), dans l'ordre ; absentes quand l'annonce n'a pas de photo. */
+    photos?: PhotoRef[];
   };
   readAt: string;
 }
@@ -373,24 +380,34 @@ export interface BoostQuote {
 
 // ─── Portefeuille, recharge simulée et achat de boost (wallet/v1, boost-purchase/v1) ───────────────
 
-export const WALLET_TRANSACTION_KINDS = ["topup", "adjustment", "boost_purchase", "boost_refund"] as const;
+export const WALLET_TRANSACTION_KINDS = [
+  "topup", "adjustment", "boost_purchase", "boost_refund", "subscription_charge", "subscription_refund", "promo_expiry",
+] as const;
 /**
  * Types connus ; « unknown » = un type que cette version de l'écran ne connaît pas (ajouté un jour par le serveur) : la ligne s'affiche « Opération »,
  * avec son montant (validé), au lieu de faire rejeter tout l'historique. Le code brut du serveur n'atteint jamais l'écran.
  */
 export type WalletTransactionKind = (typeof WALLET_TRANSACTION_KINDS)[number] | "unknown";
 
-/** Une ligne de l'historique : `amountXof` est SIGNÉ du côté de l'utilisateur (positif = crédit, négatif = débit). */
+/**
+ * Une ligne de l'historique : `amountXof` est SIGNÉ du côté de l'utilisateur sur ses crédits PAYÉS (positif = crédit, négatif = débit) ; `promoAmountXof` l'est sur ses crédits
+ * PROMOTIONNELS (lot PRO1 : émis ou restitué, dépensé, expiré ou annulé). Une opération purement promotionnelle a `amountXof` nul.
+ */
 export interface WalletTransaction {
   id: string;
   kind: WalletTransactionKind;
   amountXof: number;
+  promoAmountXof: number;
   createdAt: string;
 }
 
 export interface WalletOverview {
-  /** Solde en FCFA (entier, jamais négatif). */
+  /** Crédits PAYÉS en FCFA (entier, jamais négatif). */
   balanceXof: number;
+  /** Crédits promotionnels dépensables maintenant (lot PRO1) : distincts des crédits payés, non remboursables, non retirables, ils expirent. */
+  promoBalanceXof: number;
+  /** Échéance la plus proche de ces crédits promotionnels ; null s'il n'y en a pas. */
+  promoExpiresAt: string | null;
   /** Du plus récent au plus ancien. */
   transactions: WalletTransaction[];
   nextCursor: string | null;
@@ -442,6 +459,8 @@ export interface BoostPurchase {
   quoteId: string;
   durationCode: BoostDurationCode;
   amountXof: number;
+  /** Part du prix payée en crédits promotionnels (lot PRO1) ; le reste est payé en crédits. */
+  promoAmountXof: number;
   startsAt: string;
   endsAt: string;
   /** Vrai si la même clé d'idempotence avait déjà servi (aucun nouveau débit). */
@@ -464,6 +483,7 @@ export interface BoostPurchaseHistoryItem {
   quoteId: string;
   durationCode: BoostDurationCode;
   amountXof: number;
+  promoAmountXof: number;
   startsAt: string;
   endsAt: string;
   createdAt: string;
@@ -521,6 +541,8 @@ export interface VendorHomeOffer {
   /** Besoins correspondants, ARRONDIS (« moins de 5 », « environ N »). */
   needs: StatCount;
   boostEndsAt: string | null;
+  /** Lot PH1 : photo de couverture (le fichier est servi par `/api/media/{id}`) ; absente quand l'annonce n'a pas de photo. */
+  coverPhotoId?: string;
 }
 
 export interface VendorHome {
@@ -811,6 +833,12 @@ function parseIndicators(status: number, value: unknown): MatchIndicators {
   return parsed;
 }
 
+/** Lot PH1 : la couverture n'est reprise que si c'est un UUID ; absente sinon (jamais une valeur arbitraire du serveur). */
+function coverField(value: unknown): { coverPhotoId?: string } {
+  const cover = parseCoverPhotoId(value);
+  return cover === null ? {} : { coverPhotoId: cover };
+}
+
 function parseStoredMatch(status: number, value: unknown): StoredMatch {
   if (
     !isObject(value) ||
@@ -820,7 +848,9 @@ function parseStoredMatch(status: number, value: unknown): StoredMatch {
     !isNumberOrNull(value.coverage) ||
     typeof value.evaluatedAt !== "string" ||
     typeof value.relevance !== "number" ||
-    typeof value.sponsored !== "boolean"
+    typeof value.sponsored !== "boolean" ||
+    // Lot PRO1 : absent chez un serveur plus ancien (faux) ; s'il est présent, c'est un booléen.
+    !(value.proBadge === undefined || typeof value.proBadge === "boolean")
   ) {
     throw fixedError(status, API_INVALID_RESPONSE);
   }
@@ -834,6 +864,8 @@ function parseStoredMatch(status: number, value: unknown): StoredMatch {
     indicators: parseIndicators(status, value.indicators),
     relevance: value.relevance,
     sponsored: value.sponsored,
+    proBadge: value.proBadge === true,
+    ...coverField(value.coverPhotoId),
   };
 }
 
@@ -1116,6 +1148,7 @@ function parseOfferDetail(status: number, value: unknown): OfferDetail {
         }
         return { key: attribute.key, value: attribute.value };
       }),
+      ...(parsePhotoRefs(details.photos).length > 0 ? { photos: parsePhotoRefs(details.photos) } : {}),
     },
     readAt: raw.readAt,
   };
@@ -1161,7 +1194,9 @@ function parseWalletTransaction(status: number, value: unknown): WalletTransacti
     value.kind.length < 1 ||
     value.kind.length > 64 ||
     !isSafeAmount(value.amountXof) ||
-    value.amountXof === 0 ||
+    // Lot PRO1 : absent chez un serveur plus ancien (nul) ; une ligne a au moins un montant non nul (crédits payés ou promotionnels).
+    !(value.promoAmountXof === undefined || isSafeAmount(value.promoAmountXof)) ||
+    (value.amountXof === 0 && (value.promoAmountXof === undefined || value.promoAmountXof === 0)) ||
     !isIsoDate(value.createdAt)
   ) {
     throw fixedError(status, API_INVALID_RESPONSE);
@@ -1170,6 +1205,7 @@ function parseWalletTransaction(status: number, value: unknown): WalletTransacti
     id: value.id,
     kind: (WALLET_TRANSACTION_KINDS as readonly string[]).includes(value.kind) ? (value.kind as WalletTransactionKind) : "unknown",
     amountXof: value.amountXof,
+    promoAmountXof: value.promoAmountXof === undefined ? 0 : value.promoAmountXof,
     createdAt: value.createdAt,
   };
 }
@@ -1180,6 +1216,8 @@ function parseWalletOverview(status: number, value: unknown): WalletOverview {
     value.contractVersion !== WALLET_CONTRACT_VERSION ||
     !isSafeAmount(value.balanceXof) ||
     value.balanceXof < 0 ||
+    !(value.promoBalanceXof === undefined || (isSafeAmount(value.promoBalanceXof) && value.promoBalanceXof >= 0)) ||
+    !(value.promoExpiresAt === undefined || value.promoExpiresAt === null || isIsoDate(value.promoExpiresAt)) ||
     !Array.isArray(value.transactions) ||
     !(value.nextCursor === null || isCursor(value.nextCursor))
   ) {
@@ -1187,6 +1225,8 @@ function parseWalletOverview(status: number, value: unknown): WalletOverview {
   }
   return {
     balanceXof: value.balanceXof,
+    promoBalanceXof: value.promoBalanceXof === undefined ? 0 : value.promoBalanceXof,
+    promoExpiresAt: typeof value.promoExpiresAt === "string" ? value.promoExpiresAt : null,
     transactions: value.transactions.map((entry) => parseWalletTransaction(status, entry)),
     nextCursor: value.nextCursor,
   };
@@ -1221,6 +1261,7 @@ function parseBoostPurchaseCore(status: number, value: Record<string, unknown>):
     !(BOOST_DURATION_CODES as readonly string[]).includes(String(value.durationCode)) ||
     !isSafeAmount(value.amountXof) ||
     value.amountXof <= 0 ||
+    !(value.promoAmountXof === undefined || (isSafeAmount(value.promoAmountXof) && value.promoAmountXof >= 0 && value.promoAmountXof <= value.amountXof)) ||
     !isIsoDate(value.startsAt) ||
     !isIsoDate(value.endsAt)
   ) {
@@ -1231,6 +1272,7 @@ function parseBoostPurchaseCore(status: number, value: Record<string, unknown>):
     quoteId: value.quoteId,
     durationCode: value.durationCode as BoostDurationCode,
     amountXof: value.amountXof,
+    promoAmountXof: value.promoAmountXof === undefined ? 0 : value.promoAmountXof,
     startsAt: value.startsAt,
     endsAt: value.endsAt,
   };
@@ -1514,6 +1556,7 @@ function parseVendorHome(status: number, value: unknown): VendorHome {
       price: homeMoney(status, entry.price),
       needs: toStatCount(entry.needs),
       boostEndsAt: entry.boostEndsAt,
+      ...coverField(entry.coverPhotoId),
     };
   });
   const activeBoosts = value.activeBoosts.map((entry) => {
@@ -2139,9 +2182,11 @@ export type ApiClient = ReturnType<typeof createApiClient>;
 export const api: ApiClient = createApiClient();
 
 export type ApiErrorContext =
-  | "otp-request" | "otp-verify" | "catalog" | "matches" | "boost" | "wallet" | "purchase" | "offer" | "contact" | "stats" | "notifications" | "tracking" | "default";
+  | "otp-request" | "otp-verify" | "catalog" | "matches" | "boost" | "wallet" | "purchase" | "offer" | "contact" | "stats" | "notifications" | "tracking" | "subscription" | "import" | "default";
 
 export const GENERIC_ERROR_MESSAGE = "Une erreur est survenue. Réessayez dans un instant.";
+/** 409 `offer_limit_reached` (lot PRO1) : la limite d'annonces EN LIGNE du plan est atteinte ; rien n'a été publié. */
+export const OFFER_LIMIT_REACHED_MESSAGE = "Vous avez atteint le nombre maximal d'annonces en ligne de votre offre. Mettez une annonce en pause ou passez à l'offre Pro.";
 /** 429 d'une demande de devis (limite de débit par vendeur, lot P3). */
 export const BOOST_RATE_LIMITED_MESSAGE = "Trop de demandes de prix en peu de temps. Patientez une minute, puis réessayez.";
 /** 404 de la fiche d'une annonce et du contact : accès refusé, annonce hors de vos correspondances, ou retirée : une seule phrase, rien n'est distingué. */
@@ -2186,6 +2231,28 @@ export const PURCHASE_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.
   boost_purchase_unavailable: "L'achat de boost est temporairement indisponible. Réessayez dans un instant.",
 });
 
+/** Messages fixes des refus de l'offre Pro (`subscription`, lot PRO1) : jamais le code brut, jamais le texte du serveur. */
+export const SUBSCRIPTION_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
+  invalid_request: "Cette demande n'est pas valide. Rechargez la page, puis réessayez.",
+  resource_not_found: "Ce plan ou cet avis est introuvable. Rechargez la page.",
+  insufficient_balance: "Solde insuffisant : rechargez votre porte-monnaie, puis réessayez. Seuls vos crédits payés règlent l'abonnement, pas les crédits promotionnels.",
+  already_subscribed: "Vous avez déjà un abonnement en cours. L'écran va être actualisé.",
+  no_subscription: "Vous n'avez pas d'abonnement en cours. L'écran va être actualisé.",
+  period_ended: "La période en cours est terminée : le renouvellement ne peut plus être réactivé. Souscrivez de nouveau pour continuer.",
+  idempotency_conflict: "Cette demande est en conflit avec une demande précédente. Rechargez la page, puis réessayez.",
+  plan_not_subscribable: "Ce plan ne se souscrit pas.",
+  subscription_unavailable: "L'offre Pro est temporairement indisponible. Réessayez dans un instant.",
+});
+
+/** Messages fixes des refus de l'import de catalogue (`import`, lot PRO1). */
+export const IMPORT_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
+  invalid_request: "Cette demande n'est pas valide. Rechargez la page, puis réessayez.",
+  entitlement_required: "L'import de catalogue est réservé à l'offre Pro.",
+  too_many_rows: "Le fichier compte plus de 200 lignes : découpez-le en plusieurs fichiers.",
+  invalid_file: "Le fichier est illisible : vérifiez l'en-tête (colonne « titre » obligatoire) et le format CSV.",
+  subscription_unavailable: "L'import est temporairement indisponible. Réessayez dans un instant.",
+});
+
 function fixedMessage(table: Readonly<Record<string, string>>, code: string): string | null {
   return Object.prototype.hasOwnProperty.call(table, code) ? table[code] : null;
 }
@@ -2207,6 +2274,8 @@ export function describeApiError(error: unknown, context: ApiErrorContext = "def
   if (error.status === 400 && error.code === "phone_number_in_offer") return phoneInOfferMessage(error.field);
   // Nom d'attribut refusé (lot D3) : rappel de la règle, jamais le nom saisi.
   if (error.status === 400 && error.code === "invalid_attribute_key") return ATTRIBUTE_KEY_MESSAGE;
+  // Limite d'annonces en ligne du plan (lot PRO1) : message fixe et clair, quel que soit le contexte.
+  if (error.status === 409 && error.code === "offer_limit_reached") return OFFER_LIMIT_REACHED_MESSAGE;
 
   if (context === "matches") {
     if (error.status === 400) return "Les résultats ne peuvent pas être affichés pour le moment. Actualisez la page.";
@@ -2258,6 +2327,13 @@ export function describeApiError(error: unknown, context: ApiErrorContext = "def
     const known = fixedMessage(context === "wallet" ? WALLET_ERROR_MESSAGES : PURCHASE_ERROR_MESSAGES, error.code);
     if (known !== null && [400, 404, 409, 503].includes(error.status)) return known;
     if ([400, 404, 409].includes(error.status)) return GENERIC_ERROR_MESSAGE;
+  }
+
+  if (context === "subscription" || context === "import") {
+    const known = fixedMessage(context === "subscription" ? SUBSCRIPTION_ERROR_MESSAGES : IMPORT_ERROR_MESSAGES, error.code);
+    if (known !== null && [400, 403, 404, 409, 503].includes(error.status)) return known;
+    if ([400, 403, 404, 409].includes(error.status)) return GENERIC_ERROR_MESSAGE;
+    if (error.status === 413) return "Le fichier est trop volumineux : découpez-le en plusieurs fichiers.";
   }
 
   // Limite de débit (429) propre au portefeuille et à l'achat : le message des codes de connexion ne convient pas ici.

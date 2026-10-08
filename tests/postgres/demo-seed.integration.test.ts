@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { Pool } from "pg";
 import { readBuyerHome, readVendorHome } from "../../lib/server/home/reads";
 import { readOfferStats } from "../../lib/server/metrics/stats";
 import { runMigrations } from "../../lib/server/postgres/migrations";
+import { listStoredOfferMatchesForDemand } from "../../lib/server/matching/stored-matches";
+import { readProBadges, readUserEntitlements } from "../../lib/server/subscriptions/entitlements";
+import { readPromoSummary } from "../../lib/server/subscriptions/promo";
+import { checkWalletIntegrity } from "../../lib/server/wallet/check";
 import { readWalletBalance } from "../../lib/server/wallet/ledger";
 import { DEMO_ADMIN_PHONE, DEMO_BUYER_PHONE, DEMO_CONTACTERS, DEMO_EXTRA_BUYER_COUNT, DEMO_OFFERS, DEMO_OPENERS, DEMO_VENDOR_CREDIT_XOF, DEMO_VENDOR_PHONE, demoMarker } from "../../scripts/demo-seed-plan";
 import { runScript } from "./run-script";
@@ -19,6 +26,8 @@ const suffix = `${process.pid}_${randomBytes(4).toString("hex")}`;
 const mainDb = `noma_essai_${suffix}`;
 let admin: Pool, pool: Pool;
 let baseUrl: string;
+/** Lot PH1 : dossier jetable des photos de démonstration (jamais data/media du dépôt). */
+let mediaDir: string;
 const urlFor = (database: string): string => {
   const url = new URL(baseUrl);
   url.pathname = `/${database}`;
@@ -26,15 +35,17 @@ const urlFor = (database: string): string => {
 };
 
 before(async () => {
+  mediaDir = await mkdtemp(join(tmpdir(), "noma-demo-media-"));
   const opened = await openVerifiedTestDatabase(process.env.TEST_DATABASE_URL);
   admin = opened.pool;
   baseUrl = opened.target.connectionString;
   await admin.query(`CREATE DATABASE "${mainDb}"`);
   pool = new Pool({ connectionString: urlFor(mainDb), max: 4 });
-  assert.equal((await runMigrations(pool)).applied.length, 20);
+  assert.equal((await runMigrations(pool)).applied.length, 22);
 });
 
 after(async () => {
+  if (mediaDir) await rm(mediaDir, { recursive: true, force: true });
   if (pool) await pool.end().catch(() => {});
   if (admin) {
     await admin.query(`DROP DATABASE IF EXISTS "${mainDb}" WITH (FORCE)`).catch(() => {});
@@ -42,7 +53,7 @@ after(async () => {
   }
 });
 
-const seed = (env: Record<string, string> = {}) => runScript("scripts/demo-seed.ts", [], "public", { NODE_ENV: "development", DATABASE_URL: urlFor(mainDb), ...env });
+const seed = (env: Record<string, string> = {}) => runScript("scripts/demo-seed.ts", [], "public", { NODE_ENV: "development", DATABASE_URL: urlFor(mainDb), NOMA_MEDIA_DIR: mediaDir, ...env });
 
 async function snapshot() {
   const read = async (sql: string) => (await pool.query<{ n: string }>(sql)).rows[0].n;
@@ -58,6 +69,9 @@ async function snapshot() {
     contacts: await read("SELECT coalesce(sum(reveals), 0)::text AS n FROM offer_contacts"),
     boosts: await read("SELECT count(*)::text AS n FROM offer_boosts"),
     walletTransactions: await read("SELECT count(*)::text AS n FROM wallet_transactions"),
+    subscriptions: await read("SELECT count(*)::text AS n FROM subscriptions"),
+    subscriptionPeriods: await read("SELECT count(*)::text AS n FROM subscription_periods"),
+    promoGrants: await read("SELECT count(*)::text AS n FROM promo_grants"),
     outbox: await read("SELECT count(*)::text AS n FROM matching_outbox_events"),
     // Lot D2.
     conversations: await read("SELECT count(*)::text AS n FROM conversations"),
@@ -67,6 +81,9 @@ async function snapshot() {
     admins: await read("SELECT count(*)::text AS n FROM users WHERE is_admin"),
     adminActions: await read("SELECT count(*)::text AS n FROM admin_actions"),
     messageNotifications: await read("SELECT count(*)::text AS n FROM notifications WHERE kind = 'new_message'"),
+    // Lot PH1.
+    photos: await read("SELECT count(*)::text AS n FROM offer_photos"),
+    photoFiles: String((await readdir(mediaDir)).length),
   };
 }
 
@@ -89,7 +106,11 @@ test("premier passage : comptes aux numéros fixes, 30 annonces publiées, besoi
   assert.equal(snap.views, String(DEMO_OPENERS));
   assert.equal(snap.contacts, String(DEMO_CONTACTERS));
   assert.equal(snap.boosts, "1");
-  assert.equal(snap.walletTransactions, "1");
+  // Le crédit de démonstration, le crédit du prix de l'abonnement Pro et le débit de l'abonnement (lot PRO1) : trois transactions, jamais plus.
+  assert.equal(snap.walletTransactions, "3");
+  assert.equal(snap.subscriptions, "1");
+  assert.equal(snap.subscriptionPeriods, "1");
+  assert.equal(snap.promoGrants, "1");
   // Aucune écriture directe d'une correspondance ou d'une notification : tout vient du worker, par l'outbox du catalogue.
   assert.ok(Number(snap.outbox) >= 30 + 14, `outbox : ${snap.outbox}`);
   assert.ok(Number(snap.evaluations) > 30);
@@ -109,6 +130,21 @@ test("premier passage : comptes aux numéros fixes, 30 annonces publiées, besoi
     assert.equal(row.length, 1, offer.key);
     assert.deepEqual(row[0], { status: "published", price_amount: String(offer.priceXof), price_currency: "XOF", availability_status: "available" });
   }
+});
+
+test("lot PH1 : une photo synthétique (PNG) par annonce, en première place, fichier nommé d'un UUID dans le dossier jetable, métadonnées absentes, affichée en couverture du tableau de bord du vendeur", async () => {
+  assert.equal((await pool.query<{ n: number }>("SELECT count(*)::int AS n FROM offer_photos")).rows[0].n, 30);
+  const perOffer = await pool.query<{ offer_id: string; n: number; position: number; mime: string; width: number; height: number }>(
+    "SELECT offer_id, count(*)::int AS n, min(position) AS position, min(mime) AS mime, min(width) AS width, min(height) AS height FROM offer_photos GROUP BY offer_id");
+  assert.equal(perOffer.rows.length, 30, "une annonce = une ligne");
+  assert.ok(perOffer.rows.every((row) => row.n === 1 && row.position === 0 && row.mime === "image/png" && row.width === 480 && row.height === 360));
+  const names = await readdir(mediaDir);
+  assert.equal(names.length, 30);
+  assert.ok(names.every((name) => /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(name)), "aucun fichier hors UUID, aucun fichier temporaire");
+  const ids = new Set((await pool.query<{ id: string }>("SELECT id FROM offer_photos")).rows.map((row) => row.id));
+  assert.deepEqual(new Set(names), ids, "autant de fichiers que de lignes, les mêmes");
+  const home = await readVendorHome({ pool, userId: await userOf(DEMO_VENDOR_PHONE) });
+  assert.ok(home.offers.length > 0 && home.offers.every((offer) => offer.coverPhotoId !== undefined && ids.has(offer.coverPhotoId)), "chaque annonce du vendeur démo a sa couverture");
 });
 
 test("lot D2 : le compte Admin démo est administrateur (journalisé), une conversation de 3 messages avec un vendeur fictif, un favori, une commande proposée au vendeur démo par un acheteur fictif", async () => {
@@ -172,6 +208,33 @@ test("vendeur démo : 4 annonces en ligne dont une boostée, solde de crédits, 
   assert.ok(values.length > 0 && values.every((value) => value % 5 === 0), `tous les comptes publiés sont arrondis à 5 : ${values.join(", ")}`);
 });
 
+test("vendeur démo : abonné à l'offre Pro par la VRAIE souscription (droits Pro, badge, 5 000 FCFA de crédits promotionnels, solde de crédits intact) ; le badge apparaît dans les résultats de l'acheteur démo", async () => {
+  const vendorId = await userOf(DEMO_VENDOR_PHONE);
+  const entitlements = await readUserEntitlements(pool, vendorId);
+  assert.equal(entitlements.source, "subscription");
+  assert.equal(entitlements.planCode, "pro");
+  assert.ok(entitlements.entitlements.includes("badge_pro") && entitlements.entitlements.includes("catalog_import"));
+  assert.equal((await readPromoSummary(pool, vendorId)).balance, BigInt(5_000), "crédits promotionnels émis par l'abonnement");
+  assert.equal(await readWalletBalance(pool, vendorId), BigInt(DEMO_VENDOR_CREDIT_XOF), "le crédit de démonstration est intact : le prix de l'abonnement a été crédité en plus");
+  assert.equal((await pool.query("SELECT 1 FROM subscriptions WHERE user_id = $1 AND status = 'active'", [vendorId])).rowCount, 1);
+  assert.equal((await pool.query("SELECT 1 FROM subscription_periods WHERE user_id = $1 AND price_xof = 10000 AND promo_credits_xof = 5000", [vendorId])).rowCount, 1);
+  assert.equal((await pool.query("SELECT 1 FROM wallet_transactions WHERE kind = 'subscription_charge'")).rowCount, 1, "une seule souscription");
+  // Aucun autre compte de démonstration n'est abonné ; les vendeurs fictifs n'ont pas le badge.
+  const other = await userOf("+22507888888" + "01");
+  const badges = await readProBadges(pool, [vendorId, other]);
+  assert.equal(badges.get(vendorId), true);
+  assert.equal(badges.get(other), false);
+  // Résultats de l'acheteur démo : l'annonce du vendeur démo porte `proBadge`, celles des vendeurs fictifs non.
+  const demand = (await pool.query<{ id: string }>("SELECT id FROM demands WHERE owner_id = $1 AND raw_text LIKE '%buyer-iphone12%'", [await userOf(DEMO_BUYER_PHONE)])).rows[0];
+  const page = await listStoredOfferMatchesForDemand(await userOf(DEMO_BUYER_PHONE), demand.id, { limit: 50 }, pool);
+  const mine = page.items.filter((item) => item.candidate.ownerId === vendorId);
+  const others = page.items.filter((item) => item.candidate.ownerId !== vendorId);
+  assert.ok(mine.length >= 1 && others.length >= 5);
+  assert.ok(mine.every((item) => item.proBadge === true), "badge sur l'annonce du vendeur Pro");
+  assert.ok(others.every((item) => item.proBadge === false), "aucun badge sur les autres");
+  assert.deepEqual((await checkWalletIntegrity(pool)).violations, [], "wallet:check vert");
+});
+
 test("rejeu à l'identique : aucun doublon, aucune ouverture ni aucun contact de plus, un seul crédit, un seul boost", async () => {
   const before = await snapshot();
   const result = await seed();
@@ -179,6 +242,8 @@ test("rejeu à l'identique : aucun doublon, aucune ouverture ni aucun contact de
   assert.match(result.output, /0 annonce\(s\) publiée\(s\) \(30 déjà présente\(s\)\), 0 besoin\(s\) activé\(s\) \(14 déjà présent\(s\)\), 0 compte\(s\) créé\(s\) \(21 déjà présent\(s\)\)/);
   assert.match(result.output, /0 ouverture\(s\) et 0 contact\(s\) fictifs écrits, crédits déjà présents, boost déjà actif/);
   assert.match(result.output, /0 message\(s\) écrit\(s\), favori déjà présent, commande de démonstration déjà active, rôle admin déjà attribué/);
+  assert.match(result.output, /offre Pro : vendeur démo déjà abonné/);
+  assert.match(result.output, /photos : 0 photo\(s\) synthétique\(s\) ajoutée\(s\) \(30 déjà présente\(s\)\), une par annonce/);
   assert.deepEqual(await snapshot(), before, "l'état de la base est identique au premier passage");
 });
 

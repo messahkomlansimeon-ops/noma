@@ -645,7 +645,7 @@ describe("couche cliente : correspondances enregistrées (storedMatches)", () =>
     const text = JSON.stringify(page);
     for (const secret of [OWNER_ID, PHONE, "texte brut"]) assert.equal(text.includes(secret), false, secret);
     assert.deepEqual(Object.keys(page.items[0]).sort(), [
-      "candidate", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "indicators", "relevance", "score", "sponsored",
+      "candidate", "candidateId", "compatibilityStatus", "coverage", "evaluatedAt", "indicators", "proBadge", "relevance", "score", "sponsored",
     ]);
     assert.deepEqual(Object.keys(page.items[0].candidate).sort(), [
       "availabilityStatus", "brand", "budget", "category", "condition", "deadlineAt", "location", "model", "price", "quantity", "unit", "variant",
@@ -1247,7 +1247,8 @@ describe("couche cliente : achat de boost (boostPurchases)", () => {
     assert.equal(headerOf(calls[0], "Content-Type"), "application/json");
     assert.equal(calls[0].init.body, calls[1].init.body, "le rejeu envoie exactement la même requête");
     assert.equal(created.balanceXof, 700);
-    assert.deepEqual(created.purchase, { ...purchaseDto(), reused: false });
+    // Lot PRO1 : la part promotionnelle (absente chez un serveur plus ancien : nulle) est relue.
+    assert.deepEqual(created.purchase, { ...purchaseDto(), promoAmountXof: 0, reused: false });
     assert.equal(replay.purchase.reused, true);
   });
 

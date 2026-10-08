@@ -100,6 +100,10 @@ export interface StoredMatchItemDto extends EvaluatedMatchItemDto {
   relevance: number;
   /** Vrai uniquement pour un élément promu par un boost (tri relevance, sens demande). Jamais d'identifiant de boost, de date ni de vendeur. */
   sponsored: boolean;
+  /** Lot PRO1 : le vendeur a un abonnement Pro en vigueur (badge « Vendeur Pro »). Jamais le plan, ni les dates, ni l'identité du vendeur ; ce n'est pas une garantie de qualité. */
+  proBadge: boolean;
+  /** Lot PH1 : photo de couverture de l'annonce (identifiant ; le fichier est servi par `/api/media/{id}`). Ajoutée par la route, seulement quand l'annonce a des photos. */
+  coverPhotoId?: string;
 }
 
 export interface StoredMatchesResponseDto {
@@ -288,6 +292,7 @@ export function mapStoredMatchItem<TCandidate extends OfferRecord | DemandRecord
     },
     relevance: item.relevance,
     sponsored: item.sponsored,
+    proBadge: item.proBadge,
   };
 }
 

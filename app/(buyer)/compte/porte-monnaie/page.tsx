@@ -10,6 +10,9 @@ import { createGenerationGuard } from "@/lib/client/match-view";
 import { safeNextPath } from "@/lib/client/session";
 import {
   EMPTY_WALLET_HISTORY,
+  PAID_CREDITS_LABEL,
+  PROMO_CREDITS_LABEL,
+  PROMO_CREDITS_NOTE,
   SIMULATION_NOTICE,
   TOPUP_PRESETS,
   checkoutHref,
@@ -18,12 +21,16 @@ import {
   formatFcfa,
   mergeTransactionPages,
   parseTopupAmount,
+  promoExpiryText,
   returnTarget,
   walletRow,
 } from "@/lib/client/wallet-view";
 
 interface Loaded {
   balanceXof: number;
+  /** Lot PRO1 : crédits promotionnels dépensables et leur prochaine échéance. */
+  promoBalanceXof: number;
+  promoExpiresAt: string | null;
   transactions: WalletTransaction[];
   nextCursor: string | null;
 }
@@ -188,7 +195,13 @@ function PorteMonnaie() {
     api.wallet.overview({}, { signal: controller.signal }).then(
       (overview) => {
         if (!guard.current.isCurrent(token)) return;
-        setLoaded({ balanceXof: overview.balanceXof, transactions: overview.transactions, nextCursor: overview.nextCursor });
+        setLoaded({
+          balanceXof: overview.balanceXof,
+          promoBalanceXof: overview.promoBalanceXof,
+          promoExpiresAt: overview.promoExpiresAt,
+          transactions: overview.transactions,
+          nextCursor: overview.nextCursor,
+        });
         setLoadError(null);
         setMoreError(null);
         setLoadingMore(false);
@@ -213,6 +226,8 @@ function PorteMonnaie() {
         current
           ? {
               balanceXof: page.balanceXof,
+              promoBalanceXof: page.promoBalanceXof,
+              promoExpiresAt: page.promoExpiresAt,
               transactions: mergeTransactionPages(current.transactions, page.transactions),
               nextCursor: page.nextCursor,
             }
@@ -252,11 +267,25 @@ function PorteMonnaie() {
             <div className="mt-3 rounded-2xl bg-forest p-5 text-white">
               <div className="flex items-center gap-2 text-[13px] font-semibold text-white/80">
                 <Wallet className="size-4" aria-hidden />
-                Solde disponible
+                Solde disponible · {PAID_CREDITS_LABEL}
               </div>
               <div data-testid="wallet-balance" className="mt-1 font-display text-[40px] font-extrabold leading-tight">
                 {formatFcfa(loaded.balanceXof)}
               </div>
+              {loaded.promoBalanceXof > 0 || loaded.transactions.some((entry) => entry.promoAmountXof !== 0) ? (
+                <div data-testid="wallet-promo" className="mt-3 rounded-xl bg-white/15 px-3 py-2.5">
+                  <div className="text-[12px] font-semibold text-white/80">{PROMO_CREDITS_LABEL}</div>
+                  <div data-testid="wallet-promo-balance" className="font-display text-[22px] font-extrabold leading-tight">
+                    {formatFcfa(loaded.promoBalanceXof)}
+                  </div>
+                  {promoExpiryText(loaded.promoBalanceXof, loaded.promoExpiresAt) ? (
+                    <div data-testid="wallet-promo-expiry" className="text-[12px] text-white/80">
+                      {promoExpiryText(loaded.promoBalanceXof, loaded.promoExpiresAt)}
+                    </div>
+                  ) : null}
+                  <p className="mt-1 text-[11px] leading-snug text-white/70">{PROMO_CREDITS_NOTE}</p>
+                </div>
+              ) : null}
               <button
                 data-testid="wallet-recharge"
                 onClick={() => setRechargeOpen((open) => !open)}
@@ -284,8 +313,11 @@ function PorteMonnaie() {
                         <div className="text-[14px] font-bold text-ink">{row.label}</div>
                         <div className="text-[12px] text-ink-soft">{row.dateText}</div>
                       </div>
-                      <div data-testid="wallet-row-amount" data-tone={row.tone} className={`shrink-0 text-[15px] font-extrabold ${TONE_CLASS[row.tone]}`}>
-                        {row.amountText}
+                      <div className="shrink-0 text-right">
+                        <div data-testid="wallet-row-amount" data-tone={row.tone} className={`text-[15px] font-extrabold ${TONE_CLASS[row.tone]}`}>
+                          {row.amountText}
+                        </div>
+                        {row.promoText ? <div data-testid="wallet-row-promo" className="text-[11px] font-semibold text-ink-soft">{row.promoText}</div> : null}
                       </div>
                     </li>
                   );

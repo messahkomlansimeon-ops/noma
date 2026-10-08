@@ -97,6 +97,16 @@ remboursé. Deux remboursements simultanés : un seul passe, les autres reçoive
 annule aussi l'annulation du boost (tout ou rien). **Pas de prorata** : le montant ne dépend ni de l'usage ni du temps restant ; la
 cotation reste consommée.
 
+## Crédits promotionnels (lot PRO1)
+
+Un achat peut être payé **en partie ou en totalité par des crédits promotionnels** (`OFFRE-PRO.md`) : après TOUS les contrôles ci-dessus (cotation, places, plafond vendeur, portée), l'achat verrouille
+les émissions promotionnelles dépensables du vendeur (étape 6b de l'ordre des verrous : après les lignes de boost, **avant** les comptes), répartit le prix (`splitBoostPrice` : les crédits
+promotionnels d'abord, les crédits payés pour le reste) et écrit UNE transaction `boost_purchase` : `user` −payé / `boost_revenue` +payé, `user_promo` −promo / `promo_consumed` +promo (2 ou 4
+écritures). `boost_purchases` porte `promo_xof` (part promotionnelle) et `paid_xof` (colonne calculée) ; les dépenses sont inscrites dans `promo_movements`. **Le chemin est le même** : même
+cotation, mêmes places, même plafond vendeur, même idempotence ; un refus ne dépense rien. Solde insuffisant (promotionnel + payé) : `insufficient_balance`, rien d'écrit. Le remboursement
+intégral rend la part payée en crédits et la part promotionnelle à son émission si elle est encore valable (sinon elle est perdue, écrite `promo_expired`). Les réponses de la route
+portent `promoAmountXof`.
+
 ## HTTP (`contractVersion: "boost-purchase/v1"`)
 
 | Méthode | Chemin | Contrôles, dans l'ordre | Réponse |
