@@ -24,7 +24,8 @@
 # fichier, jamais copié dans le dépôt. La clé publique Turnstile
 # (NEXT_PUBLIC_TURNSTILE_SITE_KEY, non secrète) est ajoutée ensuite PAR
 # L'UTILISATEUR DE SERVICE (le fichier lui appartient) et doit être présent
-# DANS L'ENVIRONNEMENT AU BUILD (next build l'inline) — voir DEPLOIEMENT.md.
+# DANS L'ENVIRONNEMENT AU BUILD (next build l'inline) — voir DEPLOIEMENT.md. Le build se fait
+# par `npm run build:production`, qui ne transmet au build QUE les variables NEXT_PUBLIC_* (aucun secret).
 set -euo pipefail
 # secrets privés DÈS LA CRÉATION du temporaire (aucune fenêtre lisible)
 umask 077

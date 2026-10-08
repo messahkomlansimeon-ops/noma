@@ -52,6 +52,9 @@ export default function Admin() {
               <Link href="/admin/offres" data-testid="admin-offers-link" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
                 Offres Pro : plans et abonnements ›
               </Link>
+              <Link href="/admin/sms" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
+                SMS : consommation et envois à rapprocher ›
+              </Link>
             </div>
           </div>
         );

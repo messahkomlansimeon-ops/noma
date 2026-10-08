@@ -320,6 +320,8 @@ export interface NotificationPreferences {
   externalAvailable: boolean;
   /** Texte fixe du serveur : « Les envois par SMS ne sont pas encore disponibles : ils sont simulés en développement. » */
   notice: string;
+  /** Lot SMS1 : le transport est un VRAI fournisseur SMS (présent seulement quand il est actif) : les libellés ne parlent plus de simulation. */
+  real?: boolean;
 }
 
 export type TrackingAction = "extend" | "pause" | "resume";
@@ -1412,7 +1414,12 @@ function parseNotificationPreferences(status: number, value: unknown): Notificat
   ) {
     throw fixedError(status, API_INVALID_RESPONSE);
   }
-  return { externalEnabled: value.preferences.externalEnabled, externalAvailable: value.external.available, notice: value.external.notice };
+  return {
+    externalEnabled: value.preferences.externalEnabled,
+    externalAvailable: value.external.available,
+    notice: value.external.notice,
+    ...(value.external.real === true ? { real: true } : {}),
+  };
 }
 
 function parseDemandTracking(status: number, value: unknown): DemandTracking {
@@ -2365,6 +2372,10 @@ export function describeApiError(error: unknown, context: ApiErrorContext = "def
     case 429:
       return "Trop de demandes de code. Patientez quelques minutes avant de réessayer.";
     case 503:
+      // Lot SMS1 : l'envoi du code a échoué de façon définitive (message générique, sans détail du fournisseur).
+      if (context === "otp-request" && error.code === "otp_delivery_failed") return "Envoi du code impossible pour le moment. Réessayez dans quelques minutes.";
+      // Lot SMS1-bis : la capacité d'envoi des codes est atteinte (aucun SMS n'est parti) : message distinct, qui ne promet pas un envoi immédiat.
+      if (context === "otp-request" && error.code === "otp_capacity_reached") return "Le service d'envoi de codes est très sollicité en ce moment. Réessayez un peu plus tard.";
       return "Le service est temporairement indisponible. Réessayez dans un instant.";
     default:
       return GENERIC_ERROR_MESSAGE;

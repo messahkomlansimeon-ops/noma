@@ -9,7 +9,7 @@
 3. le **suivi d'un besoin** (« recherche active » interne) : durée, prolongation, pause, reprise, arrêt automatique ;
 4. la **rétention** (`npm run notifications:purge`).
 
-**Aucun vrai SMS, WhatsApp, courriel ni appel externe n'existe.** Aucun transport de production n'est fourni : voir « Ce qui manque pour un vrai SMS ». Aucune donnée d'un acheteur n'est
+**Par défaut, aucun vrai SMS, WhatsApp, courriel ni appel externe n'existe.** Le seul transport réel est le SMS par le fournisseur Meno (lot SMS1, **désactivé tant que `NOMA_SMS_PROVIDER=meno` et la clé ne sont pas définies**, voir `SMS.md`) ; sinon voir « Ce qui manque pour un vrai SMS ». Aucune donnée d'un acheteur n'est
 jamais notifiée à un vendeur dans ce lot (le vendeur n'a aucune notification).
 
 Code : `lib/server/notifications/` (`config.ts`, `content.ts`, `creation.ts`, `deliveries.ts`, `tracking.ts`, `preferences.ts`, `inbox.ts`, `transport.ts`, `purge.ts`, `http.ts`),
@@ -224,10 +224,11 @@ du transport de développement : identifiant tronqué, nombre d'annonces, lien).
 
 ## Ce qui manque pour un vrai SMS
 
-- un **transport de production** (fournisseur SMS ou WhatsApp, contrat, identifiants dans l'environnement, mode d'emploi du secret) : le port existe, aucune implémentation ;
-- le **numéro de téléphone vérifié** du destinataire, lu à l'envoi (aujourd'hui aucune étape ne lit un numéro) et un **consentement** explicite (opt-in légal, désinscription, STOP) ;
-- la **gestion des retours du fournisseur** (accusés de réception, numéros invalides, désinscriptions) et la **déduplication par clé d'idempotence** côté fournisseur (la livraison est « au moins une fois ») ;
-- un **budget et un suivi des coûts** d'envoi (le journal de coûts du dépôt ne couvre que l'IA) ;
+Lot SMS1 : le **transport SMS réel** (Meno) existe (`lib/server/sms/notification-transport.ts`, clé d'idempotence `notif-<lot figé>`, numéro vérifié lu dans `phone_identities` à l'envoi, résultat incertain jamais renvoyé : lignes `sent` avec `last_error='sms_uncertain'` ; lot SMS1-bis : budget des notifications atteint = lot **reporté** au lendemain 7 h UTC, jamais `failed`, `last_error='sms_budget'`) ; mise en service, coût (15 F par SMS) et rapprochement : `SMS.md`. Le branchement reste **désactivé par défaut**. Reste :
+
+- un **consentement** explicite plus complet (opt-in légal, désinscription, STOP) : aujourd'hui seule la case des préférences (désactivée par défaut) autorise l'envoi ;
+- la **gestion des retours du fournisseur** (accusés de réception, numéros invalides, désinscriptions) : « accepté » n'est pas une preuve de livraison ; la déduplication par clé d'idempotence est faite côté fournisseur ;
+- un **suivi des coûts** au-delà de `/admin/sms` (consommation du mois lue chez le fournisseur) et des budgets du jour (`NOMA_SMS_DAILY_CAP` découpé, affichés dans `/admin/sms`) ;
 - les **heures calmes par fuseau** (aujourd'hui UTC = Afrique/Abidjan), un modèle de message validé et la langue ;
 - la **supervision** (alerte sur les envois `failed`, tableau de bord), la planification de `notifications:purge`, et l'exécution du worker en service séparé (voir `MATCHING-RUNNER.md`).
 

@@ -7,9 +7,10 @@ import { unreadRefresher } from "@/components/unread-badge";
 import { api, describeApiError, isUnauthorized, type NotificationPreferences } from "@/lib/client/api";
 import {
   PREFERENCES_HINT,
-  PREFERENCES_LABEL,
   PREFERENCES_LOADING,
   PREFERENCES_TITLE,
+  preferencesLabel,
+  preferencesToast,
   preferencesView,
 } from "@/lib/client/notifications-view";
 import { useNoma } from "@/lib/store";
@@ -73,8 +74,9 @@ export function NotificationPreferencesCard() {
     if (saving) return;
     setSaving(true);
     try {
-      setPreferences(await api.notifications.setPreferences(next));
-      showToast(next ? "Envoi par SMS (simulé) activé" : "Envoi par SMS (simulé) désactivé");
+      const saved = await api.notifications.setPreferences(next);
+      setPreferences(saved);
+      showToast(preferencesToast(next, saved));
     } catch (failure) {
       showToast(describeApiError(failure, "notifications"));
     } finally {
@@ -92,10 +94,10 @@ export function NotificationPreferencesCard() {
           <div className="text-[14px] font-extrabold text-ink">{PREFERENCES_TITLE}</div>
           <div className="mt-1 flex items-center justify-between gap-3">
             <span id="external-label" className="text-[13px] font-semibold text-ink">
-              {PREFERENCES_LABEL}
+              {preferencesLabel(preferences)}
             </span>
             <span className={saving ? "opacity-50" : ""}>
-              <Switch checked={view.enabled} onChange={(next) => void toggle(next)} label={PREFERENCES_LABEL} />
+              <Switch checked={view.enabled} onChange={(next) => void toggle(next)} label={preferencesLabel(preferences)} />
             </span>
           </div>
           <p className="mt-2 text-[12px] text-ink-soft">{PREFERENCES_HINT}</p>

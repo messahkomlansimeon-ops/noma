@@ -1,4 +1,5 @@
 import { hostname } from "node:os";
+import { assertSmsProductionConfig } from "../lib/server/sms/config";
 import { getPostgresPool, closePostgresPool, requireDatabaseUrl } from "../lib/server/postgres/client";
 import { requireWorkerId } from "../lib/server/matching/jobs";
 import { runMatchingCycle, runMatchingWorkerLoop } from "../lib/server/matching/runner";
@@ -11,6 +12,15 @@ function resolveWorkerId(): string {
 }
 
 async function main(): Promise<void> {
+  // Lot SMS1 : en production, un fournisseur SMS mal configuré (meno sans clé valide…) interdit le démarrage du worker (il envoie les notifications).
+  try {
+    assertSmsProductionConfig(process.env);
+  } catch (error) {
+    // Message fixe qui nomme la variable, jamais sa valeur.
+    console.error(`Matching worker : refus de démarrer : ${error instanceof Error ? error.message : "configuration SMS invalide"}.`);
+    process.exitCode = 1;
+    return;
+  }
   requireDatabaseUrl();
   const workerId = resolveWorkerId();
   const once = process.argv.slice(2).includes("--once");

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createOtpTransportResolver } from "../sms/transports";
 import type { SendOtp, SendOtpInput } from "./types";
 
 type Environment = Record<string, string | undefined>;
@@ -73,5 +74,8 @@ export function createDevOtpResolver(
   };
 }
 
-/** Résolveur du runtime : branché uniquement dans les dépendances par défaut des gestionnaires HTTP d'authentification. */
-export const resolveDevOtpTransport = createDevOtpResolver();
+/**
+ * Résolveur du runtime : branché uniquement dans les dépendances par défaut des gestionnaires HTTP d'authentification. Lot SMS1 : le nom est conservé, mais le résolveur choisit d'abord le
+ * transport SMS réel « meno » (NOMA_SMS_PROVIDER=meno et clé valide, voir lib/server/sms/transports.ts) ; sans cela il délègue au résolveur de développement ci-dessus, inchangé.
+ */
+export const resolveDevOtpTransport = createOtpTransportResolver(createDevOtpResolver());

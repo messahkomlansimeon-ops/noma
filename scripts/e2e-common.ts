@@ -7,6 +7,8 @@
  *   NOMA_E2E_BASE_URL           origine du RELAIS (défaut http://localhost:3212) ; DOIT être NOMA_AUTH_ORIGIN du serveur
  *   NOMA_E2E_SERVER_LOG         fichier où la sortie du serveur est enregistrée (les lignes `[auth:dev]` y sont lues)
  *   NOMA_E2E_DATABASE_URL       base du serveur testé (pour la commande d'administration boost:grant) ; DOIT se terminer par /noma_e2e
+ *   NOMA_E2E_MENO_CAPTURE       fichier (une ligne JSON {at,to,content} par SMS accepté) du FAUX serveur Meno de l'essai (scripts/e2e-fake-meno.ts), quand le serveur a été lancé avec
+ *                               NOMA_SMS_PROVIDER=meno vers ce faux serveur (lot SMS1) : les codes OTP sont alors lus dans ce fichier, et non dans la sortie du serveur
  *   NOMA_E2E_NOTIFY_CONSOLE     « 1 » quand le serveur a été lancé avec NOMA_DEV_NOTIFY_CONSOLE=1 (transport de notification de développement : les lignes
  *                               `[notify:dev]` du journal sont alors vérifiées ; sans cela, aucun envoi simulé n'est attendu)
  * Les codes OTP lus dans le journal ne sont jamais affichés.
@@ -25,8 +27,45 @@ export function logSize(): number {
   return statSync(E2E_SERVER_LOG).size;
 }
 
-/** Attend, après `offset` octets du journal du serveur, une ligne `[auth:dev]` et renvoie le code et les deux derniers chiffres affichés. */
+/** Lot SMS1 : fichier des SMS reçus par le faux serveur Meno (vide : le serveur est lancé avec le transport console de développement). */
+const MENO_CAPTURE = process.env.NOMA_E2E_MENO_CAPTURE ?? "";
+export const E2E_MENO_MODE = MENO_CAPTURE !== "";
+
+/** Taille de la source des codes OTP (journal du serveur, ou fichier du faux serveur Meno) : à lire AVANT la demande de code, puis à passer à `awaitOtpLine`. */
+export function otpSourceSize(): number {
+  return statSync(MENO_CAPTURE || E2E_SERVER_LOG).size;
+}
+
+export interface MenoCapturedMessage {
+  at: string;
+  to: string;
+  content: string;
+}
+
+/** SMS acceptés par le faux serveur Meno après `offset` octets de son fichier. */
+export function menoMessagesSince(offset: number): MenoCapturedMessage[] {
+  if (!E2E_MENO_MODE) return [];
+  return readFileSync(MENO_CAPTURE)
+    .subarray(offset)
+    .toString("utf8")
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => JSON.parse(line) as MenoCapturedMessage);
+}
+
+/** Attend, après `offset` octets du journal du serveur (ou du fichier du faux serveur Meno), le code de connexion et renvoie le code et les deux derniers chiffres du numéro. */
 export async function awaitOtpLine(offset: number): Promise<{ code: string; tail: string }> {
+  if (E2E_MENO_MODE) {
+    const limit = Date.now() + 15_000;
+    while (Date.now() < limit) {
+      for (const message of menoMessagesSince(offset)) {
+        const match = /^noma : votre code est ([0-9]{6})\. /.exec(message.content);
+        if (match) return { code: match[1], tail: message.to.slice(-2) };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    throw new Error("aucun SMS de code dans le fichier du faux serveur Meno (NOMA_SMS_PROVIDER=meno vers le faux serveur ?)");
+  }
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     const text = readFileSync(E2E_SERVER_LOG).subarray(offset).toString("utf8");
@@ -137,7 +176,7 @@ export class RelaySession {
 /** Connexion par OTP (demande, lecture du code dans le journal du serveur, vérification) ; renvoie l'identifiant du compte. */
 export async function loginWithOtp(session: RelaySession, phone: string): Promise<string> {
   const api = session.client();
-  const offset = logSize();
+  const offset = otpSourceSize();
   const challenge = await api.auth.requestOtp(phone);
   const { code, tail } = await awaitOtpLine(offset);
   assert.equal(tail, phone.slice(-2), "la ligne de code vise bien ce téléphone (deux derniers chiffres)");

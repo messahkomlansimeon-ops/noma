@@ -55,16 +55,18 @@
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, statSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { buildDemandInput, buildOfferInput } from "../lib/client/catalog-view";
 import {
   E2E_BASE,
+  E2E_MENO_MODE,
   E2E_SERVER_LOG,
   RelaySession,
   awaitOtpLine,
   grantBoostByAdministration,
   loginWithOtp,
+  otpSourceSize,
   pollUntil,
   refundPurchaseByAdministration,
   seedExamplesByAdministration,
@@ -131,7 +133,7 @@ async function expectingConsoleErrors<T>(label: string, pattern: RegExp, action:
 async function loginViaUi(page: Page, localPhone: string, next: string, destination: (url: URL) => boolean): Promise<void> {
   await page.goto(`${BASE}/connexion?next=${encodeURIComponent(next)}`);
   await page.getByPlaceholder("07 00 00 00 42").fill(localPhone);
-  const offset = statSync(E2E_SERVER_LOG).size;
+  const offset = otpSourceSize();
   await page.getByRole("button", { name: /Recevoir un code/ }).click();
   await page.waitForURL("**/verification");
   const { code } = await awaitOtpLine(offset);
@@ -191,7 +193,7 @@ async function main(): Promise<void> {
     const phone = localPhone(0);
     await page.goto(`${BASE}/connexion?next=${encodeURIComponent("https://evil.example/x")}`);
     await page.getByPlaceholder("07 00 00 00 42").fill(phone);
-    const offset = statSync(E2E_SERVER_LOG).size;
+    const offset = otpSourceSize();
     await page.getByRole("button", { name: /Recevoir un code/ }).click();
     await page.waitForURL("**/verification");
     ok("demande de code acceptée À TRAVERS LE RELAIS (aucun en-tête de proxy envoyé par le navigateur), page /verification");
@@ -346,7 +348,7 @@ async function main(): Promise<void> {
     step("Retour vers la page demandée après connexion (next interne honoré)");
     const secondPhone = localPhone(7);
     await page.getByPlaceholder("07 00 00 00 42").fill(secondPhone);
-    const secondOffset = statSync(E2E_SERVER_LOG).size;
+    const secondOffset = otpSourceSize();
     await page.getByRole("button", { name: /Recevoir un code/ }).click();
     await page.waitForURL("**/verification");
     await page.getByLabel(/Code reçu par SMS/).fill((await awaitOtpLine(secondOffset)).code);
@@ -2013,13 +2015,18 @@ async function main(): Promise<void> {
     await nPrefs.waitFor();
     const nSwitch = nPrefs.getByRole("switch");
     assert.equal(await nSwitch.getAttribute("aria-checked"), "false", "désactivé par défaut");
-    assert.equal(norm(await nPage.getByTestId("external-notice").textContent()), "Les envois par SMS ne sont pas encore disponibles : ils sont simulés en développement.");
+    // Lot SMS1 : serveur lancé avec le transport SMS réel (faux serveur Meno) : le texte et les libellés ne parlent plus de simulation.
+    const nNotice = E2E_MENO_MODE
+      ? "Un SMS regroupé vous prévient des nouvelles annonces : au plus 3 par jour, jamais entre 22 h et 7 h."
+      : "Les envois par SMS ne sont pas encore disponibles : ils sont simulés en développement.";
+    const nKind = E2E_MENO_MODE ? "Envoi par SMS" : "Envoi par SMS (simulé)";
+    assert.equal(norm(await nPage.getByTestId("external-notice").textContent()), nNotice);
     const nMenuLink = nPage.locator('a[href="/notifications"]').filter({ hasText: "Notifications" });
     await nMenuLink.first().waitFor();
     await pollUntil("la pastille de la ligne « Notifications »", async () => (norm(await nMenuLink.first().innerText()) === "Notifications 1" ? true : null), 15_000, "la ligne n'a pas reçu la pastille");
     ok("la ligne « Notifications » de la page Compte porte la pastille « 1 » et mène à /notifications");
     await nSwitch.click();
-    await nPage.getByText("Envoi par SMS (simulé) activé").waitFor();
+    await nPage.getByText(`${nKind} activé`).waitFor();
     await pollUntil("l'interrupteur activé", async () => ((await nSwitch.getAttribute("aria-checked")) === "true" ? true : null), 10_000);
     await nPage.reload();
     await nPrefs.waitFor();
@@ -2027,7 +2034,7 @@ async function main(): Promise<void> {
     ok("page Compte : envoi par SMS (simulé) désactivé par défaut, texte fixe affiché, activé puis conservé après rechargement ; ligne « Notifications » avec la pastille");
     await shot(nPage, "56-compte-preferences");
     await nPrefs.getByRole("switch").click();
-    await nPage.getByText("Envoi par SMS (simulé) désactivé").waitFor();
+    await nPage.getByText(`${nKind} désactivé`).waitFor();
     await nBuyerContext.close();
 
     await sellerContext.close();

@@ -26,11 +26,11 @@ before(async () => {
   second = await openVerifiedIsolatedPool(opened.target, schema);
   third = await openVerifiedIsolatedPool(opened.target, schema);
   const first = await runMigrations(pool);
-  assert.equal(first.applied.length, 23);
-  assert.equal(first.applied.at(-1), "0023_price_observations");
+  assert.equal(first.applied.length, 24);
+  assert.equal(first.applied.at(-1), "0024_sms_sends");
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 23);
+  assert.equal(rerun.skipped.length, 24);
 });
 
 after(async () => {

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { DEV_NOTIFY_FLAG, SIMULATED_CHANNEL, type NotificationChannel } from "./config";
+import { createNotificationResolverWithMeno } from "../sms/transports";
 
 type Environment = Record<string, string | undefined>;
 
@@ -19,8 +20,12 @@ export interface NotificationMessage {
 
 export interface NotificationTransport {
   readonly channel: NotificationChannel;
+  /** Durée maximale d'un appel (lot SMS1) ; défaut : TRANSPORT_TIMEOUT_MS (5 s). Un vrai fournisseur peut en demander davantage. */
+  readonly timeoutMs?: number;
   send(message: NotificationMessage): Promise<void>;
 }
+
+export { NotificationBudgetError, NotificationUncertainError } from "./errors";
 
 /** Identifiant de compte tronqué pour la console : 8 caractères au plus, jamais l'identifiant entier. */
 export function maskUserId(userId: string): string {
@@ -85,5 +90,11 @@ export function createNotificationTransportResolver(
   };
 }
 
-/** Résolveur du runtime : branché uniquement dans l'étape « notify » du runner (le worker) et dans les préférences (disponibilité affichée). */
-export const resolveNotificationTransport = createNotificationTransportResolver();
+/** Résolveur du transport de DÉVELOPPEMENT seul (console), inchangé depuis N1. */
+export const resolveDevNotificationTransport = createNotificationTransportResolver();
+
+/**
+ * Résolveur du runtime : branché uniquement dans l'étape « notify » du runner (le worker) et dans les préférences (disponibilité affichée). Lot SMS1 : le transport SMS réel
+ * « meno » s'il est configuré (NOMA_SMS_PROVIDER=meno + clé), sinon le transport de développement ci-dessus.
+ */
+export const resolveNotificationTransport = createNotificationResolverWithMeno(resolveDevNotificationTransport);

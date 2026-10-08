@@ -19,6 +19,7 @@ import {
   TRANSPORT_TIMEOUT_MS,
 } from "./config";
 import { EXTERNAL_MESSAGE_LINK } from "./content";
+import { NotificationBudgetError, NotificationUncertainError } from "./errors";
 import type { NotificationTransport } from "./transport";
 
 /**
@@ -125,7 +126,7 @@ export interface NotifyStepResult {
   delivered: number;
   /** Lignes écartées à l'envoi (revérification, expiration). Jamais pour cause de plafond : le plafond reporte. */
   skippedDeliveries: number;
-  /** Lignes reportées (heures calmes, intervalle de 4 h, plafond du jour). */
+  /** Lignes reportées (heures calmes, intervalle de 4 h, plafond du jour, budget SMS des notifications atteint : reporté au lendemain 7 h UTC, sans consommer de tentative). */
   deferred: number;
   /** Lignes passées à `failed` (3 tentatives). */
   failed: number;
@@ -348,18 +349,32 @@ async function processPass(
   // 4. Envoi : UN message pour tout le lot (nombre d'annonces et lien vers /notifications, rien d'autre).
   await hooks.beforeSend?.(userId, members.length);
   let failure: string | null = null;
+  // Résultat inconnu du fournisseur (lot SMS1) : le message est peut-être parti. JAMAIS renvoyé : le lot est compté comme envoyé (rythme de 4 h et de 3 par jour respecté) avec le code `sms_uncertain`.
+  let uncertain = false;
+  // Budget SMS des notifications atteint (lot SMS1-bis) : aucun SMS parti ; le lot est REPORTÉ (jamais `failed`), sans consommer de tentative.
+  let budgetRefused = false;
   try {
-    await withTimeout(transport.send({ userId, count: members.length, link: EXTERNAL_MESSAGE_LINK, idempotencyKey: batchKey }), TRANSPORT_TIMEOUT_MS);
+    await withTimeout(transport.send({ userId, count: members.length, link: EXTERNAL_MESSAGE_LINK, idempotencyKey: batchKey }), transport.timeoutMs ?? TRANSPORT_TIMEOUT_MS);
   } catch (error) {
-    failure = error instanceof TransportTimeoutError ? "transport_timeout" : "transport_error";
+    if (error instanceof NotificationUncertainError) uncertain = true;
+    else if (error instanceof NotificationBudgetError) budgetRefused = true;
+    else failure = error instanceof TransportTimeoutError ? "transport_timeout" : "transport_error";
   }
-  if (failure === null) {
+  if (budgetRefused) {
+    // Le budget se renouvelle à minuit UTC : prochain créneau permis (hors heures calmes) du lendemain. Le lot reste figé (même clé) ; l'attente maximale de 48 h reste la règle.
+    const notBefore = allowedSendTime(utcDayBounds(now).end);
+    await client.query(
+      `UPDATE notification_deliveries SET next_attempt_at = GREATEST(next_attempt_at, $2::timestamptz), last_error = 'sms_budget', updated_at = $3::timestamptz WHERE id = ANY($1::uuid[]) AND status = 'pending'`,
+      [members, notBefore, now],
+    );
+    outcome.deferred = (outcome.deferred ?? 0) + members.length;
+  } else if (failure === null) {
     await hooks.afterSend?.(userId, members.length);
     await client.query(
       `UPDATE notification_deliveries
-          SET status = 'sent', attempts = attempts + 1, sent_at = $2::timestamptz, last_error = NULL, updated_at = $2::timestamptz
+          SET status = 'sent', attempts = attempts + 1, sent_at = $2::timestamptz, last_error = $3::text, updated_at = $2::timestamptz
         WHERE id = ANY($1::uuid[]) AND status = 'pending'`,
-      [members, now],
+      [members, now, uncertain ? "sms_uncertain" : null],
     );
     outcome.messages = 1;
     outcome.delivered = members.length;

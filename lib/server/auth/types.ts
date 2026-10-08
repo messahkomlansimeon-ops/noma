@@ -10,7 +10,13 @@ export interface SendOtpInput {
   expiresAt: Date;
 }
 
-export type SendOtp = (input: SendOtpInput) => Promise<void>;
+/**
+ * Transport d'envoi du code. Il lève pour un échec (le défi passe à `send_failed`) ; `OtpDeliveryUncertainError` signale un résultat inconnu (le défi reste valable).
+ * `timeoutMs` (facultatif, lot SMS1) : durée maximale propre au transport, plus longue que le défaut (10 s) pour un vrai fournisseur.
+ * `timeoutIsUncertain` (facultatif, lot SMS1-bis) : vrai si un dépassement de ce délai ne prouve PAS que rien n'est parti (vrai fournisseur : l'envoi continue peut-être en arrière-plan) ;
+ * le défi reste alors vérifiable, comme pour `OtpDeliveryUncertainError`. Absent ou faux : le dépassement est un échec (`send_failed`).
+ */
+export type SendOtp = ((input: SendOtpInput) => Promise<void>) & { readonly timeoutMs?: number; readonly timeoutIsUncertain?: boolean };
 
 export interface AuthDatabaseContext {
   pool?: Pool;

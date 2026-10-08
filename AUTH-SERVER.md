@@ -19,9 +19,17 @@ openssl rand -base64 32
 ```
 
 L'absence de secret ou de transport fait échouer `requestOtp` avant tout accès à
-la base. Le runtime ne fournit volontairement aucun transport de production. Un
-futur adaptateur devra seulement implémenter `SendOtp` : noma génère et vérifie
-le code. Seul le transport de développement ci-dessous existe.
+la base. Par défaut le runtime ne fournit aucun transport de production. Lot SMS1 :
+le transport SMS réel « meno » (`lib/server/sms/otp-transport.ts`) n'est installé que si
+`NOMA_SMS_PROVIDER=meno` ET une clé valide sont définies (voir `SMS.md` : coût de 15 F par
+SMS, résultat incertain = défi conservé sans renvoi automatique, échec définitif = `503
+otp_delivery_failed` « Envoi du code impossible pour le moment. », budget d'envoi atteint =
+`503 otp_capacity_reached` distinct, toutes les limites d'envoi conservées ; lot SMS1-bis :
+s'y ajoutent des compteurs agrégés par préfixe d'adresse, /24 en IPv4 et /64 en IPv6, dans
+`lib/server/auth/ip-prefix.ts`, et le transport réel n'est actif qu'avec `NODE_ENV=production`
+ou vers un faux serveur local). noma génère et vérifie le code ; le transport implémente `SendOtp`
+(il peut déclarer son propre `timeoutMs`). Sinon seul le transport de développement
+ci-dessous existe.
 
 ### Transport OTP de développement (console du serveur)
 

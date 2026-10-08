@@ -40,6 +40,7 @@ fournis et vérifiés.
 | `NOMA_IP_SECRET` | — | Secret HMAC de pseudonymisation IP — **requis en production** |
 | `NOMA_BUDGET_TZ` | `Africa/Abidjan` | Fuseau du budget quotidien |
 | `NOMA_FAKE_SOURCES` | — | `1` = sources simulées **sans IA ni dépense** (validation locale uniquement, refusé si production) |
+| `NOMA_SMS_PROVIDER`, `NOMA_SMS_API_KEY`, `NOMA_SMS_BASE_URL`, `NOMA_PUBLIC_URL`, `NOMA_SMS_DAILY_CAP`, `NOMA_SMS_NOTIFICATION_SHARE_PERCENT`, `NOMA_SMS_EXISTING_RESERVE_PERCENT` | vides | SMS réels par Meno (lots SMS1 et SMS1-bis) : **désactivés par défaut**, 15 F CFA par SMS accepté ; actifs seulement avec `NODE_ENV=production` (ou vers un faux serveur local) ; avec `meno` en production le démarrage est **refusé** sans clé valide, sans base https, sans URL publique (assez courte pour tenir en un SMS) ou avec une part de budget invalide. La clé **n'est jamais présente au build** (`npm run build:production`). Voir `SMS.md` |
 | `OPENROUTER_API_KEY` | — | Clé IA (lue depuis `poc/.env.local` par le moteur) |
 | `GOOGLE_API_KEY`, `GOOGLE_CX` | — | Google CSE (source « google » du moteur) |
 | `CHROME_PATH` | `/usr/bin/google-chrome-stable` | Binaire Chromium pour Playwright |
@@ -73,10 +74,21 @@ sudo deploy/gen-secrets.sh /opt/noma/shared/.env.production noma
 #    SERVICE — le fichier lui appartient (600) : pas besoin de root
 sudo -u noma sh -c 'echo "NEXT_PUBLIC_TURNSTILE_SITE_KEY=<clé-publique>" >> /opt/noma/shared/.env.production'
 # 3. build exécuté PAR L'UTILISATEUR DE SERVICE, fichier lisible (600,
-#    propriétaire noma) — jamais 644, les secrets restent privés :
-sudo -u noma sh -c 'set -a; . /opt/noma/shared/.env.production; set +a; npm run build'
+#    propriétaire noma) — jamais 644, les secrets restent privés.
+#    TOUJOURS par `npm run build:production` (lot SMS1-bis) et JAMAIS par
+#    `npm run build` / `next build` directement : le fichier est sourcé pour que
+#    la clé publique Turnstile (NEXT_PUBLIC_*) soit inlinée, mais le script
+#    RETIRE du build tous les secrets (NOMA_SMS_API_KEY, NOMA_AUTH_SECRET, …
+#    liste blanche `env -i`), travaille sous umask 077 puis rend .next privé, supprime .next/cache
+#    et ÉCHOUE (en effaçant .next) si une valeur secrète se retrouve dans .next.
+#    Raison : Turbopack gardait la clé Meno et NOMA_AUTH_SECRET EN CLAIR dans
+#    .next/cache/turbopack/*.sst (droits 0644) quand le build voyait ces variables.
+sudo -u noma sh -c 'set -a; . /opt/noma/shared/.env.production; set +a; npm run build:production'
 #    → noter le BUILD_ID produit (retour arrière) ; vérifier la clé inline :
 #      grep -rl "<clé-publique>" .next/static | head -1
+#    → vérifier qu'aucun secret n'est dans le build (doit ne rien afficher ;
+#      la clé n'est lue qu'à l'EXÉCUTION, par le serveur) :
+#      grep -rlF "$(sudo -u noma sh -c '. /opt/noma/shared/.env.production; printf %s "$NOMA_SMS_API_KEY"')" .next || true
 # 4. instance unique liée à 127.0.0.1 (deploy/noma.service)
 #    vérification post-démarrage : ss -tlnp | grep 3000  → 127.0.0.1 uniquement
 ```

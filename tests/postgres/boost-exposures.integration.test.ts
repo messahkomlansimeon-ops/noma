@@ -218,11 +218,11 @@ const cursorFor = (demand: DemandRecord, offset = 7): string => Buffer.from(JSON
 // ═════════════ 1. Migration 0013 ═════════════
 
 test("migration 0013 : 13 appliquées, la relance n'en applique aucune, chaque CHECK, clé primaire, clés étrangères, index et cascades", async () => {
-  assert.equal(firstMigration.applied.length, 23);
-  assert.equal(firstMigration.applied.at(-1), "0023_price_observations");
+  assert.equal(firstMigration.applied.length, 24);
+  assert.equal(firstMigration.applied.at(-1), "0024_sms_sends");
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 23);
+  assert.equal(rerun.skipped.length, 24);
 
   const seller = await makeUser(), viewer = await makeUser(), extraViewer = await makeUser();
   const offer = await newOffer({ ownerId: seller }), otherOffer = await newOffer({ ownerId: await makeUser() });

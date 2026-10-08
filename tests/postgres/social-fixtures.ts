@@ -61,6 +61,7 @@ export interface Login { userId: string; cookie: string; phone: string }
 
 let phoneSequence = 0;
 let ipSequence = 0;
+// Lot SMS1-bis (limites agrégées par préfixe /24 : 100 demandes par 15 minutes) : au plus 50 comptes de test par /24, pour que les suites qui ouvrent beaucoup de comptes (media) ne partagent pas un seul bloc.
 
 /** Un compte réel : connexion par code (session valide), numéro `+22507` + 8 chiffres. */
 export async function login(pool: Pool): Promise<Login> {
@@ -69,7 +70,7 @@ export async function login(pool: Pool): Promise<Login> {
   const phone = `+22507${String(70_000_000 + phoneSequence * 37).padStart(8, "0")}`;
   let delivery: SendOtpInput | undefined;
   const requested = await requestOtp(phone, {
-    pool, authSecret: SECRET, requestIp: `198.51.100.${(ipSequence % 250) + 1}`, sendOtp: async (input) => { delivery = input; },
+    pool, authSecret: SECRET, requestIp: `198.51.${100 + Math.floor((ipSequence - 1) / 50)}.${(ipSequence % 250) + 1}`, sendOtp: async (input) => { delivery = input; },
   });
   assert.ok(delivery);
   const verified = await verifyOtp(requested.challengeId, delivery.code, { pool, authSecret: SECRET });

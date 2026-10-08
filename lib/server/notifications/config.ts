@@ -65,9 +65,11 @@ export const NOTIFICATIONS_PURGE_PRODUCTION_VARIABLE = "NOMA_NOTIFICATIONS_PURGE
 /** Variable du transport simulé : valeur exacte « 1 » ET NODE_ENV=development (même verrou que l'OTP de développement). */
 export const DEV_NOTIFY_FLAG = "NOMA_DEV_NOTIFY_CONSOLE";
 
-/** Canal simulé (le seul). */
+/** Canal simulé : celui des lignes de l'outbox (colonne `channel`, contrainte de la migration 0019). */
 export const SIMULATED_CHANNEL = "sms_sim" as const;
-export type NotificationChannel = typeof SIMULATED_CHANNEL;
+/** Canal du transport SMS réel « meno » (lot SMS1) : étiquette du transport seulement, jamais écrite dans l'outbox. */
+export const MENO_CHANNEL = "sms_meno" as const;
+export type NotificationChannel = typeof SIMULATED_CHANNEL | typeof MENO_CHANNEL;
 
 /** Espaces des verrous consultatifs (voir la liste 1_314_664_945 à 954 déjà utilisée). */
 export const NOTIFICATION_CAP_LOCK_NAMESPACE = 1_314_664_955;
@@ -75,6 +77,9 @@ export const NOTIFICATION_USER_LOCK_NAMESPACE = 1_314_664_956;
 
 /** Texte fixe : tant qu'aucun vrai transport n'existe, il est affiché avec les préférences. */
 export const EXTERNAL_NOTICE = "Les envois par SMS ne sont pas encore disponibles : ils sont simulés en développement.";
+
+/** Texte affiché avec les préférences quand le transport SMS réel est configuré (lot SMS1). */
+export const EXTERNAL_NOTICE_REAL = "Un SMS regroupé vous prévient des nouvelles annonces : au plus 3 par jour, jamais entre 22 h et 7 h.";
 
 /** Migration requise par les étapes et les routes de ce lot. */
 export const NOTIFICATIONS_MIGRATION = "0019_notifications";

@@ -15,11 +15,14 @@ import {
 } from "./config";
 import {
   AuthConfigurationError,
+  OtpCapacityError,
   OtpDeliveryError,
+  OtpDeliveryUncertainError,
   OtpRateLimitError,
   OtpResendDelayError,
   OtpVerificationError,
 } from "./errors";
+import { ipAggregation } from "./ip-prefix";
 import {
   generateOtpCode,
   generateSessionToken,
@@ -91,6 +94,9 @@ async function reserveRequest(
     phone: string;
     otpDigest: string;
     ipFingerprint: string;
+    /** Empreinte du préfixe de l'adresse (/24 en IPv4, /64 en IPv6) : voir ip-prefix.ts. */
+    ipPrefixFingerprint: string;
+    ipPrefixLimits: { quarter: number; day: number };
     phoneFingerprint: string;
     now: Date;
     expiresAt: Date;
@@ -105,6 +111,9 @@ async function reserveRequest(
   await consumeQuota(client, "phone", input.phoneFingerprint, "day", day, 10, input.now);
   await consumeQuota(client, "ip", input.ipFingerprint, "15m", quarterHour, 20, input.now);
   await consumeQuota(client, "ip", input.ipFingerprint, "day", day, 100, input.now);
+  // Lot SMS1-bis (B1-d) : le même compteur agrégé par préfixe (empreinte d'un autre domaine, même table) : changer d'adresse dans son bloc ne contourne plus les limites.
+  await consumeQuota(client, "ip", input.ipPrefixFingerprint, "15m", quarterHour, input.ipPrefixLimits.quarter, input.now);
+  await consumeQuota(client, "ip", input.ipPrefixFingerprint, "day", day, input.ipPrefixLimits.day, input.now);
 
   const previous = await client.query<{ created_at: Date }>(
     `SELECT created_at
@@ -144,9 +153,17 @@ async function reserveRequest(
   );
 }
 
+/** Délai de garde dépassé : le transport n'a pas rendu son résultat (il continue peut-être en arrière-plan). */
+class OtpTransportTimeoutError extends Error {
+  constructor() {
+    super("OTP transport timeout");
+    this.name = "OtpTransportTimeoutError";
+  }
+}
+
 function sendWithTimeout(sendOtp: SendOtp, input: SendOtpInput, timeoutMs: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("OTP transport timeout")), timeoutMs);
+    const timer = setTimeout(() => reject(new OtpTransportTimeoutError()), timeoutMs);
     Promise.resolve()
       .then(() => sendOtp(input))
       .then(resolve, reject)
@@ -167,7 +184,7 @@ export async function requestOtp(
   if (typeof requestIp !== "string" || requestIp.length === 0 || requestIp.length > 255) {
     throw new AuthConfigurationError("L'empreinte IP source ne peut pas être calculée.");
   }
-  const timeoutMs = context.transportTimeoutMs ?? OTP_TRANSPORT_TIMEOUT_MS;
+  const timeoutMs = context.transportTimeoutMs ?? context.sendOtp.timeoutMs ?? OTP_TRANSPORT_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
     throw new AuthConfigurationError("Le délai du transport OTP est invalide.");
   }
@@ -175,6 +192,7 @@ export async function requestOtp(
   const challengeId = randomUUID();
   const code = generateOtpCode();
   const pool = context.pool ?? getPostgresPool();
+  const aggregation = ipAggregation(requestIp);
   const reservation = await withPostgresTransaction(async (client) => {
     // Cette lecture a lieu apres l'attente eventuelle de pool et BEGIN.
     const reservedAt = readNow(context.now);
@@ -184,6 +202,8 @@ export async function requestOtp(
       phone,
       otpDigest: otpHmac(secret, challengeId, phone, code).toString("hex"),
       ipFingerprint: secretFingerprint(secret, "ip", requestIp),
+      ipPrefixFingerprint: secretFingerprint(secret, "ip-prefix", aggregation.key),
+      ipPrefixLimits: { quarter: aggregation.limitPer15Minutes, day: aggregation.limitPerDay },
       phoneFingerprint: secretFingerprint(secret, "phone", phone),
       now: reservedAt,
       expiresAt,
@@ -210,14 +230,21 @@ export async function requestOtp(
       { phone, code, challengeId, expiresAt: reservation.expiresAt },
       timeoutMs,
     );
-  } catch {
-    await pool.query(
-      `UPDATE otp_challenges
-          SET status = 'send_failed', updated_at = $2
-        WHERE id = $1 AND status = 'pending_send'`,
-      [challengeId, readNow(context.now)],
-    );
-    throw new OtpDeliveryError();
+  } catch (error) {
+    // Résultat inconnu (lot SMS1) : le SMS est peut-être parti. Le défi reste valable (confirmé ci-dessous) et aucun code n'est renvoyé automatiquement.
+    // Lot SMS1-bis (S-b) : il en va de même quand le délai de GARDE est dépassé pour un transport dont le dépassement ne prouve rien (`timeoutIsUncertain`) : l'envoi continue
+    // peut-être en arrière-plan, le code reçu doit marcher.
+    const uncertain = error instanceof OtpDeliveryUncertainError || (error instanceof OtpTransportTimeoutError && context.sendOtp.timeoutIsUncertain === true);
+    if (!uncertain) {
+      await pool.query(
+        `UPDATE otp_challenges
+            SET status = 'send_failed', updated_at = $2
+          WHERE id = $1 AND status = 'pending_send'`,
+        [challengeId, readNow(context.now)],
+      );
+      // Budget d'envoi atteint (aucun SMS parti) : relayé tel quel, pour une réponse distincte du « envoi impossible » générique.
+      throw error instanceof OtpCapacityError ? error : new OtpDeliveryError();
+    }
   }
 
   const confirmedAt = readNow(context.now);

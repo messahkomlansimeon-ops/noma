@@ -14,6 +14,7 @@ import {
   verifyOtp,
   type SendOtpInput,
 } from "../../lib/server/auth";
+import { secretFingerprint } from "../../lib/server/auth/primitives";
 import { archiveUser, updateUser } from "../../lib/server/catalog";
 import { runMigrations } from "../../lib/server/postgres/migrations";
 import {
@@ -163,6 +164,7 @@ if (!configuredUrl?.trim()) {
         "0021_pro_subscriptions",
         "0022_offer_photos",
         "0023_price_observations",
+        "0024_sms_sends",
       ]);
     });
 
@@ -380,13 +382,14 @@ if (!configuredUrl?.trim()) {
           1,
         );
         assert.equal(concurrentSends, 20);
+        // Lot SMS1-bis : le compteur de la MÊME adresse est désigné par son empreinte (le compteur agrégé par préfixe /24 vit dans la même table, sous une autre empreinte).
         const counter = await pool.query<{ request_count: number }>(
           `SELECT request_count
              FROM otp_rate_limit_counters
-            WHERE dimension = 'ip' AND window_kind = '15m'
-            ORDER BY updated_at DESC
-            LIMIT 1`,
+            WHERE dimension = 'ip' AND window_kind = '15m' AND subject_fingerprint = $1`,
+          [secretFingerprint(SECRET, "ip", sharedIp)],
         );
+        assert.equal(counter.rows.length, 1);
         assert.equal(counter.rows[0].request_count, 20);
       } finally {
         await Promise.all(concurrentPools.map((candidate) => candidate.end()));
@@ -454,9 +457,10 @@ if (!configuredUrl?.trim()) {
       const ipDay = await pool.query<{ subject_fingerprint: string; window_start: Date }>(
         `SELECT subject_fingerprint, window_start
            FROM otp_rate_limit_counters
-          WHERE dimension = 'ip' AND window_kind = 'day'
+          WHERE dimension = 'ip' AND window_kind = 'day' AND subject_fingerprint = $1
           ORDER BY updated_at DESC
           LIMIT 1`,
+        [secretFingerprint(SECRET, "ip", dailyIp)],
       );
       await pool.query(
         `UPDATE otp_rate_limit_counters SET request_count = 100

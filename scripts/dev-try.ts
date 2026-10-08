@@ -31,6 +31,7 @@ import { existsSync, readFileSync } from "node:fs";
 import net from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isValidSmsApiKey, readSmsConfig } from "../lib/server/sms/config";
 import { DEV_PROXY_MIN_SECRET_BYTES, checkDevelopmentNodeEnv, createDevProxy } from "./dev-proxy";
 
 export const DEV_TRY_NEXT_PORT = 3211;
@@ -53,6 +54,8 @@ export interface DevTryPlan {
   publicOrigin: string;
   /** Avertissements fixes à afficher (jamais de valeur secrète). */
   warnings: string[];
+  /** Transport du code de connexion : la console du serveur, ou un FAUX serveur SMS de ce poste (lot SMS1, jamais un vrai SMS). */
+  smsMode: "console" | "meno-local";
 }
 
 export type DevTryPreparation = { ok: true; plan: DevTryPlan } | { ok: false; reason: string };
@@ -99,6 +102,37 @@ export function checkLocalDatabaseUrl(databaseUrl: string): { ok: true } | { ok:
   }
   if (!overrides.every(localHost)) return refusal;
   return { ok: true };
+}
+
+/**
+ * Lot SMS1 : dev:try n'envoie JAMAIS de vrai SMS.
+ *  - NOMA_SMS_PROVIDER absent ou différent de « meno » : le fournisseur et sa clé sont RETIRÉS de l'environnement du serveur (une clé présente dans votre terminal n'est jamais transmise) ;
+ *  - NOMA_SMS_PROVIDER=meno : accepté UNIQUEMENT vers un faux serveur de ce poste (NOMA_SMS_BASE_URL sur 127.0.0.1, localhost ou ::1, et une clé de format valide) ; le transport
+ *    console est alors retiré (le code part par SMS vers le faux serveur) et NOMA_PUBLIC_URL est l'origine du relais.
+ */
+function prepareSmsEnvironment(
+  env: DevTryEnvironment,
+  publicOrigin: string,
+): { ok: true; set: Record<string, string>; unset: string[]; mode: "console" | "meno-local" } | { ok: false; reason: string } {
+  const provider = (env.NOMA_SMS_PROVIDER ?? "").trim();
+  if (provider !== "meno") {
+    return { ok: true, set: {}, unset: ["NOMA_SMS_PROVIDER", "NOMA_SMS_API_KEY", "NOMA_SMS_BASE_URL"], mode: "console" };
+  }
+  const config = readSmsConfig(env);
+  if ((env.NOMA_SMS_BASE_URL ?? "").trim() === "" || !config.baseUrlValid || !config.baseUrlLocal || !isValidSmsApiKey(config.apiKey)) {
+    return {
+      ok: false,
+      reason:
+        "dev:try n'envoie jamais de vrai SMS : avec NOMA_SMS_PROVIDER=meno, NOMA_SMS_BASE_URL doit désigner un faux serveur de CE poste (127.0.0.1, localhost ou ::1) " +
+        "et NOMA_SMS_API_KEY une clé d'essai de format valide.",
+    };
+  }
+  return {
+    ok: true,
+    set: { NOMA_SMS_PROVIDER: "meno", NOMA_SMS_API_KEY: config.apiKey as string, NOMA_SMS_BASE_URL: config.baseUrl, NOMA_PUBLIC_URL: publicOrigin },
+    unset: ["NOMA_DEV_OTP_CONSOLE", "NOMA_DEV_NOTIFY_CONSOLE"],
+    mode: "meno-local",
+  };
 }
 
 /**
@@ -182,33 +216,43 @@ export function prepareDevTry(
   }
 
   const publicOrigin = `http://localhost:${proxyPort}`;
+  const sms = prepareSmsEnvironment(env, publicOrigin);
+  if (!sms.ok) return { ok: false, reason: sms.reason };
+  const planEnv: NodeJS.ProcessEnv = {
+    ...env,
+    NODE_ENV: "development",
+    NOMA_DEV_OTP_CONSOLE: "1",
+    NOMA_DEV_PROXY: "1",
+    // Montage entièrement simulé : la recherche rapide ne contacte jamais de vrai site (le route n'active les fausses
+    // sources que si le captcha est désactivé hors production), n'appelle aucune IA et n'exige aucun captcha.
+    NOMA_FAKE_SOURCES: "1",
+    NOMA_AI_DISABLED: "1",
+    NOMA_TURNSTILE_DISABLED: "1",
+    // Recharge par le prestataire fictif (page « paiement simulé ») : toujours actif ici, quoi que dise l'environnement.
+    NOMA_FAKE_PAYMENTS: "1",
+    NOMA_FAKE_PAYMENT_SECRET: fakePaymentSecret,
+    NOMA_AUTH_ORIGIN: publicOrigin,
+    NOMA_AUTH_SECRET: authSecret,
+    NOMA_AUTH_PROXY_SECRET: proxySecret,
+    // La recherche anonyme (POST /api/search) lit le même secret sous un autre nom : une seule valeur pour le relais.
+    NOMA_PROXY_SECRET: proxySecret,
+    PORT: String(nextPort),
+  };
+  // Lot SMS1 : fournisseur SMS retiré (aucun vrai SMS), ou faux serveur local ; dans ce cas le transport console est retiré.
+  for (const name of sms.unset) delete planEnv[name];
+  Object.assign(planEnv, sms.set);
+  if (sms.mode === "meno-local") {
+    warnings.push("NOMA_SMS_PROVIDER=meno vers un faux serveur de ce poste : le code de connexion part par SMS simulé, il n'apparaît pas dans ce terminal.");
+  }
   return {
     ok: true,
     plan: {
-      env: {
-        ...env,
-        NODE_ENV: "development",
-        NOMA_DEV_OTP_CONSOLE: "1",
-        NOMA_DEV_PROXY: "1",
-        // Montage entièrement simulé : la recherche rapide ne contacte jamais de vrai site (le route n'active les fausses
-        // sources que si le captcha est désactivé hors production), n'appelle aucune IA et n'exige aucun captcha.
-        NOMA_FAKE_SOURCES: "1",
-        NOMA_AI_DISABLED: "1",
-        NOMA_TURNSTILE_DISABLED: "1",
-        // Recharge par le prestataire fictif (page « paiement simulé ») : toujours actif ici, quoi que dise l'environnement.
-        NOMA_FAKE_PAYMENTS: "1",
-        NOMA_FAKE_PAYMENT_SECRET: fakePaymentSecret,
-        NOMA_AUTH_ORIGIN: publicOrigin,
-        NOMA_AUTH_SECRET: authSecret,
-        NOMA_AUTH_PROXY_SECRET: proxySecret,
-        // La recherche anonyme (POST /api/search) lit le même secret sous un autre nom : une seule valeur pour le relais.
-        NOMA_PROXY_SECRET: proxySecret,
-        PORT: String(nextPort),
-      },
+      env: planEnv,
       nextPort,
       proxyPort,
       publicOrigin,
       warnings,
+      smsMode: sms.mode,
     },
   };
 }
@@ -385,8 +429,12 @@ async function main(): Promise<void> {
     console.log(`     ${plan.publicOrigin}`);
     console.log("");
     console.log(` (Utilisez bien le port ${plan.proxyPort}, et non le port ${plan.nextPort}.)`);
-    console.log(" Le code de connexion à 6 chiffres s'affichera dans CE terminal,");
-    console.log(" sur une ligne « [auth:dev] code OTP pour … » (aucun SMS n'est envoyé).");
+    if (plan.smsMode === "meno-local") {
+      console.log(" Le code de connexion part par SMS vers le FAUX serveur SMS de ce poste (aucun vrai SMS).");
+    } else {
+      console.log(" Le code de connexion à 6 chiffres s'affichera dans CE terminal,");
+      console.log(" sur une ligne « [auth:dev] code OTP pour … » (aucun SMS n'est envoyé).");
+    }
     console.log(" La recherche rapide montre des résultats d'exemple (aucun vrai site n'est contacté).");
     console.log(" La recharge du porte-monnaie est SIMULÉE : aucun argent réel, aucun paiement.");
     console.log(" Pour tout arrêter : Ctrl+C.");

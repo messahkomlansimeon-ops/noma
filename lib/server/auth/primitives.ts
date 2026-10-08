@@ -48,7 +48,7 @@ export function otpHmac(
 
 export function secretFingerprint(
   secret: Uint8Array,
-  domain: "phone" | "ip",
+  domain: "phone" | "ip" | "ip-prefix",
   value: string,
 ): string {
   return createHmac("sha256", secret)

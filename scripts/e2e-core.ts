@@ -46,6 +46,7 @@ import {
 import { buildDemandInput, buildOfferInput } from "../lib/client/catalog-view";
 import {
   E2E_BASE,
+  E2E_MENO_MODE,
   E2E_SERVER_LOG,
   RelaySession,
   awaitOtpLine,
@@ -54,8 +55,10 @@ import {
   isQuietHourNow,
   logSize,
   loginWithOtp,
+  menoMessagesSince,
   notificationsPurgeSimulationByAdministration,
   notifyConsoleLinesSince,
+  otpSourceSize,
   pollUntil,
   seedExamplesByAdministration,
   uniquePhone,
@@ -101,7 +104,7 @@ async function step<T>(title: string, run: () => Promise<T>): Promise<T> {
 /** Connexion par OTP avec les contrôles du parcours (mauvais code refusé, bon code accepté, session renvoyée). */
 async function login(session: RelaySession, phone: string): Promise<string> {
   const api = session.client();
-  const offset = logSize();
+  const offset = otpSourceSize();
   const challenge = await api.auth.requestOtp(phone);
   assert.match(challenge.challengeId, /^[0-9a-f-]{36}$/);
   const { code, tail } = await awaitOtpLine(offset);
@@ -1406,9 +1409,16 @@ async function main(): Promise<void> {
     ok("GET /api/demands/{id}/tracking : suivi actif, jusqu'à la création + 30 jours");
     const preferences = await nBuyerApi.notifications.preferences();
     assert.equal(preferences.externalEnabled, false, "envoi externe désactivé par défaut");
-    assert.equal(preferences.notice, "Les envois par SMS ne sont pas encore disponibles : ils sont simulés en développement.");
-    assert.equal(preferences.externalAvailable, notifyConsole, "un transport simulé n'existe que si le serveur a NOMA_DEV_NOTIFY_CONSOLE=1");
-    ok(`GET /api/notifications/preferences : désactivé par défaut, texte « pas encore disponibles », transport simulé ${notifyConsole ? "présent" : "absent"}`);
+    if (E2E_MENO_MODE) {
+      // Lot SMS1 : serveur lancé avec NOMA_SMS_PROVIDER=meno vers le FAUX serveur Meno : le transport réel est présent et le texte ne parle plus de simulation.
+      assert.equal(preferences.notice, "Un SMS regroupé vous prévient des nouvelles annonces : au plus 3 par jour, jamais entre 22 h et 7 h.");
+      assert.equal(preferences.externalAvailable, true, "le transport meno (faux serveur) est disponible");
+      ok("GET /api/notifications/preferences : désactivé par défaut, transport SMS (faux serveur Meno) présent, texte du transport réel");
+    } else {
+      assert.equal(preferences.notice, "Les envois par SMS ne sont pas encore disponibles : ils sont simulés en développement.");
+      assert.equal(preferences.externalAvailable, notifyConsole, "un transport simulé n'existe que si le serveur a NOMA_DEV_NOTIFY_CONSOLE=1");
+      ok(`GET /api/notifications/preferences : désactivé par défaut, texte « pas encore disponibles », transport simulé ${notifyConsole ? "présent" : "absent"}`);
+    }
   });
 
   await step("Notifications (lot N1) : le vendeur publie une annonce correspondante ; après le worker l'acheteur a UNE notification (titre, prix, lien vers la fiche), le vendeur et un tiers aucune", async () => {
@@ -1545,6 +1555,7 @@ async function main(): Promise<void> {
     assert.equal((await nBuyerApi.notifications.preferences()).externalEnabled, true);
     ok("PUT /api/notifications/preferences : opt-in enregistré pour ce compte seulement ; origine refusée : 403");
     const offset = logSize();
+    const smsOffset = otpSourceSize();
     const fourth = await nPublish("A4", "57 000");
     await pollUntil("la notification de la quatrième annonce", async () => {
       const page = await nBuyerApi.notifications.list({ limit: 50 });
@@ -1559,17 +1570,38 @@ async function main(): Promise<void> {
         "SELECT extract(epoch FROM next_attempt_at - created_at)::int AS window_seconds FROM notification_deliveries WHERE demand_id = $1 AND offer_id = $2", [nDemand.id, fourth.id])).rows[0];
       assert.equal(row?.window_seconds, 900, "la ligne d'envoi n'est envoyable que 15 minutes après sa création (fenêtre de collecte)");
       ok("la ligne d'envoi de la quatrième annonce est créée avec la fenêtre de collecte : next_attempt_at = created_at + 15 minutes");
-      if (notifyConsole && !isQuietHourNow()) {
+      if ((notifyConsole || E2E_MENO_MODE) && !isQuietHourNow()) {
         await new Promise((resolve) => setTimeout(resolve, 8_000));
         assert.deepEqual(notifyConsoleLinesSince(offset), [], "fenêtre de collecte de 15 minutes : rien ne part tout de suite");
-        ok("fenêtre de collecte : 8 secondes après la notification, aucun message simulé n'est parti");
+        assert.deepEqual(menoMessagesSince(smsOffset).filter((message) => /annonce/.test(message.content)), [], "fenêtre de collecte de 15 minutes : aucun SMS réel (faux serveur) ne part tout de suite");
+        ok("fenêtre de collecte : 8 secondes après la notification, aucun message n'est parti");
         // L'essai ne peut pas attendre 15 minutes : la ligne est VIEILLIE d'une heure (créée et échéance reculées), comme si le temps avait passé.
         await windowDb.query("UPDATE notification_deliveries SET created_at = created_at - interval '1 hour', next_attempt_at = next_attempt_at - interval '1 hour' WHERE demand_id = $1 AND status = 'pending'", [nDemand.id]);
       }
     } finally {
       await windowDb.end();
     }
-    if (!notifyConsole) {
+    if (E2E_MENO_MODE) {
+      // Lot SMS1 : transport meno vers le faux serveur. Le worker envoie UN SMS regroupé (nombre d'annonces et lien), jamais la nuit.
+      if (isQuietHourNow()) {
+        await new Promise((resolve) => setTimeout(resolve, 8_000));
+        assert.deepEqual(menoMessagesSince(smsOffset).filter((message) => /annonce/.test(message.content)), [], "heures calmes (22 h – 7 h UTC) : aucun SMS de notification");
+        ok(`heures calmes en cours (${new Date().toISOString().slice(11, 16)} UTC) : aucun SMS de notification n'est parti, l'envoi est reporté à 7 h`);
+      } else {
+        const sms = await pollUntil("le SMS de notification reçu par le faux serveur Meno", async () => {
+          return menoMessagesSince(smsOffset).find((message) => /annonce/.test(message.content)) ?? null;
+        }, 60_000, "le serveur a-t-il été lancé avec NOMA_SMS_PROVIDER=meno vers le faux serveur, et le worker tourne-t-il ?");
+        await new Promise((resolve) => setTimeout(resolve, 4_000));
+        const notifications = menoMessagesSince(smsOffset).filter((message) => /annonce/.test(message.content));
+        assert.equal(notifications.length, 1, `UN seul SMS de notification : ${notifications.length}`);
+        assert.equal(sms.content, `noma : 1 nouvelle annonce pour vos besoins. ${E2E_BASE}/notifications`);
+        assert.equal(sms.to, nBuyerPhone, "le SMS vise le numéro vérifié de l'acheteur");
+        for (const secret of [nBuyerId, nTitle, "57 000", "57000", nSellerPhone]) assert.equal(sms.content.includes(secret), false, `le SMS ne montre pas « ${secret} »`);
+        const text = readFileSync(E2E_SERVER_LOG).subarray(offset).toString("utf8");
+        for (const secret of [nBuyerPhone, nBuyerPhone.slice(4), nSellerPhone, sms.content]) assert.equal(text.includes(secret), false, "la sortie du serveur ne montre ni numéro ni texte du SMS");
+        ok("faux serveur Meno : UN SMS regroupé « 1 nouvelle annonce » avec le lien /notifications, ni titre, ni prix, ni numéro du vendeur ; rien dans la sortie du serveur");
+      }
+    } else if (!notifyConsole) {
       await new Promise((resolve) => setTimeout(resolve, 6_000));
       assert.deepEqual(notifyConsoleLinesSince(offset), [], "sans transport (NOMA_DEV_NOTIFY_CONSOLE absent) : aucun envoi externe");
       ok("serveur lancé SANS NOMA_DEV_NOTIFY_CONSOLE=1 : aucun envoi externe, l'opt-in est enregistré seulement");

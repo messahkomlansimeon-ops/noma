@@ -98,6 +98,7 @@ if (!configuredUrl?.trim()) {
         "0021_pro_subscriptions",
         "0022_offer_photos",
         "0023_price_observations",
+        "0024_sms_sends",
       ]);
     });
 

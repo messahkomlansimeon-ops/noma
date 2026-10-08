@@ -212,6 +212,21 @@ else
   ok "aucune valeur de secret dans la sortie du script"
 fi
 
+# ─── 5. env.production.example — variables SMS (lot SMS1) : présentes, VIDES ──
+section "env.production.example (SMS : valeurs vides, jamais de clé versionnée)"
+for VAR in NOMA_SMS_PROVIDER NOMA_SMS_API_KEY NOMA_SMS_BASE_URL NOMA_PUBLIC_URL NOMA_SMS_DAILY_CAP NOMA_SMS_NOTIFICATION_SHARE_PERCENT NOMA_SMS_EXISTING_RESERVE_PERCENT; do
+  if [[ $(grep -c "^${VAR}=$" deploy/env.production.example) == "1" && $(grep -c "^${VAR}=." deploy/env.production.example) == "0" ]]; then
+    ok "${VAR} présente, valeur vide"
+  else
+    ko "${VAR} absente, en double ou renseignée dans l'exemple versionné"
+  fi
+done
+if grep -qE '^NOMA_SMS_API_KEY=.' deploy/env.production.example; then
+  ko "une clé SMS est écrite dans le fichier versionné !"
+else
+  ok "aucune clé SMS dans le fichier versionné"
+fi
+
 # ─── bilan ───────────────────────────────────────────────────────────────────
 echo ""
 if [[ $FAIL -eq 0 ]]; then

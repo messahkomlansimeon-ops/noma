@@ -11,6 +11,8 @@ import { readStrictJsonBody } from "../wallet/http";
 import {
   DEMAND_TRACKING_CONTRACT_VERSION,
   EXTERNAL_NOTICE,
+  EXTERNAL_NOTICE_REAL,
+  MENO_CHANNEL,
   NOTIFICATIONS_CONTRACT_VERSION,
   NOTIFICATIONS_PAGE_DEFAULT_LIMIT,
   NOTIFICATIONS_PAGE_MAX_LIMIT,
@@ -52,6 +54,8 @@ export interface NotificationsHttpDependencies {
   resolveSession?: (token: string, context: SessionContext) => Promise<ResolvedSession | null>;
   /** Disponibilité affichée d'un envoi externe (défaut : un transport existe dans cet environnement). Réservé aux tests. */
   transportAvailable?: (env: Environment) => boolean;
+  /** Le transport disponible est-il le transport SMS RÉEL ? (défaut : le transport résolu est « meno »). Lot SMS1-bis (M5). Réservé aux tests. */
+  realTransport?: (env: Environment) => boolean;
   /** Journal serveur : ne reçoit QU'UN code. Un journal qui lève est ignoré. Défaut : console.error. */
   log?: (code: string) => void;
 }
@@ -203,6 +207,7 @@ export function createNotificationsHttpHandlers(dependencies: NotificationsHttpD
   const clock = (): Date => (dependencies.now ?? (() => new Date()))();
   const poolOf = (): Pool => dependencies.pool ?? getPostgresPool();
   const transportAvailable = dependencies.transportAvailable ?? ((env: Environment) => resolveNotificationTransport(env) !== undefined);
+  const realTransport = dependencies.realTransport ?? ((env: Environment) => resolveNotificationTransport(env)?.channel === MENO_CHANNEL);
 
   function journal(code: string): void {
     try {
@@ -245,10 +250,19 @@ export function createNotificationsHttpHandlers(dependencies: NotificationsHttpD
   }
 
   function preferencesBody(externalEnabled: boolean) {
+    const env = environment();
+    const available = transportAvailable(env);
+    // Lot SMS1 / SMS1-bis (M5) : le texte « SMS réel » n'est affiché que si le transport de notification est RÉELLEMENT disponible et réel (clé valide, NODE_ENV ou base locale,
+    // NOMA_PUBLIC_URL, pas de configuration ambiguë) ; sinon l'utilisateur lirait une promesse que rien ne tiendra. `real` n'est présent que dans ce cas.
+    const real = available && realTransport(env);
     return {
       contractVersion: NOTIFICATION_PREFERENCES_CONTRACT_VERSION,
       preferences: { externalEnabled },
-      external: { available: transportAvailable(environment()), notice: EXTERNAL_NOTICE },
+      external: {
+        available,
+        notice: real ? EXTERNAL_NOTICE_REAL : EXTERNAL_NOTICE,
+        ...(real ? { real: true } : {}),
+      },
     };
   }
 

@@ -12,10 +12,10 @@
  * NOMA_MEDIA_DIR (le MÊME dossier que le serveur : le script y lit les fichiers stockés). Voir scripts/e2e-common.ts et PHOTOS.md.
  */
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { E2E_BASE, E2E_SERVER_LOG, RelaySession, awaitOtpLine, loginWithOtp, pollUntil, uniquePhone } from "./e2e-common";
+import { E2E_BASE, E2E_SERVER_LOG, RelaySession, awaitOtpLine, loginWithOtp, otpSourceSize, pollUntil, uniquePhone } from "./e2e-common";
 import {
   EXIF_DATE, EXIF_MAKE, GPS_LATITUDE_BYTES, GPS_LONGITUDE_BYTES, KITCHEN_FORBIDDEN, XMP_GPS_TEXT, buildKitchenJpeg, buildKitchenPng, buildKitchenWebp, buildPng, containsBytes,
 } from "./photo-fixtures";
@@ -64,7 +64,7 @@ function watch(page: Page): void {
 async function loginViaUi(page: Page, localPhone: string, next: string, destination: (url: URL) => boolean): Promise<void> {
   await page.goto(`${BASE}/connexion?next=${encodeURIComponent(next)}`);
   await page.getByPlaceholder("07 00 00 00 42").fill(localPhone);
-  const offset = statSync(E2E_SERVER_LOG).size;
+  const offset = otpSourceSize();
   await page.getByRole("button", { name: /Recevoir un code/ }).click();
   await page.waitForURL("**/verification");
   const { code } = await awaitOtpLine(offset);

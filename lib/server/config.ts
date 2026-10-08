@@ -1,3 +1,5 @@
+import { assertSmsProductionConfig } from "./sms/config";
+
 /**
  * Configuration des protections publiques (Lot 4) — variables d'environnement
  * et interrupteurs serveur. Module SERVEUR uniquement : ne jamais importer
@@ -124,4 +126,6 @@ export function assertProductionConfig(cfg: GuardConfig, env: Record<string, str
     const value = env[name];
     if (value !== undefined && value !== "") throw new Error(`${name} interdit en production`);
   }
+  // Fournisseur SMS (lot SMS1) : meno sans clé valide, console ou valeur inconnue = refus de démarrer.
+  assertSmsProductionConfig(env);
 }

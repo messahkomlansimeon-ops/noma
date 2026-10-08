@@ -29,9 +29,9 @@
  * Voir scripts/e2e-common.ts.
  */
 import assert from "node:assert/strict";
-import { mkdirSync, statSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
-import { E2E_BASE, E2E_SERVER_LOG, awaitOtpLine, demoSeedByAdministration, waitForValue, walletCheckByAdministration } from "./e2e-common";
+import { E2E_BASE, E2E_SERVER_LOG, awaitOtpLine, demoSeedByAdministration, otpSourceSize, waitForValue, walletCheckByAdministration } from "./e2e-common";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require("../poc/node_modules/playwright") as typeof import("../poc/node_modules/playwright");
@@ -73,7 +73,7 @@ const TECHNICAL = /\b[a-z]+(?:_[a-z0-9]+){1,}\b|undefined|\bNaN\b|\[object |\bnu
 async function loginViaUi(page: Page, localPhone: string, next: string, destination: (url: URL) => boolean): Promise<void> {
   await page.goto(`${BASE}/connexion?next=${encodeURIComponent(next)}`);
   await page.getByPlaceholder("07 00 00 00 42").fill(localPhone);
-  const offset = statSync(E2E_SERVER_LOG).size;
+  const offset = otpSourceSize();
   await page.getByRole("button", { name: /Recevoir un code/ }).click();
   await page.waitForURL("**/verification");
   const { code } = await awaitOtpLine(offset);

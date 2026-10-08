@@ -5,6 +5,7 @@ import { isIP } from "node:net";
 import type { Pool } from "pg";
 import {
   AuthConfigurationError,
+  OtpCapacityError,
   OtpDeliveryError,
   OtpRateLimitError,
   OtpRequestError,
@@ -73,6 +74,16 @@ function serviceUnavailable(extraHeaders?: HeadersInit): Response {
 
 function invalidRequest(): Response {
   return jsonError(400, "invalid_request", "Requête d'authentification invalide.");
+}
+
+/** Échec définitif de l'envoi du code (lot SMS1) : message GÉNÉRIQUE, jamais un détail du fournisseur ni du transport. */
+function otpDeliveryFailed(): Response {
+  return jsonError(503, "otp_delivery_failed", "Envoi du code impossible pour le moment.");
+}
+
+/** Capacité d'envoi des codes atteinte (lot SMS1-bis) : aucun SMS n'est parti ; réponse DISTINCTE de l'échec générique, sans chiffre ni détail de budget. */
+function otpCapacityReached(): Response {
+  return jsonError(503, "otp_capacity_reached", "Le service d'envoi de codes est très sollicité. Réessayez plus tard.");
 }
 
 function forbiddenOrigin(): Response {
@@ -201,10 +212,12 @@ export function createAuthHttpHandlers(
         if (error instanceof OtpRateLimitError || error instanceof OtpResendDelayError) {
           return jsonError(429, "otp_request_limited", "Demande OTP temporairement refusée.");
         }
-        if (error instanceof OtpRequestError && !(error instanceof OtpDeliveryError)) {
+        if (error instanceof OtpCapacityError) return otpCapacityReached();
+        if (error instanceof OtpDeliveryError) return otpDeliveryFailed();
+        if (error instanceof OtpRequestError) {
           return invalidRequest();
         }
-        if (error instanceof AuthConfigurationError || error instanceof OtpDeliveryError) {
+        if (error instanceof AuthConfigurationError) {
           return serviceUnavailable();
         }
         return serviceUnavailable();

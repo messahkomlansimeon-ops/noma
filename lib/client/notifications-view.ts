@@ -314,6 +314,18 @@ export const PREFERENCES_LOADING = "Chargement de vos préférences…";
 /** Texte fixe du serveur, repris à l'identique (testé contre le serveur). */
 export const EXTERNAL_NOTICE = "Les envois par SMS ne sont pas encore disponibles : ils sont simulés en développement.";
 
+/** Lot SMS1 : avec un vrai fournisseur SMS, plus aucun libellé ne parle de simulation (de vrais SMS partent, et coûtent). */
+export const PREFERENCES_LABEL_REAL = "Me prévenir par SMS";
+
+export function preferencesLabel(preferences: Pick<NotificationPreferences, "real">): string {
+  return preferences.real === true ? PREFERENCES_LABEL_REAL : PREFERENCES_LABEL;
+}
+
+export function preferencesToast(enabled: boolean, preferences: Pick<NotificationPreferences, "real">): string {
+  const kind = preferences.real === true ? "Envoi par SMS" : "Envoi par SMS (simulé)";
+  return `${kind} ${enabled ? "activé" : "désactivé"}`;
+}
+
 export function preferencesView(preferences: NotificationPreferences): { enabled: boolean; notice: string; extra: string | null } {
   return {
     enabled: preferences.externalEnabled,

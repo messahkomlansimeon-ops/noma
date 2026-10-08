@@ -23,11 +23,11 @@ utilisé** (la recharge du porte-monnaie passe par une page de paiement SIMULÉ)
    `npm run dev:try`, voir ci-dessous). La commande ne lit aucun fichier `.env` pour la deviner, et elle refuse de démarrer
    si la base n'est pas sur **votre ordinateur** (`127.0.0.1`, `localhost` ou `::1`).
 
-   **La base d'essai doit être migrée jusqu'au bout : 23 migrations** (de `0001` à `0020`, puis `0021`, `0022` et `0023` ; dont le porte-monnaie `0014`,
+   **La base d'essai doit être migrée jusqu'au bout : 24 migrations** (de `0001` à `0020`, puis `0021`, `0022`, `0023` et `0024` ; dont le porte-monnaie `0014`,
    l'achat de boost `0015`, la portée visible d'un devis de boost `0016`, son estimation bornée `0017`, les mesures d'efficacité
-   `0018` : ouvertures de la fiche et contacts, les notifications et le suivi des besoins `0019`, les favoris, la messagerie en direct, les commandes et l'administration `0020`, l'offre Pro : plans, abonnements, crédits promotionnels, import de catalogue `0021`, les photos des annonces `0022`, et l'historique des prix demandés `0023`). Si votre base d'essai a
+   `0018` : ouvertures de la fiche et contacts, les notifications et le suivi des besoins `0019`, les favoris, la messagerie en direct, les commandes et l'administration `0020`, l'offre Pro : plans, abonnements, crédits promotionnels, import de catalogue `0021`, les photos des annonces `0022`, l'historique des prix demandés `0023`, et le journal des envois de SMS `0024`). Si votre base d'essai a
    été créée avant ces lots, relancez simplement la deuxième commande ci-dessus (elle n'applique que ce qui manque). Contrôle : la
-   commande suivante doit afficher `23`.
+   commande suivante doit afficher `24`.
 
    ```
    docker exec deploy-postgres-1 psql -U noma_local -d noma_essai -tAc "select count(*) from noma_schema_migrations"
@@ -61,6 +61,7 @@ lui aussi un client de confiance. Il n'écoute que sur votre ordinateur ; laisse
    ligne qui ressemble à `[auth:dev] code OTP pour +***********42 : 123456`. Recopiez les 6 chiffres.
 4. Votre compte est créé la première fois. La session reste valable tant que vous ne vous déconnectez pas et que vous ne
    relancez pas la commande (au redémarrage, il faudra vous reconnecter).
+   `dev:try` n'envoie jamais de vrai SMS : même si une clé de fournisseur SMS est présente dans votre terminal, elle n'est pas transmise au serveur (voir `SMS.md`).
 
 ## Un scénario simple, avec deux comptes
 
