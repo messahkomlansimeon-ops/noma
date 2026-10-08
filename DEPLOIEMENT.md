@@ -41,11 +41,28 @@ fournis et vérifiés.
 | `NOMA_BUDGET_TZ` | `Africa/Abidjan` | Fuseau du budget quotidien |
 | `NOMA_FAKE_SOURCES` | — | `1` = sources simulées **sans IA ni dépense** (validation locale uniquement, refusé si production) |
 | `NOMA_SMS_PROVIDER`, `NOMA_SMS_API_KEY`, `NOMA_SMS_BASE_URL`, `NOMA_PUBLIC_URL`, `NOMA_SMS_DAILY_CAP`, `NOMA_SMS_NOTIFICATION_SHARE_PERCENT`, `NOMA_SMS_EXISTING_RESERVE_PERCENT` | vides | SMS réels par Meno (lots SMS1 et SMS1-bis) : **désactivés par défaut**, 15 F CFA par SMS accepté ; actifs seulement avec `NODE_ENV=production` (ou vers un faux serveur local) ; avec `meno` en production le démarrage est **refusé** sans clé valide, sans base https, sans URL publique (assez courte pour tenir en un SMS) ou avec une part de budget invalide. La clé **n'est jamais présente au build** (`npm run build:production`). Voir `SMS.md` |
+| `NOMA_PAYMENT_PROVIDER`, `WAVE_API_KEY`, `NOMA_SUBLYMUS_MANAGER_ID`, `NOMA_SUBLYMUS_WALLET_ID`, `SUBLYMUS_WEBHOOK_SECRET`, `NOMA_SUBLYMUS_BASE_URL` (et `NOMA_PUBLIC_URL`, https) | vides | Paiement des recharges par Wave via Sublymus (lot PAY1) : **argent réel**. Sans `NOMA_PAYMENT_PROVIDER=sublymus`, aucune recharge en production (le prestataire fictif y est refusé). Avec `sublymus`, le démarrage est **refusé** (le processus se termine, code 1) si une variable manque ou est mal formée. Les clés **ne sont jamais présentes au build** (`npm run build:production`). Voir `PAIEMENT-WAVE.md` |
 | `OPENROUTER_API_KEY` | — | Clé IA (lue depuis `poc/.env.local` par le moteur) |
 | `GOOGLE_API_KEY`, `GOOGLE_CX` | — | Google CSE (source « google » du moteur) |
 | `CHROME_PATH` | `/usr/bin/google-chrome-stable` | Binaire Chromium pour Playwright |
 
 Clés API et secrets : **jamais côté navigateur**, jamais journalisés.
+
+### Démarrage refusé : le processus se TERMINE (SMS et paiement)
+
+Au démarrage, `register()` (`instrumentation.ts`, voir `lib/server/startup-guard.ts`) contrôle dans cet ordre la configuration **SMS** (lot SMS1) puis celle du **paiement** (lot PAY1). En
+`NODE_ENV=production`, si l'un des contrôles refuse :
+
+1. le message FIXE du contrôle est journalisé sur la sortie d'erreur (`Démarrage refusé : configuration SMS invalide en production : …` ou `… paiement …`) : il nomme les variables à corriger, **jamais
+   leurs valeurs** ;
+2. le processus est **terminé avec le code 1** (`process.exit(1)`).
+
+Pourquoi : sous `next start`, une exception levée par `register()` laissait auparavant le processus **vivant**, qui répondait alors **500 à tout** (constat d'audit, commun SMS et paiement) : la
+supervision voyait un processus « actif » qui ne servait rien. Il tombe désormais, et `systemd` le voit tomber. Avec `deploy/noma.service` (`Restart=on-failure`, `RestartSec=5`), un fichier
+d'environnement invalide produit donc une **boucle de redémarrage toutes les 5 secondes** (aucune requête n'est servie) : lisez `journalctl -u noma -n 20` ou `systemctl status noma`, corrigez
+`/opt/noma/shared/.env.production`, puis `systemctl restart noma`. Hors production, l'exception est relancée telle quelle (affichée par `next dev`). Le worker du matching applique les mêmes règles
+(`scripts/matching-worker.ts` : refus de démarrer, code de sortie non nul). Vérifié par un vrai `next build` suivi de `next start` : configuration invalide, processus terminé avec un code non nul ;
+configuration valide, démarrage normal (`SMS.md`, `PAIEMENT-WAVE.md`).
 
 ## Préproduction privée (lot 3) — artifacts `deploy/`
 

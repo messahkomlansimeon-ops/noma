@@ -403,7 +403,13 @@ export interface WalletTransaction {
   createdAt: string;
 }
 
+/** Prestataires de paiement (lot PAY1) : le prestataire fictif (développement) et Wave via Sublymus ; « none » : aucun n'est actif. */
+export const PAYMENT_PROVIDERS = ["fake", "sublymus"] as const;
+export type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
+
 export interface WalletOverview {
+  /** Prestataire de paiement ACTIF côté serveur (lot PAY1) : sert à dire à l'écran par quel moyen on recharge. */
+  paymentMode: PaymentProviderName | "none";
   /** Crédits PAYÉS en FCFA (entier, jamais négatif). */
   balanceXof: number;
   /** Crédits promotionnels dépensables maintenant (lot PRO1) : distincts des crédits payés, non remboursables, non retirables, ils expirent. */
@@ -430,8 +436,12 @@ export interface WalletTopup {
   amountXof: number;
   status: TopupStatus;
   expiresAt: string;
-  /** Chemin de la page de paiement simulé (`/paiement-simule/<id>`) : à vérifier avant toute navigation. */
+  /** Chemin de la page de paiement simulé (`/paiement-simule/<id>`) ou de retour de paiement (`/paiement-retour/<id>`) : à vérifier avant toute navigation. */
   checkoutPath: string;
+  /** Prestataire de CETTE recharge (lot PAY1). */
+  provider: PaymentProviderName;
+  /** Lien de paiement Wave (https) vers lequel rediriger le navigateur ; null : prestataire fictif, session non ouverte, ou recharge terminée. À vérifier avant toute navigation. */
+  checkoutUrl: string | null;
 }
 
 export interface TopupRequest {
@@ -1220,18 +1230,31 @@ function parseWalletOverview(status: number, value: unknown): WalletOverview {
     value.balanceXof < 0 ||
     !(value.promoBalanceXof === undefined || (isSafeAmount(value.promoBalanceXof) && value.promoBalanceXof >= 0)) ||
     !(value.promoExpiresAt === undefined || value.promoExpiresAt === null || isIsoDate(value.promoExpiresAt)) ||
+    !(value.paymentMode === undefined || value.paymentMode === "none" || (PAYMENT_PROVIDERS as readonly string[]).includes(String(value.paymentMode))) ||
     !Array.isArray(value.transactions) ||
     !(value.nextCursor === null || isCursor(value.nextCursor))
   ) {
     throw fixedError(status, API_INVALID_RESPONSE);
   }
   return {
+    paymentMode: value.paymentMode === undefined ? "fake" : (value.paymentMode as PaymentProviderName | "none"),
     balanceXof: value.balanceXof,
     promoBalanceXof: value.promoBalanceXof === undefined ? 0 : value.promoBalanceXof,
     promoExpiresAt: typeof value.promoExpiresAt === "string" ? value.promoExpiresAt : null,
     transactions: value.transactions.map((entry) => parseWalletTransaction(status, entry)),
     nextCursor: value.nextCursor,
   };
+}
+
+/** Lien de paiement externe accepté : https, sans identifiant, sans espace, 2 000 caractères au plus (jamais javascript:, data:, http:). */
+export function isExternalCheckoutUrl(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 2000 || /\s/.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.username === "" && url.password === "" && url.hostname !== "";
+  } catch {
+    return false;
+  }
 }
 
 function parseTopup(status: number, value: unknown): WalletTopup {
@@ -1243,7 +1266,9 @@ function parseTopup(status: number, value: unknown): WalletTopup {
     !(TOPUP_STATUSES as readonly string[]).includes(String(value.status)) ||
     !isIsoDate(value.expiresAt) ||
     typeof value.checkoutPath !== "string" ||
-    value.checkoutPath.length > 200
+    value.checkoutPath.length > 200 ||
+    !(value.provider === undefined || (PAYMENT_PROVIDERS as readonly string[]).includes(String(value.provider))) ||
+    !(value.checkoutUrl === undefined || value.checkoutUrl === null || isExternalCheckoutUrl(value.checkoutUrl))
   ) {
     throw fixedError(status, API_INVALID_RESPONSE);
   }
@@ -1253,6 +1278,8 @@ function parseTopup(status: number, value: unknown): WalletTopup {
     status: value.status as TopupStatus,
     expiresAt: value.expiresAt,
     checkoutPath: value.checkoutPath,
+    provider: value.provider === undefined ? "fake" : (value.provider as PaymentProviderName),
+    checkoutUrl: typeof value.checkoutUrl === "string" ? value.checkoutUrl : null,
   };
 }
 

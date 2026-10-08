@@ -190,7 +190,7 @@ function eventBody(intent: { providerReference: string; amountXof: bigint }, ove
 
 // ───────────── données ─────────────
 
-interface ToupDto { id: string; amountXof: number; status: string; expiresAt: string; checkoutPath: string }
+interface ToupDto { id: string; amountXof: number; status: string; expiresAt: string; checkoutPath: string; provider: string; checkoutUrl: string | null }
 const topupOf = (reply: Reply): ToupDto => asObject(reply.json).topup as ToupDto;
 
 async function createIntent(who: Login, amount = 1000): Promise<{ dto: ToupDto; intent: IntentLike }> {
@@ -350,7 +350,7 @@ test("origine : vérifiée AVANT la session sur les POST (aucune résolution de 
 test("GET /api/wallet : solde et historique de l'utilisateur de la session, DTO en liste blanche, montants en entiers JSON signés, rien d'un autre compte", async () => {
   const empty = await getWallet("", { cookie: bob.cookie });
   assert.equal(empty.status, 200);
-  assert.deepEqual(empty.json, { contractVersion: WALLET_CONTRACT_VERSION, balanceXof: 0, promoBalanceXof: 0, promoExpiresAt: null, transactions: [], nextCursor: null });
+  assert.deepEqual(empty.json, { contractVersion: WALLET_CONTRACT_VERSION, balanceXof: 0, promoBalanceXof: 0, promoExpiresAt: null, transactions: [], nextCursor: null, paymentMode: "fake" });
 
   const { intent } = await createIntent(alice, 2500);
   const ledgerBefore = await getWallet();
@@ -359,7 +359,7 @@ test("GET /api/wallet : solde et historique de l'utilisateur de la session, DTO 
   const wallet = await getWallet();
   assert.equal(wallet.status, 200);
   const body = asObject(wallet.json);
-  assert.deepEqual(keys(body), sorted(["contractVersion", "balanceXof", "promoBalanceXof", "promoExpiresAt", "transactions", "nextCursor"]));
+  assert.deepEqual(keys(body), sorted(["contractVersion", "balanceXof", "promoBalanceXof", "promoExpiresAt", "transactions", "nextCursor", "paymentMode"]));
   assert.equal(body.promoBalanceXof, 0, "aucun crédit promotionnel sans abonnement");
   assert.equal(body.promoExpiresAt, null);
   assert.equal(body.contractVersion, "wallet/v1");
@@ -435,12 +435,14 @@ test("POST /topups : 201 avec le DTO exact, 200 pour la même clé et le même m
   assert.deepEqual(keys(body), sorted(["contractVersion", "topup"]));
   assert.equal(body.contractVersion, "wallet/v1");
   const dto = topupOf(created);
-  assert.deepEqual(keys(dto), sorted(["id", "amountXof", "status", "expiresAt", "checkoutPath"]));
+  assert.deepEqual(keys(dto), sorted(["id", "amountXof", "status", "expiresAt", "checkoutPath", "provider", "checkoutUrl"]));
   assert.match(dto.id, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.equal(dto.amountXof, 5000);
   assert.equal(typeof dto.amountXof, "number");
   assert.equal(dto.status, "pending");
   assert.equal(dto.checkoutPath, `/paiement-simule/${dto.id}`);
+  assert.equal(dto.provider, "fake");
+  assert.equal(dto.checkoutUrl, null, "le faux prestataire n'a pas d'adresse externe");
   const lifetime = new Date(dto.expiresAt).getTime() - Date.now();
   assert.ok(lifetime > 29 * 60_000 && lifetime <= 30 * 60_000, `expiration à 30 minutes : ${lifetime} ms`);
   assert.ok(!created.text.includes(dan.userId) && !/fakepay|idempotency|owner/i.test(created.text));
@@ -562,7 +564,7 @@ test("GET /topups/{id} : l'état de SON intention ; inexistante et intention d'a
   const own = await getTopup(dto.id);
   assert.equal(own.status, 200);
   assert.deepEqual(keys(own.json), sorted(["contractVersion", "topup"]));
-  assert.deepEqual(keys(topupOf(own)), sorted(["id", "amountXof", "status", "expiresAt", "checkoutPath"]));
+  assert.deepEqual(keys(topupOf(own)), sorted(["id", "amountXof", "status", "expiresAt", "checkoutPath", "provider", "checkoutUrl"]));
   assert.equal(topupOf(own).status, "pending");
   const missing = await getTopup(randomUUID());
   assert.equal(missing.status, 404);
@@ -913,7 +915,7 @@ test("routes de développement : confirm crédite par le MÊME chemin que le web
   assert.deepEqual(keys(confirmed.json), sorted(["contractVersion", "outcome", "topup"]));
   assert.equal(asObject(confirmed.json).outcome, "applied");
   assert.equal(topupOf(confirmed).status, "succeeded");
-  assert.deepEqual(keys(topupOf(confirmed)), sorted(["id", "amountXof", "status", "expiresAt", "checkoutPath"]));
+  assert.deepEqual(keys(topupOf(confirmed)), sorted(["id", "amountXof", "status", "expiresAt", "checkoutPath", "provider", "checkoutUrl"]));
   assert.equal(await balanceOf(alice), String(balance + 1800));
   const events = (await pool.query("SELECT provider_event_id, type, amount_xof::text AS amount, payload_sha256, outcome FROM payment_events WHERE intent_id = $1", [dto.id])).rows;
   assert.equal(events.length, 1);

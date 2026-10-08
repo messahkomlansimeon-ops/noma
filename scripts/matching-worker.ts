@@ -3,6 +3,7 @@ import { assertSmsProductionConfig } from "../lib/server/sms/config";
 import { getPostgresPool, closePostgresPool, requireDatabaseUrl } from "../lib/server/postgres/client";
 import { requireWorkerId } from "../lib/server/matching/jobs";
 import { runMatchingCycle, runMatchingWorkerLoop } from "../lib/server/matching/runner";
+import { assertPaymentConfiguration } from "../lib/server/wallet/sublymus/config";
 
 /** Worker du matching asynchrone. N'applique aucune migration et n'est jamais lancé par Next.js. */
 function resolveWorkerId(): string {
@@ -22,6 +23,8 @@ async function main(): Promise<void> {
     return;
   }
   requireDatabaseUrl();
+  // Lot PAY1 : comme le serveur, un worker mal configuré pour le paiement (rattrapage Sublymus) REFUSE de démarrer, avec un message clair (variables, jamais valeurs).
+  assertPaymentConfiguration(process.env);
   const workerId = resolveWorkerId();
   const once = process.argv.slice(2).includes("--once");
   const pool = getPostgresPool();
@@ -71,7 +74,7 @@ main()
     console.error(
       typeof code === "string" && /^[A-Za-z0-9_]{1,40}$/.test(code)
         ? `Matching worker : erreur ${code}.`
-        : (error instanceof Error && error.name === "DatabaseConfigurationError") || (error instanceof Error && error.name === "MatchingJobValidationError")
+        : (error instanceof Error && error.name === "DatabaseConfigurationError") || (error instanceof Error && error.name === "MatchingJobValidationError") || (error instanceof Error && error.name === "PaymentConfigError")
           ? `Matching worker : ${error.message}`
           : "Matching worker : erreur inattendue.",
     );

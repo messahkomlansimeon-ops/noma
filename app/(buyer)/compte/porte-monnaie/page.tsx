@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Wallet } from "lucide-react";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
-import { api, describeApiError, type WalletTransaction } from "@/lib/client/api";
+import { api, describeApiError, type PaymentProviderName, type WalletTransaction } from "@/lib/client/api";
 import { createGenerationGuard } from "@/lib/client/match-view";
 import { safeNextPath } from "@/lib/client/session";
 import {
@@ -13,20 +13,23 @@ import {
   PAID_CREDITS_LABEL,
   PROMO_CREDITS_LABEL,
   PROMO_CREDITS_NOTE,
-  SIMULATION_NOTICE,
   TOPUP_PRESETS,
   checkoutHref,
   createTopupKeys,
   createTopupWithFreshKey,
+  externalCheckoutHref,
   formatFcfa,
   mergeTransactionPages,
   parseTopupAmount,
   promoExpiryText,
+  rechargeNotice,
   returnTarget,
   walletRow,
 } from "@/lib/client/wallet-view";
 
 interface Loaded {
+  /** Prestataire de paiement ACTIF côté serveur (lot PAY1) : dit à l'écran par quel moyen on recharge. */
+  paymentMode: PaymentProviderName | "none";
   balanceXof: number;
   /** Lot PRO1 : crédits promotionnels dépensables et leur prochaine échéance. */
   promoBalanceXof: number;
@@ -37,8 +40,8 @@ interface Loaded {
 
 const TONE_CLASS = { credit: "text-forest", debit: "text-carrot-ink", neutral: "text-ink-soft" } as const;
 
-/** Panneau de recharge : montants proposés, montant libre validé, puis page de paiement simulé. */
-function RechargePanel({ next }: { next: string }) {
+/** Panneau de recharge : montants proposés, montant libre validé, puis page de paiement simulé (prestataire fictif) ou page de paiement Wave (Sublymus). */
+function RechargePanel({ next, provider }: { next: string; provider: PaymentProviderName | "none" }) {
   const router = useRouter();
   const redirectIfUnauthorized = useUnauthorizedRedirect();
   const [amountText, setAmountText] = useState("");
@@ -72,6 +75,17 @@ function RechargePanel({ next }: { next: string }) {
         scope,
         amountXof: result.amountXof,
       });
+      // Paiement par Wave (lot PAY1) : le lien de la session est vérifié (https) avant toute navigation ; le retour se fait sur /paiement-retour/<id>, qui ne crédite jamais.
+      if (topup.provider === "sublymus") {
+        const waveHref = externalCheckoutHref(topup.checkoutUrl);
+        if (waveHref === null) {
+          setError("La page de paiement Wave n'a pas pu être ouverte. Réessayez dans un instant.");
+          return;
+        }
+        navigating = true;
+        window.location.assign(waveHref);
+        return;
+      }
       const href = checkoutHref(topup.checkoutPath, next);
       if (href === null) {
         setError("La page de paiement n'a pas pu être ouverte. Réessayez dans un instant.");
@@ -97,8 +111,12 @@ function RechargePanel({ next }: { next: string }) {
       <h2 id="topup-title" className="text-[16px] font-extrabold text-ink">
         Recharger mon porte-monnaie
       </h2>
-      <p data-testid="topup-simulation-notice" className="mt-1 rounded-lg bg-carrot-soft px-3 py-2 text-[12px] font-semibold text-carrot-ink">
-        {SIMULATION_NOTICE}
+      <p
+        data-testid={provider === "fake" ? "topup-simulation-notice" : "topup-provider-notice"}
+        data-provider={provider}
+        className={`mt-1 rounded-lg px-3 py-2 text-[12px] font-semibold ${provider === "sublymus" ? "bg-sage text-forest" : "bg-carrot-soft text-carrot-ink"}`}
+      >
+        {rechargeNotice(provider)}
       </p>
 
       <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Montants proposés">
@@ -164,7 +182,7 @@ function RechargePanel({ next }: { next: string }) {
       <button
         data-testid="topup-submit"
         onClick={() => void submit()}
-        disabled={!parsed.ok || pending}
+        disabled={!parsed.ok || pending || provider === "none"}
         className="mt-4 flex w-full items-center justify-center rounded-xl bg-forest px-4 py-3.5 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
       >
         {pending ? "Ouverture du paiement…" : parsed.ok ? `Continuer vers le paiement de ${formatFcfa(parsed.amountXof)}` : "Continuer vers le paiement"}
@@ -196,6 +214,7 @@ function PorteMonnaie() {
       (overview) => {
         if (!guard.current.isCurrent(token)) return;
         setLoaded({
+          paymentMode: overview.paymentMode,
           balanceXof: overview.balanceXof,
           promoBalanceXof: overview.promoBalanceXof,
           promoExpiresAt: overview.promoExpiresAt,
@@ -225,6 +244,7 @@ function PorteMonnaie() {
       setLoaded((current) =>
         current
           ? {
+              paymentMode: page.paymentMode,
               balanceXof: page.balanceXof,
               promoBalanceXof: page.promoBalanceXof,
               promoExpiresAt: page.promoExpiresAt,
@@ -296,7 +316,7 @@ function PorteMonnaie() {
               </button>
             </div>
 
-            {rechargeOpen ? <RechargePanel next={next} /> : null}
+            {rechargeOpen ? <RechargePanel next={next} provider={loaded.paymentMode} /> : null}
 
             <h2 className="mt-6 text-[16px] font-extrabold text-ink">Historique</h2>
             {loaded.transactions.length === 0 ? (

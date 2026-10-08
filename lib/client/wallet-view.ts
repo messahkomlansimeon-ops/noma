@@ -15,10 +15,12 @@
  *  - tout retour (après paiement, après recharge) passe par `safeNextPath` : jamais une URL fournie par l'adresse.
  */
 
+import { isExternalCheckoutUrl } from "./api";
 import type {
   BoostDurationCode,
   BoostPurchaseHistoryItem,
   BoostQuote,
+  PaymentProviderName,
   WalletTopup,
   WalletTransaction,
 } from "./api";
@@ -767,3 +769,82 @@ export function purchaseHistoryRow(item: BoostPurchaseHistoryItem, timeZone?: st
     refundedText: item.refundedAt === null ? null : `Remboursé le ${formatDateTimeFr(item.refundedAt, timeZone)}`,
   };
 }
+
+// ─── Paiement par Wave (lot PAY1) ───────────────────────────────────────────────────────────────
+
+/** Moyen de paiement dit à l'écran : Wave SEULEMENT (Sublymus ne propose ni Orange Money ni MTN à cette adresse). */
+export const WAVE_LABEL = "Paiement par Wave";
+export const WAVE_NOTICE =
+  "Paiement par Wave : vous êtes redirigé vers Wave pour payer, puis ramené ici. Votre porte-monnaie est crédité dès que Wave confirme le paiement. Wave seulement : pas d'Orange Money ni de MTN pour l'instant.";
+export const NO_PROVIDER_NOTICE = "La recharge n'est pas disponible pour le moment.";
+
+/** Phrase au-dessus des montants de recharge, selon le prestataire ACTIF côté serveur (jamais une promesse de « simulation » quand on paie par Wave). */
+export function rechargeNotice(provider: PaymentProviderName | "none"): string {
+  if (provider === "sublymus") return WAVE_NOTICE;
+  if (provider === "none") return NO_PROVIDER_NOTICE;
+  return SIMULATION_NOTICE;
+}
+
+/** Lien Wave à ouvrir : seulement un lien https sans identifiant (vérifié avant toute navigation) ; sinon null. */
+export function externalCheckoutHref(url: unknown): string | null {
+  return isExternalCheckoutUrl(url) ? url : null;
+}
+
+/** Page de retour du navigateur après Wave : AFFICHAGE seulement, elle ne crédite jamais. */
+export const RETURN_PREFIX = "/paiement-retour/";
+export const RETURN_PENDING_TITLE = "Paiement en cours de confirmation";
+
+export type ReturnResult = "succes" | "echec";
+export function parseReturnResult(raw: unknown): ReturnResult | null {
+  return raw === "succes" || raw === "echec" ? raw : null;
+}
+
+export type ReturnView =
+  | { kind: "loading" }
+  | { kind: "pending"; title: string; detail: string; amountText: string }
+  | { kind: "succeeded"; title: string; detail: string; amountText: string }
+  | { kind: "failed"; title: string; detail: string; amountText: string }
+  | { kind: "expired"; title: string; detail: string; amountText: string }
+  | { kind: "not_found" | "error"; title: string; detail: string };
+
+/**
+ * Ce que la page de retour affiche, d'après l'état LU sur le serveur (jamais d'après l'adresse de retour : `resultat` ne change qu'une phrase d'explication). Une recharge en attente
+ * dit « Paiement en cours de confirmation » : seul le serveur, sur confirmation authentifiée de Sublymus, crédite.
+ */
+export function returnView(input: { topup: WalletTopup | null; failure: { status: number; code: string } | null; resultat: ReturnResult | null; waitedTooLong?: boolean }): ReturnView {
+  const { topup, failure } = input;
+  if (!topup) {
+    if (!failure) return { kind: "loading" };
+    if (failure.status === 404) return { kind: "not_found", title: "Recharge introuvable", detail: "Cette recharge est introuvable." };
+    return { kind: "error", title: "Recharge illisible", detail: "L'état de la recharge n'a pas pu être lu. Réessayez dans un instant." };
+  }
+  const amountText = formatFcfa(topup.amountXof);
+  switch (topup.status) {
+    case "succeeded":
+      return { kind: "succeeded", title: "Paiement confirmé", detail: `Votre porte-monnaie a été crédité de ${amountText}, une seule fois.`, amountText };
+    case "failed":
+      return { kind: "failed", title: "Paiement non abouti", detail: "Wave a indiqué que le paiement n'a pas abouti : rien n'a été crédité ni débité. Vous pouvez recommencer.", amountText };
+    case "expired":
+      return {
+        kind: "expired",
+        title: "Recharge expirée",
+        detail: "Cette recharge a expiré sans confirmation. Si vous avez payé, la confirmation peut encore arriver : votre porte-monnaie sera alors crédité. Sinon, vous pouvez recommencer.",
+        amountText,
+      };
+    default:
+      return {
+        kind: "pending",
+        title: RETURN_PENDING_TITLE,
+        detail: input.waitedTooLong
+          ? "La confirmation peut prendre quelques minutes. Vous pouvez fermer cette page : votre porte-monnaie sera crédité dès que Wave aura confirmé le paiement."
+          : input.resultat === "echec"
+            ? "Le paiement ne semble pas avoir abouti. Si vous avez payé, la confirmation peut arriver dans quelques minutes : votre porte-monnaie sera alors crédité."
+            : "Nous attendons la confirmation de Wave. Votre porte-monnaie sera crédité dès qu'elle arrive ; vous pouvez fermer cette page.",
+        amountText,
+      };
+  }
+}
+
+/** Relecture de la recharge en attente : toutes les 3 s pendant 2 minutes, puis la page cesse d'interroger (le crédit arrive tout de même). */
+export const RETURN_POLL_INTERVAL_MS = 3_000;
+export const RETURN_POLL_WINDOW_MS = 120_000;

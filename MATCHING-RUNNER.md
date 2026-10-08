@@ -28,11 +28,13 @@ Code : `lib/server/matching/runner.ts` (`runMatchingCycle`, `runMatchingWorkerLo
    existent (sinon `notify: { skipped: true }`, **sans erreur**) et seulement s'il existe un transport (`NODE_ENV=development` **et** `NOMA_DEV_NOTIFY_CONSOLE=1`, sinon `notify: { noTransport: true }`, aucun envoi).
    Résultat `notify { skipped, noTransport, users, messages, delivered, skippedDeliveries, deferred, failed, retried, expired, busy, errors }`. Voir `NOTIFICATIONS.md`.
 
+4b. **Étape paymentCatchup** (lot PAY1, exécutée **après** notify et abonnements, **AVANT** le relevé des prix (lot H1) et la collecte externe (lot EXT1) : l'argent d'abord, une source externe lente ne la retarde jamais) : `runSublymusCatchupStep` rattrape les recharges Sublymus restées en attente (webhook perdu) en interrogeant Sublymus ; **isolée dans son propre `try`** (une erreur de l'étape n'arrête aucune autre étape), **budget propre de 20 s par passage** (`CATCHUP_PASS_BUDGET_MS`, arrêt à la première erreur de délai, de réseau ou 5xx). Sans prestataire Sublymus actif (`NOMA_PAYMENT_PROVIDER` absent ou `fake`), avec une configuration refusée ou sans la migration `0026_sublymus_payments`, elle est ignorée **sans erreur** (`paymentCatchup: { skipped: true }`). Résultat `paymentCatchup { skipped, examined, completed, failed, waiting, notFound, anomalies, windowClosed, deferred, errors }`. Voir `PAIEMENT-WAVE.md`.
+
 5. **Étape collect** (lot EXT1, exécutée **en dernier**, après notify et après les étapes d'abonnements (lot PRO1) et de relevé des prix (lot H1), pour que son budget de 10 s ne retarde jamais les autres) : `runCollectStep` synchronise les surveillances de marché (une par clé produit, mutualisée entre les besoins actifs), puis, s'il existe des connecteurs (FICTIFS seulement : `NOMA_EXTERNAL_FAKE=1`, jamais en production), collecte les surveillances dues (`FOR UPDATE SKIP LOCKED`, au plus 3 par cycle, 10 s de budget de temps : les surveillances non commencées au-delà sont rendues sans consommer de quota) dans le budget de chaque source, avec un disjoncteur par source. Isolée comme les autres étapes :
    migration `0025_external_collection` absente → ignorée **sans erreur** (`collect: { skipped: true }`) ; aucun connecteur → `collect: { noConnectors: true }`. **Une panne d'une source n'est pas une erreur du cycle** (comptée dans `collect.sourceFailures`) ; seule une erreur d'infrastructure
    donne `collect_error_<code>`. Voir `COLLECTE-EXTERNE.md`.
 
-`idle` = rien périmé (`temporal.expired` = 0), aucun boost expiré (`boost.expired` = 0), rien lu par la projection, rien en maintenance, aucun job exécuté, aucune surveillance collectée (`collect.watchesProcessed` = 0), aucun envoi externe traité
+`idle` = rien périmé (`temporal.expired` = 0), aucun boost expiré (`boost.expired` = 0), rien lu par la projection, rien en maintenance, aucun job exécuté, aucune recharge Sublymus examinée (`paymentCatchup.examined` = 0), aucune surveillance collectée (`collect.watchesProcessed` = 0), aucun envoi externe traité
 (`notify.users` = utilisateurs laissés à un autre processus ou **en erreur** : une erreur de l'étape notify compte comme « au repos », les tentatives des lignes de l'utilisateur sont incrémentées avec une attente croissante, puis `failed` après 3 ; `notify.expired` = 0). `scoring_config_sweep` n'est jamais réservé : il reste `pending`. L'option `signal` (non prévue
 par le plan, nécessaire à l'arrêt propre) empêche toute nouvelle réservation une fois déclenchée.
 
@@ -43,7 +45,7 @@ Toutes les entrées sont validées avant la moindre requête (`MatchingJobValida
 Balayage temporel, étape boost, projection, maintenance et exécution des jobs sont isolés : l'échec de l'une n'empêche pas les
 suivantes (un événement empoisonné ne doit pas empêcher d'exécuter les jobs sains). Le résultat
 porte `errors: string[]` : codes stables `temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`,
-`job_error_<code>`, `notify_error_user_<code>`, `collect_error_<code>` (`<code>` : SQLSTATE ou code d'erreur en minuscules, `validation` ou `unknown` ;
+`job_error_<code>`, `notify_error_user_<code>`, `catchup_error_<code>`, `collect_error_<code>` (`<code>` : SQLSTATE ou code d'erreur en minuscules, `validation` ou `unknown` ;
 jamais de message, de requête ni d'identifiant). Si l'exécution d'un job lève une exception
 (base indisponible pendant l'enregistrement d'un échec…), `job_error_…` est enregistré, **aucun
 autre job** n'est exécuté dans ce cycle (la base est probablement malade) et son bail expirera

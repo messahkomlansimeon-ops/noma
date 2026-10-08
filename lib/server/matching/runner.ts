@@ -16,6 +16,7 @@ import { runNotificationStep, type NotifyHooks, type NotifyStepResult } from "..
 import { resolveNotificationTransport, type NotificationTransport } from "../notifications/transport";
 import { runSubscriptionStep, type SubscriptionStepResult } from "../subscriptions/lifecycle";
 import { emptyCollectResult, runCollectStep, type CollectStepOptions, type CollectStepResult } from "../external/collect";
+import { EMPTY_CATCHUP_RESULT, runSublymusCatchupStep, type CatchupStepResult } from "../wallet/sublymus/catchup";
 import { projectOutboxBatch, type ProjectOutboxBatchResult } from "./projection";
 import { runTemporalExpirySweep } from "./temporal";
 import { runUserReactivationSweep, type UserReactivationSweepResult } from "./sweeps";
@@ -59,6 +60,8 @@ export interface MatchingCycleResult {
   notify: NotifyStepResult;
   /** Étape « subscriptions » (lot PRO1, après « notify ») : renouvellements, délais de grâce, fins d'abonnement, expiration des crédits promotionnels. `skipped: true` : migration 0021 absente. Voir OFFRE-PRO.md. */
   subscriptions: SubscriptionStepResult;
+  /** Étape « paymentCatchup » (lot PAY1, après « subscriptions », AVANT « market » et « collect » : l'argent d'abord) : rattrape les recharges Sublymus en attente (webhook perdu). `skipped: true` : prestataire fictif ou migration 0026 absente. Budget d'un passage : 20 s. Voir PAIEMENT-WAVE.md. */
+  paymentCatchup: CatchupStepResult;
   /**
    * Étape « market » (lot H1, exécutée après « notify ») : relevé quotidien des prix affichés des annonces publiées (une fois par jour UTC, jour courant seulement : aucun rattrapage).
    * `skipped: true` : la migration 0023 n'est pas enregistrée (étape ignorée sans erreur). Elle ne compte jamais dans `idle` : un relevé quotidien n'est pas du travail
@@ -70,9 +73,9 @@ export interface MatchingCycleResult {
    * pas appliquée (étape ignorée sans erreur) ; `noConnectors: true` : aucun connecteur disponible, rien collecté. Une panne d'une source n'est pas une erreur du cycle. Voir COLLECTE-EXTERNE.md.
    */
   collect: CollectStepResult;
-  /** Aucun progrès : rien périmé, aucun boost expiré, rien lu par la projection, rien en maintenance, aucun job exécuté, aucune surveillance collectée, aucun envoi traité (un utilisateur en erreur ou laissé à un autre processus compte comme « au repos »). */
+  /** Aucun progrès : rien périmé, aucun boost expiré, rien lu par la projection, rien en maintenance, aucun job exécuté, aucune recharge Sublymus examinée par le rattrapage, aucune surveillance collectée, aucun envoi traité (un utilisateur en erreur ou laissé à un autre processus compte comme « au repos »). */
   idle: boolean;
-  /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`, `notify_error_<code>`, `market_error_<code>`, `collect_error_<code>`). */
+  /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`, `notify_error_<code>`, `market_error_<code>`, `catchup_error_<code>`, `collect_error_<code>`). */
   errors: string[];
 }
 
@@ -102,6 +105,8 @@ export interface RunMatchingCycleOptions {
   marketNow?: () => Date;
   /** Étape « collect » (lot EXT1) : connecteurs, horloge, analyseur… Absent : connecteurs résolus depuis l'environnement (aucun sans `NOMA_EXTERNAL_FAKE=1`, jamais en production). Réservé aux tests. */
   collect?: Omit<CollectStepOptions, "pool" | "signal">;
+  /** Étape « catchup » (lot PAY1) : environnement, appels sortants et horloge : réservés aux tests (qui les branchent sur la FAUSSE API locale). */
+  paymentCatchup?: { env?: Record<string, string | undefined>; fetch?: typeof fetch; now?: Date };
 }
 
 function requireBoundedInteger(value: unknown, field: string, min: number, max: number): number {
@@ -213,6 +218,14 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
   } catch (error) {
     errors.push(`subscriptions_error_${errorCodeOf(error)}`);
   }
+  // Étape « paymentCatchup » (lot PAY1) : isolée dans son propre try, exécutée AVANT « market » et « collect » (budget propre de 20 s : une source externe lente ne la retarde jamais) ; sans prestataire Sublymus ou sans la migration 0026, elle est ignorée sans erreur.
+  let paymentCatchup: CatchupStepResult = { ...EMPTY_CATCHUP_RESULT, errors: [] };
+  try {
+    paymentCatchup = await runSublymusCatchupStep({ pool, ...(options.paymentCatchup ?? {}) });
+    for (const code of paymentCatchup.errors) errors.push(code);
+  } catch (error) {
+    errors.push(`catchup_error_${errorCodeOf(error)}`);
+  }
   // Étape « market » (lot H1) : isolée comme les autres, exécutée en dernier. Sans la migration 0023, ignorée sans erreur ; une erreur de l'étape ne change rien aux autres.
   let market: MarketStepResult = { observed: 0, skipped: false, alreadyDone: false };
   try {
@@ -236,6 +249,7 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
     jobs,
     notify,
     subscriptions,
+    paymentCatchup,
     market,
     collect,
     // Au repos : l'utilisateur laissé à un autre processus (busy) ET l'utilisateur en erreur (une erreur de l'étape notify compte comme « au repos » : ses lignes ont
@@ -243,6 +257,7 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
     idle: temporal.expired === 0 && boost.expired === 0 && projected.selected === 0 && maintenance.deadLettered === 0 && jobs.length === 0
       && notify.users - notify.busy - notify.errors.length <= 0 && notify.expired === 0
       && subscriptions.renewed + subscriptions.pastDue + subscriptions.ended + subscriptions.promoExpired === 0
+      && paymentCatchup.examined === 0
       && collect.watchesProcessed === 0,
     errors,
   };
@@ -261,7 +276,7 @@ export interface RunMatchingWorkerLoopOptions {
   /** Journal injectable (une ligne de texte, sans donnée métier). Défaut : console.error. */
   log?: (line: string) => void;
   /** Étape « notify » de chaque cycle (transport, horloge, crochets) : réservé aux tests. */
-  notification?: Pick<RunMatchingCycleOptions, "notificationTransport" | "notificationNow" | "notificationHooks">;
+  notification?: Pick<RunMatchingCycleOptions, "notificationTransport" | "notificationNow" | "notificationHooks" | "paymentCatchup">;
 }
 
 export interface MatchingWorkerLoopResult {

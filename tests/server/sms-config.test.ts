@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { test } from "node:test";
 import { register } from "../../instrumentation";
+import { runStartupChecks } from "../../lib/server/startup-guard";
 import { assertProductionConfig, loadConfig } from "../../lib/server/config";
 import type { SendOtp } from "../../lib/server/auth/types";
 import type { NotificationTransport } from "../../lib/server/notifications/transport";
@@ -182,7 +183,32 @@ test("assertProductionConfig (protection de recherche) applique aussi la règle 
   assert.throws(() => assertProductionConfig(loadConfig(broken), broken), /NOMA_SMS_API_KEY requis en production/);
 });
 
-test("instrumentation.register : le serveur Node refuse de démarrer en production sans clé ; l'edge et le développement ne vérifient rien", async () => {
+test("instrumentation.register : en production, le contrôle SMS journalise le message fixe puis TERMINE le processus (code 1) ; l'edge et le développement ne vérifient rien", async () => {
+  // Le processus réel est terminé par `register` (vérifié par un vrai processus dans tests/server/startup-guard.test.ts) : ici, la sortie est injectée.
+  const refuse = (env: Record<string, string | undefined>): { logs: string[]; exits: number[]; thrown: unknown } => {
+    const logs: string[] = [];
+    const exits: number[] = [];
+    let thrown: unknown = null;
+    try {
+      runStartupChecks(env, { log: (message) => logs.push(message), exit: (code) => { exits.push(code); } });
+    } catch (error) {
+      thrown = error;
+    }
+    return { logs, exits, thrown };
+  };
+  const withoutKey = refuse({ ...PRODUCTION, NOMA_SMS_API_KEY: undefined });
+  assert.deepEqual(withoutKey.exits, [1]);
+  assert.equal(withoutKey.logs.length, 1);
+  assert.match(withoutKey.logs[0], /NOMA_SMS_API_KEY requis en production/);
+  assert.match(String(withoutKey.thrown), /NOMA_SMS_API_KEY requis en production/, "le démarrage n'est jamais réputé réussi, même si la sortie revenait");
+  const shortKey = refuse({ ...PRODUCTION, NOMA_SMS_API_KEY: "court" });
+  assert.deepEqual(shortKey.exits, [1]);
+  assert.match(shortKey.logs[0], /invalide \(format\)/);
+  const valid = refuse({ ...PRODUCTION });
+  assert.deepEqual(valid.exits, []);
+  assert.deepEqual(valid.logs, []);
+  assert.equal(valid.thrown, null);
+
   const environment = process.env as Record<string, string | undefined>;
   const names = ["NEXT_RUNTIME", "NODE_ENV", "NOMA_SMS_PROVIDER", "NOMA_SMS_API_KEY", "NOMA_PUBLIC_URL", "NOMA_AUTH_SECRET", "NOMA_SMS_BASE_URL", "NOMA_SMS_DAILY_CAP"];
   const saved = Object.fromEntries(names.map((name) => [name, environment[name]]));
@@ -194,10 +220,6 @@ test("instrumentation.register : le serveur Node refuse de démarrer en producti
     }
   };
   try {
-    apply({ ...PRODUCTION, NEXT_RUNTIME: "nodejs", NOMA_SMS_API_KEY: undefined });
-    await assert.rejects(register(), /NOMA_SMS_API_KEY requis en production/);
-    apply({ ...PRODUCTION, NEXT_RUNTIME: "nodejs", NOMA_SMS_API_KEY: "court" });
-    await assert.rejects(register(), /invalide \(format\)/);
     apply({ ...PRODUCTION, NEXT_RUNTIME: "nodejs" });
     await register();
     apply({ ...PRODUCTION, NEXT_RUNTIME: "edge", NOMA_SMS_API_KEY: undefined });

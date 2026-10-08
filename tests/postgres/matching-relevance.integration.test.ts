@@ -60,7 +60,7 @@ before(async () => {
   admin = opened.pool;
   await admin.query(`CREATE SCHEMA ${quoted}`);
   pool = await openVerifiedIsolatedPool(opened.target, schema);
-  assert.equal((await runMigrations(pool)).applied.length, 25);
+  assert.equal((await runMigrations(pool)).applied.length, 26);
   handlers = createMatchingHttpHandlers({ pool, now: () => clock.now() });
   buyer = await login();
   seller = await login();

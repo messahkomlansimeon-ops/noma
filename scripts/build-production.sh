@@ -44,7 +44,7 @@ done < <(compgen -e | grep -E '^NEXT_PUBLIC_[A-Za-z0-9_]+$' || true)
 
 # Valeurs secrètes de l'appelant, pour le contrôle final seulement (jamais affichées, jamais transmises au build) : les variables connues et toute variable exportée dont le nom évoque
 # un secret (SECRET, KEY, TOKEN, PASSWORD, PASSWD, CREDENTIAL), hors NEXT_PUBLIC_* (publiques par nature). Les valeurs de moins de 8 caractères ou sur plusieurs lignes sont ignorées.
-SECRET_NAMES=(NOMA_SMS_API_KEY NOMA_AUTH_SECRET NOMA_IP_SECRET NOMA_PROXY_SECRET NOMA_AUTH_PROXY_SECRET NOMA_TURNSTILE_SECRET NOMA_FAKE_PAYMENT_SECRET DATABASE_URL OPENROUTER_API_KEY GOOGLE_API_KEY)
+SECRET_NAMES=(NOMA_SMS_API_KEY NOMA_AUTH_SECRET NOMA_IP_SECRET NOMA_PROXY_SECRET NOMA_AUTH_PROXY_SECRET NOMA_TURNSTILE_SECRET NOMA_FAKE_PAYMENT_SECRET WAVE_API_KEY SUBLYMUS_WEBHOOK_SECRET DATABASE_URL OPENROUTER_API_KEY GOOGLE_API_KEY)
 while IFS= read -r name; do
   [ -n "$name" ] && SECRET_NAMES+=("$name")
 done < <(compgen -e | grep -E 'SECRET|KEY|TOKEN|PASSWORD|PASSWD|CREDENTIAL' | grep -vE '^NEXT_PUBLIC_' || true)

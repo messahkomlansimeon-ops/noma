@@ -217,6 +217,24 @@ Le lot PRO1 (migration **0021**, `OFFRE-PRO.md`) ajoute au grand livre, **sans m
 Les **crédits promotionnels** de ce lot répondent à la ligne « crédits promotionnels séparés » de « Ce qui n'existe pas encore » : séparés, non remboursables, non retirables, expirés par une
 écriture. Le traitement juridique et comptable des crédits reste à valider (ci-dessous).
 
+## Prestataire de paiement réel : Wave via Sublymus (lot PAY1)
+
+Voir `PAIEMENT-WAVE.md` (contrat, flux, configuration, mise en service). Ce qui change pour le porte-monnaie, **sans toucher aux écritures existantes** :
+
+- **Migration 0026** : `payment_intents` et `payment_events` admettent le prestataire `sublymus` ; une intention Sublymus a TOUJOURS pour référence `noma-topup-<identifiant>`
+  (contrainte) ; `sublymus_checkouts` (une ligne par intention : lien Wave, identifiant chez Sublymus, état du rattrapage), `sublymus_webhook_deliveries` (livraisons authentifiées,
+  clé composite (`webhook_id`, empreinte du corps), écrites dans la transaction du crédit), `sublymus_anomalies` (rapprochement : rien n'est crédité en cas d'écart, sauf un paiement
+  réussi arrivé après un échec). La migration redéfinit aussi la garde des intentions : `failed → succeeded` est admis pour une intention **Sublymus** seulement (paiement réussi
+  après un échec ; le prestataire fictif garde « échoué = terminal »).
+- **Le crédit d'une recharge** (fictive ou Sublymus) est écrit à UN seul endroit : `applyProviderEventInTransaction` (verrou de l'intention, statut, transaction `topup` à référence
+  unique). Le webhook et le rattrapage Sublymus l'appellent ; aucun ne touche seul au grand livre.
+- **DTO** : `GET /api/wallet` ajoute `paymentMode` (`fake`, `sublymus` ou `none`) ; une recharge ajoute `provider` et `checkoutUrl` (lien Wave, servi au seul propriétaire, `null` hors
+  recharge en attente) ; `checkoutPath` vaut `/paiement-retour/<id>` pour Sublymus.
+- **`wallet:check`** : `sublymus_checkout_missing`, `sublymus_checkout_mismatch`, `sublymus_credit_origin_unknown`, `sublymus_event_provider_mismatch` (écarts) ;
+  `sublymus_anomaly_open`, `sublymus_catchup_overdue` (avertissements, affichés par la commande).
+- **Commandes** : `npm run wallet:provider-check` (lecture seule), `npm run wallet:provider-checkout-test -- --amount 100 --confirm-real-checkout` et
+  `npm run wallet:provider-intent-check -- --reference <référence>` (lecture seule) : fondateur seulement ; elles appellent le vrai service dès qu'une clé est présente.
+
 ## Exploitation
 
 - `NOMA_AUTH_ORIGIN` est obligatoire pour les POST (comme les autres routes). La migration 0014 doit être appliquée.
@@ -254,8 +272,9 @@ Les **crédits promotionnels** de ce lot répondent à la ligne « crédits prom
 - **Remboursement au prorata**, remboursement par une route HTTP, compensation automatique d'un boost interrompu : plus tard.
 - ~~**Écrans** (recharge, page de paiement simulé, solde)~~ : **faits au lot P2** (`ECRANS-P2.md` : `/compte/porte-monnaie`, `/paiement-simule/<id>`,
   achat dans « Booster cette annonce » ; `dev:try` active le prestataire fictif).
-- **Vrai prestataire** (Mobile Money) : décision du propriétaire. Il faudra un adaptateur (signature réelle, identifiants réels,
-  rapprochement quotidien avec le relevé du prestataire) qui réutilise `applyProviderEvent`.
+- ~~**Vrai prestataire**~~ : **branché au lot PAY1** (Wave via Sublymus, `PAIEMENT-WAVE.md`) : port `PaymentProvider`, sélection par `NOMA_PAYMENT_PROVIDER` (`fake` par défaut, `sublymus`),
+  webhook signé, rattrapage, table de rapprochement, `/admin/paiements`. Le crédit passe par la MÊME écriture (`applyProviderEventInTransaction`). **Désactivé par défaut**, jamais
+  contacté par un essai. Reste : **rapprochement quotidien avec le relevé** du prestataire (non fait : le rattrapage ne couvre que 24 h par recharge) et orange/MTN (absents chez Sublymus).
 - **Traitement juridique et comptable des crédits** (nature des crédits, TVA, durée de validité, remboursabilité, crédits
   promotionnels séparés (**sous-compte et expiration écrite faits au lot PRO1**, leur traitement juridique restant à valider), obligations de conservation) : **à valider** avant tout paiement réel.
 - **Branchement de `expirePaymentIntents` au worker**, limites de débit propres aux routes, alerte sur `wallet:check` rouge.

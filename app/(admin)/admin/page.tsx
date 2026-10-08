@@ -58,6 +58,9 @@ export default function Admin() {
               <Link href="/admin/collecte" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
                 Collecte externe (lecture seule) ›
               </Link>
+              <Link href="/admin/paiements" data-testid="admin-payments-link" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
+                Paiements : recharges et anomalies ›
+              </Link>
             </div>
           </div>
         );

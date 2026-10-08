@@ -31,6 +31,15 @@ function printWarnings(report: WalletCheckReport): void {
     );
     for (const warning of rejected) printWarningExamples(warning, "événement(s)");
   }
+  // Paiement Sublymus / Wave (lot PAY1) : anomalies de rapprochement à traiter (rien n'a été crédité) et rattrapage échu (le worker retarde).
+  const sublymus = report.warnings.filter((warning) => warning.code.startsWith("sublymus_"));
+  if (sublymus.length > 0) {
+    console.log(
+      "AVERTISSEMENTS (paiement Wave via Sublymus : anomalies de rapprochement à traiter à la main, page /admin/paiements, ou rattrapage en retard : " +
+      "le worker ne tourne peut-être pas ; sans effet sur le code de sortie hors --strict) :",
+    );
+    for (const warning of sublymus) printWarningExamples(warning, warning.code === "sublymus_anomaly_open" ? "anomalie(s) ouverte(s)" : "rattrapage(s) échu(s)");
+  }
   if (adjustments.length > 0) {
     console.log(
       "AVERTISSEMENTS (ajustements d'administration qui créditent un compte utilisateur : de la valeur créée sans recharge, " +

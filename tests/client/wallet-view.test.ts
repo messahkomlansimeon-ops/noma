@@ -3,6 +3,17 @@ import { describe, test } from "node:test";
 import type { BoostPurchaseHistoryItem, BoostQuote, WalletTopup, WalletTransaction } from "../../lib/client/api";
 import { isUuid } from "../../lib/client/api";
 import {
+  NO_PROVIDER_NOTICE,
+  RETURN_PENDING_TITLE,
+  RETURN_POLL_INTERVAL_MS,
+  RETURN_POLL_WINDOW_MS,
+  SIMULATION_NOTICE,
+  WAVE_LABEL,
+  WAVE_NOTICE,
+  externalCheckoutHref,
+  parseReturnResult,
+  rechargeNotice,
+  returnView,
   BALANCE_UNKNOWN_TEXT,
   BOOST_SUCCESS_NOTE,
   BUY_LABELS,
@@ -74,6 +85,8 @@ function topup(overrides: Partial<WalletTopup> = {}): WalletTopup {
     status: "pending",
     expiresAt: "2031-01-01T10:30:00.000Z",
     checkoutPath: `/paiement-simule/${TOPUP_ID}`,
+    provider: "fake",
+    checkoutUrl: null,
     ...overrides,
   };
 }
@@ -928,5 +941,50 @@ describe("recharge : clé d'idempotence d'une intention déjà terminée (lot P3
     let sends = 0;
     await assert.rejects(createTopupWithFreshKey({ keys, scope: "1000", amountXof: 1_000, create: async () => { sends += 1; throw new Error("réseau"); } }), /réseau/);
     assert.equal(sends, 1);
+  });
+});
+
+describe("paiement par Wave (lot PAY1)", () => {
+  const sublymusTopup = (overrides: Partial<WalletTopup> = {}): WalletTopup => topup({ provider: "sublymus", checkoutPath: `/paiement-retour/${TOPUP_ID}`, checkoutUrl: "https://pay.wave.example/c/pi_1", ...overrides });
+
+  test("l'écran dit « Paiement par Wave », Wave seulement, et ne parle plus de simulation quand le prestataire actif est Sublymus", () => {
+    assert.equal(WAVE_LABEL, "Paiement par Wave");
+    assert.equal(rechargeNotice("sublymus"), WAVE_NOTICE);
+    assert.match(WAVE_NOTICE, /^Paiement par Wave : vous êtes redirigé vers Wave/);
+    assert.match(WAVE_NOTICE, /Wave seulement : pas d'Orange Money ni de MTN/);
+    assert.match(WAVE_NOTICE, /crédité dès que Wave confirme/);
+    assert.equal(/simul/i.test(WAVE_NOTICE), false);
+    assert.equal(rechargeNotice("fake"), SIMULATION_NOTICE);
+    assert.equal(rechargeNotice("none"), NO_PROVIDER_NOTICE);
+  });
+
+  test("lien de paiement : seulement https, sans identifiant, avant toute navigation", () => {
+    assert.equal(externalCheckoutHref("https://pay.wave.example/c/pi_1"), "https://pay.wave.example/c/pi_1");
+    for (const bad of ["http://pay.wave.example", "javascript:alert(1)", "data:text/html,x", "https://u:p@pay.wave.example", "https://pay.wave.example/a b", "", null, undefined, 42]) assert.equal(externalCheckoutHref(bad), null, String(bad));
+  });
+
+  test("retour du navigateur : « Paiement en cours de confirmation » tant que le serveur n'a rien confirmé, quoi que dise l'adresse de retour ; crédité seulement si le serveur le dit", () => {
+    assert.deepEqual(returnView({ topup: null, failure: null, resultat: "succes" }), { kind: "loading" });
+    for (const resultat of ["succes", "echec", null] as const) {
+      const view = returnView({ topup: sublymusTopup({ status: "pending" }), failure: null, resultat });
+      assert.equal(view.kind, "pending", `résultat ${resultat}`);
+      if (view.kind === "pending") assert.equal(view.title, RETURN_PENDING_TITLE);
+      assert.equal(RETURN_PENDING_TITLE, "Paiement en cours de confirmation");
+    }
+    const failedUrl = returnView({ topup: sublymusTopup({ status: "pending" }), failure: null, resultat: "echec" });
+    assert.ok(failedUrl.kind === "pending" && /ne semble pas avoir abouti/.test(failedUrl.detail) && /sera alors crédité/.test(failedUrl.detail));
+    const waited = returnView({ topup: sublymusTopup({ status: "pending" }), failure: null, resultat: "succes", waitedTooLong: true });
+    assert.ok(waited.kind === "pending" && /quelques minutes/.test(waited.detail));
+    const succeeded = returnView({ topup: sublymusTopup({ status: "succeeded" }), failure: null, resultat: "echec" });
+    assert.ok(succeeded.kind === "succeeded" && /crédité de 2\s000\sFCFA, une seule fois/.test(succeeded.detail), "le statut du serveur prime sur l'adresse");
+    assert.equal(returnView({ topup: sublymusTopup({ status: "failed" }), failure: null, resultat: "succes" }).kind, "failed");
+    assert.equal(returnView({ topup: sublymusTopup({ status: "expired" }), failure: null, resultat: "succes" }).kind, "expired");
+    assert.equal(returnView({ topup: null, failure: { status: 404, code: "resource_not_found" }, resultat: null }).kind, "not_found");
+    assert.equal(returnView({ topup: null, failure: { status: 503, code: "payment_unavailable" }, resultat: null }).kind, "error");
+    assert.equal(parseReturnResult("succes"), "succes");
+    assert.equal(parseReturnResult("echec"), "echec");
+    for (const bad of ["success", "SUCCES", "", null, undefined, 1]) assert.equal(parseReturnResult(bad), null);
+    assert.equal(RETURN_POLL_INTERVAL_MS, 3_000);
+    assert.equal(RETURN_POLL_WINDOW_MS, 120_000);
   });
 });

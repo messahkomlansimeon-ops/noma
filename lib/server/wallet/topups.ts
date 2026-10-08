@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomBytes, randomUUID } from "node:crypto";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { CatalogValidationError } from "../catalog/errors";
 import { requireUuid } from "../catalog/validation";
 import { withPostgresTransaction } from "../postgres/client";
@@ -11,6 +11,7 @@ import {
 } from "./config";
 import { WalletError } from "./errors";
 import { postWalletTransaction, requireWalletPool } from "./ledger";
+import { CATCHUP_FIRST_DELAY_MS, type PaymentProviderKind } from "./sublymus/config";
 
 /**
  * Recharges : intentions de paiement et application des événements du prestataire (lot P1a). Le module ne connaît aucun
@@ -18,7 +19,8 @@ import { postWalletTransaction, requireWalletPool } from "./ledger";
  * futur adaptateur), qui appelle `applyProviderEvent`. Voir WALLET.md.
  */
 
-export type PaymentProvider = typeof FAKE_PROVIDER;
+/** Prestataires de paiement (lot PAY1) : le prestataire fictif et Sublymus (Wave). */
+export type { PaymentProviderKind };
 export type PaymentIntentStatus = "pending" | "succeeded" | "failed" | "expired";
 export type PaymentEventType = "payment.succeeded" | "payment.failed";
 export const PAYMENT_EVENT_TYPES: readonly PaymentEventType[] = ["payment.succeeded", "payment.failed"];
@@ -31,7 +33,7 @@ export interface PaymentIntent {
   ownerId: string;
   /** XOF entiers. */
   amountXof: bigint;
-  provider: PaymentProvider;
+  provider: PaymentProviderKind;
   /**
    * Statut EFFECTIF : une intention `pending` dont l'échéance est passée est présentée `expired` même si le balayage
    * (expirePaymentIntents) ne l'a pas encore marquée. Un paiement tardif reste appliqué (voir applyProviderEvent).
@@ -50,7 +52,7 @@ interface IntentRow {
   id: string;
   owner_id: string;
   amount_xof: string;
-  provider: PaymentProvider;
+  provider: PaymentProviderKind;
   status: PaymentIntentStatus;
   effective_status: PaymentIntentStatus;
   idempotency_key: string;
@@ -101,6 +103,21 @@ export function requireIdempotencyKey(value: unknown): string {
 
 // ───────────── création et lecture ─────────────
 
+/** Ce que la création d'une intention doit savoir du prestataire choisi (le port complet est dans payment-provider.ts). */
+export interface TopupProviderSpec {
+  kind: PaymentProviderKind;
+  /** Référence de l'intention chez le prestataire, dérivée de l'identifiant de l'intention. */
+  referenceFor(intentId: string): string;
+  /** Vrai : une ligne de session (`sublymus_checkouts`) est créée avec l'intention, dans la même transaction (rattrapage garanti). */
+  tracksCheckout: boolean;
+}
+
+const FAKE_SPEC: TopupProviderSpec = {
+  kind: FAKE_PROVIDER,
+  referenceFor: () => `fakepay_${randomBytes(12).toString("hex")}`,
+  tracksCheckout: false,
+};
+
 export interface CreatedTopupIntent {
   intent: PaymentIntent;
   /** Vrai si l'intention existait déjà pour cette clé d'idempotence et ce montant (aucune écriture). */
@@ -114,18 +131,21 @@ export interface CreatedTopupIntent {
  *  - même clé, même montant : l'intention existante est renvoyée (`reused: true`, aucune écriture), même si elle n'est plus
  *    en attente ;
  *  - même clé, autre montant : `idempotency_conflict` ;
- *  - déjà TOPUP_MAX_PENDING intentions en attente et non échues : `too_many_pending_topups`.
+ *  - déjà TOPUP_MAX_PENDING intentions en attente et non échues : `too_many_pending_topups` (c'est la LIMITE DE DÉBIT de la création : elle précède tout appel au prestataire).
+ * Le prestataire (défaut : fictif) fournit la référence ; pour Sublymus la référence est `noma-topup-<identifiant>` et la ligne de session est créée dans la même transaction.
  */
 export async function createTopupIntent(input: {
   pool: Pool;
   ownerId: string;
   amountXof: bigint;
   idempotencyKey: string;
+  provider?: TopupProviderSpec;
 }): Promise<CreatedTopupIntent> {
   const pool = requireWalletPool(input.pool);
   const ownerId = requireUuid(input.ownerId, "ownerId").toLowerCase();
   const amountXof = requireTopupAmount(input.amountXof);
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+  const provider = input.provider ?? FAKE_SPEC;
 
   return withPostgresTransaction(async (client) => {
     await client.query(`SET LOCAL lock_timeout = '${WALLET_LOCK_TIMEOUT_MS}ms'`);
@@ -148,17 +168,23 @@ export async function createTopupIntent(input: {
     );
     if (pending.rows[0].n >= TOPUP_MAX_PENDING) throw new WalletError("too_many_pending_topups");
 
+    const intentId = randomUUID();
     const inserted = await client.query<IntentRow>(
       `WITH t AS (SELECT clock_timestamp() AS now)
        INSERT INTO payment_intents (id, owner_id, amount_xof, provider, status, idempotency_key, provider_reference, created_at, expires_at)
        SELECT $1::uuid, $2::uuid, $3::bigint, $4, 'pending', $5::uuid, $6, t.now, t.now + make_interval(secs => $7::int)
          FROM t
        RETURNING ${INTENT_COLUMNS}`,
-      [
-        randomUUID(), ownerId, amountXof.toString(), FAKE_PROVIDER, idempotencyKey,
-        `fakepay_${randomBytes(12).toString("hex")}`, TOPUP_EXPIRY_SECONDS,
-      ],
+      [intentId, ownerId, amountXof.toString(), provider.kind, idempotencyKey, provider.referenceFor(intentId), TOPUP_EXPIRY_SECONDS],
     );
+    if (provider.tracksCheckout) {
+      // Rattrapage garanti : la ligne de session naît avec l'intention (première tentative de rattrapage après CATCHUP_FIRST_DELAY_MS).
+      await client.query(
+        `INSERT INTO sublymus_checkouts (intent_id, external_reference, next_catchup_at)
+         SELECT id, provider_reference, created_at + make_interval(secs => $2::int) FROM payment_intents WHERE id = $1::uuid`,
+        [intentId, Math.round(CATCHUP_FIRST_DELAY_MS / 1000)],
+      );
+    }
     return { intent: mapIntent(inserted.rows[0]), reused: false };
   }, pool);
 }
@@ -178,7 +204,7 @@ export async function readTopupIntent(input: { pool: Pool; ownerId: string; inte
 // ───────────── application d'un événement du prestataire ─────────────
 
 export interface ProviderEvent {
-  provider: PaymentProvider;
+  provider: PaymentProviderKind;
   /** Identifiant de l'événement chez le prestataire (unique avec le prestataire). */
   eventId: string;
   type: PaymentEventType;
@@ -203,11 +229,15 @@ export type ProviderEventResult =
  * | expired    | applied           | rejected_state  |
  * | failed     | rejected_state    | duplicate       |
  * | succeeded  | duplicate         | rejected_state  |
+ *
+ * Option `allowSuccessAfterFailure` (Sublymus, lot PAY1) : un paiement RÉUSSI qui arrive après un échec est appliqué comme un paiement tardif (l'argent a été pris chez le
+ * prestataire) ; le prestataire fictif ne l'active jamais.
  */
 export function decideProviderEventOutcome(input: {
   intent: { amountXof: bigint; status: PaymentIntentStatus } | null;
   type: PaymentEventType;
   amountXof: bigint;
+  allowSuccessAfterFailure?: boolean;
 }): PaymentEventOutcome {
   if (!input.intent) return "rejected_unknown_intent";
   if (input.intent.amountXof !== input.amountXof) return "rejected_amount";
@@ -218,6 +248,8 @@ export function decideProviderEventOutcome(input: {
         return "applied";
       case "succeeded":
         return "duplicate";
+      case "failed":
+        return input.allowSuccessAfterFailure === true ? "applied" : "rejected_state";
       default:
         return "rejected_state";
     }
@@ -237,7 +269,7 @@ const SHA256_HEX = /^[0-9a-f]{64}$/;
 
 function requireProviderEvent(event: ProviderEvent): ProviderEvent {
   if (typeof event !== "object" || event === null) throw new CatalogValidationError("Événement invalide.");
-  if (event.provider !== FAKE_PROVIDER) throw new CatalogValidationError("Prestataire inconnu.");
+  if (event.provider !== FAKE_PROVIDER && event.provider !== "sublymus") throw new CatalogValidationError("Prestataire inconnu.");
   if (typeof event.eventId !== "string" || !EVENT_ID.test(event.eventId)) throw new CatalogValidationError("eventId invalide.");
   if (!PAYMENT_EVENT_TYPES.includes(event.type)) throw new CatalogValidationError("type d'événement inconnu.");
   if (typeof event.providerReference !== "string" || !EVENT_ID.test(event.providerReference)) {
@@ -258,73 +290,80 @@ interface LockedIntentRow {
 }
 
 /**
- * Applique UN événement du prestataire, en UNE transaction SQL (READ COMMITTED) :
+ * Applique UN événement du prestataire, en UNE transaction SQL (READ COMMITTED) : voir `applyProviderEventInTransaction` pour les étapes. L'appelant a déjà vérifié la
+ * signature : ce module ne vérifie rien du prestataire.
+ */
+export async function applyProviderEvent(input: { pool: Pool; event: ProviderEvent }): Promise<ProviderEventResult> {
+  const pool = requireWalletPool(input.pool);
+  const event = requireProviderEvent(input.event);
+  return withPostgresTransaction((client) => applyProviderEventInTransaction(client, event), pool);
+}
+
+/**
+ * CHEMIN UNIQUE d'écriture d'un événement du prestataire (fictif ET Sublymus : webhook, rattrapage), DANS la transaction de l'appelant :
  *  1. `lock_timeout`, puis verrou de l'intention (`FOR UPDATE`) : tous les événements d'une même intention sont sérialisés ;
  *  2. décision (decideProviderEventOutcome) ;
  *  3. enregistrement de l'événement dans le journal (`ON CONFLICT DO NOTHING` sur (prestataire, identifiant d'événement)) : si la
  *     ligne existe déjà, l'événement est une RELECTURE et rien d'autre n'est fait ;
  *  4. si `applied` : succès → intention `succeeded` et transaction `topup` (débit provider_clearing, crédit du compte de
  *     l'utilisateur, référence unique `topup:<intention>`) ; échec → intention `failed`.
- * L'appelant a déjà vérifié la signature : ce module ne vérifie rien du prestataire.
+ * Le crédit est donc UNE écriture de partie double, jamais deux : l'intention est verrouillée, son statut change une seule fois et la référence `topup:<intention>` est unique.
  */
-export async function applyProviderEvent(input: { pool: Pool; event: ProviderEvent }): Promise<ProviderEventResult> {
-  const pool = requireWalletPool(input.pool);
-  const event = requireProviderEvent(input.event);
+export async function applyProviderEventInTransaction(client: PoolClient, rawEvent: ProviderEvent, options: { allowSuccessAfterFailure?: boolean } = {}): Promise<ProviderEventResult> {
+  const event = requireProviderEvent(rawEvent);
+  await client.query(`SET LOCAL lock_timeout = '${WALLET_LOCK_TIMEOUT_MS}ms'`);
+  const found = await client.query<LockedIntentRow>(
+    `SELECT id, owner_id, amount_xof::text AS amount_xof, status
+       FROM payment_intents WHERE provider = $1 AND provider_reference = $2
+        FOR UPDATE`,
+    [event.provider, event.providerReference],
+  );
+  const intent = found.rows[0] ?? null;
+  const outcome = decideProviderEventOutcome({
+    intent: intent ? { amountXof: BigInt(intent.amount_xof), status: intent.status } : null,
+    type: event.type,
+    amountXof: event.amountXof,
+    allowSuccessAfterFailure: options.allowSuccessAfterFailure === true,
+  });
 
-  return withPostgresTransaction(async (client): Promise<ProviderEventResult> => {
-    await client.query(`SET LOCAL lock_timeout = '${WALLET_LOCK_TIMEOUT_MS}ms'`);
-    const found = await client.query<LockedIntentRow>(
-      `SELECT id, owner_id, amount_xof::text AS amount_xof, status
-         FROM payment_intents WHERE provider = $1 AND provider_reference = $2
-          FOR UPDATE`,
-      [event.provider, event.providerReference],
+  const logged = await client.query(
+    `INSERT INTO payment_events (id, provider, provider_event_id, intent_id, type, amount_xof, payload_sha256, outcome)
+     VALUES ($1::uuid, $2, $3, $4::uuid, $5, $6::bigint, $7, $8)
+     ON CONFLICT (provider, provider_event_id) DO NOTHING
+     RETURNING id`,
+    [randomUUID(), event.provider, event.eventId, intent?.id ?? null, event.type, event.amountXof.toString(), event.payloadSha256, outcome],
+  );
+  if (logged.rowCount === 0) {
+    const previous = await client.query<{ payload_sha256: string }>(
+      "SELECT payload_sha256 FROM payment_events WHERE provider = $1 AND provider_event_id = $2",
+      [event.provider, event.eventId],
     );
-    const intent = found.rows[0] ?? null;
-    const outcome = decideProviderEventOutcome({
-      intent: intent ? { amountXof: BigInt(intent.amount_xof), status: intent.status } : null,
-      type: event.type,
-      amountXof: event.amountXof,
-    });
+    return { outcome: "replayed", intentId: intent?.id ?? null, payloadMatches: previous.rows[0]?.payload_sha256 === event.payloadSha256 };
+  }
 
-    const logged = await client.query(
-      `INSERT INTO payment_events (id, provider, provider_event_id, intent_id, type, amount_xof, payload_sha256, outcome)
-       VALUES ($1::uuid, $2, $3, $4::uuid, $5, $6::bigint, $7, $8)
-       ON CONFLICT (provider, provider_event_id) DO NOTHING
-       RETURNING id`,
-      [randomUUID(), event.provider, event.eventId, intent?.id ?? null, event.type, event.amountXof.toString(), event.payloadSha256, outcome],
-    );
-    if (logged.rowCount === 0) {
-      const previous = await client.query<{ payload_sha256: string }>(
-        "SELECT payload_sha256 FROM payment_events WHERE provider = $1 AND provider_event_id = $2",
-        [event.provider, event.eventId],
+  if (outcome === "applied" && intent) {
+    if (event.type === "payment.succeeded") {
+      await client.query(
+        "UPDATE payment_intents SET status = 'succeeded', completed_at = clock_timestamp() WHERE id = $1::uuid",
+        [intent.id],
       );
-      return { outcome: "replayed", intentId: intent?.id ?? null, payloadMatches: previous.rows[0]?.payload_sha256 === event.payloadSha256 };
+      await postWalletTransaction(client, {
+        kind: "topup",
+        reference: `topup:${intent.id}`,
+        metadata: { paymentIntentId: intent.id, provider: event.provider },
+        entries: [
+          { account: { kind: "provider_clearing" }, amount: -event.amountXof },
+          { account: { kind: "user", ownerId: intent.owner_id }, amount: event.amountXof },
+        ],
+      });
+    } else {
+      await client.query(
+        "UPDATE payment_intents SET status = 'failed', completed_at = clock_timestamp() WHERE id = $1::uuid",
+        [intent.id],
+      );
     }
-
-    if (outcome === "applied" && intent) {
-      if (event.type === "payment.succeeded") {
-        await client.query(
-          "UPDATE payment_intents SET status = 'succeeded', completed_at = clock_timestamp() WHERE id = $1::uuid",
-          [intent.id],
-        );
-        await postWalletTransaction(client, {
-          kind: "topup",
-          reference: `topup:${intent.id}`,
-          metadata: { paymentIntentId: intent.id, provider: event.provider },
-          entries: [
-            { account: { kind: "provider_clearing" }, amount: -event.amountXof },
-            { account: { kind: "user", ownerId: intent.owner_id }, amount: event.amountXof },
-          ],
-        });
-      } else {
-        await client.query(
-          "UPDATE payment_intents SET status = 'failed', completed_at = clock_timestamp() WHERE id = $1::uuid",
-          [intent.id],
-        );
-      }
-    }
-    return { outcome, intentId: intent?.id ?? null };
-  }, pool);
+  }
+  return { outcome, intentId: intent?.id ?? null };
 }
 
 // ───────────── expiration ─────────────

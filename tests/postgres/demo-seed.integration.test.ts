@@ -42,7 +42,7 @@ before(async () => {
   baseUrl = opened.target.connectionString;
   await admin.query(`CREATE DATABASE "${mainDb}"`);
   pool = new Pool({ connectionString: urlFor(mainDb), max: 4 });
-  assert.equal((await runMigrations(pool)).applied.length, 25);
+  assert.equal((await runMigrations(pool)).applied.length, 26);
 });
 
 after(async () => {

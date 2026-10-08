@@ -47,6 +47,13 @@ import { requireWalletPool } from "./ledger";
  *    dernière période (`subscription_state_mismatch`).
  * Avertissements : `promo_expiry_overdue` (une émission échue depuis plus de 15 minutes n'est pas encore expirée : le worker retarde) et `subscription_overdue` (un abonnement échu depuis
  * plus d'une heure n'est pas encore traité).
+ *
+ * Paiement Sublymus / Wave (lot PAY1, migration 0026) : le crédit d'une recharge passe par la MÊME écriture que le prestataire fictif (les contrôles de recharge ci-dessus valent donc
+ * pour lui : équilibre, une transaction `topup` par intention réussie, événement appliqué, solde de provider_clearing). Contrôles ajoutés : toute intention Sublymus a sa ligne de
+ * session (`sublymus_checkout_missing`) qui porte SA référence (`sublymus_checkout_mismatch`) ; toute intention Sublymus réussie a été créditée par un webhook authentifié ou un
+ * rattrapage, jamais autrement (`sublymus_credit_origin_unknown` : par exemple un retour du navigateur) ; aucun événement Sublymus n'est rattaché à une intention d'un autre
+ * prestataire (`sublymus_event_provider_mismatch`). Avertissements : `sublymus_anomaly_open` (anomalies de rapprochement à traiter : montant, devise, statut, référence
+ * inconnue… rien n'a été crédité) et `sublymus_catchup_overdue` (rattrapage échu depuis plus de 15 minutes : le worker retarde).
  */
 
 export type WalletCheckCode =
@@ -95,7 +102,11 @@ export type WalletCheckCode =
   | "subscription_refund_transaction_orphan"
   | "promo_expiry_transaction_orphan"
   | "subscription_state_mismatch"
-  | "subscription_live_duplicate";
+  | "subscription_live_duplicate"
+  | "sublymus_checkout_missing"
+  | "sublymus_checkout_mismatch"
+  | "sublymus_credit_origin_unknown"
+  | "sublymus_event_provider_mismatch";
 
 export type WalletCheckWarningCode =
   | "succeeded_event_rejected_amount"
@@ -103,7 +114,9 @@ export type WalletCheckWarningCode =
   | "succeeded_event_rejected_unknown_intent"
   | "adjustment_credits_user_account"
   | "promo_expiry_overdue"
-  | "subscription_overdue";
+  | "subscription_overdue"
+  | "sublymus_anomaly_open"
+  | "sublymus_catchup_overdue";
 
 export interface WalletCheckViolation {
   code: WalletCheckCode;
@@ -233,14 +246,18 @@ const CHECKS: ReadonlyArray<{ code: WalletCheckCode; sql: string }> = [
                               WHERE ev.intent_id = i.id AND ev.type = 'payment.failed' AND ev.outcome = 'applied' AND ev.amount_xof = i.amount_xof)`,
   },
   {
-    // Réciproque : tout événement « applied » pointe une intention dans l'état qu'il produit, avec le même montant.
+    // Réciproque : tout événement « applied » pointe une intention dans l'état qu'il produit, avec le même montant (exception Sublymus : un échec supplanté par un paiement réussi).
     code: "applied_event_state_mismatch",
     sql: `SELECT ev.provider_event_id AS event_id, COALESCE(ev.intent_id::text, '') AS intent_id, ev.type AS type,
                 COALESCE(i.status, '') AS intent_status, ev.amount_xof::text AS amount
             FROM payment_events ev LEFT JOIN payment_intents i ON i.id = ev.intent_id
            WHERE ev.outcome = 'applied' AND NOT (
                  i.id IS NOT NULL AND i.amount_xof = ev.amount_xof
-             AND ((ev.type = 'payment.succeeded' AND i.status = 'succeeded') OR (ev.type = 'payment.failed' AND i.status = 'failed')))`,
+             AND ((ev.type = 'payment.succeeded' AND i.status = 'succeeded')
+                  OR (ev.type = 'payment.failed' AND (i.status = 'failed'
+                      -- Lot PAY1 : un échec SUPPLANTÉ par un paiement réussi arrivé ensuite (Sublymus seulement) reste un événement appliqué.
+                      OR (i.status = 'succeeded' AND i.provider = 'sublymus' AND EXISTS (
+                            SELECT 1 FROM payment_events later WHERE later.intent_id = i.id AND later.type = 'payment.succeeded' AND later.outcome = 'applied' AND later.received_at >= ev.received_at))))))`,
   },
   {
     // Un paiement (ou un échec) ne se déclare « appliqué » qu'une fois par intention.
@@ -537,6 +554,36 @@ const CHECKS: ReadonlyArray<{ code: WalletCheckCode; sql: string }> = [
     code: "subscription_live_duplicate",
     sql: `SELECT user_id::text AS user_id, count(*)::text AS live FROM subscriptions WHERE status IN ('active', 'past_due') GROUP BY user_id HAVING count(*) > 1`,
   },
+  {
+    // Lot PAY1 : toute intention Sublymus a sa ligne de session (créée avec elle, dans la même transaction).
+    code: "sublymus_checkout_missing",
+    sql: `SELECT i.id::text AS intent_id, i.status AS status FROM payment_intents i
+           WHERE i.provider = 'sublymus' AND NOT EXISTS (SELECT 1 FROM sublymus_checkouts c WHERE c.intent_id = i.id)`,
+  },
+  {
+    // Lot PAY1 : la ligne de session appartient à une intention Sublymus et porte SA référence (`noma-topup-<identifiant>`).
+    code: "sublymus_checkout_mismatch",
+    sql: `SELECT c.intent_id::text AS intent_id, i.provider AS provider
+            FROM sublymus_checkouts c JOIN payment_intents i ON i.id = c.intent_id
+           WHERE i.provider <> 'sublymus' OR i.provider_reference <> c.external_reference OR c.external_reference <> 'noma-topup-' || i.id::text`,
+  },
+  {
+    // Lot PAY1 : une intention Sublymus réussie a été créditée par un webhook authentifié (`wh_…`) ou par le rattrapage (`sublymus_poll_…`), jamais autrement (un retour du navigateur ne crédite pas).
+    code: "sublymus_credit_origin_unknown",
+    sql: `SELECT i.id::text AS intent_id, i.amount_xof::text AS amount
+            FROM payment_intents i
+           WHERE i.provider = 'sublymus' AND i.status = 'succeeded'
+             AND NOT EXISTS (SELECT 1 FROM payment_events ev
+                              WHERE ev.intent_id = i.id AND ev.provider = 'sublymus' AND ev.type = 'payment.succeeded' AND ev.outcome = 'applied'
+                                AND (ev.provider_event_id LIKE 'wh\\_%' OR ev.provider_event_id LIKE 'sublymus\\_poll\\_%'))`,
+  },
+  {
+    // Lot PAY1 : un événement Sublymus ne se rattache jamais à une intention d'un autre prestataire.
+    code: "sublymus_event_provider_mismatch",
+    sql: `SELECT ev.provider_event_id AS event_id, ev.intent_id::text AS intent_id
+            FROM payment_events ev JOIN payment_intents i ON i.id = ev.intent_id
+           WHERE ev.provider <> i.provider`,
+  },
 ];
 
 /** Événements payment.succeeded REFUSÉS : de l'argent a peut-être été encaissé sans crédit (à traiter à la main). */
@@ -576,6 +623,21 @@ const WARNINGS: ReadonlyArray<{ code: WalletCheckWarningCode; sql: string }> = [
     sql: `SELECT g.id::text AS grant_id, g.expires_at::text AS expires_at, promo_grant_remaining(g.id)::text AS remaining
             FROM promo_grants g WHERE g.expired_at IS NULL AND g.expires_at < clock_timestamp() - interval '15 minutes'
            ORDER BY g.expires_at, g.id`,
+  },
+  {
+    // Lot PAY1 : anomalies de rapprochement à traiter (rien n'a été crédité) : voir la page /admin/paiements.
+    code: "sublymus_anomaly_open",
+    sql: `SELECT a.id::text AS anomaly_id, a.kind AS kind, a.origin AS origin, COALESCE(a.intent_id::text, '') AS intent_id,
+                 COALESCE(a.expected_amount_xof::text, '') AS expected, COALESCE(a.received_amount_xof::text, '') AS received
+            FROM sublymus_anomalies a WHERE a.resolved_at IS NULL ORDER BY a.created_at DESC, a.id DESC`,
+  },
+  {
+    // Lot PAY1 : rattrapage échu depuis plus de 15 minutes (le worker retarde) : une recharge payée dont le webhook s'est perdu attend.
+    code: "sublymus_catchup_overdue",
+    sql: `SELECT c.intent_id::text AS intent_id, c.next_catchup_at::text AS next_at, c.catchup_attempts::text AS attempts
+            FROM sublymus_checkouts c JOIN payment_intents i ON i.id = c.intent_id
+           WHERE c.next_catchup_at IS NOT NULL AND i.status IN ('pending', 'expired') AND c.next_catchup_at < clock_timestamp() - interval '15 minutes'
+           ORDER BY c.next_catchup_at, c.intent_id`,
   },
   {
     // Lot PRO1 : un abonnement échu depuis plus d'une heure n'est pas encore traité (renouvellement, grâce ou fin) : le worker retarde.

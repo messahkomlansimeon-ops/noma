@@ -30,6 +30,17 @@ export class StrictJsonError extends Error {
 }
 
 export const STRICT_JSON_MAX_DEPTH = 8;
+/** Profondeur admise pour la charge d'un prestataire (lot PAY1). */
+export const PROVIDER_JSON_MAX_DEPTH = 16;
+
+export interface StrictJsonOptions {
+  /**
+   * Charge d'un PRESTATAIRE de paiement (webhook, réponses de l'API : lot PAY1), dont on ne maîtrise pas le contenu : les nombres à virgule ou à exposant et les entiers au-delà de
+   * 2^53 − 1 sont lus comme des nombres JavaScript (un champ de frais ou d'horodatage ne fait pas refuser tout le message). Les MONTANTS restent exacts : ils sont relus par
+   * `readAmount`, qui n'accepte qu'un entier sûr. Clés en double, `__proto__` et contenu après la valeur restent REFUSÉS.
+   */
+  providerPayload?: boolean;
+}
 
 const NUMBER_PATTERN = /-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/y;
 const HEX4 = /^[0-9a-fA-F]{4}$/;
@@ -37,7 +48,13 @@ const HEX4 = /^[0-9a-fA-F]{4}$/;
 class Reader {
   private index = 0;
 
-  constructor(private readonly text: string) {}
+  private readonly maxDepth: number;
+  private readonly providerPayload: boolean;
+
+  constructor(private readonly text: string, options: StrictJsonOptions = {}) {
+    this.providerPayload = options.providerPayload === true;
+    this.maxDepth = this.providerPayload ? PROVIDER_JSON_MAX_DEPTH : STRICT_JSON_MAX_DEPTH;
+  }
 
   parse(): unknown {
     this.skipWhitespace();
@@ -68,7 +85,7 @@ class Reader {
   }
 
   private readObject(depth: number): Record<string, unknown> {
-    if (depth > STRICT_JSON_MAX_DEPTH) throw new StrictJsonError("too_deep");
+    if (depth > this.maxDepth) throw new StrictJsonError("too_deep");
     this.index += 1;
     const result = Object.create(null) as Record<string, unknown>;
     this.skipWhitespace();
@@ -94,7 +111,7 @@ class Reader {
   }
 
   private readArray(depth: number): unknown[] {
-    if (depth > STRICT_JSON_MAX_DEPTH) throw new StrictJsonError("too_deep");
+    if (depth > this.maxDepth) throw new StrictJsonError("too_deep");
     this.index += 1;
     const result: unknown[] = [];
     this.skipWhitespace();
@@ -149,6 +166,11 @@ class Reader {
     if (!match) throw new StrictJsonError("syntax");
     const literal = match[0];
     this.index += literal.length;
+    if (this.providerPayload) {
+      const loose = Number(literal);
+      if (!Number.isFinite(loose)) throw new StrictJsonError("unsafe_integer");
+      return loose;
+    }
     if (/[.eE]/.test(literal)) throw new StrictJsonError("non_integer_number");
     if (literal === "-0") throw new StrictJsonError("non_integer_number");
     const value = Number(literal);
@@ -157,6 +179,6 @@ class Reader {
   }
 }
 
-export function parseStrictJson(text: string): unknown {
-  return new Reader(text).parse();
+export function parseStrictJson(text: string, options: StrictJsonOptions = {}): unknown {
+  return new Reader(text, options).parse();
 }

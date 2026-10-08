@@ -34,7 +34,7 @@ before(async () => {
   pool = await openVerifiedIsolatedPool(opened.target, schema);
   second = await openVerifiedIsolatedPool(opened.target, schema);
   const migrations = await runMigrations(pool);
-  assert.equal(migrations.applied.length, 25);
+  assert.equal(migrations.applied.length, 26);
 });
 
 after(async () => {

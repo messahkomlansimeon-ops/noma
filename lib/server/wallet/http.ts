@@ -16,7 +16,14 @@ import {
   buildFakePaymentEventBody, processFakePaymentEvent, resolveFakePaymentConfig, signFakePaymentBody,
 } from "./fake-provider";
 import { readWalletOverview, type WalletHistoryItem } from "./ledger";
+import { PaymentConfigError, resolvePaymentProvider, type ResolvedProvider } from "./payment-provider";
 import { parseStrictJson, StrictJsonError } from "./strict-json";
+import { SublymusApiError } from "./sublymus/client";
+import { readCheckoutUrl } from "./sublymus/checkouts";
+import {
+  SUBLYMUS_EVENT_HEADER, SUBLYMUS_MANAGER_HEADER, SUBLYMUS_SIGNATURE_HEADER, SUBLYMUS_WEBHOOK_ID_HEADER, SUBLYMUS_WEBHOOK_MAX_BODY_BYTES, resolvePaymentSelection,
+} from "./sublymus/config";
+import { processSublymusWebhook } from "./sublymus/webhook";
 import {
   createTopupIntent, readTopupIntent, type PaymentEventOutcome, type PaymentEventType, type PaymentIntent, type PaymentIntentStatus,
 } from "./topups";
@@ -40,6 +47,8 @@ type Environment = Record<string, string | undefined>;
 
 export interface WalletHttpDependencies {
   pool?: Pool;
+  /** Appels sortants vers Sublymus (défaut : fetch du système). Les essais le branchent sur la FAUSSE API locale. */
+  fetch?: typeof fetch;
   /** Horloge de session ET de la fenêtre d'horodatage des événements (défaut : l'heure du système). */
   now?: AuthClock;
   env?: Environment;
@@ -59,6 +68,10 @@ export interface WalletHttpHandlers {
     create(request: Request): Promise<Response>;
     /** GET /api/wallet/topups/{id} : état d'une intention de l'utilisateur. */
     get(request: Request, id: string): Promise<Response>;
+  };
+  sublymus: {
+    /** POST /api/webhooks/sublymus : webhook signé de Sublymus (aucune session, aucune origine : l'authentification est la signature HMAC et le gestionnaire). */
+    webhook(request: Request): Promise<Response>;
   };
   fakePayments: {
     /** POST /api/payments/fake/webhook : événement signé du prestataire fictif (aucune session, aucune origine). */
@@ -86,6 +99,9 @@ const tooManyPendingTopups = () => walletError(409, "too_many_pending_topups", "
 const paymentUnavailable = () => walletError(503, "payment_unavailable", "Le paiement est temporairement indisponible.");
 const walletUnavailable = () => walletError(503, "wallet_unavailable", "Le portefeuille est temporairement indisponible.");
 const invalidSignature = () => walletError(400, "invalid_signature", "Signature invalide.");
+/** Webhook Sublymus non authentifié (signature fausse, absente, mal formée, ou autre gestionnaire) : 401 sans AUCUN détail, identique pour toutes les causes. */
+const webhookUnauthorized = () => walletError(401, "unauthorized", "Non autorisé.");
+const payloadTooLarge = () => walletError(413, "payload_too_large", "Corps trop volumineux.");
 const invalidEvent = () => walletError(400, "invalid_event", "Événement invalide.");
 
 // ───────────── DTO (liste blanche explicite : aucun champ n'est copié par défaut) ─────────────
@@ -100,18 +116,24 @@ interface TopupDto {
   amountXof: number;
   status: PaymentIntentStatus;
   expiresAt: string;
+  /** Page de l'application : paiement simulé (prestataire fictif) ou retour de paiement (Sublymus). */
   checkoutPath: string;
+  /** Prestataire de CETTE recharge (lot PAY1). */
+  provider: PaymentIntent["provider"];
+  /** Lien de paiement Wave (https) vers lequel rediriger le navigateur ; null : prestataire fictif, session non ouverte, ou recharge terminée. */
+  checkoutUrl: string | null;
 }
 
-/** Jamais : owner_id, clé d'idempotence, référence du prestataire, statut enregistré, dates internes. */
-function topupDto(intent: PaymentIntent): TopupDto {
+/** Jamais : owner_id, clé d'idempotence, référence du prestataire, statut enregistré, dates internes. Le lien de paiement n'est servi qu'au propriétaire de l'intention. */
+function topupDto(intent: PaymentIntent, checkoutUrl: string | null = null): TopupDto {
   return {
     id: intent.id,
     amountXof: jsonInteger(intent.amountXof),
     status: intent.status,
     expiresAt: intent.expiresAt.toISOString(),
-    // La page de paiement simulé viendra au lot P2 : le chemin est seulement renvoyé.
-    checkoutPath: `/paiement-simule/${intent.id}`,
+    checkoutPath: intent.provider === "sublymus" ? `/paiement-retour/${intent.id}` : `/paiement-simule/${intent.id}`,
+    provider: intent.provider,
+    checkoutUrl: intent.status === "pending" ? checkoutUrl : null,
   };
 }
 
@@ -191,7 +213,7 @@ function parseWalletQuery(request: Request): { limit: number; cursor: string | n
 }
 
 /** Corps brut en octets (la signature porte sur les octets exacts, pas sur un texte re-encodé), plafonné. */
-async function readRawBodyCapped(request: Request, maxBytes: number): Promise<{ ok: true; bytes: Uint8Array } | { ok: false }> {
+export async function readRawBodyCapped(request: Request, maxBytes: number): Promise<{ ok: true; bytes: Uint8Array } | { ok: false }> {
   const declared = request.headers.get("content-length");
   if (declared !== null && (!/^[0-9]+$/.test(declared) || BigInt(declared) > BigInt(maxBytes))) {
     void request.body?.cancel().catch(() => {});
@@ -253,9 +275,30 @@ export function createWalletHttpHandlers(dependencies: WalletHttpDependencies = 
     return response();
   }
 
+  function paymentProviderState(): "fake" | "sublymus" | "none" {
+    try {
+      const resolved = resolvePaymentProvider(environment(), { fetch: dependencies.fetch });
+      return resolved.active ? resolved.provider.kind : "none";
+    } catch {
+      return "none";
+    }
+  }
+
+  /** Prestataire ACTIF (relu à chaque requête) : refus clair si aucun, ou si sa configuration est refusée (code seulement dans le journal : jamais une valeur). */
+  function activeProvider(): { ok: true; resolved: Extract<ResolvedProvider, { active: true }> } | { ok: false; response: Response } {
+    try {
+      const resolved = resolvePaymentProvider(environment(), { fetch: dependencies.fetch });
+      return resolved.active ? { ok: true, resolved } : { ok: false, response: unavailable("provider_inactive") };
+    } catch (error) {
+      return { ok: false, response: unavailable(error instanceof PaymentConfigError ? "provider_misconfigured" : logCodeOf(error)) };
+    }
+  }
+
   /** Domaine → HTTP. Tout ce qui n'est pas explicitement connu devient 503, sans le message de l'erreur. */
   function mapError(error: unknown, response: () => Response = paymentUnavailable): Response {
     if (error instanceof CatalogValidationError) return invalidRequest();
+    // Sublymus injoignable, clé refusée, réponse incohérente : l'utilisateur ne peut rien y faire, le journal garde le code (jamais la clé ni la réponse).
+    if (error instanceof SublymusApiError) return unavailable(error.code, response);
     if (error instanceof WalletError) {
       if (error.code === "idempotency_conflict") return idempotencyConflict();
       if (error.code === "too_many_pending_topups") return tooManyPendingTopups();
@@ -294,7 +337,7 @@ export function createWalletHttpHandlers(dependencies: WalletHttpDependencies = 
     if (!body.ok || body.text.trim().length > 0) return invalidRequest();
     try {
       const intent = await readTopupIntent({ pool: pool(), ownerId: authenticated.ownerId, intentId: id });
-      if (!intent) return resourceNotFound();
+      if (!intent || intent.provider !== "fake") return resourceNotFound();
       const now = clock();
       const bytes = new TextEncoder().encode(buildFakePaymentEventBody({
         type, providerReference: intent.providerReference, amountXof: intent.amountXof, now,
@@ -322,6 +365,8 @@ export function createWalletHttpHandlers(dependencies: WalletHttpDependencies = 
           const overview = await readWalletOverview({ pool: pool(), ownerId: authenticated.ownerId, limit, cursor });
           return noStoreJsonResponse(200, {
             contractVersion: WALLET_CONTRACT_VERSION,
+            // Prestataire de paiement ACTIF (lot PAY1) : l'écran dit « Paiement par Wave » ou « simulé » d'après le serveur.
+            paymentMode: paymentProviderState(),
             balanceXof: jsonInteger(overview.balance),
             promoBalanceXof: jsonInteger(overview.promoBalance),
             promoExpiresAt: overview.promoExpiresAt === null ? null : overview.promoExpiresAt.toISOString(),
@@ -340,15 +385,23 @@ export function createWalletHttpHandlers(dependencies: WalletHttpDependencies = 
         if (refused) return refused;
         const authenticated = await authenticate(request);
         if (!authenticated.ok) return authenticated.response;
-        if (!resolveFakePaymentConfig(environment()).enabled) return unavailable("provider_inactive");
+        const active = activeProvider();
+        if (!active.ok) return active.response;
         const body = await readStrictJsonBody(request, WALLET_HTTP_BODY_MAX_BYTES);
         if (!body.ok) return invalidRequest();
         try {
           const { amountXof, idempotencyKey } = parseTopupBody(body.value);
-          const created = await createTopupIntent({ pool: pool(), ownerId: authenticated.ownerId, amountXof, idempotencyKey });
+          // La limite de recharges en attente (limite de débit) s'applique ICI, avant tout appel au prestataire.
+          const created = await createTopupIntent({ pool: pool(), ownerId: authenticated.ownerId, amountXof, idempotencyKey, provider: active.resolved.provider });
+          // Session de paiement chez le prestataire de CETTE recharge (hors de toute transaction) : en cas d'échec, l'intention reste en attente et la même clé réessaiera.
+          const prepared = created.intent.provider === active.resolved.provider.kind
+            ? await active.resolved.provider.prepareCheckout({ pool: pool(), intent: created.intent })
+            : { checkoutUrl: null };
+          // Un webhook a pu terminer la recharge pendant l'ouverture de la session : l'état servi (et donc le droit au lien) est RELU, jamais celui de la création.
+          const effective = prepared.checkoutUrl === null ? created.intent : ((await readTopupIntent({ pool: pool(), ownerId: authenticated.ownerId, intentId: created.intent.id })) ?? created.intent);
           return noStoreJsonResponse(created.reused ? 200 : 201, {
             contractVersion: WALLET_CONTRACT_VERSION,
-            topup: topupDto(created.intent),
+            topup: topupDto(effective, prepared.checkoutUrl),
           });
         } catch (error) {
           return mapError(error);
@@ -358,14 +411,61 @@ export function createWalletHttpHandlers(dependencies: WalletHttpDependencies = 
       async get(request, id) {
         const authenticated = await authenticate(request);
         if (!authenticated.ok) return authenticated.response;
-        if (!resolveFakePaymentConfig(environment()).enabled) return unavailable("provider_inactive");
+        const active = activeProvider();
+        if (!active.ok) return active.response;
         if (!UUID.test(id)) return invalidRequest();
         try {
           const intent = await readTopupIntent({ pool: pool(), ownerId: authenticated.ownerId, intentId: id });
           if (!intent) return resourceNotFound();
-          return noStoreJsonResponse(200, { contractVersion: WALLET_CONTRACT_VERSION, topup: topupDto(intent) });
+          const checkoutUrl = intent.provider === "sublymus" && intent.status === "pending" ? await readCheckoutUrl(pool(), intent.id) : null;
+          return noStoreJsonResponse(200, { contractVersion: WALLET_CONTRACT_VERSION, topup: topupDto(intent, checkoutUrl) });
         } catch (error) {
           return mapError(error);
+        }
+      },
+    },
+
+    sublymus: {
+      async webhook(request) {
+        // Prestataire Sublymus inactif : la route n'existe pas (404), avant toute lecture du corps. Configuration refusée : 503 (Sublymus rejouera).
+        let selection: ReturnType<typeof resolvePaymentSelection>;
+        try {
+          selection = resolvePaymentSelection(environment());
+        } catch {
+          return unavailable("provider_misconfigured");
+        }
+        if (selection.provider !== "sublymus") return resourceNotFound();
+        const raw = await readRawBodyCapped(request, SUBLYMUS_WEBHOOK_MAX_BODY_BYTES);
+        if (!raw.ok) {
+          journal("webhook_payload_rejected");
+          return payloadTooLarge();
+        }
+        try {
+          const processed = await processSublymusWebhook({
+            pool,
+            secret: selection.config.webhookSecret,
+            managerId: selection.config.managerId,
+            body: raw.bytes,
+            headers: {
+              signature: request.headers.get(SUBLYMUS_SIGNATURE_HEADER),
+              event: request.headers.get(SUBLYMUS_EVENT_HEADER),
+              managerId: request.headers.get(SUBLYMUS_MANAGER_HEADER),
+              webhookId: request.headers.get(SUBLYMUS_WEBHOOK_ID_HEADER),
+            },
+          });
+          if (processed.status === "unauthorized") {
+            journal("webhook_unauthorized");
+            return webhookUnauthorized();
+          }
+          // Un écart de rapprochement, un événement illisible ou inconnu : l'anomalie est dans la table, on répond 2xx pour que Sublymus ne rejoue pas en boucle un écart qui ne se
+          // corrigera pas (seule une signature invalide donne 401 ; jamais 400 pour un événement authentifié).
+          if (processed.anomalies.includes("unreadable_event")) journal("webhook_unreadable");
+          else if (processed.anomalies.includes("unknown_event")) journal("webhook_unknown_event");
+          else if (processed.anomalies.length > 0 || processed.outcome === "anomaly") journal("webhook_anomaly");
+          return noStoreJsonResponse(200, { received: true });
+        } catch (error) {
+          // 503 : Sublymus rejouera la livraison (traitement idempotent).
+          return unavailable(logCodeOf(error));
         }
       },
     },

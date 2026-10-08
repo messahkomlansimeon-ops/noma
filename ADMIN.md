@@ -28,6 +28,13 @@ L'onglet **Admin** du sélecteur d'espace (Acheteur / Vendeur / Admin) n'est aff
 près, revenus d'abonnement du mois. La page est sous le gabarit gardé de l'espace d'administration (page 404 standard de Next pour tout non-administrateur, aucun onglet Admin) ; les routes
 répondent le même 404. Prix **provisoires** : une nouvelle version ne s'applique qu'aux nouvelles souscriptions, **les abonnés actuels gardent leur prix**. Voir `OFFRE-PRO.md`.
 
+## Paiements (lot PAY1)
+
+`/admin/paiements` et `GET /api/admin/payments`, `POST /api/admin/payments/anomalies/{id}/resolve` : recharges récentes, **anomalies de rapprochement à traiter** (marquées traitées une
+fois, avec l'administrateur et la date), état du rattrapage et des webhooks Sublymus. Même garde que les autres pages d'administration (page 404 standard pour tout non-administrateur,
+même 404 sur les routes). L'API expose l'**identifiant de la recharge** (aléatoire) mais **aucune donnée personnelle** : ni propriétaire, ni numéro, ni référence chez Sublymus, ni
+identifiant de payeur. Voir `PAIEMENT-WAVE.md`.
+
 ## Limites assumées
 
 - Un `404` JSON rapide sur `/api/admin/*` révèle l'existence des routes (pas de données) : la réponse est identique pour tout non-administrateur, mais elle diffère de celle d'une URL inconnue servie par Next.

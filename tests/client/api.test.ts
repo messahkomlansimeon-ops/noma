@@ -14,6 +14,7 @@ import {
   PAGE_LIMIT,
   createApiClient,
   describeApiError,
+  isExternalCheckoutUrl,
   isUnauthorized,
   serverTimeFromDateHeader,
   type ApiErrorContext,
@@ -1115,7 +1116,7 @@ describe("couche cliente : porte-monnaie (wallet)", () => {
     assert.equal(headerOf(calls[0], "Content-Type"), "application/json");
     assert.equal(created.reused, false);
     assert.equal(again.reused, true);
-    assert.deepEqual(created.topup, { id: TOPUP_ID, amountXof: 2000, status: "pending", expiresAt: "2031-01-01T10:30:00.000Z", checkoutPath: `/paiement-simule/${TOPUP_ID}` });
+    assert.deepEqual(created.topup, { id: TOPUP_ID, amountXof: 2000, status: "pending", expiresAt: "2031-01-01T10:30:00.000Z", checkoutPath: `/paiement-simule/${TOPUP_ID}`, provider: "fake", checkoutUrl: null });
     // Le corps ne porte rien d'autre que le montant et la clé (jamais un identifiant d'utilisateur).
     assert.deepEqual(Object.keys(JSON.parse(String(calls[0].init.body))).sort(), ["amountXof", "idempotencyKey"]);
   });
@@ -1148,6 +1149,15 @@ describe("couche cliente : porte-monnaie (wallet)", () => {
       wrap(topupDto({ expiresAt: "bientôt" })),
       wrap(topupDto({ checkoutPath: 12 })),
       wrap(topupDto({ checkoutPath: "x".repeat(201) })),
+      wrap(topupDto({ provider: "orange" })),
+      wrap(topupDto({ provider: 3 })),
+      wrap(topupDto({ checkoutUrl: "http://pay.wave.example/c/1" })),
+      wrap(topupDto({ checkoutUrl: "javascript:alert(1)" })),
+      wrap(topupDto({ checkoutUrl: "https://user:pass@pay.wave.example/c/1" })),
+      wrap(topupDto({ checkoutUrl: "https://pay.wave.example/c 1" })),
+      wrap(topupDto({ checkoutUrl: `https://pay.wave.example/${"a".repeat(2000)}` })),
+      wrap(topupDto({ checkoutUrl: 12 })),
+      wrap(topupDto({ checkoutUrl: "" })),
       wrap(topupDto(), { contractVersion: "wallet/v2" }),
       json(201, { contractVersion: "wallet/v1" }),
       new Response("pas du json", { status: 201 }),
@@ -1156,6 +1166,32 @@ describe("couche cliente : porte-monnaie (wallet)", () => {
       const { client } = harness(() => response.clone());
       await assert.rejects(client.wallet.createTopup({ amountXof: 2000, idempotencyKey: KEY }), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE);
       await assert.rejects(client.wallet.topup(TOPUP_ID), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE);
+    }
+  });
+
+  test("createTopup (lot PAY1) : le prestataire et le lien de paiement Wave (https) sont relus ; un lien d'un autre schéma est refusé ; sans ces champs : prestataire fictif, aucun lien", async () => {
+    const wave = topupDto({ provider: "sublymus", checkoutPath: `/paiement-retour/${TOPUP_ID}`, checkoutUrl: "https://pay.wave.example/c/pi_1" });
+    const { client } = harness(() => json(201, { contractVersion: "wallet/v1", topup: wave }));
+    const created = await client.wallet.createTopup({ amountXof: 2000, idempotencyKey: KEY });
+    assert.deepEqual([created.topup.provider, created.topup.checkoutUrl, created.topup.checkoutPath], ["sublymus", "https://pay.wave.example/c/pi_1", `/paiement-retour/${TOPUP_ID}`]);
+    const { client: legacy } = harness(() => json(200, { contractVersion: "wallet/v1", topup: topupDto() }));
+    const old = await legacy.wallet.topup(TOPUP_ID);
+    assert.deepEqual([old.provider, old.checkoutUrl], ["fake", null]);
+    const { client: terminated } = harness(() => json(200, { contractVersion: "wallet/v1", topup: topupDto({ provider: "sublymus", checkoutUrl: null }) }));
+    assert.equal((await terminated.wallet.topup(TOPUP_ID)).checkoutUrl, null);
+    for (const good of ["https://pay.wave.example/c/1", "https://wave.com/pay?id=abc#x"]) assert.equal(isExternalCheckoutUrl(good), true, good);
+    for (const bad of ["http://x.example", "//x.example", "ftp://x.example", "data:text/html,x", "javascript:alert(1)", "https://u@x.example", "https://x.example/a b", "", null, undefined, 5, {}]) assert.equal(isExternalCheckoutUrl(bad), false, String(bad));
+  });
+
+  test("overview (lot PAY1) : le prestataire de paiement actif est relu (fake, sublymus, none) ; absent : fictif ; autre valeur : invalid_response", async () => {
+    const overview = (extra: Record<string, unknown>) => json(200, { contractVersion: "wallet/v1", balanceXof: 0, transactions: [], nextCursor: null, ...extra });
+    for (const [value, expected] of [["sublymus", "sublymus"], ["fake", "fake"], ["none", "none"], [undefined, "fake"]] as const) {
+      const { client } = harness(() => overview(value === undefined ? {} : { paymentMode: value }));
+      assert.equal((await client.wallet.overview({})).paymentMode, expected, String(value));
+    }
+    for (const bad of ["orange", 3, null, ""]) {
+      const { client } = harness(() => overview({ paymentMode: bad }));
+      await assert.rejects(client.wallet.overview({}), (error: unknown) => error instanceof ApiError && error.code === API_INVALID_RESPONSE, String(bad));
     }
   });
 

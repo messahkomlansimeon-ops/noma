@@ -227,6 +227,21 @@ else
   ok "aucune clé SMS dans le fichier versionné"
 fi
 
+# ─── 5b. env.production.example — variables du paiement (lot PAY1) : présentes, VIDES ──
+section "env.production.example (paiement : valeurs vides, jamais de clé versionnée)"
+for VAR in NOMA_PAYMENT_PROVIDER WAVE_API_KEY NOMA_SUBLYMUS_MANAGER_ID NOMA_SUBLYMUS_WALLET_ID SUBLYMUS_WEBHOOK_SECRET NOMA_SUBLYMUS_BASE_URL; do
+  if [[ $(grep -c "^${VAR}=$" deploy/env.production.example) == "1" && $(grep -c "^${VAR}=." deploy/env.production.example) == "0" ]]; then
+    ok "${VAR} présente, valeur vide"
+  else
+    ko "${VAR} absente, en double ou renseignée dans l'exemple versionné"
+  fi
+done
+if grep -qE '^(WAVE_API_KEY|SUBLYMUS_WEBHOOK_SECRET)=.' deploy/env.production.example; then
+  ko "une clé de paiement est écrite dans le fichier versionné !"
+else
+  ok "aucune clé de paiement dans le fichier versionné"
+fi
+
 # ─── bilan ───────────────────────────────────────────────────────────────────
 echo ""
 if [[ $FAIL -eq 0 ]]; then
