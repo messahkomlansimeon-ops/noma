@@ -11,7 +11,9 @@ import {
 } from "../../lib/server/sms/budget";
 import { NOTIFY_ROWS_PER_USER } from "../../lib/server/notifications/config";
 import { EXTERNAL_MESSAGE_LINK } from "../../lib/server/notifications/content";
-import { NOTIFICATION_LINK_PATH, NOTIFICATION_WORST_CASE_COUNT, assertSmsProductionConfig, isMenoActive, menoInactiveReason, readSmsConfig } from "../../lib/server/sms/config";
+import { NOTIFICATION_LINK_PATH, NOTIFICATION_WORST_CASE_COUNT, assertSmsProductionConfig, isMenoActive, menoInactiveReason, readSmsConfig, smsStartupWarnings } from "../../lib/server/sms/config";
+import { OtpCapacityError } from "../../lib/server/auth/errors";
+import { SMS_CAPACITY_DEFAULT_DELAY_MAX_MS, SMS_CAPACITY_DEFAULT_DELAY_MIN_MS, SMS_CAPACITY_DELAY_CAP_MS, createLatencyMirror } from "../../lib/server/sms/otp-transport";
 import { analyzeSms } from "../../lib/server/sms/gsm7";
 import { notificationMessage } from "../../lib/server/sms/messages";
 
@@ -140,4 +142,65 @@ test("M2 — NOMA_PUBLIC_URL trop longue : refus au démarrage si la notificatio
   assert.doesNotThrow(() => assertSmsProductionConfig({ ...PRODUCTION, NOMA_PUBLIC_URL: "https://noma-café.ci" }));
   // Hors production : aucune vérification.
   assert.doesNotThrow(() => assertSmsProductionConfig({ ...PRODUCTION, NODE_ENV: "development", NOMA_PUBLIC_URL: refused }));
+});
+
+test("SMS1-ter — budget des notifications nul (NOMA_SMS_DAILY_CAP=1) : refus de démarrer en production, avertissement fixe ailleurs", () => {
+  assert.equal(planBudgets(1).notifications, 0, "un plafond de 1 donne un budget de notifications nul");
+  assert.equal(planBudgets(2).notifications, 1);
+  assert.equal(readSmsConfig({ ...PRODUCTION, NOMA_SMS_DAILY_CAP: "1" }).budget.notifications, 0);
+  // Production + meno : refus, message fixe qui nomme la variable.
+  assert.throws(() => assertSmsProductionConfig({ ...PRODUCTION, NOMA_SMS_DAILY_CAP: "1" }), /^Error: NOMA_SMS_DAILY_CAP trop bas : le budget des notifications serait nul \(au moins 2\)$/);
+  assert.doesNotThrow(() => assertSmsProductionConfig({ ...PRODUCTION, NOMA_SMS_DAILY_CAP: "2" }));
+  // Sans meno, un plafond de 1 est sans effet (aucun SMS) : ni refus ni avertissement.
+  assert.doesNotThrow(() => assertSmsProductionConfig({ NODE_ENV: "production", NOMA_SMS_DAILY_CAP: "1" }));
+  assert.deepEqual(smsStartupWarnings({ NOMA_SMS_DAILY_CAP: "1" }), []);
+  // Hors production (développement, essai, recette) avec meno : un avertissement, jamais un refus.
+  for (const NODE_ENV of ["development", "test", "staging", undefined]) {
+    const warnings = smsStartupWarnings({ ...PRODUCTION, NODE_ENV, NOMA_SMS_DAILY_CAP: "1" });
+    assert.equal(warnings.length, 1, String(NODE_ENV));
+    assert.match(warnings[0], /^\[sms\] NOMA_SMS_DAILY_CAP est trop bas : le budget des notifications est nul/);
+    assert.doesNotThrow(() => assertSmsProductionConfig({ ...PRODUCTION, NODE_ENV, NOMA_SMS_DAILY_CAP: "1" }));
+  }
+  assert.deepEqual(smsStartupWarnings({ ...PRODUCTION, NOMA_SMS_DAILY_CAP: "2" }), []);
+  assert.deepEqual(smsStartupWarnings({ ...PRODUCTION }), []);
+});
+
+test("SMS1-ter — miroir de latence : un refus de capacité attend une durée observée sur de vrais envois (bornée), sinon une valeur par défaut plausible", () => {
+  // Sans mesure : entre 300 et 1200 ms, bornes comprises.
+  const first = createLatencyMirror(() => 0);
+  assert.equal(first.sample(), SMS_CAPACITY_DEFAULT_DELAY_MIN_MS);
+  const last = createLatencyMirror((maximum) => maximum - 1);
+  assert.equal(last.sample(), SMS_CAPACITY_DEFAULT_DELAY_MAX_MS);
+  // Avec mesures : une durée observée, pas une autre.
+  const mirror = createLatencyMirror((maximum) => maximum - 1);
+  mirror.observe(180);
+  mirror.observe(420.4);
+  assert.equal(mirror.sample(), 420, "arrondie");
+  const picks = new Set<number>();
+  const rotating = (() => { let n = -1; return createLatencyMirror((maximum) => (n = (n + 1) % maximum)); })();
+  rotating.observe(100);
+  rotating.observe(200);
+  rotating.observe(300);
+  for (let i = 0; i < 6; i += 1) picks.add(rotating.sample());
+  assert.deepEqual([...picks].sort((a, b) => a - b), [100, 200, 300]);
+  // Valeurs invalides ignorées, durées extrêmes plafonnées, mémoire bornée (64 dernières).
+  const strict = createLatencyMirror((maximum) => maximum - 1);
+  strict.observe(Number.NaN);
+  strict.observe(-5);
+  strict.observe(Number.POSITIVE_INFINITY);
+  assert.equal(strict.sample(), SMS_CAPACITY_DEFAULT_DELAY_MAX_MS, "rien d'observé : valeur par défaut");
+  strict.observe(10 * 60_000);
+  assert.equal(strict.sample(), SMS_CAPACITY_DELAY_CAP_MS);
+  let cursor = -1;
+  const ring = createLatencyMirror((maximum) => (cursor = (cursor + 1) % maximum));
+  for (let i = 0; i < 200; i += 1) ring.observe(i);
+  const kept: number[] = [];
+  for (let i = 0; i < 64; i += 1) kept.push(ring.sample());
+  assert.deepEqual(kept.sort((a, b) => a - b), Array.from({ length: 64 }, (_, i) => 136 + i), "seules les 64 dernières observations (136 à 199) sont conservées");
+});
+
+test("SMS1-ter — OtpCapacityError porte un motif stable (jamais une valeur libre)", () => {
+  assert.equal(new OtpCapacityError("budget_new_numbers").code, "budget_new_numbers");
+  assert.equal(new OtpCapacityError().code, "budget_unknown");
+  for (const bad of ["Budget Libre !", "", "x".repeat(61), "budget-codes"]) assert.equal(new OtpCapacityError(bad).code, "budget_unknown", bad);
 });

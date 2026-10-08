@@ -1,9 +1,10 @@
 import { hostname } from "node:os";
-import { assertSmsProductionConfig } from "../lib/server/sms/config";
+import { assertSmsProductionConfig, smsStartupWarnings } from "../lib/server/sms/config";
 import { getPostgresPool, closePostgresPool, requireDatabaseUrl } from "../lib/server/postgres/client";
 import { requireWorkerId } from "../lib/server/matching/jobs";
 import { runMatchingCycle, runMatchingWorkerLoop } from "../lib/server/matching/runner";
 import { assertPaymentConfiguration } from "../lib/server/wallet/sublymus/config";
+import { STARTUP_REFUSED_EXIT_CODE } from "../lib/server/startup-guard";
 
 /** Worker du matching asynchrone. N'applique aucune migration et n'est jamais lancé par Next.js. */
 function resolveWorkerId(): string {
@@ -19,12 +20,21 @@ async function main(): Promise<void> {
   } catch (error) {
     // Message fixe qui nomme la variable, jamais sa valeur.
     console.error(`Matching worker : refus de démarrer : ${error instanceof Error ? error.message : "configuration SMS invalide"}.`);
-    process.exitCode = 1;
+    // Lot SMS1-ter : code de sortie DÉDIÉ au refus de démarrer (78), le même que celui du serveur (lib/server/startup-guard.ts).
+    process.exitCode = STARTUP_REFUSED_EXIT_CODE;
     return;
   }
+  for (const warning of smsStartupWarnings(process.env)) console.warn(warning);
   requireDatabaseUrl();
   // Lot PAY1 : comme le serveur, un worker mal configuré pour le paiement (rattrapage Sublymus) REFUSE de démarrer, avec un message clair (variables, jamais valeurs).
-  assertPaymentConfiguration(process.env);
+  try {
+    assertPaymentConfiguration(process.env);
+  } catch (error) {
+    if (!(error instanceof Error) || error.name !== "PaymentConfigError") throw error;
+    console.error(`Matching worker : ${error.message}`);
+    process.exitCode = STARTUP_REFUSED_EXIT_CODE;
+    return;
+  }
   const workerId = resolveWorkerId();
   const once = process.argv.slice(2).includes("--once");
   const pool = getPostgresPool();

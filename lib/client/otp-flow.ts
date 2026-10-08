@@ -16,6 +16,12 @@ export interface OtpFlow {
   next: string;
 }
 
+/**
+ * Consigne affichée sous le numéro, sur l'écran de vérification (lot SMS1-ter). Quand la capacité d'envoi est atteinte, le serveur répond comme pour un succès (sinon la réponse
+ * révélerait si un numéro a un compte) : l'utilisateur ne reçoit alors aucun code et doit savoir quoi faire.
+ */
+export const OTP_NOT_RECEIVED_HINT = "Si vous ne recevez pas le code d'ici 2 minutes, réessayez plus tard.";
+
 const STORAGE_KEY = "noma:otp-flow";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

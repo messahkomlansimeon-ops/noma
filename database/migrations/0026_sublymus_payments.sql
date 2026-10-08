@@ -83,7 +83,10 @@ CREATE TABLE sublymus_checkouts (
     CONSTRAINT uq_sublymus_checkouts_reference UNIQUE (external_reference),
     CONSTRAINT uq_sublymus_checkouts_sublymus_intent UNIQUE (sublymus_intent_id),
     CONSTRAINT chk_sublymus_checkouts_reference CHECK (external_reference ~ '^noma-topup-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
-    CONSTRAINT chk_sublymus_checkouts_sublymus_intent CHECK (sublymus_intent_id IS NULL OR sublymus_intent_id ~ '^[A-Za-z0-9_-]{1,100}$'),
+    -- Lot PAY1-ter (N7) : MÊME expression que SUBLYMUS_IDENTIFIER (lib/server/wallet/sublymus/config.ts), `.` et `:` compris (un test compare les deux). Commande équivalente pour une base
+    -- où 0026 aurait déjà été appliquée (aucune ne l'est à ce jour) : ALTER TABLE sublymus_checkouts DROP CONSTRAINT chk_sublymus_checkouts_sublymus_intent,
+    -- ADD CONSTRAINT chk_sublymus_checkouts_sublymus_intent CHECK (sublymus_intent_id IS NULL OR sublymus_intent_id ~ '^[A-Za-z0-9._:-]{1,100}$');
+    CONSTRAINT chk_sublymus_checkouts_sublymus_intent CHECK (sublymus_intent_id IS NULL OR sublymus_intent_id ~ '^[A-Za-z0-9._:-]{1,100}$'),
     CONSTRAINT chk_sublymus_checkouts_url CHECK (checkout_url IS NULL OR (checkout_url ~ '^https://[^[:space:]]+$' AND char_length(checkout_url) <= 2000 AND checkout_url !~ '^https://[^/]*@')),
     CONSTRAINT chk_sublymus_checkouts_created CHECK ((checkout_url IS NULL) = (checkout_created_at IS NULL)),
     CONSTRAINT chk_sublymus_checkouts_status CHECK (provider_status IS NULL OR provider_status ~ '^[A-Z_]{1,32}$'),

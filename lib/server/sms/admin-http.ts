@@ -58,6 +58,7 @@ export function createAdminSmsHttpHandlers(dependencies: AdminSmsHttpDependencie
             attempts: send.attempts,
           })),
           budget: reading.budget,
+          unsentCodes: reading.unsentCodes,
           readAt: reading.readAt.toISOString(),
         });
       } catch (error) {

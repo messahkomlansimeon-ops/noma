@@ -1,6 +1,9 @@
 [Unit]
 Description=Noma — instance unique (préproduction privée)
 After=network.target
+# Lot SMS1-ter : au plus 5 démarrages en 5 minutes ; au-delà, systemd renonce (état « failed », visible par systemctl) au lieu de tourner indéfiniment.
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -13,6 +16,10 @@ EnvironmentFile=/opt/noma/shared/.env.production
 ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1
 Restart=on-failure
 RestartSec=5
+# Lot SMS1-ter : le REFUS DE DÉMARRER (configuration SMS ou paiement invalide : instrumentation.ts, startup-guard.ts) sort avec le code DÉDIÉ 78 (EX_CONFIG). Relancer ne servirait
+# à rien (la configuration ne change pas toute seule) : pas de boucle. Toutes les autres pannes gardent Restart=on-failure, y compris une exception non rattrapée (code 1),
+# un signal ou un manque de mémoire.
+RestartPreventExitStatus=78
 # durcissement : aucune sortie de secrets, journal propre
 NoNewPrivileges=true
 ProtectSystem=strict

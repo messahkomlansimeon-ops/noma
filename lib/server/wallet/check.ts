@@ -636,7 +636,7 @@ const WARNINGS: ReadonlyArray<{ code: WalletCheckWarningCode; sql: string }> = [
     code: "sublymus_catchup_overdue",
     sql: `SELECT c.intent_id::text AS intent_id, c.next_catchup_at::text AS next_at, c.catchup_attempts::text AS attempts
             FROM sublymus_checkouts c JOIN payment_intents i ON i.id = c.intent_id
-           WHERE c.next_catchup_at IS NOT NULL AND i.status IN ('pending', 'expired') AND c.next_catchup_at < clock_timestamp() - interval '15 minutes'
+           WHERE c.next_catchup_at IS NOT NULL AND i.status IN ('pending', 'expired', 'failed') AND c.next_catchup_at < clock_timestamp() - interval '15 minutes'
            ORDER BY c.next_catchup_at, c.intent_id`,
   },
   {

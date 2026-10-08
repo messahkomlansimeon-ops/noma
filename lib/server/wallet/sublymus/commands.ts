@@ -2,7 +2,7 @@ import "server-only";
 
 import { maskPayer, maskPayerPartial } from "./anomalies";
 import { SublymusApiError, SublymusClient } from "./client";
-import { CHECKOUT_TEST_MAX_XOF, SUBLYMUS_DEFAULT_BASE_URL, SUBLYMUS_TEST_REFERENCE_PREFIX, isLoopbackUrl } from "./config";
+import { CHECKOUT_TEST_MAX_XOF, SUBLYMUS_DEFAULT_BASE_URL, SUBLYMUS_IDENTIFIER, SUBLYMUS_TEST_REFERENCE_PREFIX, isLoopbackUrl } from "./config";
 
 /**
  * COMMANDES DU FONDATEUR (lot PAY1) : `wallet:provider-check`, `wallet:provider-checkout-test` et `wallet:provider-intent-check`. Elles parlent au VRAI Sublymus DÈS QUE la clé est
@@ -22,7 +22,7 @@ export interface CommandIo {
   now?: () => Date;
 }
 
-const IDENTIFIER = /^[A-Za-z0-9._:-]{1,100}$/;
+const IDENTIFIER = SUBLYMUS_IDENTIFIER;
 
 function plainOrigin(value: string, allowLoopbackHttp = true): string | null {
   try {

@@ -6,7 +6,7 @@ import { Delete, MessageSquareText } from "lucide-react";
 import { TopBar } from "@/components/top-bar";
 import { Btn } from "@/components/ui";
 import { api, describeApiError } from "@/lib/client/api";
-import { clearOtpFlow, readOtpFlow, saveOtpFlow } from "@/lib/client/otp-flow";
+import { OTP_NOT_RECEIVED_HINT, clearOtpFlow, readOtpFlow, saveOtpFlow } from "@/lib/client/otp-flow";
 import { STORAGE_BLOCKED_MESSAGE, changeNumberHref } from "@/lib/client/otp-start";
 import { maskPhoneForDisplay } from "@/lib/client/phone";
 import { useOtpFlow } from "@/lib/client/use-otp-flow";
@@ -120,6 +120,9 @@ export default function Verification() {
         </h1>
         <p className="mt-1 text-center text-[14px] text-ink-soft">
           {flow ? `Code envoyé au ${maskPhoneForDisplay(flow.phone)}` : " "}
+        </p>
+        <p data-testid="otp-not-received-hint" className="mt-1 text-center text-[12px] text-ink-soft">
+          {OTP_NOT_RECEIVED_HINT}
         </p>
         <div className="mt-2 text-center">
           <button

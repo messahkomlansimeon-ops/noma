@@ -50,7 +50,7 @@ Ce guide est écrit pour vous, fondateur, pas pour un développeur. Tout se pass
    [auth:dev] code OTP pour +***********01 : 123456 (expire à 12:34:56 UTC)
    ```
 
-   Les 6 chiffres après les deux-points sont le code. **Limites des demandes de code** (d'après `lib/server/auth/otp.ts`), par numéro : **1 code par minute**, **3 codes par tranche de 15 minutes** (tranches fixes sur l'horloge : :00, :15, :30, :45) et **10 codes par jour** (jour UTC) ; par adresse de connexion : 20 par tranche de 15 minutes et 100 par jour. Si vous vous êtes trompé, attendez une minute ; après 3 demandes dans la même tranche de 15 minutes, attendez la tranche suivante.
+   Les 6 chiffres après les deux-points sont le code. **Limites des demandes de code** (d'après `lib/server/auth/otp.ts`), par numéro : **1 code par minute**, **3 codes par tranche de 15 minutes** (tranches fixes sur l'horloge : :00, :15, :30, :45) et **10 codes par jour** (jour UTC) ; par adresse de connexion : 60 défis non vérifiés par 15 minutes glissantes et 300 par 24 heures glissantes (lot SMS1-ter ; un code vérifié ne compte plus). Si vous vous êtes trompé, attendez une minute ; après 3 demandes dans la même tranche de 15 minutes, attendez la tranche suivante.
 
 7. **Les comptes de démonstration** (numéros fixes, à saisir dans la page de connexion) :
 

@@ -6,6 +6,8 @@
  *   codes         = le reste ; dans le budget codes, une RÉSERVE (défaut 50 % du budget codes) n'est accessible qu'aux numéros qui ont DÉJÀ un compte.
  * Une demande de code vers un numéro INCONNU ne peut donc consommer que la part non réservée (`newNumbers`), et au plus `newNumbersPerHour` par heure glissante : une rafale ne brûle
  * pas la journée en une heure. Un attaquant qui n'a que des numéros neufs ne peut plus bloquer la connexion des utilisateurs existants.
+ * Lot SMS1-ter : la réserve n'est ouverte qu'au PREMIER code du jour UTC de chaque numéro existant (le journal classe `new` les codes suivants du même numéro, voir journal.ts) : pour vider
+ * la réserve, il faut autant de numéros existants DIFFÉRENTS que la réserve a d'envois (300 avec les valeurs par défaut), et non quelques dizaines de numéros demandés en boucle.
  */
 
 export const SMS_DEFAULT_NOTIFICATION_SHARE_PERCENT = 40;

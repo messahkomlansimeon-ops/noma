@@ -1,7 +1,7 @@
 "use client";
 
 import { AdminPage } from "@/components/admin/admin-page";
-import { SMS_FAILED_EMPTY, SMS_FAILED_NOTE, SMS_NOTE, SMS_TITLE, SMS_UNCERTAIN_EMPTY, budgetLines, failedRows, loadSmsAdmin, localLines, providerLine, uncertainRows, usageErrorMessage, usageLines } from "@/lib/client/sms-admin";
+import { SMS_FAILED_EMPTY, SMS_FAILED_NOTE, SMS_NOTE, SMS_TITLE, SMS_UNCERTAIN_EMPTY, budgetLines, failedRows, loadSmsAdmin, localLines, providerLine, uncertainRows, unsentCodeLines, usageErrorMessage, usageLines } from "@/lib/client/sms-admin";
 
 const load = (signal: AbortSignal) => loadSmsAdmin({ signal });
 
@@ -33,6 +33,9 @@ export default function AdminSms() {
               </h2>
               <ul className="mt-1.5 space-y-0.5 text-[12px] text-ink-soft">
                 {budgetLines(overview.budget).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+                {unsentCodeLines(overview.unsentCodes).map((line) => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>

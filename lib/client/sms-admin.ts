@@ -12,7 +12,7 @@ export const SMS_TITLE = "SMS";
 export const SMS_NOTE = "Lecture seule. Chaque SMS accepté coûte 15 F CFA. Un envoi incertain n'est JAMAIS renvoyé automatiquement : vérifiez-le chez le fournisseur avec son identifiant.";
 export const SMS_UNCERTAIN_EMPTY = "Aucun envoi incertain à rapprocher.";
 export const SMS_FAILED_EMPTY = "Aucun envoi échoué ces dernières 24 h.";
-export const SMS_FAILED_NOTE = "Échoués : rien n'est parti (fournisseur injoignable, cadence dépassée). Un envoi dont le sort est inconnu est « incertain », jamais « échoué ». Un refus pour budget ne laisse aucune ligne : voir « Budgets du jour ».";
+export const SMS_FAILED_NOTE = "Échoués : rien n'est parti (fournisseur injoignable, cadence dépassée). Un envoi dont le sort est inconnu est « incertain », jamais « échoué ». Un refus pour budget ne laisse aucune ligne : voir « Budgets du jour » (codes non envoyés faute de capacité).";
 
 export type SmsPurposeLabel = "otp" | "notification" | "smoke";
 
@@ -65,6 +65,12 @@ export interface SmsBudgetUsedView {
   notifications: number;
 }
 
+export interface SmsUnsentCodesView {
+  windowHours: 24;
+  total: number;
+  byCode: { code: string; count: number }[];
+}
+
 export interface SmsAdminOverview {
   provider: { mode: "none" | "console" | "meno" | "invalid"; active: boolean; unitPriceXof: number };
   usage: SmsUsage | null;
@@ -73,6 +79,7 @@ export interface SmsAdminOverview {
   uncertain: SmsUncertainRow[];
   recentFailed: SmsFailedRow[];
   budget: { day: string; plan: SmsBudgetPlanView; used: SmsBudgetUsedView };
+  unsentCodes: SmsUnsentCodesView;
   readAt: string;
 }
 
@@ -176,6 +183,16 @@ function parseBudget(status: number, value: unknown): SmsAdminOverview["budget"]
   };
 }
 
+function parseUnsentCodes(status: number, value: unknown): SmsUnsentCodesView {
+  need(status, isObject(value) && value.windowHours === 24 && isCount(value.total) && Array.isArray(value.byCode) && value.byCode.length <= 20);
+  const unsent = value as Json;
+  const byCode = (unsent.byCode as unknown[]).map((entry) => {
+    need(status, isObject(entry) && typeof entry.code === "string" && /^[a-z0-9_]{1,60}$/.test(entry.code) && isCount(entry.count));
+    return { code: (entry as Json).code as string, count: (entry as Json).count as number };
+  });
+  return { windowHours: 24, total: unsent.total as number, byCode };
+}
+
 export function parseSmsAdminOverview(status: number, json: unknown): SmsAdminOverview {
   need(status, isObject(json) && json.contractVersion === ADMIN_SMS_CONTRACT_VERSION && isObject(json.provider) && isObject(json.local) && Array.isArray(json.uncertain) && Array.isArray(json.recentFailed) && isIso(json.readAt));
   const body = json as Json;
@@ -199,6 +216,7 @@ export function parseSmsAdminOverview(status: number, json: unknown): SmsAdminOv
     uncertain: (body.uncertain as unknown[]).map((row) => parseRow(status, row)),
     recentFailed: (body.recentFailed as unknown[]).map((row) => parseFailedRow(status, row)),
     budget: parseBudget(status, body.budget),
+    unsentCodes: parseUnsentCodes(status, body.unsentCodes),
     readAt: body.readAt as string,
   };
 }
@@ -268,6 +286,12 @@ export function budgetLines(budget: SmsAdminOverview["budget"]): string[] {
     `Numéros inconnus : ${used.newNumbers}/${plan.newNumbers} · cette heure : ${used.newNumbersHour}/${plan.newNumbersPerHour}`,
     `Notifications : ${used.notifications}/${plan.notifications}`,
   ];
+}
+
+/** Codes de connexion non envoyés faute de capacité (24 h) : la réponse au visiteur est identique à un succès, la trace est ici. */
+export function unsentCodeLines(unsent: SmsUnsentCodesView): string[] {
+  if (unsent.total === 0) return ["Codes non envoyés faute de capacité (24 h) : aucun"];
+  return [`Codes non envoyés faute de capacité (24 h) : ${unsent.total}`, ...unsent.byCode.map((entry) => `${entry.code} : ${entry.count}`)];
 }
 
 export interface FailedView {

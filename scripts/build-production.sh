@@ -13,7 +13,10 @@
 #     sont JAMAIS transmis, même si l'appelant les a exportées ;
 #  3. le cache du build (.next/cache) est supprimé après le build ;
 #  4. contrôle final : si l'appelant avait exporté des valeurs secrètes, aucune ne doit se retrouver dans .next ; sinon le build est EFFACÉ et le script échoue (code 1). Les valeurs
-#     ne sont jamais affichées.
+#     ne sont jamais affichées. Lot SMS1-ter : les valeurs secrètes de poc/.env.local (s'il existe) sont ajoutées à ce contrôle ;
+#  0. (lot SMS1-ter) AVANT tout : le build est REFUSÉ (code 1) si un fichier `.env*` autre que `.env.example` existe à la racine. `next build` lit lui-même `.env`, `.env.local`,
+#     `.env.production`… et ses valeurs peuvent finir dans .next (variables inlinées, cache) : `env -i` n'y change rien. Le fichier d'environnement du serveur vit hors du dépôt
+#     (/opt/noma/shared/.env.production) ; il n'a rien à faire à côté du code qu'on construit.
 # Option de test : `scripts/build-production.sh -- <commande…>` remplace `npx next build` (les mêmes garanties s'appliquent).
 set -euo pipefail
 umask 077
@@ -28,6 +31,16 @@ if [ "${1:-}" = "--" ]; then
 else
   [ $# -eq 0 ] || { echo "build:production : usage : scripts/build-production.sh [-- commande…]" >&2; exit 2; }
   BUILD_COMMAND=(npx next build)
+fi
+
+# Lot SMS1-ter : aucun fichier .env* à la racine (hors .env.example), que Next lirait de lui-même. Seuls les NOMS des fichiers sont affichés, jamais leur contenu.
+env_files=()
+while IFS= read -r -d '' path; do
+  env_files+=("$(basename "$path")")
+done < <(find . -maxdepth 1 -name '.env*' ! -name '.env.example' \( -type f -o -type l \) -print0 2>/dev/null)
+if [ "${#env_files[@]}" -gt 0 ]; then
+  echo "build:production : REFUSÉ : fichier d'environnement présent à la racine (${env_files[*]}). Next le lirait pendant le build et ses valeurs pourraient se retrouver dans .next. Déplacez-le hors du dépôt (par exemple /opt/noma/shared/.env.production) puis relancez." >&2
+  exit 1
 fi
 
 # Variables transmises au build (liste blanche). Rien d'autre : un nouveau secret ajouté plus tard au fichier d'environnement ne peut pas fuiter par omission.
@@ -59,6 +72,40 @@ for name in "${SECRET_NAMES[@]}"; do
     checked=$((checked + 1))
   fi
 done
+
+# Lot SMS1-ter : valeurs secrètes de poc/.env.local (s'il existe) : variables dont le nom évoque un secret (mêmes mots que ci-dessus) et adresses qui portent des identifiants
+# (https://utilisateur:motdepasse@hôte). Les autres valeurs (modèles, identifiants de moteur de recherche…) sont publiques par nature et ne sont pas cherchées : elles figurent
+# légitimement dans le code. Rien n'est jamais affiché.
+POC_ENV="poc/.env.local"
+if [ -f "$POC_ENV" ] && [ -r "$POC_ENV" ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    case "$line" in ''|\#*) continue ;; esac
+    line="${line#export }"
+    name="${line%%=*}"
+    value="${line#*=}"
+    [ "$name" != "$line" ] || continue
+    case "$name" in *[!A-Za-z0-9_]*|'') continue ;; esac
+    case "$name" in NEXT_PUBLIC_*) continue ;; esac
+    case "$value" in \"*\") value="${value#\"}"; value="${value%\"}" ;; \'*\') value="${value#\'}"; value="${value%\'}" ;; esac
+    secret=0
+    if printf '%s' "$name" | grep -qE 'SECRET|KEY|TOKEN|PASSWORD|PASSWD|CREDENTIAL'; then secret=1; fi
+    if printf '%s' "$value" | grep -qE '://[^/@[:space:]]+:[^/@[:space:]]+@'; then
+      secret=1
+      # Le mot de passe seul d'une adresse à identifiants est aussi cherché (une fuite peut ne contenir que lui).
+      password="$(printf '%s' "$value" | sed -nE 's#^[A-Za-z][A-Za-z0-9+.-]*://[^/@[:space:]:]+:([^/@[:space:]]+)@.*#\1#p')"
+      if [ "${#password}" -ge 8 ]; then
+        printf '%s\n' "$password" >> "$PATTERNS"
+        checked=$((checked + 1))
+      fi
+    fi
+    [ "$secret" -eq 1 ] || continue
+    if [ "${#value}" -ge 8 ]; then
+      printf '%s\n' "$value" >> "$PATTERNS"
+      checked=$((checked + 1))
+    fi
+  done < "$POC_ENV"
+fi
 
 echo "build:production : build sans secret (environnement vidé, umask 077)…" >&2
 set +e

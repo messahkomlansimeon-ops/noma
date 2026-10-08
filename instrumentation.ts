@@ -6,7 +6,7 @@
  *  - paiement (lot PAY1) : NOMA_PAYMENT_PROVIDER=sublymus sans ses variables, ou prestataire fictif demandé en production, interdit le démarrage.
  * Les messages nomment la variable, jamais sa valeur. Le worker du matching applique les mêmes règles (scripts/matching-worker.ts).
  * Correctif transversal : en production, une exception levée par `register` laisse le processus `next start` VIVANT, qui répond alors 500 à tout (constat d'audit). Le contrôle
- * journalise donc le message fixe puis TERMINE LE PROCESSUS (code 1) : un déploiement mal configuré ne sert aucune requête et le superviseur (systemd) le voit tomber.
+ * journalise donc le message fixe puis TERMINE LE PROCESSUS (code 78, EX_CONFIG) : un déploiement mal configuré ne sert aucune requête et le superviseur (systemd) le voit tomber.
  * Hors production, l'exception est relancée telle quelle (affichée par `next dev`). Voir DEPLOIEMENT.md, SMS.md et PAIEMENT-WAVE.md.
  */
 export async function register(): Promise<void> {

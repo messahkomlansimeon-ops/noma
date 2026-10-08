@@ -2419,8 +2419,7 @@ export function describeApiError(error: unknown, context: ApiErrorContext = "def
     case 503:
       // Lot SMS1 : l'envoi du code a échoué de façon définitive (message générique, sans détail du fournisseur).
       if (context === "otp-request" && error.code === "otp_delivery_failed") return "Envoi du code impossible pour le moment. Réessayez dans quelques minutes.";
-      // Lot SMS1-bis : la capacité d'envoi des codes est atteinte (aucun SMS n'est parti) : message distinct, qui ne promet pas un envoi immédiat.
-      if (context === "otp-request" && error.code === "otp_capacity_reached") return "Le service d'envoi de codes est très sollicité en ce moment. Réessayez un peu plus tard.";
+      // Lot SMS1-ter : plus de réponse propre à la saturation (elle ferait deviner si un numéro a un compte) ; l'écran de vérification porte la consigne « réessayez plus tard ».
       return "Le service est temporairement indisponible. Réessayez dans un instant.";
     default:
       return GENERIC_ERROR_MESSAGE;

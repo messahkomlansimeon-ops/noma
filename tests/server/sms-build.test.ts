@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { after, before, test } from "node:test";
@@ -155,4 +155,89 @@ test("la clé du fournisseur n'est lue qu'à l'EXÉCUTION : jamais d'accès litt
       assert.equal(/^(export\s+)?(const|let|var)\s/.test(line) && !/=>|function/.test(line), false, `${relative(ROOT, file)} : lecture de process.env au chargement du module : ${line.trim()}`);
     }
   }
+});
+
+test("SMS1-ter — un fichier .env* à la racine (hors .env.example) fait REFUSER le build avant tout : la commande n'est pas lancée, le contenu n'est jamais affiché", () => {
+  const CONTENT = "SECRETENV_ter_0123456789abcdef_unique";
+  for (const name of [".env", ".env.local", ".env.production", ".env.development.local", ".env.test", ".envrc-prod"]) {
+    const file = join(sandbox, name);
+    writeFileSync(file, `NOMA_AUTH_SECRET=${CONTENT}\n`);
+    try {
+      const result = run(["sh", "-c", "echo lance > build-started.txt; mkdir -p .next"]);
+      assert.equal(result.status, 1, `${name} : le build doit être refusé`);
+      assert.equal(existsSync(join(sandbox, "build-started.txt")), false, `${name} : la commande de build ne doit pas être lancée`);
+      assert.match(result.stderr, /REFUSÉ/);
+      assert.ok(result.stderr.includes(name), `${name} : le nom du fichier est affiché`);
+      assert.equal(`${result.stdout}${result.stderr}`.includes(CONTENT), false, `${name} : le contenu n'est jamais affiché`);
+    } finally {
+      rmSync(file, { force: true });
+    }
+  }
+  // .env.example seul est admis ; plusieurs fichiers : tous nommés ; un dossier .env* n'est pas un fichier d'environnement.
+  writeFileSync(join(sandbox, ".env.example"), "NOMA_AUTH_SECRET=\n");
+  mkdirSync(join(sandbox, ".env-dossier"));
+  try {
+    const ok = run(["sh", "-c", "mkdir -p .next && echo page > .next/page.js"]);
+    assert.equal(ok.status, 0, ok.stderr);
+    writeFileSync(join(sandbox, ".env.local"), "A=1\n");
+    writeFileSync(join(sandbox, ".env.production"), "B=2\n");
+    const both = run(["sh", "-c", "mkdir -p .next"]);
+    assert.equal(both.status, 1);
+    assert.ok(both.stderr.includes(".env.local") && both.stderr.includes(".env.production"));
+    assert.equal(both.stderr.includes(".env.example"), false);
+  } finally {
+    rmSync(join(sandbox, ".env.example"), { force: true });
+    rmSync(join(sandbox, ".env.local"), { force: true });
+    rmSync(join(sandbox, ".env.production"), { force: true });
+    rmSync(join(sandbox, ".env-dossier"), { recursive: true, force: true });
+  }
+});
+
+test("SMS1-ter — les valeurs secrètes de poc/.env.local (s'il existe) rejoignent le contrôle final : trouvées dans .next, le build est EFFACÉ et la valeur n'est jamais affichée ; les valeurs publiques ne font pas échouer", () => {
+  const SECRET_KEY = "pocKEY_ter_0123456789abcdef_unique";
+  const SECRET_QUOTED = "pocQUOTED_ter_0123456789abcdef_unique";
+  const SECRET_PROXY_PASSWORD = "pocPROXYPASS_ter_0123456789";
+  const PUBLIC_MODEL = "google/gemini-public-model-name";
+  mkdirSync(join(sandbox, "poc"), { recursive: true });
+  writeFileSync(
+    join(sandbox, "poc", ".env.local"),
+    [
+      "# commentaire",
+      `OPENROUTER_API_KEY=${SECRET_KEY}`,
+      `export GOOGLE_API_KEY="${SECRET_QUOTED}"`,
+      `HTTPS_PROXY=http://utilisateur:${SECRET_PROXY_PASSWORD}@proxy.example:3128`,
+      `ONLINE_MODEL=${PUBLIC_MODEL}`,
+      "COURT_KEY=abc",
+      "",
+    ].join("\n"),
+  );
+  try {
+    for (const value of [SECRET_KEY, SECRET_QUOTED, SECRET_PROXY_PASSWORD]) {
+      const result = run(["sh", "-c", 'mkdir -p .next/static && echo "$0" > .next/static/chunk.js', value], { NOMA_SMS_API_KEY: "", NOMA_AUTH_SECRET: "", NOMA_IP_SECRET: "", NOMA_PROXY_SECRET: "", NOMA_TURNSTILE_SECRET: "", WAVE_API_KEY: "", SUBLYMUS_WEBHOOK_SECRET: "", DATABASE_URL: "", UN_NOUVEAU_SECRET_AJOUTE_PLUS_TARD: "" });
+      assert.equal(result.status, 1, `${value.slice(0, 8)}… dans .next : le script doit échouer`);
+      assert.equal(existsSync(join(sandbox, ".next")), false, "le build est effacé");
+      assert.equal(`${result.stdout}${result.stderr}`.includes(value), false, "la valeur n'est jamais affichée");
+      assert.match(result.stderr, /valeur secrète/);
+    }
+    // Une valeur publique de ce fichier (modèle) ou trop courte ne fait pas échouer ; le compte des valeurs vérifiées reste affiché sans les valeurs.
+    const clean = run(["sh", "-c", 'mkdir -p .next/static && echo "$0 abc" > .next/static/chunk.js', PUBLIC_MODEL]);
+    assert.equal(clean.status, 0, clean.stderr);
+    assert.equal(`${clean.stdout}${clean.stderr}`.includes(SECRET_KEY), false);
+    assert.equal(`${clean.stdout}${clean.stderr}`.includes(SECRET_PROXY_PASSWORD), false);
+    // Les valeurs de poc/.env.local ne sont jamais transmises au build.
+    const seen = run(["sh", "-c", "env > build-env.txt"]);
+    assert.equal(seen.status, 0, seen.stderr);
+    assert.equal(readFileSync(join(sandbox, "build-env.txt"), "utf8").includes(SECRET_KEY), false);
+  } finally {
+    rmSync(join(sandbox, "poc"), { recursive: true, force: true });
+  }
+  // Sans poc/.env.local : aucun effet (le contrôle des variables de l'appelant reste celui d'avant).
+  assert.equal(run(["sh", "-c", "mkdir -p .next && echo page > .next/a"]).status, 0);
+});
+
+test("SMS1-ter — e2e-photos n'annonce plus « codes lus dans le journal du serveur » en mode meno", () => {
+  const photos = readFileSync(join(ROOT, "scripts", "e2e-photos.ts"), "utf8");
+  assert.match(photos, /E2E_MENO_MODE/);
+  assert.match(photos, /faux serveur Meno/);
+  assert.doesNotMatch(photos, /ok\("vendeur et acheteur connectés \(codes lus dans le journal du serveur\)"\)/, "le texte ne dépend plus du mode");
 });

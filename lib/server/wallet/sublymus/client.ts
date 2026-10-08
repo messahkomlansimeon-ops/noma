@@ -1,7 +1,7 @@
 import "server-only";
 
 import { parseStrictJson, StrictJsonError } from "../strict-json";
-import { SUBLYMUS_REQUEST_TIMEOUT_MS, SUBLYMUS_RESPONSE_MAX_BYTES, SUBLYMUS_SOURCE_SYSTEM, isLoopbackUrl, isWaveLinkHost, normalizeHostname } from "./config";
+import { SUBLYMUS_IDENTIFIER, SUBLYMUS_REQUEST_TIMEOUT_MS, SUBLYMUS_RESPONSE_MAX_BYTES, SUBLYMUS_SOURCE_SYSTEM, isLoopbackUrl, isWaveLinkHost, normalizeHostname } from "./config";
 
 /**
  * Client HTTP de l'API Sublymus (lot PAY1), selon le contrat du fournisseur. TOUTES les routes /v1/* portent `Authorization: Bearer <clé>` et `X-Manager-Id`.
@@ -105,7 +105,7 @@ export interface SublymusWallet {
 
 type Json = Record<string, unknown>;
 
-const IDENTIFIER = /^[A-Za-z0-9._:-]{1,100}$/;
+const IDENTIFIER = SUBLYMUS_IDENTIFIER;
 const STATUS = /^[A-Za-z_]{1,32}$/;
 
 function isObject(value: unknown): value is Json {

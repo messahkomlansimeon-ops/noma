@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ApiError, createApiClient, describeApiError } from "../../lib/client/api";
+import { OTP_NOT_RECEIVED_HINT } from "../../lib/client/otp-flow";
 import { preferencesLabel, preferencesToast } from "../../lib/client/notifications-view";
 import {
   PURPOSE_LABELS,
@@ -11,6 +12,7 @@ import {
   parseSmsAdminOverview,
   providerLine,
   uncertainRows,
+  unsentCodeLines,
   usageErrorMessage,
   usageLines,
 } from "../../lib/client/sms-admin";
@@ -31,6 +33,7 @@ const valid = () => ({
     plan: { total: 1000, notifications: 400, codes: 600, existingReserve: 300, newNumbers: 300, newNumbersPerHour: 38 },
     used: { total: 52, codes: 40, newNumbers: 12, newNumbersHour: 3, notifications: 12 },
   },
+  unsentCodes: { windowHours: 24, total: 7, byCode: [{ code: "budget_new_numbers", count: 5 }, { code: "budget_codes", count: 2 }] },
   readAt: "2032-06-15T12:00:00.000Z",
   injected: "<script>alert(1)</script>",
 });
@@ -68,6 +71,11 @@ test("réponse invalide refusée : contrat, numéro entier, comptes négatifs, i
     (body) => { body.budget.day = "hier"; },
     (body) => { (body as { budget: unknown }).budget = null; },
     (body) => { (body as { recentFailed: unknown }).recentFailed = "oui"; },
+    (body) => { (body as { unsentCodes: unknown }).unsentCodes = undefined; },
+    (body) => { body.unsentCodes.total = -1; },
+    (body) => { (body.unsentCodes as { windowHours: number }).windowHours = 48; },
+    (body) => { body.unsentCodes.byCode[0].code = "Détail Libre !"; },
+    (body) => { body.unsentCodes.byCode[0].count = 1.5; },
   ];
   for (const [index, change] of broken.entries()) {
     const body = valid();
@@ -134,10 +142,24 @@ test("connexion : échec définitif de l'envoi du code → message générique, 
   assert.equal(describeApiError(new ApiError(503, "otp_delivery_failed", "texte du serveur ignoré"), "otp-request"), "Envoi du code impossible pour le moment. Réessayez dans quelques minutes.");
   assert.equal(describeApiError(new ApiError(503, "auth_unavailable", "x"), "otp-request"), "Le service est temporairement indisponible. Réessayez dans un instant.");
   assert.equal(describeApiError(new ApiError(503, "otp_delivery_failed", "x"), "otp-verify"), "Le service est temporairement indisponible. Réessayez dans un instant.");
-  // SMS1-bis : budget d'envoi atteint — message DISTINCT, jamais le texte du serveur.
-  assert.equal(describeApiError(new ApiError(503, "otp_capacity_reached", "texte du serveur ignoré"), "otp-request"), "Le service d'envoi de codes est très sollicité en ce moment. Réessayez un peu plus tard.");
-  assert.notEqual(describeApiError(new ApiError(503, "otp_capacity_reached", "x"), "otp-request"), describeApiError(new ApiError(503, "otp_delivery_failed", "x"), "otp-request"));
-  assert.equal(describeApiError(new ApiError(503, "otp_capacity_reached", "x"), "otp-verify"), "Le service est temporairement indisponible. Réessayez dans un instant.", "seulement pour la demande de code");
+  // SMS1-ter : plus de réponse propre à la saturation (elle ferait deviner si un numéro a un compte) : un éventuel 503 otp_capacity_reached ne reçoit AUCUN message dédié.
+  assert.equal(describeApiError(new ApiError(503, "otp_capacity_reached", "x"), "otp-request"), "Le service est temporairement indisponible. Réessayez dans un instant.");
+});
+
+test("SMS1-ter : l'écran de vérification porte la consigne « si vous ne recevez pas le code d'ici 2 minutes, réessayez plus tard »", async () => {
+  assert.equal(OTP_NOT_RECEIVED_HINT, "Si vous ne recevez pas le code d'ici 2 minutes, réessayez plus tard.");
+  const { readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const page = readFileSync(join(import.meta.dirname, "..", "..", "app", "(auth)", "verification", "page.tsx"), "utf8");
+  assert.match(page, /OTP_NOT_RECEIVED_HINT/, "la page de vérification affiche la consigne");
+  assert.match(page, /data-testid="otp-not-received-hint"/);
+});
+
+test("administration : les codes non envoyés faute de capacité (24 h) se lisent par motif, sans numéro", () => {
+  const overview = parseSmsAdminOverview(200, valid());
+  assert.deepEqual(overview.unsentCodes, { windowHours: 24, total: 7, byCode: [{ code: "budget_new_numbers", count: 5 }, { code: "budget_codes", count: 2 }] });
+  assert.deepEqual(unsentCodeLines(overview.unsentCodes), ["Codes non envoyés faute de capacité (24 h) : 7", "budget_new_numbers : 5", "budget_codes : 2"]);
+  assert.deepEqual(unsentCodeLines({ windowHours: 24, total: 0, byCode: [] }), ["Codes non envoyés faute de capacité (24 h) : aucun"]);
 });
 
 test("préférences d'envoi : un vrai fournisseur retire « (simulé) » des libellés ; sans lui, rien ne change", async () => {

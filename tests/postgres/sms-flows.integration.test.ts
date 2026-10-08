@@ -128,19 +128,19 @@ describe("code de connexion (OTP) par SMS réel : faux serveur Meno", () => {
     assert.equal((await pool.query("SELECT count(*)::int AS n FROM sms_sends")).rows[0].n, 3);
   });
 
-  test("limite par adresse IP conservée : au plus 20 demandes par 15 min, le SMS n'est jamais envoyé au-delà", async () => {
-    const sender = makeSender();
+  test("limite par adresse IP conservée (SMS1-ter : 60 défis non vérifiés par 15 min glissantes) : le SMS n'est jamais envoyé au-delà", async () => {
+    const sender = makeSender({ dailyCap: 5_000 }); // plafond large : on isole ici la limite par adresse (le lissage horaire des numéros inconnus est de 38 par heure au plafond par défaut)
     const handlers = otpHandlers(createOtpTransportResolver(() => undefined, { resolveSender: () => sender, warn: () => {} }));
     let accepted = 0;
     let limited = 0;
-    clock = new Date(Date.UTC(2032, 5, 15, 10, 0, 1)); // début d'une fenêtre de 15 minutes
-    for (let index = 0; index < 22; index += 1) {
+    clock = new Date(Date.UTC(2032, 5, 15, 10, 0, 1));
+    for (let index = 0; index < 62; index += 1) {
       const response = await handlers.requestOtp(otpPost("/api/auth/otp/request", { phone: `+2250799${String(100_000 + index)}`.slice(0, 14) }, "198.51.100.99"));
       if (response.status === 202) accepted += 1;
       else if (response.status === 429) limited += 1;
     }
-    assert.deepEqual({ accepted, limited }, { accepted: 20, limited: 2 });
-    assert.equal(fake.messages.length, 20);
+    assert.deepEqual({ accepted, limited }, { accepted: 60, limited: 2 });
+    assert.equal(fake.messages.length, 60);
   });
 
   test("échec DÉFINITIF (422, 401, 502, 409) : réponse générique « Envoi du code impossible pour le moment », sans détail, défi en send_failed", async () => {

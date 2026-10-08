@@ -117,6 +117,16 @@ export interface BudgetReading {
   used: SmsBudgetCounts;
 }
 
+/**
+ * Codes de connexion NON envoyés faute de capacité (lot SMS1-ter) sur les dernières 24 h : la réponse au client est identique à un succès (aucun oracle d'énumération), donc la
+ * trace est ici. `byCode` : motif stable (`budget_*`) et nombre de demandes ; jamais de numéro.
+ */
+export interface UnsentCodes {
+  windowHours: 24;
+  total: number;
+  byCode: { code: string; count: number }[];
+}
+
 export interface LocalTally {
   /** Mois UTC « AAAA-MM ». */
   month: string;
@@ -133,6 +143,7 @@ export interface SmsAdminReading {
   uncertain: UncertainSend[];
   recentFailed: FailedSend[];
   budget: BudgetReading;
+  unsentCodes: UnsentCodes;
   readAt: Date;
 }
 
@@ -194,6 +205,16 @@ export async function readSmsAdmin(input: { pool: Pool; env?: Environment; now?:
       LIMIT $2::int`,
     [new Date(readAt.getTime() - ADMIN_SMS_FAILED_WINDOW_MS), ADMIN_SMS_FAILED_LIMIT],
   );
+  const unsent = await pool.query<{ code: string; n: string }>(
+    `SELECT send_failure_code AS code, count(*)::text AS n
+       FROM otp_challenges
+      WHERE send_failure_code IS NOT NULL AND created_at >= $1::timestamptz
+      GROUP BY send_failure_code
+      ORDER BY count(*) DESC, send_failure_code
+      LIMIT 10`,
+    [new Date(readAt.getTime() - ADMIN_SMS_FAILED_WINDOW_MS)],
+  );
+  const byCode = unsent.rows.map((row) => ({ code: row.code, count: safeCount(row.n) }));
   const dayStart = utcDayStart(readAt);
   const used = await readBudgetCounts(pool, dayStart, readAt);
   return {
@@ -227,6 +248,7 @@ export async function readSmsAdmin(input: { pool: Pool; env?: Environment; now?:
       attempts: row.attempts,
     })),
     budget: { day: dayStart.toISOString().slice(0, 10), plan: config.budget, used },
+    unsentCodes: { windowHours: 24, total: byCode.reduce((sum, entry) => sum + entry.count, 0), byCode },
     readAt,
   };
 }

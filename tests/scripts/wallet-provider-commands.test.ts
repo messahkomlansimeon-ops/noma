@@ -340,11 +340,11 @@ test("scripts : npm run wallet:provider-check et wallet:provider-checkout-test (
   assert.match(pkg.scripts["wallet:provider-checkout-test"], /scripts\/wallet-provider-checkout-test\.ts$/);
 });
 
-test("démarrage du worker : Sublymus choisi sans ses variables = refus de démarrer (code 1, message nommant les variables, jamais les valeurs), avant toute connexion", async () => {
+test("démarrage du worker : Sublymus choisi sans ses variables = refus de démarrer (code 78, message nommant les variables, jamais les valeurs), avant toute connexion", async () => {
   const run = await runScript("scripts/matching-worker.ts", ["--once"], {
     DATABASE_URL: "postgresql://noma_local:noma_local_only@127.0.0.1:1/noma_inexistante", NOMA_PAYMENT_PROVIDER: "sublymus", WAVE_API_KEY: "cle_inventee_du_worker_0001", NODE_ENV: "production",
   });
-  assert.equal(run.code, 1);
+  assert.equal(run.code, 78);
   assert.match(run.err, /Configuration du paiement refusée/);
   assert.match(run.err, /NOMA_SUBLYMUS_MANAGER_ID/);
   assert.match(run.err, /SUBLYMUS_WEBHOOK_SECRET/);

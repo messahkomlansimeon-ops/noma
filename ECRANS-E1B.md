@@ -89,7 +89,7 @@ remplacées par ces écrans).
 Tous les essais passent par le relais : ni `e2e:core` ni `e2e:ui` n'envoient eux-mêmes un en-tête de proxy de confiance. Montage utilisé : copie de l'arbre
 (rsync sans `/.git`, `/.next`, `/data`), `dev:full` (Next 3211 + worker) et `npm run dev:proxy` (3212), base `noma_e2e`, `NOMA_AUTH_ORIGIN=http://localhost:3212`.
 Chaque redémarrage du serveur avec un secret d'authentification neuf remet les quotas de codes OTP par IP à zéro (toutes les connexions portent l'adresse
-127.0.0.1 : limite de 20 demandes par quart d'heure partagée).
+127.0.0.1 : limite partagée de 60 défis non vérifiés par quart d'heure glissant depuis le lot SMS1-ter, 20 demandes auparavant).
 
 | Commande | Rôle |
 | --- | --- |

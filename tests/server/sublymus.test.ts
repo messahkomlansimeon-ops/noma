@@ -8,7 +8,7 @@ import { catchupDelayMs, catchupEventId, judgeProviderIntent } from "../../lib/s
 import { SublymusApiError, SublymusClient, type SublymusIntentSummary, buildCheckoutBody, isRealSublymusHost, parseCheckoutResponse, parseIntentList, readAmount } from "../../lib/server/wallet/sublymus/client";
 import {
   CATCHUP_FIRST_DELAY_MS, CATCHUP_MAX_DELAY_MS, CATCHUP_PASS_BUDGET_MS, CATCHUP_WINDOW_MS, CHECKOUT_TEST_MAX_XOF, PaymentConfigError, SUBLYMUS_DEFAULT_BASE_URL, SUBLYMUS_LINK_DOMAINS,
-  SUBLYMUS_SECRET_MIN_CHARS, SUBLYMUS_WEBHOOK_MAX_BODY_BYTES, assertPaymentConfiguration, isLoopbackUrl, isWaveLinkHost, normalizeHostname, resolvePaymentSelection,
+  SUBLYMUS_IDENTIFIER, SUBLYMUS_SECRET_MIN_CHARS, SUBLYMUS_WEBHOOK_MAX_BODY_BYTES, assertPaymentConfiguration, isLoopbackUrl, isWaveLinkHost, normalizeHostname, resolvePaymentSelection,
 } from "../../lib/server/wallet/sublymus/config";
 import {
   type KnownIntent, type ParsedSublymusWebhook, deliveryIdOf, parseSublymusWebhook, paymentEventIdOf, processSublymusWebhook, readSublymusWebhook, safeEqualText, signSublymusBody, verifySublymusEvent,
@@ -591,3 +591,63 @@ test("/admin/paiements passe par la garde de l'espace d'administration (lot D3) 
   assert.equal(/owner_id|payer_hint|external_reference|provider_reference|idempotency|phone|webhook_id/.test(overview.slice(overview.indexOf("export async function readPaymentsOverview"), overview.indexOf("export async function resolveAnomaly"))), false, "la vue ne lit ni propriétaire, ni référence, ni payeur, ni téléphone");
 });
 
+// ═════════════ Lot PAY1-ter (N7) : UNE seule expression pour les identifiants Sublymus ═════════════
+
+test("N7 — la lecture de la réponse, la lecture du webhook, la configuration, les commandes et la CONTRAINTE de la base partagent UNE expression : « . » et « : » admis partout, longueur bornée", () => {
+  assert.equal(SUBLYMUS_IDENTIFIER.source, "^[A-Za-z0-9._:-]{1,100}$");
+  for (const accepted of ["pi_123", "pi-123", "pi.abc123", "pi:abc123", "a", "a".repeat(100), "A.b:c-d_e"]) assert.equal(SUBLYMUS_IDENTIFIER.test(accepted), true, accepted);
+  for (const refusedId of ["", "a".repeat(101), "pi abc", "pi/abc", "pi\nabc", "pi;abc", "é", "pi%20"]) assert.equal(SUBLYMUS_IDENTIFIER.test(refusedId), false, JSON.stringify(refusedId));
+  // La contrainte de la migration porte EXACTEMENT la même expression (au caractère près).
+  const migration = source("database/migrations/0026_sublymus_payments.sql");
+  const constraint = /CONSTRAINT chk_sublymus_checkouts_sublymus_intent CHECK \(sublymus_intent_id IS NULL OR sublymus_intent_id ~ '([^']+)'\)/.exec(migration);
+  assert.ok(constraint, "contrainte trouvée");
+  assert.equal(constraint[1], SUBLYMUS_IDENTIFIER.source);
+  // Aucune autre expression d'identifiant dans le code : les fichiers importent la constante.
+  for (const file of ["client.ts", "webhook.ts", "commands.ts"]) {
+    const code = source(`lib/server/wallet/sublymus/${file}`);
+    assert.match(code, /SUBLYMUS_IDENTIFIER/, `${file} utilise la constante partagée`);
+    assert.equal(code.includes("[A-Za-z0-9._:-]{1,100}"), false, `${file} ne redéfinit pas l'expression`);
+  }
+  assert.equal(source("lib/server/wallet/sublymus/config.ts").split("[A-Za-z0-9._:-]{1,100}").length - 1, 1, "config.ts définit l'expression UNE fois");
+  // La lecture du client et celle du webhook acceptent ces identifiants.
+  for (const id of ["pi.abc123", "pi:abc123"]) {
+    const parsed = parseCheckoutResponse({ data: { payment_intent_id: id, wave_checkout_url: "https://pay.wave.com/c/abc", status: "WAVE_CREATED", amount: 1_000, currency: "XOF", external_reference: "noma-topup-x" } }, { amountXof: BigInt(1_000), externalReference: "noma-topup-x" });
+    assert.equal(parsed.paymentIntentId, id);
+    const read = readSublymusWebhook(new TextEncoder().encode(JSON.stringify({ event: "payment.completed", data: { id, externalReference: "noma-topup-x", amount: 1_000, currency: "XOF", status: "COMPLETED" } })));
+    assert.equal(read.ok, true, id);
+  }
+});
+
+// ═════════════ Lot PAY1-ter : unité systemd ═════════════
+
+test("deploy/noma.service : RestartPreventExitStatus=78 (le refus de démarrer ne boucle pas, une exception non rattrapée est relancée), Restart=on-failure conservé, StartLimit* bornés dans [Unit] ; documenté dans DEPLOIEMENT.md, SMS.md et PAIEMENT-WAVE.md", () => {
+  const unit = source("deploy/noma.service");
+  const sections = new Map<string, string[]>();
+  let current = "";
+  for (const line of unit.split("\n")) {
+    const header = /^\[([A-Za-z]+)\]$/.exec(line);
+    if (header) current = header[1];
+    else if (/^[A-Za-z]+=/.test(line)) sections.set(current, [...(sections.get(current) ?? []), line]);
+  }
+  const service = sections.get("Service") ?? [];
+  const unitSection = sections.get("Unit") ?? [];
+  assert.ok(service.includes("RestartPreventExitStatus=78"));
+  assert.ok(service.includes("Restart=on-failure"));
+  assert.ok(service.includes("RestartSec=5"));
+  const interval = unitSection.find((line) => line.startsWith("StartLimitIntervalSec="));
+  const burst = unitSection.find((line) => line.startsWith("StartLimitBurst="));
+  assert.ok(interval && burst, "StartLimit* dans [Unit]");
+  assert.ok(Number(interval.split("=")[1]) >= 60 && Number(interval.split("=")[1]) <= 3_600, "intervalle raisonnable");
+  assert.ok(Number(burst.split("=")[1]) >= 3 && Number(burst.split("=")[1]) <= 10, "rafale raisonnable");
+  assert.equal(service.some((line) => line.startsWith("StartLimit")), false, "StartLimit* n'est pas dans [Service]");
+  assert.equal(service.some((line) => /^RestartPreventExitStatus=.*\b1\b/.test(line)), false, "le code 1 (exception non rattrapée) n'est PAS exclu de la relance");
+  // Le refus de démarrer sort bien avec le code 78 (celui qu'empêche la relance).
+  assert.match(source("lib/server/startup-guard.ts"), /STARTUP_REFUSED_EXIT_CODE = 78/);
+  assert.match(source("lib/server/startup-guard.ts"), /io\.exit\(STARTUP_REFUSED_EXIT_CODE\)/);
+  for (const file of ["DEPLOIEMENT.md", "SMS.md", "PAIEMENT-WAVE.md"]) {
+    const text = source(file).replace(/\s+/g, " ");
+    assert.match(text, /RestartPreventExitStatus=78/, `${file} : RestartPreventExitStatus=78`);
+    assert.equal(/boucle de redémarrage toutes les 5 secondes/.test(text), false, `${file} ne promet plus une boucle de redémarrage`);
+  }
+  assert.match(source("deploy/selftest.sh"), /RestartPreventExitStatus=78/, "deploy/selftest.sh le contrôle");
+});

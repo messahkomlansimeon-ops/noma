@@ -49,7 +49,7 @@ export type Reservation =
   | { kind: "existing"; row: SmsSendRow }
   | { kind: "budget"; scope: SmsBudgetScope };
 
-/** Espace du verrou consultatif qui sérialise le comptage des budgets et l'insertion (voir la liste des espaces déjà utilisés : 945 à 960, 970 à 972, 981, 982, 990). */
+/** Espace du verrou consultatif qui sérialise le comptage des budgets et l'insertion (voir la liste des espaces déjà utilisés : 945 à 960, 970 à 972, 978 (compteurs des défis de connexion, auth/otp.ts), 981, 982, 990). */
 export const SMS_BUDGET_LOCK_NAMESPACE = 1_314_664_977;
 
 const HOUR_MS = 3_600_000;
@@ -81,7 +81,8 @@ export async function readBudgetCounts(executor: Pick<Pool | PoolClient, "query"
  *  - clé d'idempotence déjà connue et non `failed` : la ligne est rendue telle quelle (aucun contrôle de budget : aucun nouvel envoi) ;
  *  - clé nouvelle : contrôle des budgets (total, codes / notifications, part des numéros inconnus, lissage horaire), puis insertion `pending` ;
  *  - clé connue en `failed` (rien n'est parti) : la REPRISE repasse par le même contrôle de budget (C2), puis la ligne redevient `pending` datée de la reprise ;
- *  - budget refusé : AUCUNE écriture, motif rendu (`kind: "budget"`).
+ *  - budget refusé : AUCUNE écriture, motif rendu (`kind: "budget"`) ;
+ *  - lot SMS1-ter : pour un code de connexion « existant », seul le PREMIER code du jour UTC d'un numéro puise dans la réserve ; les suivants sont classés (et enregistrés) « new ».
  */
 export async function reserveSend(pool: Pool, input: ReserveInput): Promise<Reservation> {
   const client = await pool.connect();
@@ -100,8 +101,22 @@ export async function reserveSend(pool: Pool, input: ReserveInput): Promise<Rese
       return { kind: "existing", row: known };
     }
 
+    // Lot SMS1-ter : la réserve des numéros existants n'est ouverte qu'au PREMIER code du jour UTC d'un numéro. Un numéro qui a déjà reçu (ou réservé) un code « existant » aujourd'hui
+    // est classé « new » pour les suivants : demander des codes en boucle pour un même numéro existant consomme la part non réservée, jamais la réserve.
+    let audience: SmsBudgetAudience | null = input.audience ?? null;
+    if (input.purpose === "otp" && audience === "existing") {
+      const already = await client.query(
+        `SELECT 1 FROM sms_sends
+          WHERE purpose = 'otp' AND phone_hash = $1::text AND audience = 'existing' AND created_at >= $2::timestamptz
+            AND status IN ('pending', 'accepted', 'uncertain') AND idempotency_key <> $3::text
+          LIMIT 1`,
+        [input.phoneHash, input.dayStart, input.idempotencyKey],
+      );
+      if (already.rowCount) audience = "new";
+    }
+
     const counts = await readBudgetCounts(client, input.dayStart, input.now);
-    const scope = budgetVerdict(input.budget, counts, input.purpose, input.audience ?? null);
+    const scope = budgetVerdict(input.budget, counts, input.purpose, audience);
     if (scope) {
       await client.query("COMMIT");
       return { kind: "budget", scope };
@@ -115,7 +130,7 @@ export async function reserveSend(pool: Pool, input: ReserveInput): Promise<Rese
                 created_at = GREATEST($2::timestamptz, created_at), updated_at = GREATEST($2::timestamptz, created_at)
           WHERE id = $1::uuid AND status = 'failed'
           RETURNING id`,
-        [known.id, input.now, input.audience ?? null],
+        [known.id, input.now, audience],
       );
       await client.query("COMMIT");
       return resumed.rowCount ? { kind: "new", id: resumed.rows[0].id } : { kind: "existing", row: known };
@@ -126,7 +141,7 @@ export async function reserveSend(pool: Pool, input: ReserveInput): Promise<Rese
        VALUES ($1::text, $2::text, $3::text, $4::text, $5::text, $7::text, 'pending', 0, $6::timestamptz, $6::timestamptz)
        ON CONFLICT (idempotency_key) DO NOTHING
        RETURNING id`,
-      [input.purpose, input.reference, input.idempotencyKey, input.phoneHash, input.phoneLast2, input.now, input.audience ?? null],
+      [input.purpose, input.reference, input.idempotencyKey, input.phoneHash, input.phoneLast2, input.now, audience],
     );
     if (inserted.rowCount) {
       await client.query("COMMIT");

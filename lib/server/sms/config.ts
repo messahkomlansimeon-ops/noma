@@ -178,6 +178,19 @@ export function menoInactiveReason(config: SmsConfig): string | null {
 }
 
 /**
+ * Avertissements de démarrage (lot SMS1-ter), hors refus : quand `NOMA_SMS_PROVIDER=meno` est demandé et que le budget des notifications calculé vaut 0, aucune notification par SMS ne
+ * partira (chaque envoi serait refusé pour budget). En production c'est un REFUS (`assertSmsProductionConfig`) ; ailleurs, c'est cet avertissement fixe, affiché au démarrage.
+ */
+export function smsStartupWarnings(env: Environment = process.env): string[] {
+  const config = readSmsConfig(env);
+  const warnings: string[] = [];
+  if (config.provider === "meno" && config.budget.notifications === 0) {
+    warnings.push(`[sms] ${SMS_DAILY_CAP_VARIABLE} est trop bas : le budget des notifications est nul, aucune notification par SMS ne partira (valeur minimale utile : 2).`);
+  }
+  return warnings;
+}
+
+/**
  * Production (NODE_ENV exactement « production ») : REFUS DE DÉMARRER (fail closed) si la configuration SMS est incohérente. Rien n'est vérifié hors production. Messages fixes :
  * ils nomment la variable, jamais sa valeur. Appelée par instrumentation.ts (démarrage du serveur), par le worker et par assertProductionConfig.
  *  - NOMA_SMS_PROVIDER : « none », vide ou « meno » ; « console » et toute autre valeur sont refusés ;
@@ -199,6 +212,8 @@ export function assertSmsProductionConfig(env: Environment = process.env): void 
   if (!config.dailyCapValid) throw new Error(`${SMS_DAILY_CAP_VARIABLE} invalide (entier de 1 à ${SMS_MAX_DAILY_CAP})`);
   if (!isValidNotificationSharePercent(readPercent(env[SMS_NOTIFICATION_SHARE_VARIABLE], SMS_DEFAULT_NOTIFICATION_SHARE_PERCENT))) throw new Error(`${SMS_NOTIFICATION_SHARE_VARIABLE} invalide (entier de 1 à 90)`);
   if (!isValidExistingReservePercent(readPercent(env[SMS_EXISTING_RESERVE_VARIABLE], SMS_DEFAULT_EXISTING_RESERVE_PERCENT))) throw new Error(`${SMS_EXISTING_RESERVE_VARIABLE} invalide (entier de 0 à 90)`);
+  // Lot SMS1-ter : un plafond si bas que le budget des notifications vaut 0 (NOMA_SMS_DAILY_CAP=1) ferait refuser TOUTE notification en silence : refus de démarrer.
+  if (config.budget.notifications === 0) throw new Error(`${SMS_DAILY_CAP_VARIABLE} trop bas : le budget des notifications serait nul (au moins 2)`);
   // M2 : la notification au pire cas (plus grand nombre d'annonces, lien complet) doit tenir en UN segment ; sinon chaque envoi serait refusé AVANT l'appel, en silence.
   if (!isSingleSegmentSms(notificationMessage(NOTIFICATION_WORST_CASE_COUNT, `${config.publicUrl}${NOTIFICATION_LINK_PATH}`))) {
     throw new Error(`${PUBLIC_URL_VARIABLE} trop longue : la notification par SMS ne tiendrait pas dans un seul segment (raccourcissez l'adresse)`);

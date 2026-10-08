@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { E2E_BASE, E2E_SERVER_LOG, RelaySession, awaitOtpLine, loginWithOtp, otpSourceSize, pollUntil, uniquePhone } from "./e2e-common";
+import { E2E_BASE, E2E_MENO_MODE, E2E_SERVER_LOG, RelaySession, awaitOtpLine, loginWithOtp, otpSourceSize, pollUntil, uniquePhone } from "./e2e-common";
 import {
   EXIF_DATE, EXIF_MAKE, GPS_LATITUDE_BYTES, GPS_LONGITUDE_BYTES, KITCHEN_FORBIDDEN, XMP_GPS_TEXT, buildKitchenJpeg, buildKitchenPng, buildKitchenWebp, buildPng, containsBytes,
 } from "./photo-fixtures";
@@ -133,7 +133,7 @@ async function main(): Promise<void> {
     step("Connexion du vendeur et de l'acheteur dans le navigateur");
     await loginViaUi(vendor, localPhone(0), "/vendeur/annonces/nouvelle", (url) => url.pathname === "/vendeur/annonces/nouvelle");
     await loginViaUi(buyer, localPhone(13), "/alerte/nouvelle", (url) => url.pathname === "/alerte/nouvelle");
-    ok("vendeur et acheteur connectés (codes lus dans le journal du serveur)");
+    ok(`vendeur et acheteur connectés (codes lus ${E2E_MENO_MODE ? "dans les SMS reçus par le faux serveur Meno" : "dans le journal du serveur"})`);
 
     step("Le vendeur publie une annonce avec DEUX photos choisies dans le formulaire");
     // Fichiers « cuisine » : EXIF/GPS, XMP, commentaire HTML, faux profil ICC (JPEG APP2, PNG iCCP au nom piégé, WebP ICCP) remplis de « GPS », « Canon », « 0708091011 », « Cocody », « Apple Inc. ».

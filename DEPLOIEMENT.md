@@ -41,7 +41,7 @@ fournis et vérifiés.
 | `NOMA_BUDGET_TZ` | `Africa/Abidjan` | Fuseau du budget quotidien |
 | `NOMA_FAKE_SOURCES` | — | `1` = sources simulées **sans IA ni dépense** (validation locale uniquement, refusé si production) |
 | `NOMA_SMS_PROVIDER`, `NOMA_SMS_API_KEY`, `NOMA_SMS_BASE_URL`, `NOMA_PUBLIC_URL`, `NOMA_SMS_DAILY_CAP`, `NOMA_SMS_NOTIFICATION_SHARE_PERCENT`, `NOMA_SMS_EXISTING_RESERVE_PERCENT` | vides | SMS réels par Meno (lots SMS1 et SMS1-bis) : **désactivés par défaut**, 15 F CFA par SMS accepté ; actifs seulement avec `NODE_ENV=production` (ou vers un faux serveur local) ; avec `meno` en production le démarrage est **refusé** sans clé valide, sans base https, sans URL publique (assez courte pour tenir en un SMS) ou avec une part de budget invalide. La clé **n'est jamais présente au build** (`npm run build:production`). Voir `SMS.md` |
-| `NOMA_PAYMENT_PROVIDER`, `WAVE_API_KEY`, `NOMA_SUBLYMUS_MANAGER_ID`, `NOMA_SUBLYMUS_WALLET_ID`, `SUBLYMUS_WEBHOOK_SECRET`, `NOMA_SUBLYMUS_BASE_URL` (et `NOMA_PUBLIC_URL`, https) | vides | Paiement des recharges par Wave via Sublymus (lot PAY1) : **argent réel**. Sans `NOMA_PAYMENT_PROVIDER=sublymus`, aucune recharge en production (le prestataire fictif y est refusé). Avec `sublymus`, le démarrage est **refusé** (le processus se termine, code 1) si une variable manque ou est mal formée. Les clés **ne sont jamais présentes au build** (`npm run build:production`). Voir `PAIEMENT-WAVE.md` |
+| `NOMA_PAYMENT_PROVIDER`, `WAVE_API_KEY`, `NOMA_SUBLYMUS_MANAGER_ID`, `NOMA_SUBLYMUS_WALLET_ID`, `SUBLYMUS_WEBHOOK_SECRET`, `NOMA_SUBLYMUS_BASE_URL` (et `NOMA_PUBLIC_URL`, https) | vides | Paiement des recharges par Wave via Sublymus (lot PAY1) : **argent réel**. Sans `NOMA_PAYMENT_PROVIDER=sublymus`, aucune recharge en production (le prestataire fictif y est refusé). Avec `sublymus`, le démarrage est **refusé** (le processus se termine, code 78) si une variable manque ou est mal formée. Les clés **ne sont jamais présentes au build** (`npm run build:production`). Voir `PAIEMENT-WAVE.md` |
 | `OPENROUTER_API_KEY` | — | Clé IA (lue depuis `poc/.env.local` par le moteur) |
 | `GOOGLE_API_KEY`, `GOOGLE_CX` | — | Google CSE (source « google » du moteur) |
 | `CHROME_PATH` | `/usr/bin/google-chrome-stable` | Binaire Chromium pour Playwright |
@@ -55,13 +55,15 @@ Au démarrage, `register()` (`instrumentation.ts`, voir `lib/server/startup-guar
 
 1. le message FIXE du contrôle est journalisé sur la sortie d'erreur (`Démarrage refusé : configuration SMS invalide en production : …` ou `… paiement …`) : il nomme les variables à corriger, **jamais
    leurs valeurs** ;
-2. le processus est **terminé avec le code 1** (`process.exit(1)`).
+2. le processus est **terminé avec le code 78** (`process.exit(78)`, EX_CONFIG de sysexits.h : code DÉDIÉ au refus de démarrer, constante `STARTUP_REFUSED_EXIT_CODE` de `lib/server/startup-guard.ts`).
 
 Pourquoi : sous `next start`, une exception levée par `register()` laissait auparavant le processus **vivant**, qui répondait alors **500 à tout** (constat d'audit, commun SMS et paiement) : la
-supervision voyait un processus « actif » qui ne servait rien. Il tombe désormais, et `systemd` le voit tomber. Avec `deploy/noma.service` (`Restart=on-failure`, `RestartSec=5`), un fichier
-d'environnement invalide produit donc une **boucle de redémarrage toutes les 5 secondes** (aucune requête n'est servie) : lisez `journalctl -u noma -n 20` ou `systemctl status noma`, corrigez
-`/opt/noma/shared/.env.production`, puis `systemctl restart noma`. Hors production, l'exception est relancée telle quelle (affichée par `next dev`). Le worker du matching applique les mêmes règles
-(`scripts/matching-worker.ts` : refus de démarrer, code de sortie non nul). Vérifié par un vrai `next build` suivi de `next start` : configuration invalide, processus terminé avec un code non nul ;
+supervision voyait un processus « actif » qui ne servait rien. Il tombe désormais, et `systemd` le voit tomber. Lot SMS1-ter : `deploy/noma.service` porte **`RestartPreventExitStatus=78`** (le refus de démarrer sort avec le code dédié 78) : un fichier
+d'environnement invalide **ne produit plus de boucle de redémarrage** ; le service reste à l'état `failed` (aucune requête n'est servie) et c'est `systemctl status noma` / `journalctl -u noma -n 20` qui dit
+pourquoi. Corrigez `/opt/noma/shared/.env.production`, puis `systemctl restart noma`. Les **autres pannes** (signal, mémoire, exception non rattrapée de Node qui sort avec le code 1, tout code de sortie différent de 78) gardent `Restart=on-failure` et `RestartSec=5`,
+bornés par `StartLimitIntervalSec=300` et `StartLimitBurst=5` (section `[Unit]`) : au plus 5 démarrages en 5 minutes, puis systemd renonce (`systemctl reset-failed noma` avant de relancer).
+Une exception non rattrapée (code 1) reste donc relancée, dans la limite de `StartLimit*` ; `deploy/selftest.sh` contrôle ces lignes de l'unité. Hors production, l'exception est relancée telle quelle (affichée par `next dev`). Le worker du matching applique les mêmes règles
+(`scripts/matching-worker.ts` : refus de démarrer SMS ou paiement, même code de sortie 78). Vérifié par un vrai `next build` suivi de `next start` : configuration invalide, processus terminé avec un code non nul ;
 configuration valide, démarrage normal (`SMS.md`, `PAIEMENT-WAVE.md`).
 
 ## Préproduction privée (lot 3) — artifacts `deploy/`
@@ -71,7 +73,7 @@ configuration valide, démarrage normal (`SMS.md`, `PAIEMENT-WAVE.md`).
 | `deploy/env.production.example` | Modèle d'environnement production (aucune valeur réelle) | Versionné |
 | `deploy/gen-secrets.sh` | Génère `NOMA_IP_SECRET`/`NOMA_PROXY_SECRET` SUR LE SERVEUR (chmod 600, jamais affichées). Sur le serveur : `sudo deploy/gen-secrets.sh /opt/noma/shared/.env.production noma` — le fichier est TRANSFÉRÉ à l'utilisateur de service (lisible au build et par systemd, jamais « tous ») ; **root sans propriétaire → refus par construction** ; LE MÊME fichier est lu par systemd (`EnvironmentFile`) et sourcé avant le build (clé publique Turnstile inline). **Remplacement atomique** : propriétaire validé AVANT toute modification, contenu préparé via `mktemp` (privé dès la création, `umask 077`) dans le même répertoire, original remplacé UNIQUEMENT après succès complet. Codes de lecture : seul `grep` 0/1 est accepté — **une erreur de lecture interrompt SANS remplacement** (l'original et ses autres clés sont préservés). | Testé (création, régénération avec préservation des autres clés, chemin personnalisé, propriétaire, échecs sans destruction de l'original, lecture impossible sans remplacement, temporaire privé sous umask 000, garde root) |
 | `deploy/nginx-noma.conf` | TLS, liste allow/deny des testeurs (y compris `/api/search`), `proxy_buffering off`, `gzip off`, `proxy_read_timeout 200s` | Préfiguré (simulation locale) |
-| `deploy/noma.service` | Service systemd instance unique, secrets via `EnvironmentFile`, **écoute forcée sur 127.0.0.1** (`npm run start -- --hostname 127.0.0.1`) — le port Node n'est jamais public, seul nginx expose l'app | **Écoute vérifiée localement** (`ss` : `127.0.0.1:3000` seul) |
+| `deploy/noma.service` | Service systemd instance unique, secrets via `EnvironmentFile`, **écoute forcée sur 127.0.0.1** (`npm run start -- --hostname 127.0.0.1`) — le port Node n'est jamais public, seul nginx expose l'app ; `Restart=on-failure` + `RestartPreventExitStatus=78` (pas de boucle sur un refus de démarrer, code dédié ; une exception non rattrapée, code 1, est relancée) + `StartLimitIntervalSec=300` / `StartLimitBurst=5` (lot SMS1-ter) | **Écoute vérifiée localement** (`ss` : `127.0.0.1:3000` seul) |
 | `deploy/backup.sh` | Sauvegarde SQLite cohérente (`VACUUM INTO`) sans arrêt de l'app. **Garde-fous** : source inexistante → exit 1 (aucune base vide créée) ; base illisible/non SQLite → exit 1 ; sauvegarde sans les 4 tables de protection → fichier SUPPRIMÉ + exit 1 | **Exécuté** : nominal ✔ + 3 modes d'échec rejetés (source absente, non-SQLite, SQLite valide sans tables) |
 | `deploy/restore-check.sh` | Restaure la sauvegarde sur une COPIE ; exige intégrité `ok` ET les 4 tables de protection — une sauvegarde incomplète est rejetée (exit 1, copie supprimée) | **Exécuté** : nominal ✔ + 2 modes d'échec rejetés |
 | `deploy/verify-turnstile.ts` | Vérification siteverify ISOLÉE (ni moteur, ni Chromium, ni IA, ni `/api/search`) | Exécuté hors ligne (usage + refus jeton factice) ; appel avec secret réel en préproduction |
@@ -97,7 +99,9 @@ sudo -u noma sh -c 'echo "NEXT_PUBLIC_TURNSTILE_SITE_KEY=<clé-publique>" >> /op
 #    la clé publique Turnstile (NEXT_PUBLIC_*) soit inlinée, mais le script
 #    RETIRE du build tous les secrets (NOMA_SMS_API_KEY, NOMA_AUTH_SECRET, …
 #    liste blanche `env -i`), travaille sous umask 077 puis rend .next privé, supprime .next/cache
-#    et ÉCHOUE (en effaçant .next) si une valeur secrète se retrouve dans .next.
+#    et ÉCHOUE (en effaçant .next) si une valeur secrète se retrouve dans .next (lot SMS1-ter : y compris
+#    les valeurs secrètes de poc/.env.local s'il existe). Il REFUSE aussi de construire si un fichier
+#    .env* (hors .env.example) est présent à la racine du dépôt : Next le lirait lui-même.
 #    Raison : Turbopack gardait la clé Meno et NOMA_AUTH_SECRET EN CLAIR dans
 #    .next/cache/turbopack/*.sst (droits 0644) quand le build voyait ces variables.
 sudo -u noma sh -c 'set -a; . /opt/noma/shared/.env.production; set +a; npm run build:production'

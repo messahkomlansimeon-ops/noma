@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import { test } from "node:test";
 import {
+  IP_ADDRESS_LIMIT_15M,
+  IP_ADDRESS_LIMIT_DAY,
   IP_PREFIX_V4_LIMIT_15M,
   IP_PREFIX_V4_LIMIT_DAY,
   IP_PREFIX_V6_LIMIT_15M,
@@ -61,28 +63,38 @@ test("valeur qui n'est pas une adresse : pas d'agrégation, limites d'une adress
     const aggregation = ipAggregation(odd);
     assert.equal(aggregation.family, "other", odd);
     assert.equal(aggregation.key, `raw:${odd}`);
-    assert.equal(aggregation.limitPer15Minutes, 20);
-    assert.equal(aggregation.limitPerDay, 100);
+    assert.equal(aggregation.limitPer15Minutes, 60, "SMS1-ter : 60 par 15 minutes pour une adresse");
+    assert.equal(aggregation.limitPerDay, 300, "SMS1-ter : 300 par jour pour une adresse");
   }
   assert.notEqual(ipAggregation("ip-test-1").key, ipAggregation("ip-test-2").key);
 });
 
-test("les limites du préfixe ne sont jamais plus basses que celles d'une adresse (20 par 15 min, 100 par jour) : le préfixe s'AJOUTE aux compteurs existants", () => {
+test("SMS1-ter — limites relevées : une adresse 60 par 15 min et 300 par jour, un /24 300 et 1500, un /64 60 et 300 (jamais plus bas qu'une adresse)", () => {
+  assert.deepEqual([IP_ADDRESS_LIMIT_15M, IP_ADDRESS_LIMIT_DAY], [60, 300]);
+  assert.deepEqual([IP_PREFIX_V4_LIMIT_15M, IP_PREFIX_V4_LIMIT_DAY], [300, 1500]);
+  assert.deepEqual([IP_PREFIX_V6_LIMIT_15M, IP_PREFIX_V6_LIMIT_DAY], [60, 300]);
   for (const sample of ["203.0.113.7", "2001:db8::1", "::ffff:203.0.113.7", "texte"]) {
     const aggregation = ipAggregation(sample);
-    assert.ok(aggregation.limitPer15Minutes >= 20, sample);
-    assert.ok(aggregation.limitPerDay >= 100, sample);
+    assert.ok(aggregation.limitPer15Minutes >= IP_ADDRESS_LIMIT_15M, sample);
+    assert.ok(aggregation.limitPerDay >= IP_ADDRESS_LIMIT_DAY, sample);
   }
-  assert.ok(IP_PREFIX_V4_LIMIT_15M > 20 && IP_PREFIX_V4_LIMIT_DAY > 100, "un /24 abrite plusieurs abonnés");
+  assert.ok(IP_PREFIX_V4_LIMIT_15M > IP_ADDRESS_LIMIT_15M && IP_PREFIX_V4_LIMIT_DAY > IP_ADDRESS_LIMIT_DAY, "un /24 abrite plusieurs abonnés");
 });
 
 test("l'empreinte du préfixe est distincte de celle de l'adresse et dépend du secret (jamais l'adresse ni le préfixe en clair)", () => {
   const secret = randomBytes(32);
   const exact = secretFingerprint(secret, "ip", "203.0.113.7");
-  const prefix = secretFingerprint(secret, "ip-prefix", ipAggregation("203.0.113.7").key);
+  const prefixKey = ipAggregation("203.0.113.7").key;
+  const prefix = secretFingerprint(secret, "ip-prefix", prefixKey);
   assert.match(prefix, /^[0-9a-f]{64}$/);
   assert.notEqual(prefix, exact);
   assert.equal(secretFingerprint(secret, "ip-prefix", ipAggregation("203.0.113.200").key), prefix, "même /24, même empreinte");
-  assert.notEqual(secretFingerprint(randomBytes(32), "ip-prefix", ipAggregation("203.0.113.7").key), prefix);
-  assert.equal(prefix.includes("203"), false);
+  assert.notEqual(secretFingerprint(randomBytes(32), "ip-prefix", prefixKey), prefix);
+  // Déterministe (SMS1-ter) : un condensé hexadécimal aléatoire contient « 203 » une fois sur ~65 ; seul le préfixe EN CLAIR est donc interdit. Il contient « : » et « . », jamais présents dans un condensé hexadécimal.
+  assert.equal(prefixKey, "v4:203.0.113");
+  assert.equal(prefix.includes(prefixKey), false, "le préfixe en clair n'apparaît pas dans l'empreinte");
+  assert.equal(/[:.]/.test(prefix), false, "l'empreinte ne contient que des chiffres hexadécimaux");
+  // Valeur attendue recalculée indépendamment de secretFingerprint (HMAC-SHA-256 du préfixe sous le domaine « ip-prefix »).
+  const expected = createHmac("sha256", secret).update("noma:auth:ip-prefix:v1\0", "utf8").update(prefixKey, "utf8").digest("hex");
+  assert.equal(prefix, expected);
 });

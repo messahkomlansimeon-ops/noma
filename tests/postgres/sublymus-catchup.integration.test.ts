@@ -143,7 +143,9 @@ test("FAILED chez Sublymus : l'intention échoue, rien n'est crédité ; introuv
   assert.ok((await catchup(await later(failed.intent.id, 3))).failed >= 1);
   assert.equal(await status(failed.intent.id), "failed");
   assert.equal(await balanceOf(env.pool, owner.userId), BigInt(0));
-  assert.deepEqual([(await state(failed.intent.id)).done, (await state(failed.intent.id)).outcome], [true, "failed"]);
+  // Lot PAY1-ter (N4) : un échec ne ferme PLUS la session (elle reste sondée jusqu'à 24 h : un paiement peut réussir après un échec).
+  const afterFailure = await state(failed.intent.id);
+  assert.deepEqual([afterFailure.done, afterFailure.outcome, afterFailure.provider_status, afterFailure.next !== null], [false, "failed", "FAILED", true]);
   // Introuvable chez Sublymus (création perdue) : on retente plus tard, rien n'est présumé.
   const lost = await newTopup(env.pool, api, envVars, owner.userId, 3_000);
   api.intents.delete(lost.fakeIntent!.id);
@@ -425,3 +427,168 @@ test("étape du worker (runMatchingCycle) : isolée, ignorée avec le prestatair
   assert.equal(typeof unexpected.notify, "object");
   assert.equal(typeof unexpected.subscriptions, "object");
 });
+
+// ═════════════ 6. Lot PAY1-ter (N4) : les intentions ÉCHOUÉES restent sondées ═════════════
+
+const eventsOf = async (intentId: string): Promise<Array<{ type: string; outcome: string }>> =>
+  (await env.pool.query<{ type: string; outcome: string }>("SELECT type, outcome FROM payment_events WHERE intent_id = $1 ORDER BY received_at, id", [intentId])).rows;
+
+test("N4 — échec par WEBHOOK : la session n'est pas fermée, elle reste sondée avec une attente doublée (4, 8, 16, 32 minutes, plafond 1 heure) ; fermée seulement à la fin des 24 h, l'issue « failed » restant lisible", async () => {
+  await quiesce();
+  const owner = await login(env.pool);
+  const handle = await newTopup(env.pool, api, envVars, owner.userId, 2_000);
+  const failedHook = api.webhook({ intent: handle.fakeIntent!, event: "payment.failed", secret: TEST_WEBHOOK_SECRET, webhookId: "wh_n4_failed_01" });
+  assert.equal((await handlers.sublymus.webhook(webhookRequest(failedHook)).then(reply)).status, 200);
+  assert.equal(await status(handle.intent.id), "failed");
+  const afterHook = await state(handle.intent.id);
+  assert.deepEqual([afterHook.done, afterHook.next !== null, afterHook.provider_status, afterHook.outcome], [false, true, "FAILED", "failed"], "le webhook d'échec ne ferme plus la session");
+  // Sublymus répond FAILED : chaque passage échu fait une tentative, l'attente double.
+  api.setStatus(handle.fakeIntent!.id, "FAILED");
+  const start = await createdAt(handle.intent.id);
+  let now = new Date(start.getTime() + 3 * MINUTE);
+  for (const expected of [4, 8, 16, 32, 60, 60]) {
+    const result = await catchup(now);
+    assert.ok(result.examined >= 1, `un passage examine la session échouée (attente ${expected} min)`);
+    const after = await state(handle.intent.id);
+    assert.deepEqual([after.done, after.outcome], [false, "failed"]);
+    assert.equal(after.next!.getTime() - now.getTime(), expected * MINUTE, `attente de ${expected} minutes`);
+    assert.equal(await status(handle.intent.id), "failed");
+    now = new Date(after.next!.getTime() + 1_000);
+  }
+  assert.equal(await balanceOf(env.pool, owner.userId), BigInt(0), "FAILED chez Sublymus : rien n'est crédité");
+  // On continue de sonder à chaque échéance (toutes les heures) : la fenêtre de 24 h se referme PAR LE SONDAGE LUI-MÊME dès que la prochaine tentative la dépasserait, l'issue « failed » restant lisible.
+  let polls = 0;
+  while (!(await state(handle.intent.id)).done && polls < 40) {
+    polls += 1;
+    now = new Date((await state(handle.intent.id)).next!.getTime() + 1_000);
+    await catchup(now);
+    assert.equal(await status(handle.intent.id), "failed");
+  }
+  const closed = await state(handle.intent.id);
+  assert.deepEqual([closed.done, closed.next, closed.outcome, closed.provider_status], [true, null, "failed", "FAILED"], "fenêtre refermée par le dernier sondage : l'issue « failed » n'est pas écrasée");
+  assert.ok(now.getTime() <= start.getTime() + 24 * HOUR, "le dernier sondage a lieu dans les 24 h");
+  assert.ok(polls >= 20 && polls <= 30, `une vingtaine de sondages horaires après la rampe de doublement (${polls})`);
+  // Plus aucune requête ensuite, même bien après les 24 h.
+  const requestsBefore = api.requests.length;
+  await catchup(new Date(start.getTime() + 25 * HOUR));
+  assert.equal(api.requests.slice(requestsBefore).filter((entry) => entry.path.includes(handle.reference)).length, 0, "aucune requête après les 24 h");
+  assert.equal(await balanceOf(env.pool, owner.userId), BigInt(0));
+});
+
+test("N4 — échec par webhook, puis paiement RÉUSSI chez Wave dont le webhook est PERDU : le rattrapage voit COMPLETED et crédite UNE fois (anomalie state_conflict), aucun second crédit aux passages suivants", async () => {
+  await quiesce();
+  const owner = await login(env.pool);
+  const handle = await newTopup(env.pool, api, envVars, owner.userId, 2_000);
+  const failedHook = api.webhook({ intent: handle.fakeIntent!, event: "payment.failed", secret: TEST_WEBHOOK_SECRET, webhookId: "wh_n4_failed_02" });
+  assert.equal((await handlers.sublymus.webhook(webhookRequest(failedHook)).then(reply)).status, 200);
+  assert.equal(await status(handle.intent.id), "failed");
+  api.setStatus(handle.fakeIntent!.id, "COMPLETED");
+  const start = await createdAt(handle.intent.id);
+  const passes: number[] = [];
+  for (const minutes of [3, 30, 120, 600]) passes.push((await catchup(new Date(start.getTime() + minutes * MINUTE))).examined);
+  assert.ok(passes[0] >= 1, "le premier passage échu examine l'intention échouée");
+  assert.equal(await status(handle.intent.id), "succeeded", "l'argent a été pris : la recharge est créditée");
+  assert.equal(await balanceOf(env.pool, owner.userId), BigInt(2_000));
+  assert.equal(await topupTransactions(env.pool, handle.intent.id), 1, "UN seul crédit");
+  assert.deepEqual(await kindsOf(handle.intent.id), ["state_conflict"], "le conflit d'état est journalisé");
+  const after = await state(handle.intent.id);
+  assert.deepEqual([after.done, after.next, after.outcome, after.provider_status], [true, null, "completed", "COMPLETED"]);
+  assert.deepEqual(passes.slice(1), [0, 0, 0], "les passages suivants n'examinent plus rien");
+  assert.deepEqual((await eventsOf(handle.intent.id)).map((row) => `${row.type}:${row.outcome}`), ["payment.failed:applied", "payment.succeeded:applied"]);
+  const anomalyRows = await env.pool.query("SELECT kind, origin FROM sublymus_anomalies WHERE intent_id = $1", [handle.intent.id]);
+  assert.deepEqual(anomalyRows.rows, [{ kind: "state_conflict", origin: "catchup" }]);
+  assert.deepEqual((await checkWalletIntegrity(env.pool)).violations, [], "wallet:check ne signale rien");
+});
+
+test("N4 — échec lu par le RATTRAPAGE lui-même (FAILED) : l'intention échoue mais reste sondée ; COMPLETED plus tard est crédité une fois ; deux passages simultanés ne créditent pas deux fois", async () => {
+  await quiesce();
+  const owner = await login(env.pool);
+  const handle = await newTopup(env.pool, api, envVars, owner.userId, 3_300);
+  api.setStatus(handle.fakeIntent!.id, "FAILED");
+  const first = await later(handle.intent.id, 3);
+  assert.ok((await catchup(first)).failed >= 1);
+  assert.equal(await status(handle.intent.id), "failed");
+  const failedState = await state(handle.intent.id);
+  assert.deepEqual([failedState.done, failedState.next !== null, failedState.attempts], [false, true, 1]);
+  // Un second passage échu relit FAILED : rien ne change (événement déjà enregistré), l'attente double encore.
+  assert.ok((await catchup(new Date(failedState.next!.getTime() + 1_000))).examined >= 1);
+  assert.equal(await status(handle.intent.id), "failed");
+  assert.equal((await state(handle.intent.id)).attempts, 2);
+  // Le paiement aboutit finalement chez Wave : DEUX passages simultanés, un seul crédit.
+  api.setStatus(handle.fakeIntent!.id, "COMPLETED");
+  const due = new Date((await state(handle.intent.id)).next!.getTime() + 1_000);
+  await Promise.all([catchup(due), catchup(due)]);
+  assert.equal(await status(handle.intent.id), "succeeded");
+  assert.equal(await topupTransactions(env.pool, handle.intent.id), 1, "jamais deux crédits");
+  assert.equal(await balanceOf(env.pool, owner.userId), BigInt(3_300));
+  assert.deepEqual(await kindsOf(handle.intent.id), ["state_conflict"]);
+  await catchup(new Date(due.getTime() + 2 * HOUR));
+  assert.equal(await topupTransactions(env.pool, handle.intent.id), 1);
+  assert.deepEqual((await checkWalletIntegrity(env.pool)).violations, []);
+});
+
+test("N4 — intention EXPIRÉE lue FAILED : elle reste sondée (statut inchangé) ; COMPLETED la crédite une fois (paiement tardif, sans conflit d'état : elle n'était pas échouée)", async () => {
+  await quiesce();
+  const owner = await login(env.pool);
+  const handle = await newTopup(env.pool, api, envVars, owner.userId, 1_700);
+  await env.pool.query("UPDATE payment_intents SET status = 'expired', completed_at = clock_timestamp() WHERE id = $1", [handle.intent.id]);
+  api.setStatus(handle.fakeIntent!.id, "FAILED");
+  assert.ok((await catchup(await later(handle.intent.id, 3))).failed >= 1);
+  assert.equal(await status(handle.intent.id), "expired", "une intention expirée n'est pas déclarée échouée");
+  const stillPolled = await state(handle.intent.id);
+  assert.deepEqual([stillPolled.done, stillPolled.next !== null, stillPolled.outcome], [false, true, "failed"], "elle reste sondée");
+  assert.deepEqual(await eventsOf(handle.intent.id), [{ type: "payment.failed", outcome: "rejected_state" }]);
+  api.setStatus(handle.fakeIntent!.id, "COMPLETED");
+  assert.ok((await catchup(new Date(stillPolled.next!.getTime() + 1_000))).completed >= 1);
+  assert.equal(await status(handle.intent.id), "succeeded");
+  assert.equal(await topupTransactions(env.pool, handle.intent.id), 1);
+  assert.equal(await balanceOf(env.pool, owner.userId), BigInt(1_700));
+  assert.deepEqual(await kindsOf(handle.intent.id), []);
+});
+
+test("N4 — passé 24 h après la création, une intention échouée n'est plus sondée même si Sublymus dit COMPLETED (aucune requête, aucun crédit)", async () => {
+  await quiesce();
+  const owner = await login(env.pool);
+  const handle = await newTopup(env.pool, api, envVars, owner.userId, 1_900);
+  const failedHook = api.webhook({ intent: handle.fakeIntent!, event: "payment.failed", secret: TEST_WEBHOOK_SECRET, webhookId: "wh_n4_failed_03" });
+  assert.equal((await handlers.sublymus.webhook(webhookRequest(failedHook)).then(reply)).status, 200);
+  api.setStatus(handle.fakeIntent!.id, "COMPLETED");
+  const requestsBefore = api.requests.length;
+  const result = await catchup(await later(handle.intent.id, 25 * 60));
+  assert.ok(result.windowClosed >= 1);
+  assert.equal(api.requests.slice(requestsBefore).filter((entry) => entry.path.includes(handle.reference)).length, 0);
+  assert.equal(await status(handle.intent.id), "failed");
+  assert.equal(await balanceOf(env.pool, owner.userId), BigInt(0));
+});
+
+test("N4 — wallet:check signale une session échouée dont le rattrapage est en retard de plus de 15 minutes (comme pour les autres intentions sondées)", async () => {
+  await quiesce();
+  const owner = await login(env.pool);
+  const handle = await newTopup(env.pool, api, envVars, owner.userId, 1_100);
+  const failedHook = api.webhook({ intent: handle.fakeIntent!, event: "payment.failed", secret: TEST_WEBHOOK_SECRET, webhookId: "wh_n4_failed_04" });
+  assert.equal((await handlers.sublymus.webhook(webhookRequest(failedHook)).then(reply)).status, 200);
+  await env.pool.query("UPDATE sublymus_checkouts SET next_catchup_at = clock_timestamp() - interval '20 minutes' WHERE intent_id = $1", [handle.intent.id]);
+  const report = await checkWalletIntegrity(env.pool);
+  const overdue = [...report.violations, ...report.warnings].filter((entry) => entry.code === "sublymus_catchup_overdue");
+  assert.ok(overdue.length >= 1 && overdue[0].examples.some((example) => example.intent_id === handle.intent.id), "le retard d'une session échouée est signalé");
+});
+
+// ═════════════ 7. Lot PAY1-ter (N7) : identifiants Sublymus avec « . » et « : » ═════════════
+
+for (const sublymusId of ["pi.abc123", "pi:abc123"]) {
+  test(`N7 — identifiant Sublymus « ${sublymusId} » : le rattrapage enregistre l'identifiant (la contrainte de la base l'accepte) et crédite une fois`, async () => {
+    await quiesce();
+    const owner = await login(env.pool);
+    // Intention dont la création de session a été interrompue : l'identifiant Sublymus n'est connu de noma que par la lecture du rattrapage.
+    const created = await createTopupIntent({ pool: env.pool, ownerId: owner.userId, amountXof: BigInt(1_000), idempotencyKey: crypto.randomUUID(), provider: providerOf(envVars) });
+    api.seed({ id: sublymusId, externalReference: created.intent.providerReference, amount: 1_000, status: "COMPLETED" });
+    const result = await catchup(await later(created.intent.id, 3));
+    assert.deepEqual(result.errors, []);
+    assert.equal(await status(created.intent.id), "succeeded");
+    assert.equal(await topupTransactions(env.pool, created.intent.id), 1);
+    assert.equal(await balanceOf(env.pool, owner.userId), BigInt(1_000));
+    assert.equal((await env.pool.query<{ id: string }>("SELECT sublymus_intent_id AS id FROM sublymus_checkouts WHERE intent_id = $1", [created.intent.id])).rows[0].id, sublymusId);
+    assert.deepEqual(await kindsOf(created.intent.id), []);
+    api.intents.delete(sublymusId);
+  });
+}

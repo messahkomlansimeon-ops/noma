@@ -24,9 +24,10 @@ le transport SMS réel « meno » (`lib/server/sms/otp-transport.ts`) n'est inst
 `NOMA_SMS_PROVIDER=meno` ET une clé valide sont définies (voir `SMS.md` : coût de 15 F par
 SMS, résultat incertain = défi conservé sans renvoi automatique, échec définitif = `503
 otp_delivery_failed` « Envoi du code impossible pour le moment. », budget d'envoi atteint =
-`503 otp_capacity_reached` distinct, toutes les limites d'envoi conservées ; lot SMS1-bis :
+réponse `202` identique à un succès sans SMS envoyé (lot SMS1-ter ; avant, `503 otp_capacity_reached` distinct), limites d'envoi conservées ; lot SMS1-bis :
 s'y ajoutent des compteurs agrégés par préfixe d'adresse, /24 en IPv4 et /64 en IPv6, dans
-`lib/server/auth/ip-prefix.ts`, et le transport réel n'est actif qu'avec `NODE_ENV=production`
+`lib/server/auth/ip-prefix.ts` ; lot SMS1-ter : les compteurs par adresse (60 par 15 minutes, 300 par 24 h) et par préfixe
+(/24 : 300 et 1500 ; /64 : 60 et 300) ne comptent que les défis NON vérifiés, sur des fenêtres glissantes, et le transport réel n'est actif qu'avec `NODE_ENV=production`
 ou vers un faux serveur local). noma génère et vérifie le code ; le transport implémente `SendOtp`
 (il peut déclarer son propre `timeoutMs`). Sinon seul le transport de développement
 ci-dessous existe.

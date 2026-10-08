@@ -22,7 +22,7 @@ import {
   OtpResendDelayError,
   OtpVerificationError,
 } from "./errors";
-import { ipAggregation } from "./ip-prefix";
+import { IP_ADDRESS_LIMIT_15M, IP_ADDRESS_LIMIT_DAY, ipAggregation } from "./ip-prefix";
 import {
   generateOtpCode,
   generateSessionToken,
@@ -59,13 +59,16 @@ interface IdentityRow extends QueryResultRow {
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1_000;
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
+/** Espace du verrou consultatif qui sérialise le comptage des défis non vérifiés d'une adresse ou d'un préfixe (lot SMS1-ter). Voir aussi SMS_BUDGET_LOCK_NAMESPACE (…977). */
+export const OTP_ADDRESS_LOCK_NAMESPACE = 1_314_664_978;
+
 function fixedWindowStart(now: Date, durationMs: number): Date {
   return new Date(Math.floor(now.getTime() / durationMs) * durationMs);
 }
 
+/** Compteur à fenêtres FIXES (numéro de téléphone seulement : 3 par quart d'heure civil, 10 par jour UTC). */
 async function consumeQuota(
   client: PoolClient,
-  dimension: "phone" | "ip",
   fingerprint: string,
   windowKind: "15m" | "day",
   windowStart: Date,
@@ -75,16 +78,39 @@ async function consumeQuota(
   const result = await client.query(
     `INSERT INTO otp_rate_limit_counters (
        dimension, subject_fingerprint, window_kind, window_start, request_count, updated_at
-     ) VALUES ($1, $2, $3, $4, 1, $5)
+     ) VALUES ('phone', $1, $2, $3, 1, $4)
      ON CONFLICT (dimension, subject_fingerprint, window_kind, window_start)
      DO UPDATE SET
        request_count = otp_rate_limit_counters.request_count + 1,
        updated_at = EXCLUDED.updated_at
-     WHERE otp_rate_limit_counters.request_count < $6
+     WHERE otp_rate_limit_counters.request_count < $5
      RETURNING request_count`,
-    [dimension, fingerprint, windowKind, windowStart, now, limit],
+    [fingerprint, windowKind, windowStart, now, limit],
   );
   if (!result.rowCount) throw new OtpRateLimitError();
+}
+
+/**
+ * Compteur par adresse ou par préfixe (lot SMS1-ter) : ne compte que les défis NON vérifiés (statut différent de `consumed`) créés dans les 15 dernières minutes et les 24 dernières
+ * heures (fenêtres GLISSANTES : aucun blocage ne dure « jusqu'à minuit »). Un utilisateur qui vérifie son code libère sa place : derrière une adresse partagée (CGNAT), les
+ * utilisateurs légitimes ne s'épuisent pas entre eux, seuls les demandeurs qui ne vérifient jamais atteignent la limite. Le comptage et l'insertion du défi sont sérialisés par un
+ * verrou consultatif propre au sujet : la limite est EXACTE sous concurrence.
+ */
+async function assertUnverifiedWithinLimits(
+  client: PoolClient,
+  column: "request_ip_fingerprint" | "request_prefix_fingerprint",
+  fingerprint: string,
+  limits: { quarter: number; day: number },
+  now: Date,
+): Promise<void> {
+  await client.query("SELECT pg_advisory_xact_lock($1::int, hashtext($2::text))", [OTP_ADDRESS_LOCK_NAMESPACE, `${column}:${fingerprint}`]);
+  const counted = await client.query<{ quarter: number; day: number }>(
+    `SELECT count(*) FILTER (WHERE created_at > $2::timestamptz)::int AS quarter, count(*)::int AS day
+       FROM otp_challenges
+      WHERE ${column} = $1 AND created_at > $3::timestamptz AND status <> 'consumed'`,
+    [fingerprint, new Date(now.getTime() - FIFTEEN_MINUTES_MS), new Date(now.getTime() - DAY_MS)],
+  );
+  if (counted.rows[0].quarter >= limits.quarter || counted.rows[0].day >= limits.day) throw new OtpRateLimitError();
 }
 
 async function reserveRequest(
@@ -105,15 +131,14 @@ async function reserveRequest(
   const quarterHour = fixedWindowStart(input.now, FIFTEEN_MINUTES_MS);
   const day = fixedWindowStart(input.now, DAY_MS);
 
-  // L'ordre est stable. Le premier compteur téléphone sérialise aussi deux
-  // premières demandes concurrentes, même si aucun challenge n'existe encore.
-  await consumeQuota(client, "phone", input.phoneFingerprint, "15m", quarterHour, 3, input.now);
-  await consumeQuota(client, "phone", input.phoneFingerprint, "day", day, 10, input.now);
-  await consumeQuota(client, "ip", input.ipFingerprint, "15m", quarterHour, 20, input.now);
-  await consumeQuota(client, "ip", input.ipFingerprint, "day", day, 100, input.now);
-  // Lot SMS1-bis (B1-d) : le même compteur agrégé par préfixe (empreinte d'un autre domaine, même table) : changer d'adresse dans son bloc ne contourne plus les limites.
-  await consumeQuota(client, "ip", input.ipPrefixFingerprint, "15m", quarterHour, input.ipPrefixLimits.quarter, input.now);
-  await consumeQuota(client, "ip", input.ipPrefixFingerprint, "day", day, input.ipPrefixLimits.day, input.now);
+  // L'ordre est stable (numéro, puis adresse, puis préfixe : aucune attente circulaire possible). Le premier compteur téléphone sérialise aussi deux premières demandes
+  // concurrentes, même si aucun challenge n'existe encore.
+  await client.query("SET LOCAL lock_timeout = '5s'");
+  await consumeQuota(client, input.phoneFingerprint, "15m", quarterHour, 3, input.now);
+  await consumeQuota(client, input.phoneFingerprint, "day", day, 10, input.now);
+  // Lot SMS1-ter : par adresse (60 par 15 minutes, 300 par jour) puis par préfixe (SMS1-bis, B1-d : changer d'adresse dans son bloc ne contourne pas les limites), défis non vérifiés seulement.
+  await assertUnverifiedWithinLimits(client, "request_ip_fingerprint", input.ipFingerprint, { quarter: IP_ADDRESS_LIMIT_15M, day: IP_ADDRESS_LIMIT_DAY }, input.now);
+  await assertUnverifiedWithinLimits(client, "request_prefix_fingerprint", input.ipPrefixFingerprint, input.ipPrefixLimits, input.now);
 
   const previous = await client.query<{ created_at: Date }>(
     `SELECT created_at
@@ -139,14 +164,15 @@ async function reserveRequest(
   );
   await client.query(
     `INSERT INTO otp_challenges (
-       id, phone_e164, otp_hmac, request_ip_fingerprint, status,
+       id, phone_e164, otp_hmac, request_ip_fingerprint, request_prefix_fingerprint, status,
        expires_at, created_at, updated_at
-     ) VALUES ($1, $2, $3, $4, 'pending_send', $5, $6, $6)`,
+     ) VALUES ($1, $2, $3, $4, $5, 'pending_send', $6, $7, $7)`,
     [
       input.challengeId,
       input.phone,
       input.otpDigest,
       input.ipFingerprint,
+      input.ipPrefixFingerprint,
       input.expiresAt,
       input.now,
     ],
@@ -236,14 +262,29 @@ export async function requestOtp(
     // peut-être en arrière-plan, le code reçu doit marcher.
     const uncertain = error instanceof OtpDeliveryUncertainError || (error instanceof OtpTransportTimeoutError && context.sendOtp.timeoutIsUncertain === true);
     if (!uncertain) {
+      const failedAt = readNow(context.now);
+      // Budget d'envoi atteint (aucun SMS parti) : lot SMS1-ter, AUCUN oracle d'énumération. Le défi est créé mais ne peut jamais être vérifié (statut `send_failed`) et la réponse est
+      // EXACTEMENT celle d'un succès (même forme, même délai de renvoi) : un refus pour capacité ne dit pas si le numéro a un compte. Le motif est gardé pour l'administration.
+      if (error instanceof OtpCapacityError) {
+        await pool.query(
+          `UPDATE otp_challenges
+              SET status = 'send_failed', send_failure_code = $3, updated_at = $2
+            WHERE id = $1 AND status = 'pending_send'`,
+          [challengeId, failedAt, error.code],
+        );
+        return {
+          challengeId,
+          expiresAt: reservation.expiresAt,
+          resendAvailableAt: new Date(reservation.reservedAt.getTime() + OTP_RESEND_DELAY_MS),
+        };
+      }
       await pool.query(
         `UPDATE otp_challenges
             SET status = 'send_failed', updated_at = $2
           WHERE id = $1 AND status = 'pending_send'`,
-        [challengeId, readNow(context.now)],
+        [challengeId, failedAt],
       );
-      // Budget d'envoi atteint (aucun SMS parti) : relayé tel quel, pour une réponse distincte du « envoi impossible » générique.
-      throw error instanceof OtpCapacityError ? error : new OtpDeliveryError();
+      throw new OtpDeliveryError();
     }
   }
 

@@ -92,11 +92,23 @@ Plusieurs verrous indépendants garantissent « une recharge payée = un crédit
 
 Un paiement tardif (recharge expirée côté noma après 30 minutes, puis payée) est **crédité** : l'argent a été pris.
 
+## Identifiants Sublymus (lot PAY1-ter, N7)
+
+Tout identifiant venu de Sublymus (identifiant d'intention de la réponse à la création, de la liste de recherche, `data.id` d'un webhook) suit **une seule expression**, définie une fois dans le code
+(`SUBLYMUS_IDENTIFIER`, `lib/server/wallet/sublymus/config.ts`) : lettres, chiffres, `.`, `_`, `:` et `-`, de 1 à 100 caractères. La contrainte `chk_sublymus_checkouts_sublymus_intent` de la
+migration 0026 porte **exactement** la même expression (un test compare les deux) : un identifiant que la lecture accepte (`pi.abc123`, `pi:abc123`) ne fait plus échouer l'écriture en base (avant,
+la base refusait `.` et `:` : le webhook ou le rattrapage échouait après avoir accepté l'identifiant). Aucune base réelle n'ayant reçu la migration 0026, elle a été modifiée en place ; pour une base
+où elle aurait déjà été appliquée : `ALTER TABLE sublymus_checkouts DROP CONSTRAINT chk_sublymus_checkouts_sublymus_intent, ADD CONSTRAINT chk_sublymus_checkouts_sublymus_intent CHECK (sublymus_intent_id IS NULL OR sublymus_intent_id ~ '^[A-Za-z0-9._:-]{1,100}$');`
+
 ## Le rattrapage
 
 Étape **isolée** du worker (`runMatchingCycle`, comme les abonnements et les notifications) : toute recharge **en attente depuis plus de 2 minutes** est interrogée chez Sublymus, avec une
-attente **doublée** à chaque tentative (2, 4, 8, 16, 32 minutes, puis 1 heure au plus), jusqu'à **24 heures** après sa création. `COMPLETED` crédite, `FAILED` termine l'intention,
-`WAVE_CREATED` attend. Les écarts (montant, devise, payeur, système source, identifiant, statut inconnu, **plusieurs** intentions exactes) sont journalisés comme anomalies
+attente **doublée** à chaque tentative (2, 4, 8, 16, 32 minutes, puis 1 heure au plus), jusqu'à **24 heures** après sa création. `COMPLETED` crédite, `FAILED` marque l'intention échouée,
+`WAVE_CREATED` attend. **Lot PAY1-ter (N4) : une intention échouée reste sondée.** Une recharge `failed` (par un webhook `payment.failed` ou par une lecture `FAILED`) ou `expired` lue `FAILED`
+n'est PLUS retirée du rattrapage : elle est interrogée aux mêmes intervalles (attente doublée, plafond 1 heure) jusqu'à **24 heures** après sa création, parce qu'un paiement peut réussir après un
+échec (webhook `completed` perdu). Si Sublymus répond alors `COMPLETED`, la recharge est créditée **une seule fois** (même chemin et même verrou que le webhook, option `allowSuccessAfterFailure`)
+et l'anomalie `state_conflict` est journalisée (origine « rattrapage »). Seule une recharge `succeeded` ferme tout de suite sa session ; au-delà de 24 h elle n'est plus interrogée (l'issue « failed »
+reste lisible). `wallet:check` (`sublymus_catchup_overdue`) surveille aussi ces sessions. Les écarts (montant, devise, payeur, système source, identifiant, statut inconnu, **plusieurs** intentions exactes) sont journalisés comme anomalies
 « rattrapage » sans rien créditer, sauf un **doublon exact** (deux intentions chez Sublymus pour la même référence) quand l'identifiant Sublymus de **notre** session est déjà
 enregistré : l'entrée qui porte cet identifiant est jugée (et créditée si elle est payée), le doublon est journalisé (`duplicate_provider_intents`) sans bloquer le crédit ; sans
 identifiant enregistré, on ne sait pas laquelle est la nôtre : anomalie, rien n'est décidé.
@@ -156,9 +168,10 @@ explicite (serveur de production, ou commande du fondateur hors `NODE_ENV=test`)
 donc `WALLET.SUBLYMUS.COM.` ou `wallet.sublymus.com.evil.example` sont refusés comme le vrai nom.
 
 **Le processus se termine (correctif transversal du lot de reprise PAY1).** En production, lorsque ce contrôle (ou le contrôle SMS qui le précède) refuse la configuration, `register()` journalise le message
-fixe (les variables à corriger, jamais leurs valeurs) puis termine le processus avec le **code 1** (`process.exit(1)`). Auparavant, sous `next start`, l'exception laissait le processus vivant, qui
-répondait 500 à tout. Avec `deploy/noma.service` (`Restart=on-failure`, `RestartSec=5`), un fichier d'environnement invalide produit une boucle de redémarrage toutes les 5 secondes, visible
-dans `journalctl -u noma` : corrigez `/opt/noma/shared/.env.production` puis redémarrez. Hors production (`next dev`), l'exception est relancée telle quelle. Les variables du paiement sont
+fixe (les variables à corriger, jamais leurs valeurs) puis termine le processus avec le **code 78** (`process.exit(78)`, code dédié EX_CONFIG). Auparavant, sous `next start`, l'exception laissait le processus vivant, qui
+répondait 500 à tout. Lot PAY1-ter : `deploy/noma.service` porte `RestartPreventExitStatus=78` (le refus de démarrer sort avec le code dédié 78) en gardant `Restart=on-failure` pour les autres pannes, y compris une exception non rattrapée (code 1), bornées par
+`StartLimitIntervalSec=300` et `StartLimitBurst=5` : un fichier d'environnement invalide ne produit **plus de boucle de redémarrage**, le service reste `failed` et `journalctl -u noma` dit pourquoi ;
+corrigez `/opt/noma/shared/.env.production` puis redémarrez (`systemctl reset-failed noma`, `systemctl restart noma`). Hors production (`next dev`), l'exception est relancée telle quelle. Les variables du paiement sont
 listées (vides) dans `deploy/env.production.example` ; **aucune** ne passe au build : `npm run build:production` ne transmet que sa liste blanche, et son contrôle final efface le build si
 `WAVE_API_KEY` ou `SUBLYMUS_WEBHOOK_SECRET` s'y retrouvait. Voir la section « Démarrage refusé » de `DEPLOIEMENT.md`.
 
@@ -219,7 +232,9 @@ avant tout appel.
   navigateur sans crédit, webhook (signature fausse, corps modifié, JSON re-sérialisé, gestionnaire différent, montant ou devise modifiés, référence inconnue ou voisine, statut,
   `payment.failed`, rejeu, 10 livraisons simultanées, événements illisibles ou inconnus, paiement réussi après un échec, montants décimaux), rattrapage (filtre exact, concurrence avec
   le webhook, budget de temps, arrêt sur erreur, doublons), chemins de **production** (configuration de production complète, fetch bouchon qui intercepte
-  `https://wallet.sublymus.com` : création de session, webhook, rattrapage, cycle du worker, lien hors domaines Wave), `wallet:check`, administration, commandes du fondateur.
+  `https://wallet.sublymus.com` : création de session, webhook, rattrapage, cycle du worker, lien hors domaines Wave), `wallet:check`, administration, commandes du fondateur ;
+  lot PAY1-ter : intentions échouées ou expirées toujours sondées (attente doublée, 24 h, un seul crédit, `state_conflict`), identifiants `pi.abc123` et `pi:abc123` (webhook, rattrapage, expression
+  partagée avec la contrainte de la base), unité systemd (`RestartPreventExitStatus=78`, `StartLimit*`).
 - `npm run e2e:pay` (par `dev:try` branché sur la fausse API) : une recharge de bout en bout dans un navigateur : redirection vers un faux lien Wave, retour « Paiement en cours de
   confirmation », webhook synthétique signé, solde crédité une seule fois.
 
@@ -237,6 +252,6 @@ avant tout appel.
 - **Wave seulement** ; **aucun remboursement automatique** d'une recharge créditée (un remboursement passe par Sublymus, puis un ajustement d'administration journalisé).
 - Une recharge payée d'un montant faux n'est **jamais** créditée : elle attend une décision humaine (anomalie).
 - Pas de limitation de débit HTTP sur le webhook lui-même : il est protégé par la signature (sans secret, rien n'est lu ni écrit).
-- Le rattrapage s'arrête 24 h après la création ; au-delà, seul un webhook tardif peut encore créditer.
+- Le rattrapage s'arrête 24 h après la création (recharges en attente, expirées ou échouées, lot PAY1-ter) ; au-delà, seul un webhook tardif peut encore créditer.
 - Un passage du rattrapage s'arrête à la première erreur de Sublymus : si Sublymus reste en panne, les recharges attendent (une requête par passage), puis sont reprises au retour.
 - La création d'une session dépend de la disponibilité de Sublymus (délai de 10 s) ; en cas d'échec l'utilisateur peut réessayer, la recharge n'est jamais dupliquée.

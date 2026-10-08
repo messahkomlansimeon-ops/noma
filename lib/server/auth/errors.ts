@@ -47,13 +47,17 @@ export class OtpDeliveryUncertainError extends Error {
 
 /**
  * Budget d'envoi des codes atteint (lot SMS1-bis) : la capacité d'envoi du jour ou de l'heure est épuisée pour ce type de demande (numéro inconnu : part non réservée ou lissage
- * horaire ; tous numéros : budget des codes). AUCUN SMS n'est parti. Levée par le transport ; `requestOtp` la relaie telle quelle (le défi passe à `send_failed`), et la route
- * répond par un code DISTINCT du « envoi impossible » générique.
+ * horaire ; tous numéros : budget des codes). AUCUN SMS n'est parti. Levée par le transport ; `requestOtp` l'ABSORBE (lot SMS1-ter) : le défi passe à `send_failed` (aucun code
+ * ne peut être vérifié) mais la réponse au client est IDENTIQUE à celle d'un envoi réussi, pour qu'un refus de capacité ne révèle jamais si un numéro a un compte. `code` est le
+ * motif stable (`budget_*`), conservé dans le défi et lu par l'administration.
  */
 export class OtpCapacityError extends OtpRequestError {
-  constructor() {
+  readonly code: string;
+
+  constructor(code = "budget_unknown") {
     super("La capacité d'envoi des codes est atteinte pour le moment.");
     this.name = "OtpCapacityError";
+    this.code = /^[a-z0-9_]{1,60}$/.test(code) ? code : "budget_unknown";
   }
 }
 

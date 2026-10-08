@@ -3,11 +3,12 @@ import { randomBytes } from "node:crypto";
 import { after, before, test } from "node:test";
 import { checkWalletIntegrity } from "../../lib/server/wallet/check";
 import { createWalletHttpHandlers, type WalletHttpHandlers } from "../../lib/server/wallet/http";
+import { createTopupIntent } from "../../lib/server/wallet/topups";
 import { signSublymusBody } from "../../lib/server/wallet/sublymus/webhook";
 import { SUBLYMUS_WEBHOOK_MAX_BODY_BYTES } from "../../lib/server/wallet/sublymus/config";
 import type { FakeIntent, FakeSublymusApi } from "../../scripts/sublymus-fake-api";
 import {
-  TEST_API_KEY, TEST_MANAGER_ID, TEST_WEBHOOK_SECRET, balanceOf, countRows, newTopup, paymentSnapshot, startApi, sublymusEnv, topupTransactions, webhookRequest, type Env,
+  TEST_API_KEY, TEST_MANAGER_ID, TEST_WEBHOOK_SECRET, balanceOf, countRows, newTopup, paymentSnapshot, providerOf, startApi, sublymusEnv, topupTransactions, webhookRequest, type Env,
 } from "./sublymus-fixtures";
 import { login, openTestSchema, reply, type Login, type Reply, type TestSchema } from "./social-fixtures";
 
@@ -436,6 +437,25 @@ test("paiement tardif : une recharge échue (expirée) puis payée chez Wave est
   assert.equal(await balanceOf(env.pool, owner.userId), BigInt(5_000));
   assert.equal(await topupTransactions(env.pool, handle.intent.id), 1);
 });
+
+// ═════════════ 4 bis. Lot PAY1-ter (N7) : identifiants Sublymus avec « . » et « : » ═════════════
+
+for (const sublymusId of ["pi.abc123", "pi:abc123"]) {
+  test(`N7 — webhook avec l'identifiant Sublymus « ${sublymusId} » : la contrainte de la base l'accepte, l'identifiant est enregistré, UNE recharge est créditée (200, pas d'échec ni de rejeu infini)`, async () => {
+    const owner = await login(env.pool);
+    // Intention dont la création de session a été interrompue : l'identifiant Sublymus n'est connu que par le premier événement authentifié.
+    const created = await createTopupIntent({ pool: env.pool, ownerId: owner.userId, amountXof: BigInt(1_000), idempotencyKey: crypto.randomUUID(), provider: providerOf(envVars) });
+    const fake = api.seed({ id: sublymusId, externalReference: created.intent.providerReference, amount: 1_000, status: "COMPLETED" });
+    const answer = await deliver(sign(fake, { webhookId: `wh_n7_${sublymusId.replace(/[^a-z0-9]/g, "_")}` }));
+    assert.equal(answer.status, 200, answer.text);
+    assert.equal(await intentStatus(created.intent.id), "succeeded");
+    assert.equal(await topupTransactions(env.pool, created.intent.id), 1);
+    assert.equal(await balanceOf(env.pool, owner.userId), BigInt(1_000));
+    assert.equal((await env.pool.query<{ id: string }>("SELECT sublymus_intent_id AS id FROM sublymus_checkouts WHERE intent_id = $1", [created.intent.id])).rows[0].id, sublymusId);
+    assert.deepEqual(await anomalies(created.intent.id), []);
+    api.intents.delete(sublymusId);
+  });
+}
 
 // ═════════════ 5. Prestataire inactif, journal ═════════════
 

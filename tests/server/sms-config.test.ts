@@ -183,7 +183,7 @@ test("assertProductionConfig (protection de recherche) applique aussi la règle 
   assert.throws(() => assertProductionConfig(loadConfig(broken), broken), /NOMA_SMS_API_KEY requis en production/);
 });
 
-test("instrumentation.register : en production, le contrôle SMS journalise le message fixe puis TERMINE le processus (code 1) ; l'edge et le développement ne vérifient rien", async () => {
+test("instrumentation.register : en production, le contrôle SMS journalise le message fixe puis TERMINE le processus (code 78) ; l'edge et le développement ne vérifient rien", async () => {
   // Le processus réel est terminé par `register` (vérifié par un vrai processus dans tests/server/startup-guard.test.ts) : ici, la sortie est injectée.
   const refuse = (env: Record<string, string | undefined>): { logs: string[]; exits: number[]; thrown: unknown } => {
     const logs: string[] = [];
@@ -197,12 +197,12 @@ test("instrumentation.register : en production, le contrôle SMS journalise le m
     return { logs, exits, thrown };
   };
   const withoutKey = refuse({ ...PRODUCTION, NOMA_SMS_API_KEY: undefined });
-  assert.deepEqual(withoutKey.exits, [1]);
+  assert.deepEqual(withoutKey.exits, [78]);
   assert.equal(withoutKey.logs.length, 1);
   assert.match(withoutKey.logs[0], /NOMA_SMS_API_KEY requis en production/);
   assert.match(String(withoutKey.thrown), /NOMA_SMS_API_KEY requis en production/, "le démarrage n'est jamais réputé réussi, même si la sortie revenait");
   const shortKey = refuse({ ...PRODUCTION, NOMA_SMS_API_KEY: "court" });
-  assert.deepEqual(shortKey.exits, [1]);
+  assert.deepEqual(shortKey.exits, [78]);
   assert.match(shortKey.logs[0], /invalide \(format\)/);
   const valid = refuse({ ...PRODUCTION });
   assert.deepEqual(valid.exits, []);

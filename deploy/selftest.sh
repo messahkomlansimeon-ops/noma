@@ -59,6 +59,36 @@ else
   ko "EnvironmentFile incohérent avec gen-secrets.sh"
 fi
 
+# Lot SMS1-ter : le refus de démarrer (configuration invalide, code de sortie DÉDIÉ 78) ne produit pas de boucle de redémarrage ; les autres pannes (dont le code 1 d'une exception non rattrapée) gardent Restart=on-failure.
+if grep -q '^RestartPreventExitStatus=78$' deploy/noma.service; then
+  ok "RestartPreventExitStatus=78 : le refus de démarrer (code 78) n'est pas relancé"
+else
+  ko "RestartPreventExitStatus=78 absent de noma.service"
+fi
+if grep -q '^Restart=on-failure$' deploy/noma.service; then
+  ok "Restart=on-failure conservé pour les autres pannes"
+else
+  ko "Restart=on-failure absent de noma.service"
+fi
+if grep -q '^StartLimitIntervalSec=[0-9]\+$' deploy/noma.service && grep -q '^StartLimitBurst=[0-9]\+$' deploy/noma.service; then
+  ok "StartLimitIntervalSec et StartLimitBurst bornent les redémarrages"
+else
+  ko "StartLimitIntervalSec / StartLimitBurst absents de noma.service"
+fi
+# Les limites sont dans [Unit] (systemd ≥ 230), RestartPreventExitStatus dans [Service].
+unit_section=$(awk '/^\[/{section=$0} /^StartLimit(IntervalSec|Burst)=/{print section}' deploy/noma.service | sort -u)
+if [[ "$unit_section" == "[Unit]" ]]; then
+  ok "StartLimit* sont dans la section [Unit]"
+else
+  ko "StartLimit* hors de la section [Unit] (section : $unit_section)"
+fi
+service_section=$(awk '/^\[/{section=$0} /^RestartPreventExitStatus=/{print section}' deploy/noma.service | sort -u)
+if [[ "$service_section" == "[Service]" ]]; then
+  ok "RestartPreventExitStatus est dans la section [Service]"
+else
+  ko "RestartPreventExitStatus hors de la section [Service] (section : $service_section)"
+fi
+
 # ─── 2. backup.sh — jamais de sauvegarde vide déclarée valide ────────────────
 section "backup.sh (négatifs + nominal)"
 NOMA_DB_PATH="$TMP/absente.sqlite" ./deploy/backup.sh "$TMP/b1" >/dev/null 2>&1

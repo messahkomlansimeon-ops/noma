@@ -19,6 +19,10 @@ import { safeEqualText } from "./webhook";
  * EN ATTENTE depuis plus de 2 minutes est interrogée chez Sublymus (`GET /v1/intents?external_reference=<référence>`), avec une attente DOUBLÉE à chaque tentative (plafond
  * 1 heure) et jusqu'à 24 heures après sa création.
  *
+ * Lot PAY1-ter (N4) : une intention ÉCHOUÉE (`failed`, par un webhook ou par une lecture FAILED) ou EXPIRÉE lue FAILED RESTE sondée, aux mêmes intervalles (doublement, plafond
+ * 1 heure) et jusqu'à 24 heures après sa création : un paiement peut réussir après un échec (l'argent a été pris). Si Sublymus répond alors COMPLETED, la recharge est créditée UNE
+ * fois (`allowSuccessAfterFailure`, même chemin que le webhook) et une anomalie `state_conflict` est journalisée. Seule une intention `succeeded` ferme la session tout de suite.
+ *
  * La recherche de Sublymus est PARTIELLE : on filtre la référence EXACTE, puis on vérifie payeur, montant, devise, système source et identifiant avant d'agir. `COMPLETED` crédite
  * (une seule fois, par le MÊME chemin que le webhook : verrou de l'intention, statut, référence `topup:<intention>` unique), `FAILED` termine l'intention, `WAVE_CREATED` attend.
  * Le rattrapage et le webhook peuvent arriver en même temps : l'intention est verrouillée, le second ne fait rien (`duplicate`).
@@ -56,6 +60,8 @@ interface DueRow {
   sublymus_intent_id: string | null;
   catchup_attempts: number;
   created_at: Date;
+  /** Statut de l'intention de recharge au moment de la réservation (lot PAY1-ter : `failed` et `expired` restent sondées). */
+  intent_status: string;
   /** Prochaine tentative AVANT la réservation (rendue si l'intention n'est pas examinée). */
   previous_due: Date;
 }
@@ -116,7 +122,8 @@ async function finishRow(client: PoolClient, intentId: string, input: { outcome:
             next_catchup_at = CASE WHEN $5::boolean OR catchup_done_at IS NOT NULL THEN NULL ELSE $6::timestamptz END,
             catchup_done_at = CASE WHEN $5::boolean THEN COALESCE(catchup_done_at, $2::timestamptz) ELSE catchup_done_at END
       WHERE intent_id = $1::uuid`,
-    [intentId, input.now.toISOString(), closed && !input.done ? "window_closed" : input.outcome, input.providerStatus, closed, next.toISOString()],
+    // Lot PAY1-ter : à la fermeture de la fenêtre, l'issue « failed » d'une intention échouée reste lisible (« window_closed » ne l'écrase pas).
+    [intentId, input.now.toISOString(), closed && !input.done && input.outcome !== "failed" ? "window_closed" : input.outcome, input.providerStatus, closed, next.toISOString()],
   );
 }
 
@@ -200,8 +207,9 @@ async function processRow(input: {
       providerReference: row.external_reference,
       amountXof: amount,
       payloadSha256: createHash("sha256").update(`poll:${row.external_reference}:${entry.status}:${entry.id}`).digest("hex"),
-    });
-    if (verdict.type === "payment.succeeded" && applied.outcome === "rejected_state") {
+      // Lot PAY1-ter (N4) : un paiement RÉUSSI lu chez Sublymus sur une intention déjà échouée est crédité (l'argent a été pris), UNE seule fois, comme pour le webhook.
+    }, { allowSuccessAfterFailure: true });
+    if (verdict.type === "payment.succeeded" && (applied.outcome === "rejected_state" || (applied.outcome === "applied" && row.intent_status === "failed"))) {
       result.anomalies += 1;
       await recordAnomaly(tx, {
         kind: "state_conflict", origin: "catchup", dedupeKey: `catchup:${row.intent_id}`, intentId: row.intent_id, externalReference: row.external_reference, sublymusIntentId: entry.id,
@@ -210,9 +218,10 @@ async function processRow(input: {
     }
     if (verdict.type === "payment.succeeded") result.completed += 1;
     else result.failed += 1;
+    // Lot PAY1-ter (N4) : seule une réussite TERMINE la session. Un échec (FAILED) la laisse sondée (attente doublée, plafond 1 h) jusqu'à la fin de la fenêtre de 24 h.
     await finishRow(tx, row.intent_id, {
       outcome: verdict.type === "payment.succeeded" ? "completed" : "failed", providerStatus: verdict.type === "payment.succeeded" ? "COMPLETED" : "FAILED",
-      attempts, createdAt: row.created_at, now, done: true,
+      attempts, createdAt: row.created_at, now, done: verdict.type === "payment.succeeded",
     });
   }, input.pool);
 }
@@ -233,14 +242,14 @@ export async function runCatchup(input: { pool: Pool; client: SublymusClient; ma
   const startedAt = Date.now();
   const result: CatchupStepResult = { ...EMPTY_CATCHUP_RESULT, errors: [] };
 
-  // Fermeture : plus de 24 h, ou intention déjà terminée (créditée ou échouée par un webhook).
+  // Fermeture : plus de 24 h, ou intention déjà créditée. Une intention échouée (webhook ou lecture FAILED) reste sondée jusqu'à 24 h (lot PAY1-ter, N4).
   const closed = await pool.query(
     `UPDATE sublymus_checkouts c
         SET next_catchup_at = NULL, catchup_done_at = COALESCE(c.catchup_done_at, $1::timestamptz),
             last_catchup_outcome = COALESCE(c.last_catchup_outcome, CASE WHEN p.status = 'succeeded' THEN 'completed' WHEN p.status = 'failed' THEN 'failed' ELSE 'window_closed' END)
        FROM payment_intents p
       WHERE p.id = c.intent_id AND c.next_catchup_at IS NOT NULL
-        AND (p.status IN ('succeeded', 'failed') OR p.created_at <= $1::timestamptz - make_interval(secs => $2::int))`,
+        AND (p.status = 'succeeded' OR p.created_at <= $1::timestamptz - make_interval(secs => $2::int))`,
     [now.toISOString(), Math.round(CATCHUP_WINDOW_MS / 1000)],
   );
   result.windowClosed = closed.rowCount ?? 0;
@@ -248,7 +257,7 @@ export async function runCatchup(input: { pool: Pool; client: SublymusClient; ma
   const claimed = await pool.query<DueRow>(
     `WITH due AS (
        SELECT c.intent_id, c.next_catchup_at AS previous_due FROM sublymus_checkouts c JOIN payment_intents p ON p.id = c.intent_id
-        WHERE c.next_catchup_at IS NOT NULL AND c.next_catchup_at <= $1::timestamptz AND p.provider = 'sublymus' AND p.status IN ('pending', 'expired')
+        WHERE c.next_catchup_at IS NOT NULL AND c.next_catchup_at <= $1::timestamptz AND p.provider = 'sublymus' AND p.status IN ('pending', 'expired', 'failed')
         ORDER BY c.next_catchup_at, c.intent_id
         LIMIT $2::int
         FOR UPDATE OF c SKIP LOCKED
@@ -257,7 +266,7 @@ export async function runCatchup(input: { pool: Pool; client: SublymusClient; ma
         SET next_catchup_at = $1::timestamptz + make_interval(secs => $3::int)
        FROM due, payment_intents p
       WHERE c.intent_id = due.intent_id AND p.id = c.intent_id
-      RETURNING c.intent_id, c.external_reference, p.amount_xof::text AS amount_xof, c.sublymus_intent_id, c.catchup_attempts, p.created_at, due.previous_due`,
+      RETURNING c.intent_id, c.external_reference, p.amount_xof::text AS amount_xof, c.sublymus_intent_id, c.catchup_attempts, p.created_at, p.status AS intent_status, due.previous_due`,
     [now.toISOString(), limit, Math.round(LEASE_MS / 1000)],
   );
   let next = 0;

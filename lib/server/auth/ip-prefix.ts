@@ -4,10 +4,14 @@ import { isIP } from "node:net";
  * Agrégation des adresses IP par préfixe (lot SMS1-bis, B1-d) : un attaquant qui dispose d'un bloc d'adresses (un /24 en IPv4, un /64 en IPv6, l'unité d'attribution à un abonné) ne
  * contourne plus les compteurs par adresse en changeant d'adresse dans son bloc. Module PUR (aucun accès base ou environnement) : il fournit la clé de regroupement et les limites.
  *
- *  - IPv4 : les 3 premiers octets (/24) ; limites 100 par 15 minutes et 500 par jour (5 fois celles d'une adresse : plusieurs abonnés peuvent partager un /24, par exemple derrière la passerelle d'un opérateur mobile) ;
- *  - IPv6 : les 4 premiers groupes (/64) ; limites 20 par 15 minutes et 100 par jour (celles d'une adresse : un /64 est UN abonné) ;
+ *  - IPv4 : les 3 premiers octets (/24) ; limites 300 par 15 minutes et 1500 par jour (5 fois celles d'une adresse : plusieurs abonnés peuvent partager un /24, par exemple derrière la passerelle d'un opérateur mobile) ;
+ *  - IPv6 : les 4 premiers groupes (/64) ; limites 60 par 15 minutes et 300 par jour (celles d'une adresse : un /64 est UN abonné) ;
  *  - IPv6 qui encapsule une adresse IPv4 (::ffff:a.b.c.d, 0:0:0:0:0:ffff:…) : traitée comme l'adresse IPv4 ;
  *  - toute autre valeur (non-adresse) : la valeur elle-même, avec les limites d'une adresse (pas d'agrégation).
+ *
+ * Lot SMS1-ter (adresses partagées, CGNAT) : les limites sont relevées (une adresse d'opérateur mobile est partagée par des centaines d'abonnés) ET ne s'appliquent plus qu'aux
+ * défis NON vérifiés, sur des fenêtres GLISSANTES de 15 minutes et de 24 heures (voir otp.ts) : un utilisateur qui vérifie son code libère sa place, et aucun blocage ne dure « jusqu'à
+ * minuit ». Les limites d'un préfixe ne sont jamais plus basses que celles d'une adresse (IP_ADDRESS_LIMIT_*).
  */
 
 export interface IpAggregation {
@@ -18,10 +22,13 @@ export interface IpAggregation {
   limitPerDay: number;
 }
 
-export const IP_PREFIX_V4_LIMIT_15M = 100;
-export const IP_PREFIX_V4_LIMIT_DAY = 500;
-export const IP_PREFIX_V6_LIMIT_15M = 20;
-export const IP_PREFIX_V6_LIMIT_DAY = 100;
+/** Limites d'UNE adresse (défis non vérifiés, fenêtres glissantes de 15 minutes et de 24 heures). */
+export const IP_ADDRESS_LIMIT_15M = 60;
+export const IP_ADDRESS_LIMIT_DAY = 300;
+export const IP_PREFIX_V4_LIMIT_15M = 300;
+export const IP_PREFIX_V4_LIMIT_DAY = 1500;
+export const IP_PREFIX_V6_LIMIT_15M = 60;
+export const IP_PREFIX_V6_LIMIT_DAY = 300;
 
 function parseGroups(address: string): number[] | null {
   let text = address.split("%")[0].toLowerCase();

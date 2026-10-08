@@ -8,7 +8,7 @@ import { parseStrictJson } from "../strict-json";
 import { applyProviderEventInTransaction, type PaymentEventOutcome, type PaymentEventType, type ProviderEventResult } from "../topups";
 import { recordAnomaly, type AnomalyKind } from "./anomalies";
 import { readAmount } from "./client";
-import { SUBLYMUS_EVENTS, SUBLYMUS_PROVIDER, SUBLYMUS_SOURCE_SYSTEM, type SublymusEventName } from "./config";
+import { SUBLYMUS_EVENTS, SUBLYMUS_IDENTIFIER, SUBLYMUS_PROVIDER, SUBLYMUS_SOURCE_SYSTEM, type SublymusEventName } from "./config";
 
 /**
  * Webhook Sublymus → noma (lot PAY1), `POST /api/webhooks/sublymus`. ORDRE de traitement (contrat du fournisseur) :
@@ -59,7 +59,7 @@ export interface ParsedSublymusWebhook {
   sourceSystem: string | null;
 }
 
-const DATA_ID = /^[A-Za-z0-9._:-]{1,100}$/;
+const DATA_ID = SUBLYMUS_IDENTIFIER;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -285,13 +285,17 @@ export async function applySublymusWebhook(input: {
     result.push("state_conflict");
   }
   if (applied.outcome === "applied" || applied.outcome === "duplicate") {
-    // La session est terminée chez Sublymus : le rattrapage n'a plus rien à faire pour elle.
+    // Un paiement RÉUSSI termine la session : le rattrapage n'a plus rien à faire pour elle. Lot PAY1-ter (N4) : un ÉCHEC ne la termine pas, elle reste sondée (attente doublée,
+    // plafond 1 h, jusqu'à 24 h après la création) : un paiement peut réussir après un échec (l'argent a été pris).
+    const finished = type === "payment.succeeded";
     await client.query(
       `UPDATE sublymus_checkouts
-          SET provider_status = $2, next_catchup_at = NULL, catchup_done_at = COALESCE(catchup_done_at, clock_timestamp()),
+          SET provider_status = $2,
+              next_catchup_at = CASE WHEN $4::boolean THEN NULL ELSE next_catchup_at END,
+              catchup_done_at = CASE WHEN $4::boolean THEN COALESCE(catchup_done_at, clock_timestamp()) ELSE catchup_done_at END,
               last_catchup_outcome = CASE WHEN $3 = 'completed' THEN 'completed' ELSE COALESCE(last_catchup_outcome, $3) END
         WHERE intent_id = $1::uuid`,
-      [intent.id, type === "payment.succeeded" ? "COMPLETED" : "FAILED", type === "payment.succeeded" ? "completed" : "failed"],
+      [intent.id, finished ? "COMPLETED" : "FAILED", finished ? "completed" : "failed", finished],
     );
   }
   await recordDelivery(applied.outcome === "replayed" ? "duplicate" : applied.outcome);

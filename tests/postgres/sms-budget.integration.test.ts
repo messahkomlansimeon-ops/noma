@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { after, before, beforeEach, describe, test } from "node:test";
 import type { Pool, PoolClient } from "pg";
-import { OtpRateLimitError, requestOtp } from "../../lib/server/auth";
+import { OtpRateLimitError, requestOtp, verifyOtp } from "../../lib/server/auth";
+import { ipAggregation } from "../../lib/server/auth/ip-prefix";
+import { secretFingerprint } from "../../lib/server/auth/primitives";
 import { createAuthHttpHandlers, type AuthHttpHandlers } from "../../lib/server/auth/http";
 import type { SendOtp } from "../../lib/server/auth/types";
 import type { DemandRecord, OfferRecord } from "../../lib/server/catalog/types";
@@ -18,7 +20,7 @@ import { planBudgets, type SmsBudgetPlan } from "../../lib/server/sms/budget";
 import { createMenoClient } from "../../lib/server/sms/meno";
 import { SMOKE_MESSAGE } from "../../lib/server/sms/messages";
 import { createMenoNotificationTransport } from "../../lib/server/sms/notification-transport";
-import { createMenoOtpTransport } from "../../lib/server/sms/otp-transport";
+import { createLatencyMirror, createMenoOtpTransport } from "../../lib/server/sms/otp-transport";
 import { createSmsSender, phoneHash, type SmsSender, type SmsSendRequest, type SmsSendResult } from "../../lib/server/sms/sender";
 import { startFakeMeno, type FakeMeno } from "../server/fake-meno";
 import { insertEvaluation, makeDemand, makeOffer, makePerson, type Person } from "./metrics-fixtures";
@@ -135,6 +137,43 @@ describe("B1 — budgets séparés, réserve des numéros existants, lissage hor
     assert.equal(await count("audience = 'existing'"), 6);
   });
 
+  test("f) SMS1-ter — la réserve des numéros existants n'est ouverte qu'au PREMIER code du jour UTC de chaque numéro : les codes suivants du même numéro comptent dans la part des inconnus", async () => {
+    const sender = makeSender({ budget: plan({ total: 20, notifications: 8, codes: 12, existingReserve: 6, newNumbers: 6, newNumbersPerHour: 12 }) });
+    const again = (phoneN: number, keyN: number): SmsSendRequest => ({ ...sendRequest("otp", phoneN, "existing"), idempotencyKey: `otp-again-${String(keyN).padStart(5, "0")}`, reference: `again-${keyN}` });
+    // Le numéro 1 (existant) demande 7 codes dans la journée : le premier puise dans la réserve, les 6 suivants dans la part des inconnus.
+    for (let k = 1; k <= 7; k += 1) assert.equal(summary(await sender.send(again(1, k))), "accepted:-", `code ${k} du même numéro`);
+    assert.deepEqual((await rows()).map((row) => row.audience), ["existing", "new", "new", "new", "new", "new", "new"]);
+    assert.equal((await sender.send(again(1, 8))).errorCode, "budget_new_numbers", "la part des inconnus est épuisée par ce seul numéro : le 8e code est refusé");
+    // La réserve est INTACTE : cinq autres numéros existants obtiennent leur premier code du jour.
+    for (let n = 2; n <= 6; n += 1) assert.equal(summary(await sender.send(sendRequest("otp", n, "existing"))), "accepted:-", `premier code du numéro existant ${n}`);
+    assert.equal(await count("audience = 'existing'"), 6, "1 + 5 premiers codes : la réserve (6) est entièrement disponible pour des numéros DIFFÉRENTS");
+    assert.equal((await sender.send(sendRequest("otp", 7, "existing"))).errorCode, "budget_codes", "le budget des codes (12) est atteint");
+    // Le lendemain, le numéro 1 retrouve son premier code de la réserve.
+    clock = new Date(clock.getTime() + DAY);
+    assert.equal(summary(await sender.send(again(1, 9))), "accepted:-");
+    assert.equal((await rows()).at(-1).audience, "existing");
+  });
+
+  test("f) SMS1-ter — bloquer la connexion des numéros existants demande autant de numéros existants DIFFÉRENTS que la réserve a de places : quelques numéros demandés en boucle ne la vident pas (plafond 100 : codes 60, inconnus 30, réserve 30)", async () => {
+    const budget = planBudgets(100);
+    assert.deepEqual(budget, { total: 100, notifications: 40, codes: 60, existingReserve: 30, newNumbers: 30, newNumbersPerHour: 4 });
+    const sender = makeSender({ budget });
+    const loop = (phoneN: number, k: number): SmsSendRequest => ({ ...sendRequest("otp", phoneN, "existing"), idempotencyKey: `otp-loop-${phoneN}-${String(k).padStart(3, "0")}`, reference: `loop-${phoneN}-${k}` });
+    // Cinq numéros existants (connus de l'attaquant) demandés en boucle pendant la journée, au rythme maximal (20 demandes par heure).
+    for (let hour = 0; hour < 12; hour += 1) {
+      for (let k = 0; k < 4; k += 1) for (let phoneN = 1; phoneN <= 5; phoneN += 1) await sender.send(loop(phoneN, hour * 4 + k));
+      clock = new Date(clock.getTime() + 3_600_000);
+    }
+    assert.equal(clock.toISOString(), "2032-06-16T00:00:00.000Z");
+    clock = new Date(Date.UTC(2032, 5, 15, 21, 30, 0)); // fin du 15 juin, hors heures calmes
+    assert.equal(await count("created_at >= '2032-06-15T00:00:00Z' AND created_at < '2032-06-16T00:00:00Z' AND audience = 'existing'"), 5, "seuls les cinq PREMIERS codes ont puisé dans la réserve");
+    assert.equal(await count("audience = 'new'"), 30, "tous les autres sont dans la part des inconnus (30), épuisée");
+    // Les vrais utilisateurs existants (numéros différents) obtiennent encore leur premier code : 60 − 35 = 25 places.
+    for (let phoneN = 6; phoneN <= 30; phoneN += 1) assert.equal(summary(await sender.send(sendRequest("otp", phoneN, "existing"))), "accepted:-", `premier code du numéro existant ${phoneN}`);
+    assert.equal((await sender.send(sendRequest("otp", 31, "existing"))).errorCode, "budget_codes", "il aura fallu 30 numéros existants DIFFÉRENTS (5 + 25) en plus des 30 inconnus pour atteindre le budget des codes");
+    assert.equal(await count("audience = 'existing'"), 30);
+  });
+
   test("c) lissage horaire : au plus (part / 24) × 3 numéros inconnus par heure GLISSANTE, y compris au passage de minuit ; les numéros existants n'y sont pas soumis", async () => {
     const sender = makeSender({ budget: plan({ total: 100, notifications: 10, codes: 90, existingReserve: 10, newNumbers: 80, newNumbersPerHour: 2 }) });
     assert.equal(summary(await sender.send(sendRequest("otp", 1))), "accepted:-");
@@ -177,28 +216,87 @@ describe("B1 — budgets séparés, réserve des numéros existants, lissage hor
     assert.equal((await sender.send(sendRequest("otp", 6))).errorCode, "budget_total");
   });
 
-  test("e) code de connexion refusé pour budget : réponse DISTINCTE (503 otp_capacity_reached), aucun SMS, défi send_failed ; un utilisateur existant se connecte encore", async () => {
+  test("e) SMS1-ter — code de connexion refusé pour budget : réponse IDENTIQUE à un succès (202, même corps, mêmes en-têtes), aucun SMS, défi send_failed non vérifiable, motif conservé ; un utilisateur existant reçoit son code", async () => {
     const sender = makeSender({ budget: plan({ total: 100, notifications: 40, codes: 60, existingReserve: 30, newNumbers: 2, newNumbersPerHour: 2 }) });
     const handlers = otpHandlers(sender);
     const existing = await login(pool);
     const post = (phone: string, ip: string) => handlers.requestOtp(otpPost("/api/auth/otp/request", { phone }, ip));
-    assert.equal((await post(phoneOf(101), "100.64.1.1")).status, 202);
+    const first = await post(phoneOf(101), "100.64.1.1");
+    assert.equal(first.status, 202);
     assert.equal((await post(phoneOf(102), "100.64.2.1")).status, 202);
     const refused = await post(phoneOf(103), "100.64.3.1");
     const text = await refused.text();
-    assert.equal(refused.status, 503);
-    assert.deepEqual(JSON.parse(text), { error: { code: "otp_capacity_reached", message: "Le service d'envoi de codes est très sollicité. Réessayez plus tard." } });
-    assert.notEqual(JSON.parse(text).error.code, "otp_delivery_failed", "réponse distincte du « envoi impossible » générique");
-    for (const leak of ["budget", "300", "plafond", KEY, phoneOf(103), "Meno"]) assert.equal(text.includes(leak), false, leak);
+    assert.equal(refused.status, 202, "le refus de capacité répond EXACTEMENT comme un succès");
+    const refusedBody = JSON.parse(text) as { challengeId: string; expiresAt: string; resendAvailableAt: string };
+    const firstBody = (await first.json()) as typeof refusedBody;
+    assert.deepEqual(Object.keys(refusedBody).sort(), Object.keys(firstBody).sort(), "même forme de corps");
+    assert.equal(refusedBody.expiresAt, firstBody.expiresAt, "même durée de vie annoncée");
+    assert.equal(refusedBody.resendAvailableAt, firstBody.resendAvailableAt, "même délai de renvoi annoncé");
+    assert.deepEqual([...refused.headers.keys()].sort(), [...first.headers.keys()].sort(), "mêmes en-têtes");
+    assert.equal(refused.headers.get("content-type"), first.headers.get("content-type"));
+    for (const leak of ["budget", "capacity", "capacité", "sollicité", "300", "plafond", KEY, phoneOf(103), "Meno"]) assert.equal(text.includes(leak), false, leak);
     assert.equal(fake.messages.length, 2, "aucun SMS pour la demande refusée");
     assert.equal(await count(), 2, "aucune ligne de journal pour la demande refusée");
-    const challenge = (await pool.query("SELECT status FROM otp_challenges WHERE phone_e164 = $1", [phoneOf(103)])).rows[0];
-    assert.equal(challenge.status, "send_failed");
+    const challenge = (await pool.query("SELECT id, status, send_failure_code FROM otp_challenges WHERE phone_e164 = $1", [phoneOf(103)])).rows[0];
+    assert.equal(challenge.status, "send_failed", "le défi est créé mais ne peut jamais être vérifié");
+    assert.equal(challenge.send_failure_code, "budget_new_numbers", "le motif reste dans le défi (administration)");
+    assert.equal(challenge.id, refusedBody.challengeId);
+    // Aucun code ne vérifie ce défi : pas même un code plausible (le code n'existe chez personne).
+    for (const code of ["000000", "123456", "654321"]) {
+      assert.equal((await handlers.verifyOtp(otpPost("/api/auth/otp/verify", { challengeId: refusedBody.challengeId, code }, "100.64.3.1"))).status, 401);
+    }
     // Le numéro existant, lui, reçoit son code (réserve).
     const existingAnswer = await post(existing.phone, "100.64.4.1");
     assert.equal(existingAnswer.status, 202);
     assert.equal(fake.messages.at(-1)?.to, existing.phone);
     assert.equal((await pool.query("SELECT audience FROM sms_sends WHERE phone_hash = $1", [phoneHash(AUTH_SECRET, existing.phone)])).rows[0].audience, "existing");
+    // Un second refus pour le même numéro dans la minute : même réponse qu'un renvoi trop rapide d'un numéro qui a reçu son code (429 dans les deux cas).
+    const again = await post(phoneOf(103), "100.64.3.1");
+    const againAfterSuccess = await post(phoneOf(101), "100.64.1.1");
+    assert.equal(again.status, 429);
+    assert.equal(againAfterSuccess.status, 429);
+    assert.equal(await again.text(), await againAfterSuccess.text());
+  });
+
+  test("e) SMS1-ter — le TEMPS d'un refus de capacité imite celui d'un vrai envoi : le transport attend une durée tirée parmi celles des envois réels", async () => {
+    const sender = makeSender({ budget: plan({ total: 100, notifications: 40, codes: 60, existingReserve: 30, newNumbers: 1, newNumbersPerHour: 1 }) });
+    const waits: number[] = [];
+    let now = 0;
+    const latency = { observed: [] as number[], observe(ms: number) { this.observed.push(ms); }, sample() { return 750; } };
+    const transport = createMenoOtpTransport(sender, { pool: () => pool, latency, sleep: async (ms) => { waits.push(ms); }, clock: () => now });
+    const input = (n: number) => ({ phone: phoneOf(n), code: "654321", challengeId: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`, expiresAt: new Date(clock.getTime() + 300_000) });
+    await transport(input(1)); // part de l'unique place des inconnus : envoi réel
+    assert.equal(latency.observed.length, 1, "la durée d'un vrai envoi alimente le miroir");
+    assert.deepEqual([...waits], [], "un envoi réussi n'attend pas");
+    await assert.rejects(transport(input(2)), (error: unknown) => error instanceof Error && error.name === "OtpCapacityError" && (error as { code?: string }).code === "budget_new_numbers");
+    assert.deepEqual([...waits], [750], "le refus attend la durée échantillonnée (le temps déjà écoulé est déduit)");
+    assert.equal(latency.observed.length, 1, "un refus local n'alimente pas le miroir");
+    now = 0;
+    // Le temps déjà écoulé dans le transport est déduit de l'attente.
+    const slowClock = [0, 200, 200, 200, 200];
+    let tick = 0;
+    const transport2 = createMenoOtpTransport(sender, { pool: () => pool, latency, sleep: async (ms) => { waits.push(ms); }, clock: () => slowClock[Math.min(tick++, slowClock.length - 1)] });
+    await assert.rejects(transport2(input(3)));
+    assert.deepEqual([...waits], [750, 550], "750 ms visés, 200 ms déjà écoulés : on attend 550 ms");
+  });
+
+  test("e) SMS1-ter — mesure réelle : un fournisseur qui met ~250 ms à répondre ; la demande refusée pour capacité met autant de temps qu'une demande réussie, non quelques millisecondes", async () => {
+    const sender = makeSender({ budget: plan({ total: 100, notifications: 40, codes: 60, existingReserve: 30, newNumbers: 3, newNumbersPerHour: 3 }) });
+    const handlers = otpHandlersWith(() => createMenoOtpTransport(sender, { pool: () => pool, latency: createLatencyMirror() }));
+    fake.queue(...Array.from({ length: 3 }, () => ({ kind: "delay" as const, ms: 250 })));
+    const timed = async (n: number) => {
+      const started = performance.now();
+      const answer = await handlers.requestOtp(otpPost("/api/auth/otp/request", { phone: phoneOf(n) }, `100.65.${n % 250}.1`));
+      return { status: answer.status, ms: performance.now() - started };
+    };
+    const succeeded = [await timed(201), await timed(202), await timed(203)];
+    const refused = await timed(204);
+    assert.deepEqual(succeeded.map((entry) => entry.status), [202, 202, 202]);
+    assert.equal(refused.status, 202);
+    assert.equal(fake.messages.length, 3, "le quatrième numéro n'a reçu aucun SMS");
+    for (const entry of succeeded) assert.ok(entry.ms >= 240, `un vrai envoi dure ~250 ms (${Math.round(entry.ms)} ms)`);
+    assert.ok(refused.ms >= 200, `le refus de capacité attend comme un vrai envoi : ${Math.round(refused.ms)} ms`);
+    assert.ok(refused.ms < 1_500, `mais pas davantage : ${Math.round(refused.ms)} ms`);
   });
 
   test("e) notification refusée pour budget : REPORTÉE au lendemain 7 h (jamais failed), aucune tentative consommée, aucun SMS, MÊME clé de lot le lendemain", async () => {
@@ -275,18 +373,18 @@ describe("B1 — budgets séparés, réserve des numéros existants, lissage hor
     const users = [await login(pool), await login(pool), await login(pool)];
     let attackerIp = 0;
     const attack = async (hours: number, attemptsPerHour: number) => {
-      let accepted = 0;
+      // SMS1-ter : toutes les réponses sont 202 (aucun oracle) ; ce qui est borné, c'est le nombre de SMS RÉELLEMENT envoyés.
+      const sentBefore = fake.messages.length;
       for (let hour = 0; hour < hours; hour += 1) {
         for (let attempt = 0; attempt < attemptsPerHour; attempt += 1) {
           attackerIp += 1;
           // Une adresse d'un /24 différent à chaque demande : ni les compteurs par adresse ni ceux par préfixe ne l'arrêtent.
           const answer = await handlers.requestOtp(otpPost("/api/auth/otp/request", { phone: phoneOf(1_000 + attackerIp) }, `100.${64 + Math.floor(attackerIp / 250)}.${attackerIp % 250}.9`));
-          if (answer.status === 202) accepted += 1;
-          else assert.equal(answer.status, 503);
+          assert.equal(answer.status, 202, "même réponse qu'un succès, SMS envoyé ou non");
         }
         clock = new Date(clock.getTime() + 3_600_000);
       }
-      return accepted;
+      return fake.messages.length - sentBefore;
     };
     // Première heure : une rafale de 50 demandes n'obtient que 4 SMS (60 F pour 4 SMS à 15 F).
     const firstHour = await attack(1, 50);
@@ -308,10 +406,11 @@ describe("B1 — budgets séparés, réserve des numéros existants, lissage hor
       assert.equal(fake.messages.at(-1)?.to, user.phone);
     }
     assert.equal(fake.messages.length, 33);
-    // Et un numéro neuf, lui, est refusé (distinctement).
+    // Et un numéro neuf ne reçoit rien, mais la réponse est la MÊME que pour un succès (aucun oracle d'énumération).
     const newcomer = await handlers.requestOtp(otpPost("/api/auth/otp/request", { phone: phoneOf(9_999) }, "100.210.1.1"));
-    assert.equal(newcomer.status, 503);
-    assert.equal(((await newcomer.json()) as { error: { code: string } }).error.code, "otp_capacity_reached");
+    assert.equal(newcomer.status, 202);
+    assert.equal(fake.messages.length, 33, "aucun SMS pour le numéro neuf");
+    assert.equal((await pool.query("SELECT send_failure_code FROM otp_challenges WHERE phone_e164 = $1", [phoneOf(9_999)])).rows[0].send_failure_code, "budget_new_numbers");
     // Les notifications ont leur budget propre : elles partent encore.
     await scenario({ offers: 1, at: clock });
     const notify = await step(notificationTransport(sender), clock);
@@ -601,60 +700,139 @@ describe("administration — budgets du jour et envois échoués récents", () =
   });
 });
 
-// ───────────── B1-d : compteurs agrégés par préfixe d'adresse ─────────────
+describe("administration — codes de connexion non envoyés faute de capacité (SMS1-ter)", () => {
+  test("/api/admin/sms compte, par motif et sans numéro, les demandes de code refusées pour capacité (24 h) alors que le visiteur a reçu un 202 identique à un succès", async () => {
+    clock = new Date(); // heure réelle : la session du compte administrateur est créée avec l'heure réelle
+    const boss = await login(pool);
+    await grantAdmin({ pool, phone: boss.phone });
+    const sender = makeSender({ budget: plan({ total: 100, notifications: 40, codes: 60, existingReserve: 30, newNumbers: 1, newNumbersPerHour: 1 }) });
+    const handlers = otpHandlers(sender);
+    for (const [index, ip] of ["100.66.1.1", "100.66.2.1", "100.66.3.1", "100.66.4.1"].entries()) {
+      assert.equal((await handlers.requestOtp(otpPost("/api/auth/otp/request", { phone: phoneOf(900 + index) }, ip))).status, 202);
+    }
+    assert.equal(fake.messages.length, 1, "un seul SMS : la place des numéros inconnus est de 1");
+    const admin = createAdminSmsHttpHandlers({ pool, env: { NODE_ENV: "test", NOMA_SMS_PROVIDER: "meno", NOMA_SMS_API_KEY: KEY, NOMA_SMS_BASE_URL: fake.baseUrl }, log: () => {}, usageCache: createUsageCache({ fetchUsage: null }), now: () => clock });
+    const answer = await admin.overview(request("GET", "/api/admin/sms", { cookie: boss.cookie })).then(reply);
+    assert.equal(answer.status, 200);
+    const body = answer.json as { unsentCodes: { windowHours: number; total: number; byCode: Array<{ code: string; count: number }> } };
+    assert.deepEqual(body.unsentCodes, { windowHours: 24, total: 3, byCode: [{ code: "budget_new_numbers", count: 3 }] });
+    for (const leak of [phoneOf(901).slice(1), phoneOf(902).slice(1), KEY]) assert.equal(answer.text.includes(leak), false, leak);
+    // Plus de 24 h plus tard : la trace sort de la fenêtre.
+    const later = createAdminSmsHttpHandlers({ pool, env: {}, log: () => {}, usageCache: createUsageCache({ fetchUsage: null }), now: () => new Date(clock.getTime() + 25 * 3_600_000) });
+    assert.deepEqual(((await later.overview(request("GET", "/api/admin/sms", { cookie: boss.cookie })).then(reply)).json as typeof body).unsentCodes, { windowHours: 24, total: 0, byCode: [] });
+  });
+});
 
-describe("B1-d — compteurs agrégés par préfixe d'adresse (/24 en IPv4, /64 en IPv6), en plus des compteurs par adresse", () => {
+// ───────────── B1-d (SMS1-ter) : compteurs par adresse et par préfixe, défis NON vérifiés, fenêtres glissantes ─────────────
+
+describe("B1-d / SMS1-ter — compteurs par adresse et par préfixe d'adresse (/24 en IPv4, /64 en IPv6) : défis non vérifiés, fenêtres glissantes de 15 minutes et de 24 heures", () => {
   let phones = 0;
-  const WINDOW = new Date(Date.UTC(2032, 5, 15, 10, 0, 1)); // début d'une fenêtre fixe de 15 minutes
+  const WINDOW = new Date(Date.UTC(2032, 5, 15, 10, 0, 1));
   const ask = (ip: string, at: Date = WINDOW) =>
     requestOtp(phoneOf(50_000 + (phones += 1)), { pool, authSecret: AUTH_SECRET, requestIp: ip, now: () => at, sendOtp: async () => {} });
-  const refused = (ip: string, at: Date = WINDOW) => ask(ip, at).then(() => false, (error: unknown) => error instanceof OtpRateLimitError || Promise.reject(error));
+  const isRefused = (ip: string, at: Date = WINDOW) => ask(ip, at).then(() => false, (error: unknown) => (error instanceof OtpRateLimitError ? true : Promise.reject(error)));
+  /** Défis non vérifiés déjà présents (hors de la fenêtre de 15 minutes si `ageMs` est grand), sans passer par 300 demandes réelles. */
+  async function seed(column: "request_ip_fingerprint" | "request_prefix_fingerprint", fingerprint: string, count: number, createdAt: Date, status = "expired"): Promise<void> {
+    await pool.query(
+      `INSERT INTO otp_challenges (id, phone_e164, otp_hmac, request_ip_fingerprint, request_prefix_fingerprint, status, expires_at, created_at, updated_at)
+       SELECT gen_random_uuid(), '+2250708' || lpad((g + $5::int)::text, 6, '0'), repeat('a', 64),
+              CASE WHEN $1 = 'request_ip_fingerprint' THEN $2 ELSE repeat('b', 64) END,
+              CASE WHEN $1 = 'request_prefix_fingerprint' THEN $2 ELSE NULL END,
+              $3, $4::timestamptz + interval '5 minutes', $4::timestamptz, $4::timestamptz
+         FROM generate_series(1, $6::int) AS g`,
+      [column, fingerprint, status, createdAt.toISOString(), (phones += 1) * 1_000, count],
+    );
+  }
+  const ipFingerprint = (ip: string) => secretFingerprint(AUTH_SECRET, "ip", ip);
+  const prefixFingerprint = (ip: string) => secretFingerprint(AUTH_SECRET, "ip-prefix", ipAggregation(ip).key);
 
-  test("IPv4 : 100 adresses différentes d'un même /24 passent en 15 min (chacune bien en dessous de sa limite), la 101e est refusée ; un autre /24 n'est pas touché", async () => {
-    for (let host = 1; host <= 100; host += 1) await ask(`203.0.113.${host}`);
-    assert.equal(await refused("203.0.113.101"), true, "101e demande du même /24");
-    assert.equal(await refused("203.0.113.200"), true);
+  test("IPv4 : 300 adresses différentes d'un même /24 passent en 15 min (chacune bien en dessous de sa limite), la 301e est refusée ; un autre /24 n'est pas touché ; 15 minutes plus tard le /24 repart (fenêtre glissante, pas minuit)", async () => {
+    for (let host = 1; host <= 300; host += 1) await ask(`203.0.113.${(host % 250) + 1}`);
+    assert.equal(await isRefused("203.0.113.251"), true, "301e demande du même /24");
+    assert.equal(await isRefused("203.0.113.252"), true);
     await ask("203.0.114.1"); // autre /24
     await ask("198.51.100.1");
-    // La même adresse n'a pas dépassé sa limite propre (1 sur 20) : c'est bien le compteur de préfixe qui a refusé.
-    const perAddress = await pool.query("SELECT max(request_count)::int AS n FROM otp_rate_limit_counters WHERE dimension = 'ip' AND window_kind = '15m'");
-    assert.equal(perAddress.rows[0].n, 100, "le compteur le plus haut est celui du préfixe (100), les adresses sont à 1");
-    // Quinze minutes plus tard (nouvelle fenêtre), le /24 repart.
-    await ask("203.0.113.101", new Date(WINDOW.getTime() + 15 * 60_000));
+    // C'est bien le compteur de préfixe qui a refusé : l'adresse refusée n'a aucun défi à son nom.
+    assert.equal((await pool.query("SELECT count(*)::int AS n FROM otp_challenges WHERE request_ip_fingerprint = $1", [ipFingerprint("203.0.113.251")])).rows[0].n, 0);
+    // 15 minutes plus tard (même jour UTC) : les 300 défis sortent de la fenêtre glissante, le /24 repart sans attendre minuit.
+    await ask("203.0.113.251", new Date(WINDOW.getTime() + 15 * 60_000 + 1_000));
   });
 
-  test("IPv4 : au plus 500 demandes par jour pour un /24, même réparties sur des fenêtres de 15 minutes différentes", async () => {
-    let accepted = 0;
-    for (let slot = 0; slot < 6; slot += 1) {
-      const at = new Date(WINDOW.getTime() + slot * 16 * 60_000);
-      for (let host = 1; host <= 100; host += 1) {
-        const ok = await ask(`192.0.2.${host + slot}`, at).then(() => true, (error: unknown) => (error instanceof OtpRateLimitError ? false : Promise.reject(error)));
-        if (ok) accepted += 1;
-      }
-    }
-    assert.equal(accepted, 500, "500 par jour pour un /24");
-    assert.equal(await refused("192.0.2.250", new Date(WINDOW.getTime() + 6 * 16 * 60_000)), true);
-    assert.equal(await refused("192.0.2.251", new Date(WINDOW.getTime() + 7 * 16 * 60_000)), true);
+  test("IPv4 : au plus 1500 défis non vérifiés par jour glissant pour un /24, même répartis sur des quarts d'heure différents ; la limite se libère 24 h après, pas à minuit", async () => {
+    const prefix = prefixFingerprint("192.0.2.7");
+    await seed("request_prefix_fingerprint", prefix, 1_499, new Date(WINDOW.getTime() - 3 * 3_600_000));
+    await ask("192.0.2.10"); // le 1500e
+    assert.equal(await isRefused("192.0.2.11"), true, "1500 par jour pour un /24");
+    assert.equal(await isRefused("192.0.2.12", new Date(WINDOW.getTime() + 6 * 3_600_000)), true, "6 h plus tard : toujours dans les 24 h glissantes");
+    // Les 1499 défis ont été créés 3 h avant WINDOW : ils sortent de la fenêtre 24 h + 3 h après (donc après minuit UTC, mais ce n'est pas minuit qui libère).
+    assert.equal(await isRefused("192.0.2.13", new Date(WINDOW.getTime() + 20 * 3_600_000 + 59 * 60_000)), true, "à 20 h 59 : encore refusé");
+    await ask("192.0.2.14", new Date(WINDOW.getTime() + 21 * 3_600_000 + 1_000));
   });
 
-  test("IPv6 : 20 demandes par 15 min pour un /64 quelle que soit l'adresse dans le bloc (écritures différentes comprises) ; un autre /64 n'est pas touché", async () => {
-    for (let index = 1; index <= 20; index += 1) await ask(`2001:db8:1:2:${index.toString(16)}::1`);
-    assert.equal(await refused("2001:db8:1:2:ffff:ffff:ffff:ffff"), true, "21e demande du même /64");
-    assert.equal(await refused("2001:0db8:0001:0002:0000:0000:0000:0042"), true, "autre écriture du même /64");
+  test("IPv6 : 60 demandes par 15 min pour un /64 quelle que soit l'adresse dans le bloc (écritures différentes comprises) ; un autre /64 n'est pas touché", async () => {
+    for (let index = 1; index <= 60; index += 1) await ask(`2001:db8:1:2:${index.toString(16)}::1`);
+    assert.equal(await isRefused("2001:db8:1:2:ffff:ffff:ffff:ffff"), true, "61e demande du même /64");
+    assert.equal(await isRefused("2001:0db8:0001:0002:0000:0000:0000:0042"), true, "autre écriture du même /64");
     await ask("2001:db8:1:3::1"); // autre /64
     await ask("2001:db8:2:2::1");
   });
 
   test("IPv6 qui encapsule une IPv4 : compté dans le /24 de l'IPv4", async () => {
-    for (let host = 1; host <= 100; host += 1) await ask(`203.0.115.${host}`);
-    assert.equal(await refused("::ffff:203.0.115.200"), true);
-    assert.equal(await refused("::ffff:cb00:73c9"), true);
+    await seed("request_prefix_fingerprint", prefixFingerprint("203.0.115.1"), 300, new Date(WINDOW.getTime() - 60_000));
+    assert.equal(await isRefused("::ffff:203.0.115.200"), true);
+    assert.equal(await isRefused("::ffff:cb00:73c9"), true);
+    assert.equal(await isRefused("203.0.115.201"), true);
+    await ask("203.0.116.1");
   });
 
-  test("les compteurs existants restent : une même adresse est limitée à 20 par 15 min", async () => {
-    for (let index = 1; index <= 20; index += 1) await ask("203.0.116.7");
-    assert.equal(await refused("203.0.116.7"), true);
+  test("une même adresse est limitée à 60 défis non vérifiés par 15 min glissantes (le reste du /24 n'est pas touché) et à 300 par 24 h glissantes", async () => {
+    for (let index = 1; index <= 60; index += 1) await ask("203.0.116.7");
+    assert.equal(await isRefused("203.0.116.7"), true);
     await ask("203.0.116.8");
+    await ask("203.0.116.7", new Date(WINDOW.getTime() + 15 * 60_000 + 1_000)); // 15 min plus tard : libérée
+    await seed("request_ip_fingerprint", ipFingerprint("203.0.117.7"), 299, new Date(WINDOW.getTime() - 2 * 3_600_000));
+    await ask("203.0.117.7");
+    assert.equal(await isRefused("203.0.117.7"), true, "300 par jour pour une adresse");
+    await ask("203.0.117.7", new Date(WINDOW.getTime() + 22 * 3_600_000 + 1_000));
+  });
+
+  test("CGNAT : 150 utilisateurs légitimes derrière UNE adresse partagée, qui vérifient leur code, passent tous (le défi vérifié libère sa place) ; un demandeur qui ne vérifie jamais est arrêté à 60", async () => {
+    const codes = new Map<string, string>();
+    let clockMs = WINDOW.getTime();
+    let refusedLegit = 0;
+    for (let user = 0; user < 150; user += 1) {
+      clockMs += 5_000; // 150 utilisateurs en 12 minutes et demie, sous une même adresse publique
+      const phone = phoneOf(70_000 + user);
+      let challengeId: string;
+      try {
+        ({ challengeId } = await requestOtp(phone, { pool, authSecret: AUTH_SECRET, requestIp: "41.66.10.77", now: () => new Date(clockMs), sendOtp: async (input) => { codes.set(input.challengeId, input.code); } }));
+      } catch (error) {
+        if (error instanceof OtpRateLimitError) { refusedLegit += 1; continue; }
+        throw error;
+      }
+      await verifyOtp(challengeId, codes.get(challengeId)!, { pool, authSecret: AUTH_SECRET, now: () => new Date(clockMs + 1_000) });
+    }
+    assert.equal(refusedLegit, 0, "aucun utilisateur légitime refusé derrière l'adresse partagée");
+    assert.equal((await pool.query("SELECT count(*)::int AS n FROM otp_challenges WHERE request_ip_fingerprint = $1 AND status = 'consumed'", [ipFingerprint("41.66.10.77")])).rows[0].n, 150);
+    // Le demandeur qui ne vérifie jamais (même adresse) : arrêté à 60 défis non vérifiés.
+    let attackerAccepted = 0;
+    for (let index = 0; index < 70; index += 1) {
+      const ok = await requestOtp(phoneOf(80_000 + index), { pool, authSecret: AUTH_SECRET, requestIp: "41.66.10.77", now: () => new Date(clockMs), sendOtp: async () => {} }).then(() => true, (error: unknown) => (error instanceof OtpRateLimitError ? false : Promise.reject(error)));
+      if (ok) attackerAccepted += 1;
+    }
+    assert.equal(attackerAccepted, 60, "60 défis non vérifiés par adresse, les 150 vérifiés ne comptent pas");
+  });
+
+  test("CGNAT : 320 utilisateurs légitimes répartis sur un /24 (5 adresses) qui vérifient leur code passent tous, au-delà de la limite de 300 du /24", async () => {
+    const codes = new Map<string, string>();
+    let clockMs = WINDOW.getTime();
+    for (let user = 0; user < 320; user += 1) {
+      clockMs += 2_000;
+      const ip = `41.66.11.${1 + (user % 5)}`;
+      const { challengeId } = await requestOtp(phoneOf(90_000 + user), { pool, authSecret: AUTH_SECRET, requestIp: ip, now: () => new Date(clockMs), sendOtp: async (input) => { codes.set(input.challengeId, input.code); } });
+      await verifyOtp(challengeId, codes.get(challengeId)!, { pool, authSecret: AUTH_SECRET, now: () => new Date(clockMs + 500) });
+    }
+    assert.equal((await pool.query("SELECT count(*)::int AS n FROM otp_challenges WHERE request_prefix_fingerprint = $1 AND status = 'consumed'", [prefixFingerprint("41.66.11.1")])).rows[0].n, 320);
   });
 });
 
@@ -679,7 +857,7 @@ function otpHandlersWith(resolveSendOtp: (env: Record<string, string | undefined
 }
 
 function otpHandlers(sender: SmsSender): AuthHttpHandlers {
-  return otpHandlersWith(() => createMenoOtpTransport(sender, { pool: () => pool }));
+  return otpHandlersWith(() => createMenoOtpTransport(sender, { pool: () => pool, sleep: async () => {} }));
 }
 
 function notificationTransport(sender: SmsSender): NotificationTransport {

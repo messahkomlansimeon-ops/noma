@@ -14,6 +14,8 @@ import {
   verifyOtp,
   type SendOtpInput,
 } from "../../lib/server/auth";
+import { OTP_ADDRESS_LOCK_NAMESPACE } from "../../lib/server/auth/otp";
+import { ipAggregation } from "../../lib/server/auth/ip-prefix";
 import { secretFingerprint } from "../../lib/server/auth/primitives";
 import { archiveUser, updateUser } from "../../lib/server/catalog";
 import { runMigrations } from "../../lib/server/postgres/migrations";
@@ -365,7 +367,8 @@ if (!configuredUrl?.trim()) {
         const sharedIp = "198.51.100.200";
         const concurrentClock = new TestClock(Date.UTC(2030, 0, 4, 10));
         let concurrentSends = 0;
-        const requests = Array.from({ length: 21 }, (_, index) =>
+        // Lot SMS1-ter : 60 défis non vérifiés par adresse et par quart d'heure glissant (20 avant) : 61 demandes concurrentes, 60 acceptées, une seule refusée.
+        const requests = Array.from({ length: 61 }, (_, index) =>
           requestOtp(uniquePhone(), {
             pool: concurrentPools[index % concurrentPools.length],
             requestIp: sharedIp,
@@ -377,23 +380,20 @@ if (!configuredUrl?.trim()) {
           }),
         );
         const outcomes = await Promise.allSettled(requests);
-        assert.equal(outcomes.filter((result) => result.status === "fulfilled").length, 20);
+        assert.equal(outcomes.filter((result) => result.status === "fulfilled").length, 60);
         assert.equal(
           outcomes.filter(
             (result) => result.status === "rejected" && result.reason instanceof OtpRateLimitError,
           ).length,
           1,
         );
-        assert.equal(concurrentSends, 20);
-        // Lot SMS1-bis : le compteur de la MÊME adresse est désigné par son empreinte (le compteur agrégé par préfixe /24 vit dans la même table, sous une autre empreinte).
-        const counter = await pool.query<{ request_count: number }>(
-          `SELECT request_count
-             FROM otp_rate_limit_counters
-            WHERE dimension = 'ip' AND window_kind = '15m' AND subject_fingerprint = $1`,
+        assert.equal(concurrentSends, 60);
+        // Lot SMS1-ter : le compteur de l'adresse est lu dans les défis NON vérifiés (otp_challenges), désignés par l'empreinte de l'adresse.
+        const counter = await pool.query<{ n: number }>(
+          `SELECT count(*)::int AS n FROM otp_challenges WHERE request_ip_fingerprint = $1 AND status <> 'consumed'`,
           [secretFingerprint(SECRET, "ip", sharedIp)],
         );
-        assert.equal(counter.rows.length, 1);
-        assert.equal(counter.rows[0].request_count, 20);
+        assert.equal(counter.rows[0].n, 60);
       } finally {
         await Promise.all(concurrentPools.map((candidate) => candidate.end()));
       }
@@ -457,20 +457,15 @@ if (!configuredUrl?.trim()) {
         OtpRateLimitError,
       );
 
-      const ipDay = await pool.query<{ subject_fingerprint: string; window_start: Date }>(
-        `SELECT subject_fingerprint, window_start
-           FROM otp_rate_limit_counters
-          WHERE dimension = 'ip' AND window_kind = 'day' AND subject_fingerprint = $1
-          ORDER BY updated_at DESC
-          LIMIT 1`,
-        [secretFingerprint(SECRET, "ip", dailyIp)],
-      );
+      // Lot SMS1-ter : limite journalière de l'adresse = 300 défis non vérifiés sur 24 h GLISSANTES. l'adresse a déjà 1 défi ; 298 autres (créés il y a 2 h, hors du quart d'heure) font 299 : la demande passe, elle fait le 300e ;
+      // la suivante est refusée.
       await pool.query(
-        `UPDATE otp_rate_limit_counters SET request_count = 100
-          WHERE dimension = 'ip' AND subject_fingerprint = $1
-            AND window_kind = 'day' AND window_start = $2`,
-        [ipDay.rows[0].subject_fingerprint, ipDay.rows[0].window_start],
+        `INSERT INTO otp_challenges (id, phone_e164, otp_hmac, request_ip_fingerprint, status, expires_at, created_at, updated_at)
+         SELECT gen_random_uuid(), '+2250707' || lpad(g::text, 6, '0'), repeat('a', 64), $1, 'expired', $2::timestamptz - interval '119 minutes', $2::timestamptz - interval '2 hours', $2::timestamptz - interval '2 hours'
+           FROM generate_series(1, 298) AS g`,
+        [secretFingerprint(SECRET, "ip", dailyIp), dailyClock.now().toISOString()],
       );
+      await requestOtp(uniquePhone(), { pool, requestIp: dailyIp, now: dailyClock.now, authSecret: SECRET, sendOtp });
       await assert.rejects(
         requestOtp(uniquePhone(), {
           pool,
@@ -905,6 +900,52 @@ if (!configuredUrl?.trim()) {
       } finally {
         if (sessionClientHeld) heldSessionClient.release();
         await sessionPool.end();
+      }
+    });
+
+    test("SMS1-ter — le comptage des défis non vérifiés d'une adresse et d'un préfixe est sérialisé par un verrou consultatif propre au sujet (déterministe)", async () => {
+      // Une transaction tient le verrou de l'adresse (puis celui du préfixe) : la demande ATTEND sur ce verrou (observé dans pg_locks, espace 1_314_664_978), puis aboutit une fois libéré.
+      // Un test de charge concurrente seul ne suffit pas : sans verrou, il ne détecte l'absence qu'une fois sur deux.
+      const requestIp = "198.51.100.77";
+      const subjects = [
+        ["request_ip_fingerprint", secretFingerprint(SECRET, "ip", requestIp)],
+        ["request_prefix_fingerprint", secretFingerprint(SECRET, "ip-prefix", ipAggregation(requestIp).key)],
+      ] as const;
+      const [requestPool, lockerPool] = await extraPools(2);
+      let transactionOpen = false;
+      try {
+        const pid = await poolBackendPid(requestPool);
+        for (const [column, fingerprint] of subjects) {
+          const clock = new TestClock(Date.UTC(2030, 0, 14, 10));
+          let sends = 0;
+          await lockerPool.query("BEGIN");
+          transactionOpen = true;
+          await lockerPool.query("SELECT pg_advisory_xact_lock($1::int, hashtext($2::text))", [OTP_ADDRESS_LOCK_NAMESPACE, `${column}:${fingerprint}`]);
+          const request = requestOtp(uniquePhone(), {
+            pool: requestPool,
+            requestIp,
+            now: clock.now,
+            authSecret: SECRET,
+            sendOtp: async () => {
+              sends += 1;
+            },
+          });
+          await waitUntil(async () => {
+            const waiting = await adminPool.query<{ n: number }>(
+              "SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted AND pid = $1 AND classid = $2::oid",
+              [pid, OTP_ADDRESS_LOCK_NAMESPACE],
+            );
+            return waiting.rows[0].n === 1;
+          }, `${column} : la demande attend le verrou consultatif du sujet`);
+          assert.equal(sends, 0, `${column} : rien n'est envoyé tant que le verrou est tenu`);
+          await lockerPool.query("COMMIT");
+          transactionOpen = false;
+          await request;
+          assert.equal(sends, 1, `${column} : la demande aboutit une fois le verrou libéré`);
+        }
+      } finally {
+        if (transactionOpen) await lockerPool.query("ROLLBACK");
+        await Promise.all([requestPool.end(), lockerPool.end()]);
       }
     });
 

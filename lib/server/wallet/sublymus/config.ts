@@ -89,7 +89,13 @@ export function isWaveLinkHost(host: string): boolean {
   return SUBLYMUS_LINK_DOMAINS.some((domain) => normalized.endsWith(`.${domain}`));
 }
 
-const IDENTIFIER = /^[A-Za-z0-9._:-]{1,100}$/;
+/**
+ * UNE SEULE expression pour tout identifiant venu de Sublymus ou choisi avec lui (lot PAY1-ter, N7) : identifiant d'intention (réponse à la création, liste de recherche, `data.id` d'un
+ * webhook), gestionnaire, portefeuille, référence : lettres, chiffres, `.`, `_`, `:` et `-`, 1 à 100 caractères. La contrainte `chk_sublymus_checkouts_sublymus_intent` de la
+ * migration 0026 porte EXACTEMENT la même expression (un test compare les deux) : un identifiant que le code accepte (`pi.abc123`, `pi:abc123`) ne fait jamais échouer l'écriture en base.
+ */
+export const SUBLYMUS_IDENTIFIER = /^[A-Za-z0-9._:-]{1,100}$/;
+const IDENTIFIER = SUBLYMUS_IDENTIFIER;
 
 type Environment = Record<string, string | undefined>;
 
