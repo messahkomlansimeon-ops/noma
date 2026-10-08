@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import type { Pool } from "pg";
 import { activateDemand, createDemand, createOffer, createUser, getUserById, publishOffer } from "../lib/server/catalog";
 import { grantAdmin } from "../lib/server/admin/grant";
+import { seedExternalDemo, type ExternalDemoReport } from "../lib/server/external/demo";
 import { BOOST_ERROR_MESSAGES, BoostError, grantOfferBoost } from "../lib/server/boost/boosts";
 import { runMatchingCycle } from "../lib/server/matching/runner";
 import { isMatchingSchemaReady } from "../lib/server/matching/schema-ready";
@@ -96,6 +97,8 @@ export interface DemoSeedReport {
   marketObservationsWritten: number;
   /** Cycles du worker du matching exécutés (jusqu'au repos). */
   cycles: number;
+  /** Lot EXT1 : surveillances de marché et annonces externes FICTIVES des besoins de l'acheteur démo (collecte avec les deux connecteurs fictifs, sans réseau). */
+  external: ExternalDemoReport;
 }
 
 interface Counters {
@@ -279,6 +282,7 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
     report: {
       accountsCreated: 0, accountsExisting: 0, offersCreated: 0, offersExisting: 0, demandsCreated: 0, demandsExisting: 0,
       viewsRecorded: 0, contactsRecorded: 0, creditAdded: false, proSubscribed: false, boost: "existing", adminGranted: false, messagesWritten: 0, favoriteAdded: false, orderDeclared: false, photosAdded: 0, photosExisting: 0, marketObservationsWritten: 0, cycles: 0,
+      external: { skipped: false, watches: 0, watchesCollected: 0, listingsCreated: 0, listingsKnown: 0, sourceFailures: 0, budgetSkipped: 0 },
     },
   };
   const { report } = counters;
@@ -371,6 +375,9 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
 
   // 7. Lot H1 : 90 jours de relevés de prix synthétiques (annonces et ventes fictives), pour que l'encart « Prix du marché » soit rempli.
   report.marketObservationsWritten = await seedMarketHistory(pool, { sellerIds, extraBuyerIds, historySellerIds });
+
+  // 8. Lot EXT1 : surveillances de marché et annonces d'AUTRES SITES fictives pour les besoins de l'acheteur démo (connecteurs fictifs, aucun réseau ; rejouable).
+  report.external = await seedExternalDemo(pool, buyerId);
   return report;
 }
 
@@ -484,6 +491,13 @@ async function main(): Promise<number> {
   console.log(`demo:seed : photos : ${report.photosAdded} photo(s) synthétique(s) ajoutée(s) (${report.photosExisting} déjà présente(s)), une par annonce.`);
   console.log(
     `demo:seed : historique des prix : ${report.marketObservationsWritten} relevé(s) synthétique(s) écrit(s) (annonces et ventes fictives des 90 derniers jours ; ${report.marketObservationsWritten === 0 ? "déjà présents" : "nouveaux"}).`,
+  );
+  const external = report.external;
+  console.log(
+    external.skipped
+      ? "demo:seed : collecte externe ignorée (migration 0025 absente)."
+      : `demo:seed : collecte externe (sources FICTIVES, aucun réseau) : ${external.watches} surveillance(s) pour l'acheteur démo, ${external.listingsCreated} annonce(s) externe(s) créée(s) ` +
+          `(${external.listingsKnown} déjà présente(s)), ${external.sourceFailures} panne(s) de source, ${external.budgetSkipped} requête(s) refusée(s) par le budget du jour.`,
   );
   console.log("demo:seed : comptes de démonstration (le code de connexion s'affiche dans le terminal de `npm run dev:try`) :");
   console.log("  Acheteur démo : +225 07 00 00 01 01");

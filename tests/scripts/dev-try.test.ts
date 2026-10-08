@@ -265,6 +265,16 @@ describe("dev:try : préparation de l'environnement", () => {
     assert.notEqual(other.plan.env.NOMA_AUTH_PROXY_SECRET, another.plan.env.NOMA_AUTH_PROXY_SECRET);
   });
 
+  test("collecte d'annonces externes (lot EXT1) : NOMA_EXTERNAL_FAKE est transmis tel quel au worker, avec le secret d'authentification dont dérive la clé d'empreinte des identifiants", () => {
+    const withFake = prepareDevTry({ DATABASE_URL, NOMA_EXTERNAL_FAKE: "1" });
+    assert.ok(withFake.ok);
+    assert.equal(withFake.plan.env.NOMA_EXTERNAL_FAKE, "1");
+    assert.ok(isValidAuthSecret(withFake.plan.env.NOMA_AUTH_SECRET as string), "un secret d'au moins 32 octets est toujours présent pour le worker");
+    const without = prepareDevTry({ DATABASE_URL });
+    assert.ok(without.ok);
+    assert.equal(without.plan.env.NOMA_EXTERNAL_FAKE, undefined, "jamais activée par défaut");
+  });
+
   test("secrets fournis : conservés tels quels, sans avertissement", () => {
     const prepared = prepareDevTry({ DATABASE_URL, NOMA_AUTH_SECRET: GOOD_AUTH_SECRET, NOMA_AUTH_PROXY_SECRET: GOOD_PROXY_SECRET });
     assert.ok(prepared.ok);
@@ -509,9 +519,10 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
   const guide = readFileSync(fileURLToPath(new URL("../../ESSAYER.md", import.meta.url)), "utf8");
   const normalized = guide.replace(/\s+/g, " ");
 
-  test("le guide dit (lots P2, P2-bis, P3, M1, N1, D2, PRO1, PH1, H1 et SMS1) : base à 24 migrations, recharge simulée, achat de boost, « aucun argent réel », « Sponsorisé »", () => {
+  test("le guide dit (lots P2, P2-bis, P3, M1, N1, D2, PRO1, PH1, H1, SMS1 et EXT1) : base à 25 migrations, recharge simulée, achat de boost, « aucun argent réel », « Sponsorisé »", () => {
     for (const expected of [
-      "24 migrations",
+      "25 migrations",
+      "0025",
       "0024",
       "0023",
       "0022",
@@ -639,7 +650,8 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
     const notificationStep = normalized.indexOf("voir une notification");
     const smsStep = normalized.indexOf("activer l'envoi par SMS simulé");
     assert.ok(seedStep !== -1 && notificationStep > seedStep && smsStep > notificationStep, "les notifications viennent après les annonces d'exemple, l'envoi simulé après les notifications");
-    assert.equal(/24 migrations/.test(normalized), true);
+    assert.equal(/25 migrations/.test(normalized), true);
+    assert.equal(/\b24 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations (24)");
     assert.equal(/\b23 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations (23)");
     assert.equal(/\b22 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations (22)");
     assert.equal(/\b21 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations (21)");

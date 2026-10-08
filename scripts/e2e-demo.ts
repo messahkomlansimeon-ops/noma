@@ -140,6 +140,7 @@ async function main(): Promise<void> {
   assert.match(first, /3 message\(s\) écrit\(s\), favori ajouté, commande de démonstration proposée au vendeur démo, rôle admin attribué au compte Admin démo/);
   assert.match(first, /offre Pro : vendeur démo abonné \(crédits promotionnels émis\)/);
   assert.match(first, /photos : 30 photo\(s\) synthétique\(s\) ajoutée\(s\) \(0 déjà présente\(s\)\), une par annonce/);
+  assert.match(first, /demo:seed : collecte externe \(sources FICTIVES, aucun réseau\) : 3 surveillance\(s\) pour l'acheteur démo, \d+ annonce\(s\) externe\(s\) créée\(s\) \(0 déjà présente\(s\)\), 0 panne\(s\) de source/);
   const created = Number(/: (\d+) annonce\(s\) publiée\(s\)/.exec(first)?.[1]);
   const history = Number(/historique des prix : (\d+) relevé\(s\) synthétique\(s\) écrit\(s\)/.exec(first)?.[1]);
   assert.ok(history > 1_000, `historique des prix synthétique écrit (${history} relevés)`);
@@ -151,6 +152,7 @@ async function main(): Promise<void> {
   assert.match(second, /historique des prix : 0 relevé\(s\) synthétique\(s\) écrit\(s\) \(annonces et ventes fictives des 90 derniers jours ; déjà présents\)/);
   assert.match(second, /offre Pro : vendeur démo déjà abonné/, "rejeu : le vendeur démo n'est jamais abonné deux fois");
   assert.match(second, /photos : 0 photo\(s\) synthétique\(s\) ajoutée\(s\) \(30 déjà présente\(s\)\), une par annonce/);
+  assert.match(second, /3 surveillance\(s\) pour l'acheteur démo, 0 annonce\(s\) externe\(s\) créée\(s\) \(\d+ déjà présente\(s\)\)/);
   ok(`premier passage : ${created} annonce(s) et ${history} relevé(s) de prix synthétiques ; rejeu : 0 annonce, 0 besoin, 0 compte, 0 ouverture, 0 contact, crédits et boost déjà présents`);
 
   const browser = await chromium.launch({ executablePath: CHROME });
@@ -232,6 +234,30 @@ async function main(): Promise<void> {
     assert.equal(await buyer.getByTestId("photo-cover").count(), 9, "une vignette par carte");
     assert.deepEqual(await decodedSizes(buyer, '[data-testid="match-card"] [data-testid="photo-cover"]'), Array.from({ length: 9 }, () => [480, 360]));
     ok("lot PH1 : les 9 cartes montrent la vignette de leur annonce (PNG synthétique 480 × 360 décodé par le navigateur)");
+    // Lot EXT1 : la section « Sur d'autres sites » (annonces des sources FICTIVES), à part, avec la mention et des liens sortants sûrs.
+    await buyer.getByTestId("external-section").waitFor();
+    assert.equal(((await buyer.getByTestId("external-section").getByRole("heading").first().textContent()) ?? "").trim(), "Sur d'autres sites");
+    assert.equal(await buyer.getByTestId("external-card").count(), 4, "quatre annonces d'autres sites dans le budget, à Abidjan, pour le produit (le doublon des deux sources n'est montré qu'une fois)");
+    assert.equal(await buyer.locator('[aria-label="Offres correspondant à votre besoin"] [data-testid="external-card"]').count(), 0, "jamais dans la liste des résultats noma");
+    assert.equal(await buyer.getByTestId("match-card").count(), 9, "la section externe n'ajoute rien à la liste noma");
+    const mentions = await buyer.getByTestId("external-mention").allInnerTexts();
+    assert.equal(mentions.length, 4);
+    for (const mention of mentions) assert.match(mention, /^Annonce trouvée sur Annonces Démo [AB] : noma ne garantit ni le prix ni la disponibilité ; vous serez redirigé vers le site\.$/);
+    const links = buyer.getByTestId("external-link");
+    assert.equal(await links.count(), 4);
+    for (let index = 0; index < 4; index += 1) {
+      const link = links.nth(index);
+      assert.equal(await link.getAttribute("target"), "_blank");
+      assert.equal(await link.getAttribute("rel"), "noopener noreferrer nofollow");
+      assert.match((await link.getAttribute("href")) ?? "", /^https:\/\/annonces-demo-[ab]\.example\/annonce\/demo_[ab]-/);
+    }
+    const externalText = await buyer.getByTestId("external-section").innerText();
+    assert.equal(/Sponsoris|Contacter|favori|tel:/i.test(externalText), false, "aucune action de noma ni mise en avant dans la section externe");
+    assert.equal(await buyer.getByTestId("external-section").locator('a[href^="tel:"], a[href*="wa.me"], button:not([data-testid="external-more"])').count(), 0);
+    assert.match(externalText.replace(/\s+/g, " "), /Aussi trouvée sur Annonces Démo B/, "le doublon entre sources est présenté une fois");
+    assert.equal((externalText.match(/Vue le \d{2}\/\d{2}\/\d{4}/g) ?? []).length, 4, "lot EXT1-bis : chaque annonce porte sa date de dernière VUE (« Vue le jj/mm/aaaa »)");
+    assert.equal(/0708091011|07 08 09 10 11|appelez/i.test(await buyer.evaluate(() => document.body.innerText)), false, "le numéro de téléphone de l'annonce piégée n'est jamais affiché");
+    ok("section « Sur d'autres sites » : 4 annonces fictives à part, mention obligatoire, liens en nouvel onglet (noopener noreferrer nofollow), aucun numéro, aucune action de noma");
     await checkClean(buyer, "résultats");
     await shot(buyer, "03-resultats-acheteur");
     await sponsored.getByTestId("match-detail-link").click();
@@ -615,6 +641,28 @@ async function main(): Promise<void> {
     await checkSwitcherDoesNotOverlap(adminPage, "tableau de bord admin");
     await checkClean(adminPage, "tableau de bord admin");
     await shot(adminPage, "24-admin-tableau-de-bord");
+    // Lot EXT1 : /admin/collecte, en lecture seule (sources fictives, surveillances, annonces, erreurs), sans bouton d'activation.
+    await adminPage.getByRole("link", { name: /Collecte externe/ }).click();
+    await adminPage.waitForURL(/\/admin\/collecte$/);
+    await adminPage.getByTestId("admin-collection").waitFor();
+    assert.equal(((await adminPage.getByRole("heading", { level: 1 }).textContent()) ?? "").trim(), "Collecte externe");
+    assert.match(await adminPage.getByTestId("admin-collection-note").innerText(), /Lecture seule\. Seules des sources FICTIVES existent/);
+    await adminPage.getByTestId("collection-source").first().waitFor();
+    assert.deepEqual(await adminPage.getByTestId("collection-source").evaluateAll((nodes) => nodes.map((node) => `${node.getAttribute("data-source")}:${node.getAttribute("data-state")}`)), ["demo_a:closed", "demo_b:closed"]);
+    const sourcesText = await adminPage.getByTestId("admin-collection").innerText();
+    assert.match(sourcesText, /Annonces Démo A/);
+    assert.match(sourcesText, /Annonces Démo B/);
+    assert.match(sourcesText, /Source fictive/);
+    for (const quota of await adminPage.getByTestId("collection-quota").allInnerTexts()) assert.match(quota, /^\d+ \/ 200 requêtes aujourd'hui$/);
+    assert.match(await adminPage.getByTestId("collection-watches").innerText(), /3 surveillance\(s\) : 3 active\(s\), 0 en pause, 0 due\(s\) maintenant/);
+    assert.match(await adminPage.getByTestId("collection-watches").innerText(), /\d+ annonce\(s\) disponible\(s\), 0 disparue\(s\)/);
+    assert.match(await adminPage.getByTestId("collection-errors").innerText(), /Aucune erreur récente\./);
+    assert.equal(await adminPage.getByTestId("admin-collection").locator("input, button, textarea, select").count(), 0, "lecture seule : aucun bouton d'activation d'une source");
+    assert.equal(/réelle|activer/i.test(sourcesText.replace(/Seules des sources FICTIVES[^.]*\./, "")), false, "aucune invitation à activer une source réelle");
+    await checkSwitcherDoesNotOverlap(adminPage, "collecte externe");
+    await checkClean(adminPage, "collecte externe");
+    await shot(adminPage, "24b-admin-collecte");
+    ok("/admin/collecte : 2 sources fictives fermées avec leur quota, 3 surveillances actives, aucune erreur, aucun bouton d'activation");
     await adminPage.goto(`${BASE}/admin/vendeurs`);
     await adminPage.getByTestId("vendor-row").first().waitFor();
     assert.equal(await adminPage.getByTestId("vendor-row").count(), 8, "le vendeur démo et les 7 vendeurs fictifs");
@@ -685,6 +733,10 @@ async function main(): Promise<void> {
       return results;
     });
     assert.deepEqual(apiStatuses, [404, 404, 404, 404, 404], "les routes d'administration (dont /api/admin/market, les ventes confirmées) répondent 404 à un compte ordinaire");
+    assert.equal(await buyer.evaluate(async () => (await fetch("/api/admin/collection")).status), 404, "lot EXT1 : /api/admin/collection répond 404 à un compte ordinaire");
+    const collecteRefused = await buyer.goto(`${BASE}/admin/collecte`);
+    assert.equal(collecteRefused?.status(), 404, "lot EXT1 : /admin/collecte est une page 404 pour un compte ordinaire");
+    assert.equal(/Collecte externe/.test(await buyer.evaluate(() => document.body.innerText)), false);
     const subPage = await buyer.goto(`${BASE}/admin/vendeurs`);
     assert.equal(subPage?.status(), 404);
     await buyer.getByText("This page could not be found.").waitFor();

@@ -33,7 +33,7 @@ before(async () => {
   target = opened.target;
   await admin.query(`CREATE SCHEMA ${quoted}`);
   pool = await openVerifiedIsolatedPool(target, schema, wide);
-  assert.equal((await runMigrations(pool)).applied.length, 24);
+  assert.equal((await runMigrations(pool)).applied.length, 25);
 });
 
 after(async () => {
@@ -869,8 +869,8 @@ test("migration 0019 : contraintes des tables (statuts, compteurs, formes, unici
   // Relancer les migrations n'applique rien.
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 24);
-  assert.equal(rerun.skipped.at(-1), "0024_sms_sends");
+  assert.equal(rerun.skipped.length, 25);
+  assert.equal(rerun.skipped.at(-1), "0025_external_collection");
 });
 
 // ───────────── 9. lot N1-bis : seules les annonces NOUVELLES pour le besoin notifient ─────────────

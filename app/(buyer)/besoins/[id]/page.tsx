@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { ExternalSection } from "@/components/external/external-section";
 import { BuyerMatchCard } from "@/components/matches/match-parts";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
@@ -219,6 +220,9 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
               {loadingMore ? "Chargement…" : "Voir plus"}
             </button>
           ) : null}
+
+          {/* Lot EXT1 : annonces d'AUTRES SITES, section séparée (jamais dans la liste ni le classement ci-dessus). */}
+          <ExternalSection demandId={demandId} />
         </>
       )}
     </>

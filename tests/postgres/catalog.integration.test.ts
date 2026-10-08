@@ -171,8 +171,8 @@ if (!configuredUrl?.trim()) {
           runMigrations(pool),
           runMigrations(secondPool),
         ]);
-        assert.equal(first.applied.length + second.applied.length, 24);
-        assert.equal(first.skipped.length + second.skipped.length, 24);
+        assert.equal(first.applied.length + second.applied.length, 25);
+        assert.equal(first.skipped.length + second.skipped.length, 25);
         const rerun = await runMigrations(pool);
         assert.deepEqual(rerun.applied, []);
         assert.deepEqual(rerun.skipped, [
@@ -200,11 +200,12 @@ if (!configuredUrl?.trim()) {
           "0022_offer_photos",
           "0023_price_observations",
           "0024_sms_sends",
+          "0025_external_collection",
         ]);
         const history = await pool.query(
           "SELECT version, checksum FROM noma_schema_migrations ORDER BY version",
         );
-        assert.equal(history.rowCount, 24);
+        assert.equal(history.rowCount, 25);
         assert.deepEqual(history.rows.map((row) => row.version), [
           "0001_users_offers_demands",
           "0002_phone_otp_sessions",
@@ -230,6 +231,7 @@ if (!configuredUrl?.trim()) {
           "0022_offer_photos",
           "0023_price_observations",
           "0024_sms_sends",
+          "0025_external_collection",
         ]);
         assert.ok(history.rows.every((row) => /^[0-9a-f]{64}$/.test(row.checksum)));
       } finally {

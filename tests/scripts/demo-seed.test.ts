@@ -245,6 +245,12 @@ describe("verrou consultatif de demo:seed (lot D3)", () => {
     const duplicates = [...declared].filter(([, owners]) => owners.length > 1);
     assert.deepEqual(duplicates, [], "aucun espace de verrou n'est partagé");
     assert.deepEqual(declared.get("1314664960"), ["scripts/demo-seed-plan.ts:DEMO_SEED_LOCK_NAMESPACE"]);
+    // Plage réservée à la collecte externe (lot EXT1) : 981 (analyse par empreinte) et 982 (regroupement entre sources), déclarés une seule fois, dans la configuration du lot.
+    assert.deepEqual(declared.get("1314664981"), ["lib/server/external/config.ts:EXTERNAL_ANALYSIS_LOCK_NAMESPACE"]);
+    assert.deepEqual(declared.get("1314664982"), ["lib/server/external/config.ts:EXTERNAL_GROUP_LOCK_NAMESPACE"]);
+    // La liste de scripts/demo-seed-plan.ts les mentionne (elle est la référence documentaire des espaces utilisés).
+    const plan = readFileSync(join(root, "scripts/demo-seed-plan.ts"), "utf8");
+    assert.match(plan, /981 et 982 \(collecte externe/);
   });
 });
 

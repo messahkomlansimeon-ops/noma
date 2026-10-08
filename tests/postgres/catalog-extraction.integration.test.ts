@@ -99,6 +99,7 @@ if (!configuredUrl?.trim()) {
         "0022_offer_photos",
         "0023_price_observations",
         "0024_sms_sends",
+        "0025_external_collection",
       ]);
     });
 

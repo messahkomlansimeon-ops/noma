@@ -15,6 +15,7 @@ import { runMarketStep, type MarketStepResult } from "../market/observe";
 import { runNotificationStep, type NotifyHooks, type NotifyStepResult } from "../notifications/deliveries";
 import { resolveNotificationTransport, type NotificationTransport } from "../notifications/transport";
 import { runSubscriptionStep, type SubscriptionStepResult } from "../subscriptions/lifecycle";
+import { emptyCollectResult, runCollectStep, type CollectStepOptions, type CollectStepResult } from "../external/collect";
 import { projectOutboxBatch, type ProjectOutboxBatchResult } from "./projection";
 import { runTemporalExpirySweep } from "./temporal";
 import { runUserReactivationSweep, type UserReactivationSweepResult } from "./sweeps";
@@ -64,9 +65,14 @@ export interface MatchingCycleResult {
    * qui doit relancer la boucle. Voir HISTORIQUE-PRIX.md.
    */
   market: MarketStepResult;
-  /** Aucun progrès : rien périmé, aucun boost expiré, rien lu par la projection, rien en maintenance, aucun job exécuté, aucun envoi traité (un utilisateur en erreur ou laissé à un autre processus compte comme « au repos »). */
+  /**
+   * Étape « collect » (lot EXT1, exécutée en dernier, après « market ») : collecte MUTUALISÉE d'annonces externes par surveillance de marché, sources FICTIVES seulement. `skipped: true` : la migration 0025 n'est
+   * pas appliquée (étape ignorée sans erreur) ; `noConnectors: true` : aucun connecteur disponible, rien collecté. Une panne d'une source n'est pas une erreur du cycle. Voir COLLECTE-EXTERNE.md.
+   */
+  collect: CollectStepResult;
+  /** Aucun progrès : rien périmé, aucun boost expiré, rien lu par la projection, rien en maintenance, aucun job exécuté, aucune surveillance collectée, aucun envoi traité (un utilisateur en erreur ou laissé à un autre processus compte comme « au repos »). */
   idle: boolean;
-  /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`, `notify_error_<code>`, `market_error_<code>`). */
+  /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`, `notify_error_<code>`, `market_error_<code>`, `collect_error_<code>`). */
   errors: string[];
 }
 
@@ -94,6 +100,8 @@ export interface RunMatchingCycleOptions {
   notificationHooks?: NotifyHooks;
   /** Instant de l'étape « market » (jour UTC du relevé) : réservé aux tests ; sinon l'horloge de la base. */
   marketNow?: () => Date;
+  /** Étape « collect » (lot EXT1) : connecteurs, horloge, analyseur… Absent : connecteurs résolus depuis l'environnement (aucun sans `NOMA_EXTERNAL_FAKE=1`, jamais en production). Réservé aux tests. */
+  collect?: Omit<CollectStepOptions, "pool" | "signal">;
 }
 
 function requireBoundedInteger(value: unknown, field: string, min: number, max: number): number {
@@ -212,6 +220,14 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
   } catch (error) {
     errors.push(`market_error_${errorCodeOf(error)}`);
   }
+  // Étape « collect » (lot EXT1) : isolée comme les autres, exécutée en dernier (budget borné) ; ne lève jamais (ses erreurs sont des codes stables) et une panne d'une source n'est jamais une erreur du cycle.
+  let collect = emptyCollectResult();
+  try {
+    collect = await runCollectStep({ ...options.collect, pool, signal });
+    for (const code of collect.errors) errors.push(`collect_error_${code}`);
+  } catch (error) {
+    errors.push(`collect_error_${errorCodeOf(error)}`);
+  }
   return {
     temporal,
     boost,
@@ -221,11 +237,13 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
     notify,
     subscriptions,
     market,
+    collect,
     // Au repos : l'utilisateur laissé à un autre processus (busy) ET l'utilisateur en erreur (une erreur de l'étape notify compte comme « au repos » : ses lignes ont
     // une tentative de plus et une attente croissante, `recordUserFailure`) ne comptent pas comme du travail ; sinon un échec permanent ferait tourner la boucle sans pause.
     idle: temporal.expired === 0 && boost.expired === 0 && projected.selected === 0 && maintenance.deadLettered === 0 && jobs.length === 0
       && notify.users - notify.busy - notify.errors.length <= 0 && notify.expired === 0
-      && subscriptions.renewed + subscriptions.pastDue + subscriptions.ended + subscriptions.promoExpired === 0,
+      && subscriptions.renewed + subscriptions.pastDue + subscriptions.ended + subscriptions.promoExpired === 0
+      && collect.watchesProcessed === 0,
     errors,
   };
 }

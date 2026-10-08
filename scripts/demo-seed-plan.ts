@@ -27,7 +27,8 @@ export const DEMO_HISTORY_SELLER_COUNT = 6;
  * Espace du verrou consultatif qui sérialise deux `demo:seed`. Constante DÉDIÉE (lot D3) : l'ancienne valeur, 1_314_664_955, était celle du plafond de notifications
  * (`NOTIFICATION_CAP_LOCK_NAMESPACE`) ; deux verrous d'usages différents ne partagent jamais un espace. Liste des espaces utilisés : 1_314_664_945 (migrations), 946 et 947 (matching),
  * 948 et 949 (boost : périmètre, devis), 950 (recharges), 951 (achat de boost), 952 (cadence des devis), 953 (dev:seed), 954 (contacts), 955 et 956 (notifications), 957 à 959 (messagerie,
- * conversations, favoris), 960 (demo:seed), 970 et 971 (photos), 972 (abonnements), 977 (budgets SMS, lot SMS1). Un test (`tests/scripts/demo-seed.test.ts`) vérifie qu'aucun espace n'est déclaré deux fois.
+ * conversations, favoris), 960 (demo:seed), 970 et 971 (photos), 972 (abonnements), 977 (budgets SMS, lot SMS1), 981 et 982 (collecte externe, lot EXT1 : analyse par empreinte, regroupement entre sources ; plage réservée par l'orchestrateur). Un test
+ * (`tests/scripts/demo-seed.test.ts`) vérifie qu'aucun espace n'est déclaré deux fois et que 981 et 982 appartiennent à `lib/server/external/config.ts`.
  */
 export const DEMO_SEED_LOCK_NAMESPACE = 1_314_664_960;
 /** Repère placé dans le texte de chaque annonce et de chaque besoin de démonstration : c'est lui qui rend la commande rejouable sans doublon. */

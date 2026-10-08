@@ -42,6 +42,13 @@ async function main(): Promise<void> {
         `${result.notify.failed} en échec, ${result.notify.expired} expiré(s).`,
       );
     }
+    // Étape « collect » (lot EXT1, sources FICTIVES) : une ligne seulement si elle a travaillé (jamais le contenu d'une annonce ni une adresse).
+    if (result.collect.watchesProcessed > 0) {
+      console.log(
+        `Matching worker : collecte externe (sources fictives), ${result.collect.watchesProcessed} surveillance(s) collectée(s), ${result.collect.created} annonce(s) créée(s), ` +
+        `${result.collect.sourceFailures} panne(s) de source.`,
+      );
+    }
     // Un code stable par ligne (jamais de message brut) ; une étape en échec donne le code de sortie 1.
     for (const code of result.errors) console.error(`Matching worker : ${code}`);
     if (result.errors.length > 0) process.exitCode = 1;

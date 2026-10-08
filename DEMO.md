@@ -80,6 +80,7 @@ Page d'accueil sans compte. **Dites** : « noma, c'est l'inverse d'un site d'ann
 4. **Fiche d'une annonce** : « Voir l'annonce » sur l'annonce sponsorisée. Prix, état, quartier, caractéristiques, date. **Dites** : « Remarquez : aucun numéro de téléphone. noma refuse à la publication les numéros qu'il reconnaît dans l'annonce et les cache à l'affichage s'il en passe un. » (La règle et sa limite sont expliquées dans « Les numéros dans les annonces » plus bas : ne promettez pas que rien ne passe.)
 5. **Contact** : « Contacter le vendeur » : le numéro vérifié apparaît, avec « Appeler » et WhatsApp. **Dites** : « Le contact est le moment qu'on mesure. Le vendeur verra qu'un acheteur l'a contacté via noma, jamais son nom ni son numéro. »
 6. **Notifications** : retour à l'accueil puis « Notifications » (ou l'onglet « Alertes »). Trois nouvelles annonces, publiées **après** les besoins. **Dites** : « L'acheteur est prévenu quand une annonce correspond. Il y a des plafonds (20 par besoin et par jour, 50 par jour) pour ne jamais le harceler, et l'envoi par SMS est prévu avec des heures calmes. »
+7. **Sur d'autres sites** : en bas des résultats de l'iPhone 12, la section **« Sur d'autres sites »** (annonces des sources FICTIVES « Annonces Démo A » et « Annonces Démo B », aucun site contacté), à part, sans « Sponsorisé », avec la mention « noma ne garantit ni le prix ni la disponibilité ; vous serez redirigé vers le site » et un lien en nouvel onglet. **Dites** : « Une collecte sert tous les acheteurs qui cherchent le même produit ; une annonce vue sur deux sites n'apparaît qu'une fois ; et une panne d'un site externe ne touche jamais les résultats noma. » (Administrateur : `/admin/collecte`, lecture seule ; voir `COLLECTE-EXTERNE.md`.)
 
 ### Côté vendeur (5 minutes) : fenêtre de navigation privée
 
@@ -134,6 +135,7 @@ Elle **ne refuse pas** les prix à milliers et leurs fourchettes (« 12 500 000 
 - le **paiement** : la recharge passe par un prestataire fictif et une page « SIMULATION — aucun argent réel » ;
 - les **SMS** : le code de connexion s'affiche dans le terminal ; les envois de notification n'existent qu'en ligne de terminal (`NOMA_DEV_NOTIFY_CONSOLE=1`) ;
 - les **sources de la recherche externe** : annonces fictives, aucun site contacté ;
+- la **collecte d'annonces d'autres sites** (section « Sur d'autres sites ») : deux sources fictives, aucun site contacté, aucune source réelle activable avant validation juridique (`COLLECTE-EXTERNE.md`) ;
 - les **vendeurs et acheteurs fictifs** du marché de démonstration (numéros `+225 07 88 88 88 01` à `07`, `+225 07 66 66 66 01` à `11`, et les six comptes fictifs de l'historique des prix `+225 07 55 55 55 01` à `06`, qui n'appartiennent à personne) ;
 - les **ouvertures et contacts** des acheteurs fictifs ;
 - le **vendeur de la conversation** de démonstration (un vendeur fictif), l'**acheteur fictif** de la commande à confirmer et leurs messages.
