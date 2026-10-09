@@ -3,13 +3,15 @@ import "server-only";
 import type { Pool } from "pg";
 import { CatalogNotFoundError, CatalogValidationError } from "../catalog/errors";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
-import { TRACKING_EXTEND_DAYS, TRACKING_MAX_DAYS } from "./config";
+import { trackingMaxDaysFor } from "../active-search/state";
+import { TRACKING_EXTEND_DAYS } from "./config";
 
 /**
  * Suivi d'un besoin (« recherche active » interne, lot N1) : `demands.notify_until` (défaut création + 30 jours) et `demands.notify_paused`. Réservé au propriétaire
  * (un besoin d'autrui ou inconnu : la même erreur « introuvable »). Le MATCHING continue pendant une pause ou après l'expiration (les résultats restent visibles) :
  * seules les notifications s'arrêtent. Prolonger ajoute 30 jours (à partir de l'échéance si elle est dans le futur, sinon de maintenant), plafonné à maintenant + 90 jours.
- * Ces colonnes ne sont pas du contenu : changer le suivi n'incrémente jamais `content_version` et n'émet aucun événement de matching. Voir NOTIFICATIONS.md.
+ * Le plafond est de 90 jours, ou de 180 jours PENDANT que la RECHERCHE ACTIVE payante du besoin est en vigueur (lot RA1) ; quand elle prend fin, le suivi revient au plafond de 90 jours
+ * (entretien du worker). Ces colonnes ne sont pas du contenu : changer le suivi n'incrémente jamais `content_version` et n'émet aucun événement de matching. Voir NOTIFICATIONS.md.
  */
 
 export type TrackingAction = "extend" | "pause" | "resume";
@@ -42,14 +44,14 @@ interface TrackingRow {
   notify_paused: boolean;
 }
 
-function toTracking(demandId: string, row: TrackingRow, now: Date): DemandTracking {
+function toTracking(demandId: string, row: TrackingRow, now: Date, maxDays: number): DemandTracking {
   return {
     demandId,
     demandStatus: row.status,
     until: row.notify_until,
     paused: row.notify_paused,
     active: row.status === "active" && !row.archived && !row.notify_paused && row.notify_until.getTime() > now.getTime(),
-    maxUntil: new Date(now.getTime() + TRACKING_MAX_DAYS * 86_400_000),
+    maxUntil: new Date(now.getTime() + maxDays * 86_400_000),
     readAt: now,
   };
 }
@@ -65,7 +67,7 @@ export async function readDemandTracking(input: { pool: Pool; ownerId: string; d
        FROM demands WHERE id = $1::uuid AND owner_id = $2::uuid`,
     [demandId, ownerId],
   );
-  return result.rows[0] ? toTracking(demandId, result.rows[0], now) : null;
+  return result.rows[0] ? toTracking(demandId, result.rows[0], now, await trackingMaxDaysFor(pool, demandId, now)) : null;
 }
 
 /**
@@ -97,6 +99,7 @@ export async function applyTrackingAction(input: {
     );
     if (!locked.rows[0]) throw new CatalogNotFoundError("demande");
     if (locked.rows[0].status !== "active" || locked.rows[0].archived) throw new TrackingNotActiveError();
+    const maxDays = await trackingMaxDaysFor(client, demandId, now);
 
     let updated: TrackingRow;
     if (input.action === "extend") {
@@ -109,7 +112,7 @@ export async function applyTrackingAction(input: {
                     $2::timestamptz + ($4::int * interval '1 day')))
           WHERE id = $1::uuid
           RETURNING status, archived_at IS NOT NULL AS archived, notify_until, notify_paused`,
-        [demandId, now, TRACKING_EXTEND_DAYS, TRACKING_MAX_DAYS],
+        [demandId, now, TRACKING_EXTEND_DAYS, maxDays],
       );
       updated = result.rows[0];
     } else {
@@ -121,7 +124,7 @@ export async function applyTrackingAction(input: {
       updated = result.rows[0];
     }
     await client.query("COMMIT");
-    return toTracking(demandId, updated, now);
+    return toTracking(demandId, updated, now, maxDays);
   } catch (error) {
     try {
       await client.query("ROLLBACK");

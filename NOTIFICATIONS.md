@@ -156,6 +156,10 @@ Chaque ligne prise est contrôlée ; sinon elle passe à `skipped` avec un motif
   livraison est **au moins une fois**, avec la **même** clé d'idempotence (`idempotencyKey`) pour qu'un vrai fournisseur puisse dédoublonner. Les notifications **dans l'application**, elles, n'ont jamais de doublon.
 - Un besoin satisfait ou archivé annulé **entre** le figeage et l'envoi : les lignes passent à `cancelled`, aucun message ne part pour elles.
 
+## Recherche active payante : deux genres de plus (lot RA1)
+
+`new_external_match` (« annonce d'un AUTRE SITE » : titre nettoyé, prix, nom de la source ; le lien est la page du BESOIN, jamais l'adresse de l'annonce externe) et `active_search_expiring` (avis d'échéance de l'option, 3 jours avant la fin) s'ajoutent à `new_match`, `new_matches_digest`, `new_message` et `mission_coverage` (couverture d'une mission, lot MV1, migration 0027 : la 0028 reprend ce genre et la colonne `mission_id` dans les deux contraintes de `notifications`, voir `RECHERCHE-ACTIVE.md`). Ils ne naissent que pour un besoin dont l'option payante est en vigueur (étape `activeSearch` du worker, `RECHERCHE-ACTIVE.md`), comptent dans les **mêmes plafonds** (20 par besoin et 50 par utilisateur et par jour UTC, un résumé au-delà), ont les mêmes envois externes simulés (ligne d'envoi sur `external_listing_id`, revérifiée à l'envoi) et apparaissent dans `/notifications` (pastilles « Autre site » et « Recherche active ») et sur l'accueil. Le plafond du suivi ci-dessous passe de 90 à **180 jours pendant** l'option.
+
 ## Le suivi d'un besoin
 
 Colonnes `demands.notify_until` (défaut **création + 30 jours** par déclencheur ; les besoins qui existaient reçoivent **maintenant + 30 jours** à la migration) et `demands.notify_paused`.
@@ -164,7 +168,7 @@ n'incrémente jamais `content_version` et n'émet aucun événement de matching.
 
 | Action (`POST /api/demands/{id}/tracking`, corps `{ "action" }`) | Effet |
 | --- | --- |
-| `extend` | `notify_until` + 30 jours à partir de l'échéance (de maintenant si elle est passée), **plafonné à maintenant + 90 jours**, jamais réduit ; sans effet au plafond |
+| `extend` | `notify_until` + 30 jours à partir de l'échéance (de maintenant si elle est passée), **plafonné à maintenant + 90 jours** (**180 jours pendant la recherche active payante du besoin**, lot RA1 : `trackingMaxDaysFor` ; à la fin de l'option l'entretien ramène le suivi à 90 jours au plus), jamais réduit ; sans effet au plafond |
 | `pause` | `notify_paused = true` (idempotent) |
 | `resume` | `notify_paused = false` (idempotent) ; ne prolonge pas un suivi échu |
 

@@ -19,7 +19,7 @@ import { readSubscriptionState, type SubscriptionState } from "./state";
  * Routes HTTP de l'offre Pro (lot PRO1), toutes en `no-store`, origine vérifiée AVANT la session sur ce qui écrit, session obligatoire (l'utilisateur vient TOUJOURS de la session),
  * corps JSON STRICT (`application/json`, clés exactes), DTO en liste blanche, textes fixes, journal serveur limité à un code :
  *  - GET  /api/subscription                      : plans courants, droits en vigueur, abonnement, crédits promotionnels, annonces en ligne, avis ;
- *  - POST /api/subscription                      : `{ planCode, idempotencyKey }` souscrit avec les crédits payés (201 ; 200 pour un rejeu de la clé) ;
+ *  - POST /api/subscription                      : `{ planCode, idempotencyKey, expectedPriceXof }` souscrit avec les crédits payés au prix AFFICHÉ (409 `price_changed` s'il a changé ; 201 ; 200 pour un rejeu de la clé) ;
  *  - POST /api/subscription/auto-renew           : `{ autoRenew }` active ou désactive (annule) le renouvellement automatique ;
  *  - POST /api/subscription/notices/read         : `{ all: true }` ou `{ ids }` marque des avis comme lus ;
  *  - POST /api/offers/import                     : `{ csv, dryRun }` aperçu à blanc ou application de l'import de catalogue (droit `catalog_import`).
@@ -164,10 +164,12 @@ export function createSubscriptionHttpHandlers(dependencies: SocialHttpDependenc
         const body = await readStrictJsonBody(request, SUBSCRIPTION_HTTP_BODY_MAX_BYTES);
         if (!body.ok || !isPlainObject(body.value)) return invalidRequest();
         const keys = Object.keys(body.value);
-        const { planCode, idempotencyKey } = body.value;
-        if (keys.length !== 2 || typeof planCode !== "string" || typeof idempotencyKey !== "string" || !UUID.test(idempotencyKey) || hasUnexpectedQuery(request)) return invalidRequest();
+        const { planCode, idempotencyKey, expectedPriceXof } = body.value;
+        if (keys.length !== 3 || typeof planCode !== "string" || typeof idempotencyKey !== "string" || !UUID.test(idempotencyKey) || hasUnexpectedQuery(request)) return invalidRequest();
+        // Le prix AFFICHÉ est obligatoire : la souscription ne se fait jamais à un prix que l'acheteur n'a pas vu.
+        if (typeof expectedPriceXof !== "number" || !Number.isSafeInteger(expectedPriceXof) || expectedPriceXof <= 0) return invalidRequest();
         const pool = context.poolOf();
-        const result = await subscribeToPlan({ pool, userId, planCode, idempotencyKey });
+        const result = await subscribeToPlan({ pool, userId, planCode, idempotencyKey, expectedPriceXof });
         const dto = subscriptionStateDto(await readSubscriptionState({ pool, userId }));
         return noStoreJsonResponse(result.reused ? 200 : 201, { ...dto, reused: result.reused });
       }),

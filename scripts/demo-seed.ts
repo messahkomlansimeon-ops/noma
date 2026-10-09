@@ -24,6 +24,8 @@ import { buildDemoMarketHistory, marketSellerId } from "./demo-market-plan";
 import {
   DEMO_ADMIN_PHONE,
   DEMO_BOOST_DURATION,
+  DEMO_BUYER_CREDIT_REFERENCE,
+  DEMO_BUYER_CREDIT_XOF,
   DEMO_BUYER_DEMANDS,
   DEMO_BUYER_PHONE,
   DEMO_CONTACTERS,
@@ -84,6 +86,8 @@ export interface DemoSeedReport {
   viewsRecorded: number;
   contactsRecorded: number;
   creditAdded: boolean;
+  /** Lot RA1 : le crédit PAYÉ de l'acheteur démo (de quoi acheter la recherche active) a été ajouté ce coup-ci (faux : déjà présent). */
+  buyerCreditAdded: boolean;
   /** Lot PRO1 : le vendeur démo a été abonné à l'offre Pro ce coup-ci (faux : déjà abonné). */
   proSubscribed: boolean;
   boost: "granted" | "existing" | "refused";
@@ -199,6 +203,22 @@ export async function runMatchingUntilIdle(pool: Pool, counters: Counters): Prom
   }
 }
 
+/** Lot RA1 : crédit PAYÉ de l'acheteur démo, écrit une seule fois (même ajustement d'administration que le crédit du vendeur). */
+async function ensureBuyerCredit(pool: Pool, buyerId: string): Promise<boolean> {
+  const existing = await pool.query("SELECT 1 FROM wallet_transactions WHERE reference = $1", [DEMO_BUYER_CREDIT_REFERENCE]);
+  if (existing.rowCount) return false;
+  await recordWalletTransaction(pool, {
+    kind: "adjustment",
+    reference: DEMO_BUYER_CREDIT_REFERENCE,
+    metadata: { reasonCode: "demo_seed" },
+    entries: [
+      { account: { kind: "boost_revenue" }, amount: -BigInt(DEMO_BUYER_CREDIT_XOF) },
+      { account: { kind: "user", ownerId: buyerId }, amount: BigInt(DEMO_BUYER_CREDIT_XOF) },
+    ],
+  });
+  return true;
+}
+
 async function ensureVendorCredit(pool: Pool, vendorId: string): Promise<boolean> {
   const existing = await pool.query("SELECT 1 FROM wallet_transactions WHERE reference = $1", [DEMO_VENDOR_CREDIT_REFERENCE]);
   if (existing.rowCount) return false;
@@ -285,7 +305,7 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
   const counters: Counters = {
     report: {
       accountsCreated: 0, accountsExisting: 0, offersCreated: 0, offersExisting: 0, demandsCreated: 0, demandsExisting: 0,
-      viewsRecorded: 0, contactsRecorded: 0, creditAdded: false, proSubscribed: false, boost: "existing", adminGranted: false, messagesWritten: 0, favoriteAdded: false, orderDeclared: false, photosAdded: 0, photosExisting: 0, marketObservationsWritten: 0, mission: "existing", cycles: 0,
+      viewsRecorded: 0, contactsRecorded: 0, creditAdded: false, buyerCreditAdded: false, proSubscribed: false, boost: "existing", adminGranted: false, messagesWritten: 0, favoriteAdded: false, orderDeclared: false, photosAdded: 0, photosExisting: 0, marketObservationsWritten: 0, mission: "existing", cycles: 0,
       external: { skipped: false, watches: 0, watchesCollected: 0, listingsCreated: 0, listingsKnown: 0, sourceFailures: 0, budgetSkipped: 0 },
     },
   };
@@ -352,6 +372,8 @@ async function seedUnderLock(pool: Pool): Promise<DemoSeedReport> {
 
   // 5. Le vendeur démo : crédits, boost de son iPhone 12, ouvertures et contacts d'acheteurs fictifs.
   report.creditAdded = await ensureVendorCredit(pool, vendorId);
+  // Lot RA1 : l'acheteur démo a des crédits payés pour acheter la recherche active.
+  report.buyerCreditAdded = await ensureBuyerCredit(pool, buyerId);
   // Lot PRO1 : le vendeur démo est abonné à l'offre Pro (crédit d'abonnement en plus, puis vraie souscription).
   report.proSubscribed = await ensureVendorPro(pool, vendorId);
   const boostedOffer = DEMO_OFFERS.find((offer) => offer.boosted === true) as DemoOffer;
@@ -508,6 +530,7 @@ async function main(): Promise<number> {
     `demo:seed : messagerie, favoris, commandes et administration : ${report.messagesWritten} message(s) écrit(s), favori ${report.favoriteAdded ? "ajouté" : "déjà présent"}, ` +
       `commande de démonstration ${report.orderDeclared ? "proposée au vendeur démo" : "déjà active"}, rôle admin ${report.adminGranted ? "attribué au compte Admin démo" : "déjà attribué"}.`,
   );
+  console.log(`demo:seed : recherche active : acheteur démo, ${DEMO_BUYER_CREDIT_XOF} FCFA de crédits payés ${report.buyerCreditAdded ? "ajoutés" : "déjà présents"} (prix PROVISOIRE de l'option : 2 000 FCFA pour 30 jours).`);
   console.log(`demo:seed : offre Pro : vendeur démo ${report.proSubscribed ? "abonné (crédits promotionnels émis)" : "déjà abonné"}.`);
   console.log(`demo:seed : photos : ${report.photosAdded} photo(s) synthétique(s) ajoutée(s) (${report.photosExisting} déjà présente(s)), une par annonce.`);
   console.log(

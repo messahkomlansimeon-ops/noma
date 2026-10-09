@@ -15,13 +15,14 @@ import {
   WATCH_RETRY_SECONDS,
   ALLOWED_SOURCE_TYPE,
 } from "./config";
+import { acceleratedQuotaShare } from "../active-search/config";
 import { connectorFor, externalSchemaPresent, listSources, resolveConnectors, SOURCE_COLUMNS } from "./registry";
 import { groupWatchDuplicates } from "./grouping";
 import { sanitizeBatch, type SanitizedBatch } from "./sanitize";
 import { readPseudonymKey } from "./secret";
 import { isListingDataError, isStoreConflict, storeSearchResult, type Analyzer, type StoreOutcome } from "./store";
 import { productKeyOfWatch, type ClaimedWatch, type ConnectorContext, type ProductKey, type SourceConnector, type SourceRow } from "./types";
-import { claimDueWatches, finishWatch, releaseWatches, renewLease, syncMarketWatches, type SyncResult } from "./watches";
+import { claimDueWatches, finishWatch, readLeasedFrequency, releaseWatches, renewLease, syncMarketWatches, type SyncResult } from "./watches";
 
 /**
  * Étape « collect » du worker (lot EXT1). Isolée comme les autres étapes : elle ne lève jamais, rapporte des codes stables, et une panne de la collecte ne change rien au reste du cycle.
@@ -134,7 +135,7 @@ export interface CollectStepResult {
 
 export function emptyCollectResult(): CollectStepResult {
   return {
-    skipped: false, noConnectors: false, sync: { activeKeys: 0, created: 0, reactivated: 0, paused: 0 }, claimed: 0, watchesProcessed: 0, released: 0, leaseLost: 0, sourceCalls: 0,
+    skipped: false, noConnectors: false, sync: { activeKeys: 0, created: 0, reactivated: 0, paused: 0, accelerated: 0, decelerated: 0 }, claimed: 0, watchesProcessed: 0, released: 0, leaseLost: 0, sourceCalls: 0,
     sourceFailures: 0, breakerOpened: 0, breakerSkipped: 0, quotaSkipped: 0, budgetSkipped: 0, intervalSkipped: 0, busySkipped: 0, abortedRequests: 0, inactiveSources: 0, waits: 0,
     stored: 0, created: 0, changed: 0, unchanged: 0, revived: 0, goneBySource: 0, goneByAbsence: 0, analyzed: 0, analysisReused: 0, grouped: 0, groupingConflicts: 0, storeRetries: 0, rejected: 0,
     phoneRemoved: 0, duplicatesInResponse: 0, truncated: 0, errors: [],
@@ -193,6 +194,8 @@ type RefusalReason = "inactive" | "breaker" | "quota" | "budget" | "interval" | 
 /** Ce qu'il faut pour RENDRE une réservation (compteurs, dernière requête, jeton d'essai) si la requête ne part finalement pas. */
 interface Ticket {
   day: string;
+  /** La requête a été comptée dans la part ACCÉLÉRÉE du quota de la source (surveillance accélérée par la recherche active). */
+  accelerated: boolean;
   reservedAt: Date;
   previousRequestAt: Date | null;
   trialUntil: Date | null;
@@ -247,11 +250,17 @@ async function reserveRequest(pool: Pool, watch: ClaimedWatch, sourceCode: strin
     if (halfOpen && source.breaker_trial_until !== null && source.breaker_trial_until.getTime() > now.getTime()) return await refuse("breaker");
     const day = utcDay(now);
     if (source.daily_quota < 1) return await refuse("quota");
+    // Surveillance ACCÉLÉRÉE (recherche active, lot RA1-bis) : ses requêtes ne consomment qu'une PART du quota de la source (la moitié) ; la part ordinaire reste réservée.
+    const accelerated = watch.accelerated === true ? 1 : 0;
+    const acceleratedShare = acceleratedQuotaShare(source.daily_quota);
+    if (accelerated === 1 && acceleratedShare < 1) return await refuse("quota");
     const quota = await client.query(
-      `INSERT INTO external_source_usage (source_code, day, requests) VALUES ($1, $2::date, 1)
-       ON CONFLICT (source_code, day) DO UPDATE SET requests = external_source_usage.requests + 1 WHERE external_source_usage.requests < $3::int
+      `INSERT INTO external_source_usage (source_code, day, requests, accelerated_requests) VALUES ($1, $2::date, 1, $4::int)
+       ON CONFLICT (source_code, day) DO UPDATE
+         SET requests = external_source_usage.requests + 1, accelerated_requests = external_source_usage.accelerated_requests + $4::int
+         WHERE external_source_usage.requests < $3::int AND ($4::int = 0 OR external_source_usage.accelerated_requests < $5::int)
        RETURNING requests`,
-      [sourceCode, day, source.daily_quota],
+      [sourceCode, day, source.daily_quota, accelerated, acceleratedShare],
     );
     if (quota.rowCount === 0) return await refuse("quota");
     if (watch.daily_request_budget < 1) return await refuse("budget");
@@ -272,7 +281,7 @@ async function reserveRequest(pool: Pool, watch: ClaimedWatch, sourceCode: strin
       sourceCode, reservedAt, trialUntil, now,
     ]);
     await client.query("COMMIT");
-    return { granted: true, waitMs, ticket: { day, reservedAt, previousRequestAt: source.last_request_at, trialUntil } };
+    return { granted: true, waitMs, ticket: { day, accelerated: accelerated === 1, reservedAt, previousRequestAt: source.last_request_at, trialUntil } };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     // Verrou de la source tenu plus de 2 s par un autre processus : source « occupée », pas une panne d'infrastructure.
@@ -289,7 +298,10 @@ async function reserveRequest(pool: Pool, watch: ClaimedWatch, sourceCode: strin
  */
 async function releaseReservation(pool: Pool, watchId: string, sourceCode: string, ticket: Ticket): Promise<void> {
   await withShortTransaction(pool, async (client) => {
-    await client.query("UPDATE external_source_usage SET requests = GREATEST(requests - 1, 0) WHERE source_code = $1 AND day = $2::date", [sourceCode, ticket.day]);
+    await client.query(
+      "UPDATE external_source_usage SET requests = GREATEST(requests - 1, 0), accelerated_requests = GREATEST(accelerated_requests - $3::int, 0) WHERE source_code = $1 AND day = $2::date",
+      [sourceCode, ticket.day, ticket.accelerated ? 1 : 0],
+    );
     await client.query("UPDATE market_watch_usage SET requests = GREATEST(requests - 1, 0) WHERE watch_id = $1::uuid AND source_code = $2 AND day = $3::date", [watchId, sourceCode, ticket.day]);
     await client.query("UPDATE external_sources SET last_request_at = $2::timestamptz WHERE code = $1 AND last_request_at = $3::timestamptz", [sourceCode, ticket.previousRequestAt, ticket.reservedAt]);
     if (ticket.trialUntil !== null) {
@@ -567,8 +579,10 @@ export async function runCollectStep(options: CollectStepOptions): Promise<Colle
           result.released += 1;
           break;
         }
-        // Clôture conditionnée au jeton du bail : si un autre exécuteur a repris la surveillance entre-temps, son échéance est conservée.
-        if (await finishWatch(pool, watch, now, planNextRun(now, watch.frequency_seconds, verdict))) result.watchesProcessed += 1;
+        // Clôture conditionnée au jeton du bail : si un autre exécuteur a repris la surveillance entre-temps, son échéance est conservée. La fréquence est RELUE juste avant (lot RA1) :
+        // une recherche active achetée pendant la collecte accélère la surveillance, et la prochaine échéance doit en tenir compte.
+        const frequency = (await readLeasedFrequency(pool, watch)) ?? watch.frequency_seconds;
+        if (await finishWatch(pool, watch, now, planNextRun(now, frequency, verdict))) result.watchesProcessed += 1;
         else result.leaseLost += 1;
       }
     } finally {

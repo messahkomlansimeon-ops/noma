@@ -112,11 +112,12 @@ sudo -u noma sh -c 'set -a; . /opt/noma/shared/.env.production; set +a; npm run 
 #      grep -rlF "$(sudo -u noma sh -c '. /opt/noma/shared/.env.production; printf %s "$NOMA_SMS_API_KEY"')" .next || true
 # 3b. APPLIQUER LES MIGRATIONS DE LA BASE (`npm run db:migrate`) AVANT de démarrer — ou de redémarrer — la nouvelle version, jamais après.
 #    La nouvelle version lit des tables, des colonnes et des index que les migrations ajoutent (par exemple `0027_missions` : table des missions, quantité des commandes,
-#    notifications de couverture) : démarrée sur une base pas encore migrée, elle répond en erreur sur les écrans qui les lisent (accueil acheteur, « Mes besoins », commandes,
+#    notifications de couverture ; `0028_active_search` : achats de la recherche active payante, annonces vues, notifications d'annonces d'autres sites, recréation des contraintes de
+#    `notifications` qui reprend le genre des missions) : démarrée sur une base pas encore migrée, elle répond en erreur sur les écrans qui les lisent (accueil acheteur, « Mes besoins », commandes,
 #    comptes de besoins du vendeur). Sauvegarde `pg_dump` de la base d'abord ; la commande n'applique que les migrations manquantes (une migration déjà appliquée n'est jamais
 #    rejouée) et affiche « N appliquée(s), M déjà présente(s) » ; la base doit pointer sur le serveur PostgreSQL de production (variable `DATABASE_URL` du fichier d'environnement).
 sudo -u noma sh -c 'set -a; . /opt/noma/shared/.env.production; set +a; npm run db:migrate'
-#    → vérifier que la dernière migration affichée est celle de la version déployée (`0027_missions` pour les missions d'achat en volume) AVANT l'étape 4.
+#    → vérifier que la dernière migration affichée est celle de la version déployée (`0028_active_search` pour la recherche active payante, après `0027_missions` pour les missions d'achat en volume) AVANT l'étape 4.
 # 4. instance unique liée à 127.0.0.1 (deploy/noma.service)
 #    vérification post-démarrage : ss -tlnp | grep 3000  → 127.0.0.1 uniquement
 ```

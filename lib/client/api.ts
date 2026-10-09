@@ -274,8 +274,8 @@ export interface OfferContact {
 
 // ─── Notifications et suivi des besoins (notifications/v1, notification-preferences/v1, demand-tracking/v1) ───
 
-export type NotificationKind = "new_match" | "new_matches_digest" | "new_message" | "mission_coverage";
-export const NOTIFICATION_KINDS: readonly NotificationKind[] = ["new_match", "new_matches_digest", "new_message", "mission_coverage"];
+export type NotificationKind = "new_match" | "new_matches_digest" | "new_message" | "mission_coverage" | "new_external_match" | "active_search_expiring";
+export const NOTIFICATION_KINDS: readonly NotificationKind[] = ["new_match", "new_matches_digest", "new_message", "mission_coverage", "new_external_match", "active_search_expiring"];
 
 /** Une notification DANS l'application : liste blanche (titre, prix, lien interne) ; jamais de téléphone, d'identifiant du vendeur ni de texte libre. */
 export interface NotificationItem {
@@ -293,6 +293,10 @@ export interface NotificationItem {
   link: string;
   createdAt: string;
   readAt: string | null;
+  /** new_external_match seulement (recherche active) : nom de la source de l'annonce d'un autre site. */
+  sourceName?: string;
+  /** active_search_expiring seulement (recherche active) : fin de la dernière période payée. */
+  endsAt?: string;
 }
 
 export interface NotificationsPage {
@@ -383,7 +387,7 @@ export interface BoostQuote {
 // ─── Portefeuille, recharge simulée et achat de boost (wallet/v1, boost-purchase/v1) ───────────────
 
 export const WALLET_TRANSACTION_KINDS = [
-  "topup", "adjustment", "boost_purchase", "boost_refund", "subscription_charge", "subscription_refund", "promo_expiry",
+  "topup", "adjustment", "boost_purchase", "boost_refund", "subscription_charge", "subscription_refund", "promo_expiry", "search_purchase", "search_refund",
 ] as const;
 /**
  * Types connus ; « unknown » = un type que cette version de l'écran ne connaît pas (ajouté un jour par le serveur) : la ligne s'affiche « Opération »,
@@ -1365,6 +1369,45 @@ function parseNotificationItem(status: number, value: unknown): NotificationItem
     }
     return { id: value.id, kind, title: value.title, price, count: null, demandId: value.demandId, offerId: value.offerId, link: value.link, createdAt: value.createdAt, readAt: value.readAt };
   }
+  if (kind === "new_external_match") {
+    // Annonce d'un AUTRE SITE (recherche active) : titre, prix, nom de la source ; le lien est la page du BESOIN (jamais l'adresse de l'annonce externe).
+    if (
+      typeof value.title !== "string" ||
+      value.title.length < 1 ||
+      value.title.length > 160 ||
+      UNSAFE_NOTIFICATION_TEXT.test(value.title) ||
+      typeof value.sourceName !== "string" ||
+      value.sourceName.length < 1 ||
+      value.sourceName.length > 80 ||
+      UNSAFE_NOTIFICATION_TEXT.test(value.sourceName) ||
+      value.offerId !== null ||
+      value.count !== null ||
+      value.link !== `/besoins/${value.demandId}`
+    ) {
+      throw fixedError(status, API_INVALID_RESPONSE);
+    }
+    return {
+      id: value.id, kind, title: value.title, price, count: null, demandId: value.demandId, offerId: null, link: value.link, createdAt: value.createdAt, readAt: value.readAt,
+      sourceName: value.sourceName,
+    };
+  }
+  if (kind === "active_search_expiring") {
+    // Avis d'échéance de la recherche active : aucune donnée d'annonce, la fin de l'option et le lien vers le besoin.
+    if (
+      value.title !== null ||
+      value.price !== null ||
+      value.offerId !== null ||
+      value.count !== null ||
+      !isIsoDate(value.endsAt) ||
+      value.link !== `/besoins/${value.demandId}`
+    ) {
+      throw fixedError(status, API_INVALID_RESPONSE);
+    }
+    return {
+      id: value.id, kind, title: null, price: null, count: null, demandId: value.demandId, offerId: null, link: value.link, createdAt: value.createdAt, readAt: value.readAt,
+      endsAt: value.endsAt,
+    };
+  }
   if (kind === "new_message") {
     // Un nouveau message : titre de l'annonce et lien INTERNE exact vers la conversation ; jamais de texte de message, de prix ni d'identité.
     if (
@@ -2234,7 +2277,7 @@ export type ApiClient = ReturnType<typeof createApiClient>;
 export const api: ApiClient = createApiClient();
 
 export type ApiErrorContext =
-  | "otp-request" | "otp-verify" | "catalog" | "matches" | "boost" | "wallet" | "purchase" | "offer" | "contact" | "stats" | "notifications" | "tracking" | "subscription" | "import" | "default";
+  | "otp-request" | "otp-verify" | "catalog" | "matches" | "boost" | "wallet" | "purchase" | "offer" | "contact" | "stats" | "notifications" | "tracking" | "subscription" | "import" | "active-search" | "default";
 
 export const GENERIC_ERROR_MESSAGE = "Une erreur est survenue. Réessayez dans un instant.";
 /** 409 `offer_limit_reached` (lot PRO1) : la limite d'annonces EN LIGNE du plan est atteinte ; rien n'a été publié. */
@@ -2289,11 +2332,28 @@ export const SUBSCRIPTION_ERROR_MESSAGES: Readonly<Record<string, string>> = Obj
   resource_not_found: "Ce plan ou cet avis est introuvable. Rechargez la page.",
   insufficient_balance: "Solde insuffisant : rechargez votre porte-monnaie, puis réessayez. Seuls vos crédits payés règlent l'abonnement, pas les crédits promotionnels.",
   already_subscribed: "Vous avez déjà un abonnement en cours. L'écran va être actualisé.",
+  price_changed: "Le prix de l'abonnement a changé : relisez le nouveau prix, puis confirmez de nouveau.",
   no_subscription: "Vous n'avez pas d'abonnement en cours. L'écran va être actualisé.",
   period_ended: "La période en cours est terminée : le renouvellement ne peut plus être réactivé. Souscrivez de nouveau pour continuer.",
   idempotency_conflict: "Cette demande est en conflit avec une demande précédente. Rechargez la page, puis réessayez.",
   plan_not_subscribable: "Ce plan ne se souscrit pas.",
   subscription_unavailable: "L'offre Pro est temporairement indisponible. Réessayez dans un instant.",
+});
+
+/** Messages fixes des refus de la recherche active payante (`active-search`, lot RA1) : jamais le code brut, jamais le texte du serveur. */
+export const ACTIVE_SEARCH_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
+  invalid_request: "Cette demande n'est pas valide. Rechargez la page, puis réessayez.",
+  resource_not_found: "Besoin introuvable : il a peut-être été archivé ou n'existe plus.",
+  insufficient_balance: "Solde insuffisant : rechargez votre porte-monnaie, puis réessayez. Seuls vos crédits payés règlent la recherche active, pas les crédits promotionnels.",
+  demand_not_active: "La recherche active n'est disponible que pour un besoin actif.",
+  no_product_key: "Option indisponible pour ce besoin : il faut au moins une catégorie, une marque et un modèle.",
+  unavailable: "La recherche active n'est pas encore disponible : aucune annonce d'un autre site n'est collectée pour le moment.",
+  capacity: "La collecte accélérée est complète pour le moment : réessayez plus tard.",
+  price_changed: "Le prix de la recherche active a changé : rechargez la page, puis réessayez.",
+  purchase_refunded: "Cette option a été remboursée : démarrez une nouvelle option si vous la souhaitez.",
+  max_horizon: "La recherche active ne peut pas dépasser 180 jours à partir d'aujourd'hui.",
+  idempotency_conflict: "Cette demande est en conflit avec une demande précédente. Rechargez la page, puis réessayez.",
+  active_search_unavailable: "La recherche active est temporairement indisponible. Réessayez dans un instant.",
 });
 
 /** Messages fixes des refus de l'import de catalogue (`import`, lot PRO1). */
@@ -2377,6 +2437,12 @@ export function describeApiError(error: unknown, context: ApiErrorContext = "def
     // Un code connu (avec un statut de refus cohérent) a son message fixe ; un code inconnu ne montre JAMAIS le code brut :
     // message générique pour 400, 404 et 409 (les messages communs parlent d'une « liste » qui n'existe pas ici).
     const known = fixedMessage(context === "wallet" ? WALLET_ERROR_MESSAGES : PURCHASE_ERROR_MESSAGES, error.code);
+    if (known !== null && [400, 404, 409, 503].includes(error.status)) return known;
+    if ([400, 404, 409].includes(error.status)) return GENERIC_ERROR_MESSAGE;
+  }
+
+  if (context === "active-search") {
+    const known = fixedMessage(ACTIVE_SEARCH_ERROR_MESSAGES, error.code);
     if (known !== null && [400, 404, 409, 503].includes(error.status)) return known;
     if ([400, 404, 409].includes(error.status)) return GENERIC_ERROR_MESSAGE;
   }

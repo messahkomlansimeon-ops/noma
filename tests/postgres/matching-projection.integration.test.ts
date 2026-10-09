@@ -33,12 +33,12 @@ before(async () => {
   pool = await openVerifiedIsolatedPool(opened.target, schema);
   second = await openVerifiedIsolatedPool(opened.target, schema);
   const first = await runMigrations(pool);
-  assert.equal(first.applied.length, 27);
+  assert.equal(first.applied.length, 28);
   assert.ok(first.applied.includes("0009_matching_projection"));
-  assert.equal(first.applied.at(-1), "0027_missions");
+  assert.equal(first.applied.at(-1), "0028_active_search");
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 27);
+  assert.equal(rerun.skipped.length, 28);
   await pool.query(`CREATE FUNCTION reject_audit_job() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN RAISE EXCEPTION 'audit job failure'; END $$`);
 });

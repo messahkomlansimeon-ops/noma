@@ -277,6 +277,23 @@ export function demoSeedByAdministration(): Promise<string> {
 }
 
 /**
+ * COMMANDE `active-search:simulate` (lot RA1) sur la base noma_e2e : fait apparaître une annonce FICTIVE compatible d'un autre site pour ce besoin, collecte sa surveillance (connecteurs
+ * FICTIFS) et passe l'étape « activeSearch » du worker. Renvoie sa sortie ; lève une erreur si elle refuse ou échoue.
+ */
+export function activeSearchSimulateByAdministration(demandId: string): Promise<string> {
+  const databaseUrl = e2eDatabaseUrl();
+  return new Promise((resolve, reject) => {
+    const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: "development", DATABASE_URL: databaseUrl, NODE_OPTIONS: "--conditions=react-server" };
+    const child = spawn(process.execPath, ["--import", "./poc/node_modules/tsx/dist/loader.mjs", "scripts/active-search-simulate.ts", "--demand", demandId], { cwd: process.cwd(), env, stdio: ["ignore", "pipe", "pipe"] });
+    let out = "";
+    child.stdout.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
+    child.stderr.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
+    child.on("error", () => reject(new Error("active-search:simulate : lancement impossible")));
+    child.on("exit", (code) => (code === 0 ? resolve(out.trim()) : reject(new Error(`active-search:simulate a refusé ou échoué (code ${code}) : ${out.trim().slice(0, 300)}`))));
+  });
+}
+
+/**
  * COMMANDE D'ADMINISTRATION `wallet:check` (lecture seule) sur la base noma_e2e : réconciliation du grand livre, des intentions de
  * recharge, des événements et des achats de boost. Renvoie sa sortie ; lève une erreur si elle signale un écart (code 1) ou échoue.
  */

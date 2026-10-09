@@ -176,6 +176,9 @@ function Notifications() {
                     <span className="min-w-0 flex-1">
                       <span className={`block text-[15px] text-ink ${row.unread ? "font-extrabold" : "font-medium"}`}>
                         {row.unread ? <span className="sr-only">{UNREAD_SR_LABEL} : </span> : null}
+                        {row.badge ? (
+                          <span data-testid="notification-badge" className="mr-1.5 rounded-full bg-wash px-2 py-0.5 align-middle text-[11px] font-bold text-ink-soft">{row.badge}</span>
+                        ) : null}
                         {row.title}
                       </span>
                       {row.subtitle ? <span className="block text-[13px] text-ink-soft">{row.subtitle}</span> : null}

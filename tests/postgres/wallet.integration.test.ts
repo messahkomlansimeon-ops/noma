@@ -61,8 +61,8 @@ before(async () => {
   txPool = await openNamed("tx");
   dirtyPool = await openNamed("dirty", dirtySchema);
   holderPool = await openNamed("holder");
-  assert.equal((await runMigrations(pool)).applied.length, 27);
-  assert.equal((await runMigrations(dirtyPool)).applied.length, 27);
+  assert.equal((await runMigrations(pool)).applied.length, 28);
+  assert.equal((await runMigrations(dirtyPool)).applied.length, 28);
 });
 
 after(async () => {
@@ -259,11 +259,12 @@ const insertEntry = (client: PoolClient, transactionId: string, accountId: strin
 test("migration 0014 : 14 appliquées, la relance n'en applique aucune, comptes système créés, tables et index présents", async () => {
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 27);
-  assert.equal(rerun.skipped.at(-1), "0027_missions");
+  assert.equal(rerun.skipped.length, 28);
+  assert.equal(rerun.skipped.at(-1), "0028_active_search");
   const accounts = (await pool.query("SELECT kind, owner_id, balance::text AS balance FROM wallet_accounts ORDER BY kind")).rows;
-  // Lot PRO1 (migration 0021) : quatre comptes système de plus (revenus d'abonnement et crédits promotionnels : émis, dépensés, expirés).
+  // Lot PRO1 (migration 0021) : quatre comptes système de plus (revenus d'abonnement et crédits promotionnels : émis, dépensés, expirés). Lot RA1 (migration 0028) : les revenus de la recherche active.
   assert.deepEqual(accounts, [
+    { kind: "active_search_revenue", owner_id: null, balance: "0" },
     { kind: "boost_revenue", owner_id: null, balance: "0" },
     { kind: "promo_consumed", owner_id: null, balance: "0" },
     { kind: "promo_expired", owner_id: null, balance: "0" },
@@ -285,6 +286,8 @@ test("migration 0014 : 14 appliquées, la relance n'en applique aucune, comptes 
     `SELECT t.tgname FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE NOT t.tgisinternal AND n.nspname = $1 AND (c.relname LIKE 'wallet\_%' OR c.relname LIKE 'payment\_%') ORDER BY t.tgname`, [schema])).rows.map((row) => row.tgname);
   assert.deepEqual(triggers, [
+    // Ajouté par la migration 0028 (lot RA1) : un débit ou un remboursement de recherche active n'existe jamais sans son achat (contrainte différée).
+    "trg_active_search_transactions_linked",
     "trg_payment_events_immutable", "trg_payment_intents_guard",
     // Ajoutés par la migration 0021 (lot PRO1) : une transaction de l'offre Pro n'existe jamais sans son objet (contrainte différée), et un compte promotionnel ou de revenus
     // d'abonnement n'est touché que par les types de transaction de son rôle, dans le bon sens.
@@ -1448,7 +1451,7 @@ test("wallet:check vert sur la base saine (toutes les opérations des tests pré
   const emptyPool = await openVerifiedIsolatedPool(target, empty);
   try {
     await runMigrations(emptyPool);
-    assert.deepEqual(await checkWalletIntegrity(emptyPool), { ok: true, totals: { accounts: 6, transactions: 0, entries: 0, paymentIntents: 0, paymentEvents: 0 }, violations: [], warnings: [] });
+    assert.deepEqual(await checkWalletIntegrity(emptyPool), { ok: true, totals: { accounts: 7, transactions: 0, entries: 0, paymentIntents: 0, paymentEvents: 0 }, violations: [], warnings: [] });
   } finally {
     await emptyPool.end();
     await admin.query(`DROP SCHEMA IF EXISTS ${quoteTemporarySchema(empty)} CASCADE`);
@@ -1839,7 +1842,7 @@ test("script wallet:check : code 0 sur base saine, code 1 avec rapport sans donn
     const intent = await paidIntent(owner, 2000, scratchPool);
     const healthy = await runScript("scripts/wallet-check.ts", [], scratch);
     assert.equal(healthy.code, 0, healthy.output);
-    assert.match(healthy.output, /Portefeuille : 7 compte\(s\), 1 transaction\(s\), 2 écriture\(s\), 1 intention\(s\) de paiement, 1 événement\(s\) du prestataire\./);
+    assert.match(healthy.output, /Portefeuille : 8 compte\(s\), 1 transaction\(s\), 2 écriture\(s\), 1 intention\(s\) de paiement, 1 événement\(s\) du prestataire\./);
     assert.match(healthy.output, /aucun écart/);
 
     const revenue = await systemAccount("boost_revenue", scratchPool);

@@ -14,7 +14,7 @@ import { readProBadges, readUserEntitlements } from "../../lib/server/subscripti
 import { readPromoSummary } from "../../lib/server/subscriptions/promo";
 import { checkWalletIntegrity } from "../../lib/server/wallet/check";
 import { readWalletBalance } from "../../lib/server/wallet/ledger";
-import { DEMO_ADMIN_PHONE, DEMO_BUYER_PHONE, DEMO_CONTACTERS, DEMO_EXTRA_BUYER_COUNT, DEMO_HISTORY_SELLER_COUNT, DEMO_OFFERS, DEMO_OPENERS, DEMO_VENDOR_CREDIT_XOF, DEMO_VENDOR_PHONE, demoMarker } from "../../scripts/demo-seed-plan";
+import { DEMO_ADMIN_PHONE, DEMO_BUYER_CREDIT_REFERENCE, DEMO_BUYER_CREDIT_XOF, DEMO_BUYER_PHONE, DEMO_CONTACTERS, DEMO_EXTRA_BUYER_COUNT, DEMO_HISTORY_SELLER_COUNT, DEMO_OFFERS, DEMO_OPENERS, DEMO_VENDOR_CREDIT_XOF, DEMO_VENDOR_PHONE, demoMarker } from "../../scripts/demo-seed-plan";
 import { runScript } from "./run-script";
 import { openVerifiedTestDatabase } from "./test-database";
 
@@ -42,7 +42,7 @@ before(async () => {
   baseUrl = opened.target.connectionString;
   await admin.query(`CREATE DATABASE "${mainDb}"`);
   pool = new Pool({ connectionString: urlFor(mainDb), max: 4 });
-  assert.equal((await runMigrations(pool)).applied.length, 27);
+  assert.equal((await runMigrations(pool)).applied.length, 28);
 });
 
 after(async () => {
@@ -114,8 +114,8 @@ test("premier passage : comptes aux numéros fixes, 30 annonces publiées, besoi
   assert.equal(snap.views, String(DEMO_OPENERS));
   assert.equal(snap.contacts, String(DEMO_CONTACTERS));
   assert.equal(snap.boosts, "1");
-  // Le crédit de démonstration, le crédit du prix de l'abonnement Pro et le débit de l'abonnement (lot PRO1) : trois transactions, jamais plus.
-  assert.equal(snap.walletTransactions, "3");
+  // Le crédit de démonstration du vendeur, le crédit du prix de l'abonnement Pro et le débit de l'abonnement (lot PRO1), puis le crédit PAYÉ de l'acheteur démo (lot RA1) : quatre transactions, jamais plus.
+  assert.equal(snap.walletTransactions, "4");
   assert.equal(snap.subscriptions, "1");
   assert.equal(snap.subscriptionPeriods, "1");
   assert.equal(snap.promoGrants, "1");
@@ -269,6 +269,16 @@ test("vendeur démo : abonné à l'offre Pro par la VRAIE souscription (droits P
   assert.ok(mine.every((item) => item.proBadge === true), "badge sur l'annonce du vendeur Pro");
   assert.ok(others.every((item) => item.proBadge === false), "aucun badge sur les autres");
   assert.deepEqual((await checkWalletIntegrity(pool)).violations, [], "wallet:check vert");
+});
+
+test("acheteur démo (lot RA1) : 10 000 FCFA de crédits PAYÉS (jamais promotionnels), de quoi acheter la recherche active ; aucune option déjà achetée ; grand livre vert", async () => {
+  const buyerId = await userOf(DEMO_BUYER_PHONE);
+  assert.equal(await readWalletBalance(pool, buyerId), BigInt(DEMO_BUYER_CREDIT_XOF));
+  assert.equal(DEMO_BUYER_CREDIT_XOF, 10_000);
+  assert.equal((await readPromoSummary(pool, buyerId)).balance, BigInt(0), "aucun crédit promotionnel");
+  assert.equal((await pool.query("SELECT 1 FROM wallet_transactions WHERE reference = $1 AND kind = 'adjustment'", [DEMO_BUYER_CREDIT_REFERENCE])).rowCount, 1, "un seul crédit, par ajustement d'administration");
+  assert.equal((await pool.query("SELECT count(*)::int AS n FROM active_search_purchases")).rows[0].n, 0, "la démonstration laisse l'achat à l'acheteur : aucune option préachetée");
+  assert.deepEqual((await checkWalletIntegrity(pool)).violations, []);
 });
 
 test("lot H1 : 90 jours de relevés de prix synthétiques entre vendeurs et acheteurs FICTIFS ; l'encart « Prix demandés dans les annonces » est rempli (clé exacte, fourchette, tendance à la baisse) ; les ventes ne sont qu'un nombre arrondi pour l'administration", async () => {

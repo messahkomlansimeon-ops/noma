@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, test } from "node:test";
 import type { AdminPlansOverview, CatalogImportResult, PlanView, SubscriptionNoticeView, SubscriptionState, SubscriptionView } from "../../lib/client/pro-api";
 import {
@@ -263,5 +265,28 @@ describe("administration", () => {
     assert.equal(buildNewVersion({ name: "Gratuit", monthlyPriceXof: "0", promoCreditsXof: "0", maxOnlineOffers: "12", entitlements: [] }, "free").ok, true);
     assert.equal(buildNewVersion({ name: "Gratuit", monthlyPriceXof: "100", promoCreditsXof: "0", maxOnlineOffers: "12", entitlements: [] }, "free").ok, false);
     assert.equal(buildNewVersion({ name: "Gratuit", monthlyPriceXof: "0", promoCreditsXof: "0", maxOnlineOffers: "12", entitlements: ["badge_pro"] }, "free").ok, false);
+  });
+});
+
+describe("A6 : l'écran d'abonnement envoie le prix qu'il AFFICHE", () => {
+  const screen = readFileSync(join(import.meta.dirname, "../../components/vendor/pro-offer-screen.tsx"), "utf8").replace(/\/\/.*$/gm, "");
+
+  test("la souscription n'est lancée que depuis l'état « prêt » et envoie son prix (celui de la confirmation) ; un refus price_changed ferme la confirmation et recharge l'écran", () => {
+    assert.match(screen, /if \(!plan \|\| subscribe\.kind !== "ready"\) return;/);
+    assert.match(screen, /const displayedPriceXof = subscribe\.priceXof;/);
+    assert.match(screen, /subscribe\(\{ planCode: plan\.code, idempotencyKey: key, expectedPriceXof: displayedPriceXof \}\)/);
+    assert.match(screen, /failure\.code === "price_changed"\) setConfirming\(false\)/);
+    assert.match(screen, /failure\.status === 409 && failure\.code !== "insufficient_balance"\) setReloadKey/);
+  });
+
+  test("le prix affiché dans la confirmation est celui de l'état « prêt » (jamais une valeur codée en dur)", () => {
+    const ready = subscribeState({ plan: PRO, balanceXof: 20_000 });
+    assert.equal(ready.kind, "ready");
+    if (ready.kind === "ready") {
+      assert.equal(ready.priceXof, PRO.monthlyPriceXof);
+      assert.match(subscribeConfirmationText(ready), /10\s000 FCFA/);
+    }
+    const repriced = subscribeState({ plan: { ...PRO, monthlyPriceXof: 12_000 }, balanceXof: 20_000 });
+    assert.equal(repriced.kind === "ready" ? repriced.priceXof : null, 12_000, "un nouveau tarif relu change le prix envoyé");
   });
 });

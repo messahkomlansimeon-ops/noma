@@ -4,6 +4,7 @@ import "server-only";
 export type SubscriptionErrorCode =
   | "plan_not_found"
   | "plan_not_subscribable"
+  | "price_changed"
   | "already_subscribed"
   | "no_subscription"
   | "period_ended"
@@ -19,6 +20,7 @@ export type SubscriptionErrorCode =
 export const SUBSCRIPTION_ERROR_MESSAGES: Readonly<Record<SubscriptionErrorCode, string>> = Object.freeze({
   plan_not_found: "Ce plan n'existe pas.",
   plan_not_subscribable: "Ce plan ne se souscrit pas : il est gratuit.",
+  price_changed: "Le prix de l'abonnement a changé : rechargez la page, puis réessayez.",
   already_subscribed: "Vous avez déjà un abonnement en cours.",
   no_subscription: "Vous n'avez pas d'abonnement en cours.",
   period_ended: "La période en cours est terminée : le renouvellement automatique ne peut plus être réactivé.",

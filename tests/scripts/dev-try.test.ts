@@ -265,14 +265,16 @@ describe("dev:try : préparation de l'environnement", () => {
     assert.notEqual(other.plan.env.NOMA_AUTH_PROXY_SECRET, another.plan.env.NOMA_AUTH_PROXY_SECRET);
   });
 
-  test("collecte d'annonces externes (lot EXT1) : NOMA_EXTERNAL_FAKE est transmis tel quel au worker, avec le secret d'authentification dont dérive la clé d'empreinte des identifiants", () => {
-    const withFake = prepareDevTry({ DATABASE_URL, NOMA_EXTERNAL_FAKE: "1" });
-    assert.ok(withFake.ok);
-    assert.equal(withFake.plan.env.NOMA_EXTERNAL_FAKE, "1");
-    assert.ok(isValidAuthSecret(withFake.plan.env.NOMA_AUTH_SECRET as string), "un secret d'au moins 32 octets est toujours présent pour le worker");
-    const without = prepareDevTry({ DATABASE_URL });
-    assert.ok(without.ok);
-    assert.equal(without.plan.env.NOMA_EXTERNAL_FAKE, undefined, "jamais activée par défaut");
+  test("collecte d'annonces externes (lots EXT1 et RA1-bis) : le montage d'essai FORCE les connecteurs fictifs (comme les faux paiements), en développement seulement, avec le secret dont dérive la clé d'empreinte des identifiants", () => {
+    // Sans variable : activée. Avec une valeur quelconque (« 0 », vide) : toujours « 1 », comme NOMA_FAKE_PAYMENTS. Le mode est « development » : les connecteurs n'existent jamais en production
+    // (resolveConnectors), quoi que dise l'environnement.
+    for (const given of [undefined, "1", "0", "", "true"]) {
+      const prepared = prepareDevTry(given === undefined ? { DATABASE_URL } : { DATABASE_URL, NOMA_EXTERNAL_FAKE: given });
+      assert.ok(prepared.ok);
+      assert.equal(prepared.plan.env.NOMA_EXTERNAL_FAKE, "1", `valeur donnée : ${String(given)}`);
+      assert.equal(prepared.plan.env.NODE_ENV, "development");
+      assert.ok(isValidAuthSecret(prepared.plan.env.NOMA_AUTH_SECRET as string), "un secret d'au moins 32 octets est toujours présent pour le worker");
+    }
   });
 
   test("secrets fournis : conservés tels quels, sans avertissement", () => {
@@ -519,9 +521,10 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
   const guide = readFileSync(fileURLToPath(new URL("../../ESSAYER.md", import.meta.url)), "utf8");
   const normalized = guide.replace(/\s+/g, " ");
 
-  test("le guide dit (lots P2, P2-bis, P3, M1, N1, D2, PRO1, PH1, H1, SMS1, EXT1, PAY1 et MV1) : base à 27 migrations, recharge simulée, achat de boost, « aucun argent réel », « Sponsorisé »", () => {
+  test("le guide dit (lots P2, P2-bis, P3, M1, N1, D2, PRO1, PH1, H1, SMS1, EXT1, PAY1, MV1 et RA1) : base à 28 migrations, recharge simulée, achat de boost, « aucun argent réel », « Sponsorisé »", () => {
     for (const expected of [
-      "27 migrations",
+      "28 migrations",
+      "0028",
       "0027",
       "0026",
       "0025",
@@ -652,7 +655,7 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
     const notificationStep = normalized.indexOf("voir une notification");
     const smsStep = normalized.indexOf("activer l'envoi par SMS simulé");
     assert.ok(seedStep !== -1 && notificationStep > seedStep && smsStep > notificationStep, "les notifications viennent après les annonces d'exemple, l'envoi simulé après les notifications");
-    assert.equal(/27 migrations/.test(normalized), true);
+    assert.equal(/28 migrations/.test(normalized), true);
     assert.equal(/\b26 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations (26)");
     assert.equal(/\b25 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations (25)");
     assert.equal(/\b24 migrations/.test(normalized), false, "plus de trace de l'ancien compteur de migrations (24)");

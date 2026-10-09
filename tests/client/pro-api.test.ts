@@ -94,22 +94,35 @@ describe("abonnement", () => {
     }
   });
 
-  test("subscribe : POST /api/subscription avec exactement { planCode, idempotencyKey } ; 201 puis 200 (rejeu) ; clé et plan vérifiés AVANT la requête", async () => {
+  test("subscribe : POST /api/subscription avec exactement { planCode, idempotencyKey, expectedPriceXof } (le prix AFFICHÉ) ; 201 puis 200 (rejeu) ; clé, plan et prix vérifiés AVANT la requête", async () => {
     let call = 0;
     const { api, calls } = client(() => ({ status: call++ === 0 ? 201 : 200, body: { ...state(), reused: call > 1 } }));
-    const first = await api.subscription.subscribe({ planCode: "pro", idempotencyKey: UUID_A });
-    const replay = await api.subscription.subscribe({ planCode: "pro", idempotencyKey: UUID_A });
+    const first = await api.subscription.subscribe({ planCode: "pro", idempotencyKey: UUID_A, expectedPriceXof: 10_000 });
+    const replay = await api.subscription.subscribe({ planCode: "pro", idempotencyKey: UUID_A, expectedPriceXof: 10_000 });
     assert.equal(first.reused, false);
     assert.equal(replay.reused, true);
     assert.equal(first.state.subscription?.status, "active");
-    assert.deepEqual(calls[0].body, { planCode: "pro", idempotencyKey: UUID_A });
+    assert.deepEqual(calls[0].body, { planCode: "pro", idempotencyKey: UUID_A, expectedPriceXof: 10_000 });
     assert.equal(calls[0].contentType, "application/json");
     assert.deepEqual(calls[0].body, calls[1].body, "le rejeu envoie exactement la même requête");
     const before = calls.length;
-    for (const request of [{ planCode: "Pro", idempotencyKey: UUID_A }, { planCode: "pro", idempotencyKey: "x" }, { planCode: 5, idempotencyKey: UUID_A }, undefined]) {
-      await assert.rejects(api.subscription.subscribe(request as never), (error: unknown) => error instanceof ApiError && error.code === "invalid_argument" && error.status === 0);
+    for (const request of [
+      { planCode: "Pro", idempotencyKey: UUID_A, expectedPriceXof: 10_000 }, { planCode: "pro", idempotencyKey: "x", expectedPriceXof: 10_000 }, { planCode: 5, idempotencyKey: UUID_A, expectedPriceXof: 10_000 }, undefined,
+      // A6 : le prix affiché est obligatoire, entier, positif.
+      { planCode: "pro", idempotencyKey: UUID_A }, { planCode: "pro", idempotencyKey: UUID_A, expectedPriceXof: 0 }, { planCode: "pro", idempotencyKey: UUID_A, expectedPriceXof: -1 },
+      { planCode: "pro", idempotencyKey: UUID_A, expectedPriceXof: 10_000.5 }, { planCode: "pro", idempotencyKey: UUID_A, expectedPriceXof: "10000" },
+    ]) {
+      await assert.rejects(api.subscription.subscribe(request as never), (error: unknown) => error instanceof ApiError && error.code === "invalid_argument" && error.status === 0, JSON.stringify(request));
     }
     assert.equal(calls.length, before, "aucune requête pour un argument invalide");
+  });
+
+  test("subscribe : un 409 price_changed du serveur devient une ApiError (code et statut conservés), l'écran relit le prix", async () => {
+    const { api } = client(() => ({ status: 409, body: { error: { code: "price_changed", message: "Le prix de l'abonnement a changé : rechargez la page, puis réessayez." } } }));
+    await assert.rejects(
+      api.subscription.subscribe({ planCode: "pro", idempotencyKey: UUID_A, expectedPriceXof: 10_000 }),
+      (error: unknown) => error instanceof ApiError && error.status === 409 && error.code === "price_changed",
+    );
   });
 
   test("setAutoRenew et markNoticesRead : corps exacts, arguments vérifiés avant la requête", async () => {

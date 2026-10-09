@@ -103,6 +103,9 @@ function itemDto(item: NotificationItem) {
     link: item.link,
     createdAt: item.createdAt.toISOString(),
     readAt: item.readAt === null ? null : item.readAt.toISOString(),
+    // Lot RA1 : champs propres à deux genres seulement (absents des autres : la forme des genres existants ne change pas).
+    ...(item.sourceName !== undefined ? { sourceName: item.sourceName } : {}),
+    ...(item.endsAt !== undefined ? { endsAt: item.endsAt.toISOString() } : {}),
   };
 }
 

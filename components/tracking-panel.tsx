@@ -5,7 +5,6 @@ import { BellOff, BellRing, CalendarPlus } from "lucide-react";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
 import { api, describeApiError, type DemandTracking, type TrackingAction } from "@/lib/client/api";
 import {
-  TRACKING_AT_MAXIMUM,
   TRACKING_EXTEND_LABEL,
   TRACKING_LOADING,
   TRACKING_NOTE,
@@ -15,6 +14,7 @@ import {
   trackingActionDone,
   trackingView,
 } from "@/lib/client/notifications-view";
+import { trackingMaximumText } from "@/lib/client/active-search-view";
 import { useNoma } from "@/lib/store";
 
 /**
@@ -130,7 +130,7 @@ export function TrackingPanel({ demandId }: { demandId: string }) {
               {busy === "resume" ? "…" : TRACKING_RESUME_LABEL}
             </button>
           ) : null}
-          {view.atMaximum ? <span className="self-center text-[12px] text-ink-soft">{TRACKING_AT_MAXIMUM}</span> : null}
+          {view.atMaximum ? <span className="self-center text-[12px] text-ink-soft">{trackingMaximumText(tracking)}</span> : null}
         </div>
       ) : null}
       <p className="mt-2.5 text-[11px] text-ink-soft">{TRACKING_NOTE}</p>

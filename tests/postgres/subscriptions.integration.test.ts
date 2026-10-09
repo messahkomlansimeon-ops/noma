@@ -207,6 +207,28 @@ test("solde insuffisant : 409, RIEN n'est écrit (ni débit, ni abonnement, ni p
   await assertWalletGreen(pool, "après des souscriptions refusées et exacte");
 });
 
+test("A6 : le prix AFFICHÉ (expectedPriceXof) est comparé au prix de la dernière version : un autre prix → price_changed, RIEN n'est écrit même avec un solde suffisant ; le bon prix passe ; le rejeu avec un autre prix est refusé ; un prix invalide est refusé avant tout SQL", async () => {
+  const userId = await makeUser(pool);
+  await fund(pool, userId, 25_000);
+  const snapshot = await ledgerSnapshot(pool);
+  for (const expectedPriceXof of [PRO_PRICE - 1, PRO_PRICE + 1, 1, 100_000]) {
+    assert.equal(await outcome(subscribeToPlan({ pool, userId, planCode: "pro", idempotencyKey: randomUUID(), expectedPriceXof })), "price_changed", String(expectedPriceXof));
+  }
+  for (const expectedPriceXof of [0, -PRO_PRICE, PRO_PRICE + 0.5, Number.NaN, Number.MAX_SAFE_INTEGER + 2, "10000" as unknown as number]) {
+    assert.match(await outcome(subscribeToPlan({ pool, userId, planCode: "pro", idempotencyKey: randomUUID(), expectedPriceXof })), /CatalogValidationError/, String(expectedPriceXof));
+  }
+  assert.deepEqual(await ledgerSnapshot(pool), snapshot, "aucun refus n'écrit ni ne débite");
+  assert.equal(await balanceOf(pool, userId), big(25_000));
+  const key = randomUUID();
+  const created = await subscribeToPlan({ pool, userId, planCode: "pro", idempotencyKey: key, expectedPriceXof: PRO_PRICE });
+  assert.equal(created.reused, false);
+  assert.equal(await balanceOf(pool, userId), big(25_000 - PRO_PRICE));
+  assert.equal(await outcome(subscribeToPlan({ pool, userId, planCode: "pro", idempotencyKey: key, expectedPriceXof: PRO_PRICE + 1 })), "price_changed", "rejeu avec un autre prix affiché");
+  assert.equal((await subscribeToPlan({ pool, userId, planCode: "pro", idempotencyKey: key, expectedPriceXof: PRO_PRICE })).reused, true, "rejeu au prix payé");
+  assert.equal(await balanceOf(pool, userId), big(25_000 - PRO_PRICE), "un seul débit");
+  await assertWalletGreen(pool, "après les refus de prix");
+});
+
 test("double clic : 12 souscriptions simultanées avec la même clé → UN débit, une période, une seule `reused: false` ; une autre clé ou un autre plan est refusé", async () => {
   const userId = await makeUser(pool);
   await fund(pool, userId, 25_000);

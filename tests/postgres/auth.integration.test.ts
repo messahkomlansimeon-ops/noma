@@ -170,6 +170,7 @@ if (!configuredUrl?.trim()) {
         "0025_external_collection",
         "0026_sublymus_payments",
         "0027_missions",
+        "0028_active_search",
       ]);
     });
 

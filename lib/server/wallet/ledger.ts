@@ -20,23 +20,24 @@ import { WalletError } from "./errors";
  */
 
 export const WALLET_ACCOUNT_KINDS = [
-  "user", "user_promo", "provider_clearing", "boost_revenue", "subscription_revenue", "promo_issuance", "promo_consumed", "promo_expired",
+  "user", "user_promo", "provider_clearing", "boost_revenue", "subscription_revenue", "promo_issuance", "promo_consumed", "promo_expired", "active_search_revenue",
 ] as const;
 export type WalletAccountKind = (typeof WALLET_ACCOUNT_KINDS)[number];
 
 /** Comptes système (un seul de chaque, créés par les migrations, recréés à la demande s'il en manquait). */
 export const WALLET_SYSTEM_ACCOUNT_KINDS = [
-  "provider_clearing", "boost_revenue", "subscription_revenue", "promo_issuance", "promo_consumed", "promo_expired",
+  "provider_clearing", "boost_revenue", "subscription_revenue", "promo_issuance", "promo_consumed", "promo_expired", "active_search_revenue",
 ] as const;
 export type WalletSystemAccountKind = (typeof WALLET_SYSTEM_ACCOUNT_KINDS)[number];
 
 /**
  * Types de transaction (même liste que chk_wallet_transactions_kind, migration 0021) : recharge, ajustement d'administration, achat
  * de boost et remboursement intégral d'un achat (lot P1b), débit d'une période d'abonnement avec émission de ses crédits promotionnels,
- * remboursement intégral d'une période, expiration des crédits promotionnels restants (lot PRO1).
+ * remboursement intégral d'une période, expiration des crédits promotionnels restants (lot PRO1), achat d'une période de recherche active et son remboursement intégral (lot RA1,
+ * payés en crédits PAYÉS uniquement).
  */
 export const WALLET_TRANSACTION_KINDS = [
-  "topup", "adjustment", "boost_purchase", "boost_refund", "subscription_charge", "subscription_refund", "promo_expiry",
+  "topup", "adjustment", "boost_purchase", "boost_refund", "subscription_charge", "subscription_refund", "promo_expiry", "search_purchase", "search_refund",
 ] as const;
 export type WalletTransactionKind = (typeof WALLET_TRANSACTION_KINDS)[number];
 
@@ -64,6 +65,8 @@ export interface WalletTransactionMetadata {
   subscriptionPeriodId?: string;
   /** Émission de crédits promotionnels expirée (`promo_expiry`). */
   promoGrantId?: string;
+  /** Achat d'une période de recherche active débité (`search_purchase`) ou remboursé (`search_refund`) (lot RA1). */
+  activeSearchId?: string;
 }
 
 export interface WalletTransactionInput {
@@ -125,6 +128,7 @@ function requireMetadata(value: unknown): WalletTransactionMetadata {
     else if (key === "quoteId" && UUID_LOWER.test(entry)) result.quoteId = entry;
     else if (key === "subscriptionPeriodId" && UUID_LOWER.test(entry)) result.subscriptionPeriodId = entry;
     else if (key === "promoGrantId" && UUID_LOWER.test(entry)) result.promoGrantId = entry;
+    else if (key === "activeSearchId" && UUID_LOWER.test(entry)) result.activeSearchId = entry;
     else throw new CatalogValidationError(`metadata.${key} refusé (clé inconnue ou forme invalide).`);
   }
   return result;
@@ -165,6 +169,9 @@ function assertAccountUsage(kind: WalletTransactionKind, account: LedgerAccountR
       break;
     case "subscription_revenue":
       allowed = (kind === "subscription_charge" && amount > ZERO) || (kind === "subscription_refund" && amount < ZERO);
+      break;
+    case "active_search_revenue":
+      allowed = (kind === "search_purchase" && amount > ZERO) || (kind === "search_refund" && amount < ZERO);
       break;
     default:
       break;
@@ -208,6 +215,16 @@ export function validateWalletTransactionInput(input: unknown): Required<WalletT
   }
   if (!["subscription_charge", "subscription_refund", "promo_expiry"].includes(kind) && (metadata.subscriptionPeriodId !== undefined || metadata.promoGrantId !== undefined)) {
     throw new CatalogValidationError("subscriptionPeriodId et promoGrantId sont réservés aux transactions de l'offre Pro.");
+  }
+  // Mêmes règles que chk_wallet_transactions_active_search (lot RA1) : clés exactes, référence dérivée de l'achat ; aucune autre sorte ne porte activeSearchId.
+  if (kind === "search_purchase" && (metadataKeys !== "activeSearchId" || reference !== `search_purchase:${metadata.activeSearchId}`)) {
+    throw new CatalogValidationError("Un achat de recherche active porte activeSearchId, et sa référence en dérive.");
+  }
+  if (kind === "search_refund" && (metadataKeys !== "activeSearchId,reasonCode" || reference !== `search_refund:${metadata.activeSearchId}`)) {
+    throw new CatalogValidationError("Un remboursement de recherche active porte activeSearchId et reasonCode, et sa référence en dérive.");
+  }
+  if (kind !== "search_purchase" && kind !== "search_refund" && metadata.activeSearchId !== undefined) {
+    throw new CatalogValidationError("activeSearchId est réservé aux achats et remboursements de recherche active.");
   }
   if (!Array.isArray(entries) || entries.length < 2 || entries.length > MAX_ENTRIES) {
     throw new CatalogValidationError(`Une transaction compte de 2 à ${MAX_ENTRIES} écritures.`);

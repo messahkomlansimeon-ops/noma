@@ -99,6 +99,9 @@ export const TRANSACTION_LABELS: Readonly<Record<string, string>> = Object.freez
   subscription_charge: "Abonnement Pro",
   subscription_refund: "Remboursement d'abonnement",
   promo_expiry: "Expiration de crédits promotionnels",
+  // Lot RA1 : recherche active payante d'un besoin.
+  search_purchase: "Recherche active",
+  search_refund: "Remboursement de recherche active",
 });
 
 /** Lot PRO1 : le porte-monnaie distingue les crédits (payés) et les crédits promotionnels. */

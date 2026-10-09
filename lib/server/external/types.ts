@@ -81,6 +81,8 @@ export interface WatchRow {
   daily_request_budget: number;
   last_run_at: Date | null;
   next_run_at: Date;
+  /** Fréquence et budget relevés par la recherche active payante (lot RA1) ; ses requêtes ne consomment qu'une part du quota de chaque source. */
+  accelerated: boolean;
 }
 
 /** Surveillance réservée par un exécuteur : `claim_token` est le jeton de son bail (seul lui peut la clore ou la rendre). */

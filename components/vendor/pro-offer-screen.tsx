@@ -76,6 +76,8 @@ export function ProOfferScreen() {
       setActionError(describeApiError(failure, "subscription"));
       // Un refus définitif (déjà abonné, plus d'abonnement, période terminée) : l'écran est relu.
       if (failure instanceof ApiError && failure.status === 409 && failure.code !== "insufficient_balance") setReloadKey((key) => key + 1);
+      // Le prix a changé : la confirmation se ferme, l'acheteur relit le nouveau prix avant de confirmer.
+      if (failure instanceof ApiError && failure.code === "price_changed") setConfirming(false);
       return false;
     } finally {
       submitting.current = false;
@@ -84,11 +86,13 @@ export function ProOfferScreen() {
   }, [redirectIfUnauthorized]);
 
   const confirmSubscribe = async () => {
-    if (!plan) return;
+    if (!plan || subscribe.kind !== "ready") return;
+    // Le prix envoyé est celui que la confirmation AFFICHE : si le tarif a changé entre-temps, le serveur refuse (`price_changed`, aucun débit) et l'écran se recharge.
+    const displayedPriceXof = subscribe.priceXof;
     // Une clé par tentative, conservée dans l'onglet : un nouvel essai réseau réutilise la MÊME clé (jamais deux débits).
     const key = keys.current.keyFor(plan.code);
     const ok = await run(async () => {
-      const result = await proApi.subscription.subscribe({ planCode: plan.code, idempotencyKey: key });
+      const result = await proApi.subscription.subscribe({ planCode: plan.code, idempotencyKey: key, expectedPriceXof: displayedPriceXof });
       return result.state;
     }, "Votre abonnement est actif. Bienvenue dans l'offre Pro !");
     if (ok) {

@@ -49,7 +49,7 @@ export interface BuyerHomeDemand {
 
 export interface BuyerHomeNotification {
   id: string;
-  kind: "new_match" | "new_matches_digest" | "new_message" | "mission_coverage";
+  kind: "new_match" | "new_matches_digest" | "new_message" | "mission_coverage" | "new_external_match" | "active_search_expiring";
   title: string | null;
   price: Money | null;
   count: number | null;

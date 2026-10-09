@@ -28,6 +28,10 @@ L'onglet **Admin** du sélecteur d'espace (Acheteur / Vendeur / Admin) n'est aff
 près, revenus d'abonnement du mois. La page est sous le gabarit gardé de l'espace d'administration (page 404 standard de Next pour tout non-administrateur, aucun onglet Admin) ; les routes
 répondent le même 404. Prix **provisoires** : une nouvelle version ne s'applique qu'aux nouvelles souscriptions, **les abonnés actuels gardent leur prix**. Voir `OFFRE-PRO.md`.
 
+## Recherche active (lot RA1)
+
+`/admin/recherche-active` (lien depuis l'aperçu) et `GET /api/admin/active-search` : besoins avec une option payante en vigueur (**arrondis à 5 près**, jamais un compte exact) et **revenus nets du mois** (achats − remboursements, lus dans le grand livre). Même gabarit gardé que `/admin/offres` (page 404 standard de Next pour tout non-administrateur) ; la route répond le même 404 à un visiteur, un compte ordinaire ou un administrateur suspendu, et ne fait que lire. Le remboursement est la commande `npm run active-search:refund`. Prix **provisoire**. Voir `RECHERCHE-ACTIVE.md`.
+
 ## Paiements (lot PAY1)
 
 `/admin/paiements` et `GET /api/admin/payments`, `POST /api/admin/payments/anomalies/{id}/resolve` : recharges récentes, **anomalies de rapprochement à traiter** (marquées traitées une

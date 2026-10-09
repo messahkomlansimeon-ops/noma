@@ -68,6 +68,14 @@ async function main(): Promise<void> {
         `${result.collect.sourceFailures} panne(s) de source.`,
       );
     }
+    // Étape « activeSearch » (lot RA1) : une ligne seulement si elle a travaillé (jamais le titre d'une annonce, un nom de source ni un identifiant).
+    const search = result.activeSearch;
+    if (search.ended + search.stopped + search.notices + search.notified + search.digested + search.baselines > 0) {
+      console.log(
+        `Matching worker : recherche active, ${search.ended} option(s) terminée(s), ${search.stopped} arrêtée(s), ${search.notices} avis d'échéance, ` +
+        `${search.baselines} liste(s) d'annonces existantes relevée(s), ${search.notified} notification(s) d'annonce d'un autre site, ${search.digested} résumée(s).`,
+      );
+    }
     // Un code stable par ligne (jamais de message brut) ; une étape en échec donne le code de sortie 1.
     for (const code of result.errors) console.error(`Matching worker : ${code}`);
     if (result.errors.length > 0) process.exitCode = 1;

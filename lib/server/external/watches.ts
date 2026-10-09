@@ -1,6 +1,8 @@
 import "server-only";
 
 import type { SqlExecutor } from "../postgres/client";
+import { ACTIVE_SEARCH_WATCH_DAILY_BUDGET, ACTIVE_SEARCH_WATCH_FREQUENCY_SECONDS } from "../active-search/config";
+import { activeSearchSchemaPresent } from "../active-search/state";
 import { WATCH_CLAIM_LEASE_SECONDS } from "./config";
 import { productKeyOf, productKeyString } from "./product-key";
 import type { ClaimedWatch, ProductKey, WatchRow } from "./types";
@@ -11,7 +13,7 @@ import type { ClaimedWatch, ProductKey, WatchRow } from "./types";
  * quand plus aucun besoin actif ne la référence. Une seule instruction par opération, sur `pool.query` : aucune connexion dédiée, donc rien à tenir en cas de panne.
  */
 
-export const WATCH_COLUMNS = "id, product_key, category, brand, model, variant, zone, status, frequency_seconds, daily_request_budget, last_run_at, next_run_at";
+export const WATCH_COLUMNS = "id, product_key, category, brand, model, variant, zone, status, frequency_seconds, daily_request_budget, last_run_at, next_run_at, accelerated";
 
 export interface SyncResult {
   /** Clés produit portées par au moins un besoin actif. */
@@ -19,6 +21,10 @@ export interface SyncResult {
   created: number;
   reactivated: number;
   paused: number;
+  /** Surveillances passées à la fréquence rapide (1 h) parce qu'au moins un besoin actif de leur clé a la recherche active (lot RA1). */
+  accelerated: number;
+  /** Surveillances revenues à la fréquence ordinaire (6 h) : plus aucun besoin actif de leur clé n'a la recherche active. */
+  decelerated: number;
 }
 
 interface DemandKeyRow {
@@ -97,7 +103,74 @@ export async function syncMarketWatches(executor: SqlExecutor, now: Date): Promi
          ORDER BY w.id FOR UPDATE SKIP LOCKED)`,
     [texts, now],
   );
-  return { activeKeys: keys.length, created: inserted.rows[0]?.created ?? 0, reactivated: reactivated.rowCount ?? 0, paused: paused.rowCount ?? 0 };
+  const speeds = await syncWatchFrequencies(executor, now);
+  return { activeKeys: keys.length, created: inserted.rows[0]?.created ?? 0, reactivated: reactivated.rowCount ?? 0, paused: paused.rowCount ?? 0, ...speeds };
+}
+
+/**
+ * Clés des besoins ACTIFS (propriétaire actif) dont la recherche active est en vigueur à `now`. Sans la migration 0028, aucune. Lot MV1 : un besoin PORTEUR d'une mission (en pause ou non)
+ * n'accélère JAMAIS une surveillance (il n'est pas un besoin de l'acheteur : l'option ne s'y achète pas, et une éventuelle ligne d'achat n'aurait aucun effet sur la collecte).
+ */
+export async function readActiveSearchKeys(executor: SqlExecutor, now: Date): Promise<string[]> {
+  if (!(await activeSearchSchemaPresent(executor))) return [];
+  // Comme `readActiveDemandKeys` : sans la table des missions (jamais le cas quand la 0028 est appliquée, mais une panne de cette table ne doit pas arrêter la collecte), aucun besoin n'est porteur.
+  const missions = await executor.query<{ present: boolean }>("SELECT to_regclass('missions') IS NOT NULL AS present");
+  const carriers = missions.rows[0]?.present === true ? "AND NOT EXISTS (SELECT 1 FROM missions mc WHERE mc.demand_id = d.id)" : "";
+  const rows = await executor.query<DemandKeyRow>(
+    `SELECT d.category, d.brand, d.model, d.variant, d.location_text
+       FROM demands d JOIN users u ON u.id = d.owner_id
+      WHERE d.status = 'active' AND d.archived_at IS NULL AND u.status = 'active' AND u.archived_at IS NULL
+        ${carriers}
+        AND d.category IS NOT NULL AND d.brand IS NOT NULL AND d.model IS NOT NULL
+        AND EXISTS (SELECT 1 FROM active_search_purchases p
+                     WHERE p.demand_id = d.id AND p.status = 'active' AND p.refunded_at IS NULL AND p.starts_at <= $1::timestamptz AND p.ends_at > $1::timestamptz)
+      GROUP BY d.category, d.brand, d.model, d.variant, d.location_text`,
+    [now],
+  );
+  const keys = new Set<string>();
+  for (const row of rows.rows) {
+    const key = productKeyOf({ category: row.category, brand: row.brand, model: row.model, variant: row.variant, location: row.location_text });
+    if (key !== null) keys.add(productKeyString(key));
+  }
+  return [...keys].sort();
+}
+
+/**
+ * Fréquence d'une surveillance PARTAGÉE (lots RA1 et RA1-bis) : la plus élevée demandée par ses besoins actifs. Si au moins un besoin ACTIF de la clé a la recherche active en vigueur, la
+ * surveillance passe à `LEAST(intervalle actuel, 1 h)` et `GREATEST(budget actuel, 24 requêtes par jour et par source)` : l'accélération ne ralentit JAMAIS une surveillance déjà plus
+ * rapide ou mieux dotée. Ses valeurs d'AVANT sont gardées (`base_frequency_seconds`, `base_daily_request_budget`, `accelerated`) et rétablies quand plus aucun besoin actif de la clé n'a
+ * l'option (un besoin SATISFAIT suspend l'option : il n'accélère rien). Une surveillance qu'aucun changement ne concerne (déjà au moins aussi rapide et dotée) n'est pas marquée accélérée.
+ * Les quotas journaliers de chaque SOURCE s'appliquent toujours, et les surveillances accélérées ne peuvent en consommer que la moitié (`reserveRequest`). Quand la fréquence monte, la
+ * prochaine collecte est avancée (jamais pendant le bail d'une collecte en cours : `claim_token` doit être vide ; la collecte en cours relit la fréquence à sa clôture,
+ * `readLeasedFrequency`). À la décélération, des valeurs réglées à la main depuis l'accélération ne sont pas écrasées. Instructions sans attente de verrou (`SKIP LOCKED`) : une
+ * surveillance verrouillée est traitée au cycle suivant.
+ */
+async function syncWatchFrequencies(executor: SqlExecutor, now: Date): Promise<{ accelerated: number; decelerated: number }> {
+  if (!(await activeSearchSchemaPresent(executor))) return { accelerated: 0, decelerated: 0 };
+  const boosted = await readActiveSearchKeys(executor, now);
+  const accelerated = await executor.query(
+    `UPDATE market_watches
+        SET base_frequency_seconds = frequency_seconds, base_daily_request_budget = daily_request_budget, accelerated = TRUE,
+            frequency_seconds = LEAST(frequency_seconds, $1::int), daily_request_budget = GREATEST(daily_request_budget, $2::int),
+            next_run_at = CASE WHEN claim_token IS NULL AND last_run_at IS NOT NULL AND next_run_at > $4::timestamptz
+                               THEN LEAST(next_run_at, last_run_at + (LEAST(frequency_seconds, $1::int) * interval '1 second')) ELSE next_run_at END,
+            updated_at = $4::timestamptz
+      WHERE id IN (SELECT id FROM market_watches
+                    WHERE product_key = ANY($3::text[]) AND NOT accelerated AND (frequency_seconds > $1::int OR daily_request_budget < $2::int)
+                    ORDER BY id FOR UPDATE SKIP LOCKED)`,
+    [ACTIVE_SEARCH_WATCH_FREQUENCY_SECONDS, ACTIVE_SEARCH_WATCH_DAILY_BUDGET, boosted, now],
+  );
+  const decelerated = await executor.query(
+    `UPDATE market_watches
+        SET frequency_seconds = CASE WHEN frequency_seconds = LEAST(base_frequency_seconds, $1::int) AND daily_request_budget = GREATEST(base_daily_request_budget, $2::int)
+                                     THEN base_frequency_seconds ELSE frequency_seconds END,
+            daily_request_budget = CASE WHEN frequency_seconds = LEAST(base_frequency_seconds, $1::int) AND daily_request_budget = GREATEST(base_daily_request_budget, $2::int)
+                                        THEN base_daily_request_budget ELSE daily_request_budget END,
+            accelerated = FALSE, base_frequency_seconds = NULL, base_daily_request_budget = NULL, updated_at = $4::timestamptz
+      WHERE id IN (SELECT id FROM market_watches WHERE accelerated AND NOT (product_key = ANY($3::text[])) ORDER BY id FOR UPDATE SKIP LOCKED)`,
+    [ACTIVE_SEARCH_WATCH_FREQUENCY_SECONDS, ACTIVE_SEARCH_WATCH_DAILY_BUDGET, boosted, now],
+  );
+  return { accelerated: accelerated.rowCount ?? 0, decelerated: decelerated.rowCount ?? 0 };
 }
 
 export interface ClaimOptions {
@@ -124,7 +197,7 @@ export async function claimDueWatches(executor: SqlExecutor, now: Date, options:
           FOR UPDATE SKIP LOCKED
        ) due
       WHERE w.id = due.id
-      RETURNING w.id, w.product_key, w.category, w.brand, w.model, w.variant, w.zone, w.status, w.frequency_seconds, w.daily_request_budget, w.last_run_at, w.next_run_at, w.claim_token`,
+      RETURNING w.id, w.product_key, w.category, w.brand, w.model, w.variant, w.zone, w.status, w.frequency_seconds, w.daily_request_budget, w.last_run_at, w.next_run_at, w.accelerated, w.claim_token`,
     [now, options.limit, WATCH_CLAIM_LEASE_SECONDS, only],
   );
   return claimed.rows;
@@ -141,6 +214,15 @@ export async function renewLease(executor: SqlExecutor, watch: Pick<ClaimedWatch
     [watch.id, watch.claim_token, now, WATCH_CLAIM_LEASE_SECONDS],
   );
   return (renewed.rowCount ?? 0) > 0;
+}
+
+/**
+ * Fréquence ACTUELLE d'une surveillance dont cet exécuteur détient le bail (jeton), lue juste avant la clôture : une option de recherche active achetée PENDANT la collecte change la
+ * fréquence en base, et la prochaine échéance doit en tenir compte (sinon la surveillance attendrait 6 h au lieu d'1 h). Null : le bail n'est plus le nôtre.
+ */
+export async function readLeasedFrequency(executor: SqlExecutor, watch: Pick<ClaimedWatch, "id" | "claim_token">): Promise<number | null> {
+  const result = await executor.query<{ frequency_seconds: number }>("SELECT frequency_seconds FROM market_watches WHERE id = $1::uuid AND claim_token = $2::uuid", [watch.id, watch.claim_token]);
+  return result.rows[0]?.frequency_seconds ?? null;
 }
 
 /**

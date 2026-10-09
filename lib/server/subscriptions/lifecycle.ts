@@ -19,7 +19,7 @@ import { addHours, addOneMonth, currentInstant, INSTANT_TEXT_SQL, renewalStart }
  *
  *  - SOUSCRIPTION (`subscribeToPlan`) : UNE transaction, sous le verrou de l'utilisateur : abonnement, débit (`subscription_charge` : vendeur −prix, `subscription_revenue` +prix,
  *    et, s'il y a des crédits promotionnels, `user_promo` +crédits, `promo_issuance` −crédits), période d'un mois, émission promotionnelle. Idempotente par clé (un double clic ne
- *    donne jamais deux débits). Solde insuffisant : rien n'est écrit. Les crédits promotionnels ne paient JAMAIS un abonnement. La souscription utilise la DERNIÈRE version du plan ;
+ *    donne jamais deux débits). Le prix AFFICHÉ (`expectedPriceXof`) est comparé au prix courant de la dernière version : `price_changed`, sans débit, s'il a changé. Solde insuffisant : rien n'est écrit. Les crédits promotionnels ne paient JAMAIS un abonnement. La souscription utilise la DERNIÈRE version du plan ;
  *    elle remet en ligne, dans la limite du plan, les annonces que la fin d'un abonnement précédent avait mises en pause (`paused_reason = 'plan_limit'`, les plus récentes d'abord ;
  *    jamais celles que le vendeur avait mises en pause lui-même) et en avertit le vendeur.
  *  - RENOUVELLEMENT, GRÂCE, FIN (`runSubscriptionStep`, étape « subscriptions » du worker) : à l'échéance, renouvellement automatique si l'option est activée (périodes contiguës).
@@ -137,6 +137,11 @@ export async function subscribeToPlan(input: {
   userId: string;
   planCode: string;
   idempotencyKey: string;
+  /**
+   * Prix mensuel AFFICHÉ à l'acheteur (XOF, entier) : `price_changed` s'il diffère du prix de la dernière version du plan (aucun débit). La route HTTP l'EXIGE toujours ; seuls les outils
+   * internes et les essais qui souscrivent sans écran peuvent l'omettre.
+   */
+  expectedPriceXof?: number;
   /** Horloge injectable (essais, outils) : défaut, l'horloge de la base. */
   now?: Date;
   hooks?: SubscribeTestHooks;
@@ -146,19 +151,24 @@ export async function subscribeToPlan(input: {
   const idempotencyKey = requireUuid(input.idempotencyKey, "idempotencyKey").toLowerCase();
   if (typeof input.planCode !== "string" || !/^[a-z][a-z0-9_]{1,29}$/.test(input.planCode)) throw new CatalogValidationError("planCode invalide.");
   const planCode = input.planCode;
+  if (input.expectedPriceXof !== undefined && (typeof input.expectedPriceXof !== "number" || !Number.isSafeInteger(input.expectedPriceXof) || input.expectedPriceXof <= 0)) {
+    throw new CatalogValidationError("expectedPriceXof doit être un entier positif (le prix affiché).");
+  }
+  const expectedPrice = input.expectedPriceXof === undefined ? null : BigInt(input.expectedPriceXof);
 
   return withPostgresTransaction(async (client) => {
     await client.query(`SET LOCAL lock_timeout = '${SUBSCRIPTION_LOCK_TIMEOUT_MS}ms'`);
     await lockUserEntitlements(client, userId);
 
-    const replay = await client.query<{ id: string; subscription_id: string; code: string }>(
-      `SELECT p.id, p.subscription_id, pl.code
+    const replay = await client.query<{ id: string; subscription_id: string; code: string; price: string }>(
+      `SELECT p.id, p.subscription_id, pl.code, p.price_xof::text AS price
          FROM subscription_periods p JOIN plan_versions v ON v.id = p.plan_version_id JOIN plans pl ON pl.id = v.plan_id
         WHERE p.user_id = $1::uuid AND p.idempotency_key = $2::uuid`,
       [userId, idempotencyKey],
     );
     if (replay.rows[0]) {
       if (replay.rows[0].code !== planCode) throw new SubscriptionError("idempotency_conflict");
+      if (expectedPrice !== null && BigInt(replay.rows[0].price) !== expectedPrice) throw new SubscriptionError("price_changed");
       return { subscriptionId: replay.rows[0].subscription_id, periodId: replay.rows[0].id, reused: true, restoredOffers: 0 };
     }
 
@@ -167,6 +177,8 @@ export async function subscribeToPlan(input: {
     if (choice.price <= ZERO) throw new SubscriptionError("plan_not_subscribable");
     const live = await client.query("SELECT 1 FROM subscriptions WHERE user_id = $1::uuid AND status IN ('active', 'past_due')", [userId]);
     if (live.rowCount) throw new SubscriptionError("already_subscribed");
+    // Le prix affiché n'est plus celui de la dernière version du plan : rien n'est débité, l'écran recharge le prix courant.
+    if (expectedPrice !== null && choice.price !== expectedPrice) throw new SubscriptionError("price_changed");
 
     const startsAt = await currentInstant(client, input.now);
     const endsAt = await addOneMonth(client, startsAt);

@@ -318,13 +318,13 @@ async function tamperPurchasedBoost(boostId: string, assignments: string): Promi
 // ═════════════ 1. Migration 0015 ═════════════
 
 test("migration 0015 (suivie de 0016 à 0019) : 19 appliquées, la relance n'en applique aucune, tables, index et déclencheurs présents", async () => {
-  assert.equal(firstMigration.applied.length, 27);
+  assert.equal(firstMigration.applied.length, 28);
   assert.ok(firstMigration.applied.includes("0015_boost_purchases"));
-  assert.equal(firstMigration.applied.at(-1), "0027_missions");
+  assert.equal(firstMigration.applied.at(-1), "0028_active_search");
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 27);
-  assert.equal(rerun.skipped.at(-1), "0027_missions");
+  assert.equal(rerun.skipped.length, 28);
+  assert.equal(rerun.skipped.at(-1), "0028_active_search");
   assert.equal(await countRows("boost_purchases"), 0);
 
   const columns = (await pool.query<{ column_name: string; is_nullable: string; data_type: string }>(
@@ -357,9 +357,9 @@ test("migration 0015 (suivie de 0016 à 0019) : 19 appliquées, la relance n'en 
   const index = (await pool.query<{ indexdef: string }>("SELECT indexdef FROM pg_indexes WHERE schemaname = $1 AND indexname = 'idx_boost_purchases_offer'", [schema])).rows[0];
   assert.match(index.indexdef, /\(offer_id, created_at DESC\)/);
   // Les comptes système existent toujours (0014 inchangée) et aucune écriture n'a été créée par la migration.
-  // (Lot PRO1 : la migration 0021 ajoute quatre comptes système ; on vérifie les deux de 0014 et le total.)
+  // (Lot PRO1 : la migration 0021 ajoute quatre comptes système ; lot RA1 : la migration 0028 ajoute celui des revenus de la recherche active ; on vérifie la liste complète.)
   assert.deepEqual((await pool.query("SELECT kind FROM wallet_accounts ORDER BY kind")).rows.map((row) => row.kind),
-    ["boost_revenue", "promo_consumed", "promo_expired", "promo_issuance", "provider_clearing", "subscription_revenue"]);
+    ["active_search_revenue", "boost_revenue", "promo_consumed", "promo_expired", "promo_issuance", "provider_clearing", "subscription_revenue"]);
 });
 
 /** Exécute `operation` dans une transaction ANNULÉE (ou validée) ; renvoie l'échec SQL (code, contrainte) ou null. */

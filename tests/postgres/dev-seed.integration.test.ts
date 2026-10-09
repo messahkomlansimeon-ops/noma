@@ -40,8 +40,8 @@ before(async () => {
   pool = new Pool({ connectionString: urlFor(mainDb), max: 4 });
   emptyPool = new Pool({ connectionString: urlFor(emptyDb), max: 1 });
   racePool = new Pool({ connectionString: urlFor(raceDb), max: 6 });
-  assert.equal((await runMigrations(pool)).applied.length, 27);
-  assert.equal((await runMigrations(racePool)).applied.length, 27);
+  assert.equal((await runMigrations(pool)).applied.length, 28);
+  assert.equal((await runMigrations(racePool)).applied.length, 28);
 });
 
 after(async () => {

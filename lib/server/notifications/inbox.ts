@@ -9,7 +9,7 @@ import {
   NOTIFICATIONS_READ_MAX_IDS,
 } from "./config";
 import { looksLikePhoneNumber } from "../../phone-text";
-import { TITLE_FALLBACK, demandLink, offerLink, type NotificationPrice } from "./content";
+import { EXTERNAL_SOURCE_FALLBACK, EXTERNAL_TITLE_FALLBACK, TITLE_FALLBACK, demandLink, offerLink, type NotificationPrice } from "./content";
 
 /**
  * Lecture des notifications DANS l'application (lot N1) : pagination par curseur (plus récentes d'abord), compteur de non-lues, « marquer comme lu ».
@@ -17,7 +17,7 @@ import { TITLE_FALLBACK, demandLink, offerLink, type NotificationPrice } from ".
  * titre, prix, lien, dates. Jamais de téléphone, d'identifiant du vendeur ni de texte libre. Voir NOTIFICATIONS.md.
  */
 
-export type NotificationKind = "new_match" | "new_matches_digest" | "new_message" | "mission_coverage";
+export type NotificationKind = "new_match" | "new_matches_digest" | "new_message" | "mission_coverage" | "new_external_match" | "active_search_expiring";
 
 export interface NotificationItem {
   id: string;
@@ -33,6 +33,10 @@ export interface NotificationItem {
   link: string;
   createdAt: Date;
   readAt: Date | null;
+  /** new_external_match seulement (lot RA1) : nom de la source de l'annonce d'un autre site. Absent des autres genres. */
+  sourceName?: string;
+  /** active_search_expiring seulement (lots RA1 et RA1-bis) : fin de la CHAÎNE de périodes de recherche active au moment de la lecture (une prolongation payée après l'avis la repousse). Absent des autres genres. */
+  endsAt?: Date;
 }
 
 export interface NotificationsPage {
@@ -69,6 +73,8 @@ interface NotificationRow {
   offer_id: string | null;
   conversation_id: string | null;
   mission_id: string | null;
+  source_name: string | null;
+  search_ends_at: Date | null;
   created_at: Date;
   read_at: Date | null;
   cursor_at: string;
@@ -90,6 +96,27 @@ function mapRow(row: NotificationRow): NotificationItem {
       createdAt: row.created_at,
       readAt: row.read_at,
     };
+  }
+  if (row.kind === "new_external_match") {
+    // Annonce d'un AUTRE SITE (recherche active) : titre nettoyé, prix, nom de la source ; le lien est la page du BESOIN (jamais l'URL de l'annonce externe).
+    const amount = row.price_amount === null ? null : Number(row.price_amount);
+    return {
+      id: row.id,
+      kind: row.kind,
+      title: row.title !== null && !looksLikePhoneNumber(row.title) ? row.title : EXTERNAL_TITLE_FALLBACK,
+      price: amount !== null && Number.isSafeInteger(amount) && row.price_currency !== null ? { amount, currency: row.price_currency } : null,
+      count: null,
+      demandId: row.demand_id,
+      offerId: null,
+      link: demandLink(row.demand_id),
+      createdAt: row.created_at,
+      readAt: row.read_at,
+      sourceName: row.source_name !== null && !looksLikePhoneNumber(row.source_name) ? row.source_name : EXTERNAL_SOURCE_FALLBACK,
+    };
+  }
+  if (row.kind === "active_search_expiring" && row.search_ends_at !== null) {
+    // Avis d'échéance de la recherche active : aucune donnée d'annonce.
+    return { id: row.id, kind: row.kind, title: null, price: null, count: null, demandId: row.demand_id, offerId: null, link: demandLink(row.demand_id), createdAt: row.created_at, readAt: row.read_at, endsAt: row.search_ends_at };
   }
   if (row.kind === "new_message" && row.conversation_id !== null) {
     // « Nouveau message » (lot D2) : titre de l'annonce (liste blanche), lien vers la conversation. Jamais le texte du message ni l'identité de l'autre participant.
@@ -137,12 +164,13 @@ export async function listNotifications(input: { pool: Pool; userId: string; lim
   try {
     await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
     const rows = await client.query<NotificationRow>(
-      `SELECT id, kind, title, price_amount::text AS price_amount, price_currency, item_count, demand_id, offer_id, conversation_id, mission_id, created_at, read_at,
-              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at
-         FROM notifications
-        WHERE user_id = $1::uuid
-          AND ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3::uuid))
-        ORDER BY created_at DESC, id DESC
+      `SELECT n.id, n.kind, n.title, n.price_amount::text AS price_amount, n.price_currency, n.item_count, n.demand_id, n.offer_id, n.conversation_id, n.mission_id, n.source_name,
+              active_search_chain_end(n.active_search_id) AS search_ends_at, n.created_at, n.read_at,
+              to_char(n.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at
+         FROM notifications n
+        WHERE n.user_id = $1::uuid
+          AND ($2::timestamptz IS NULL OR (n.created_at, n.id) < ($2::timestamptz, $3::uuid))
+        ORDER BY n.created_at DESC, n.id DESC
         LIMIT $4::int`,
       [userId, cursor?.createdAt ?? null, cursor?.id ?? null, limit + 1],
     );

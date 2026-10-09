@@ -231,6 +231,9 @@ export function prepareDevTry(
     // Recharge par le prestataire fictif (page « paiement simulé ») : toujours actif ici, quoi que dise l'environnement.
     NOMA_FAKE_PAYMENTS: "1",
     NOMA_FAKE_PAYMENT_SECRET: fakePaymentSecret,
+    // Collecte d'annonces d'autres sites par les connecteurs FICTIFS (aucun réseau sortant, développement seulement) : toujours active ici, comme les fausses sources et les faux paiements.
+    // Sans elle, la recherche active payante (lot RA1) est « pas encore disponible » (aucune annonce externe n'est collectée) et le montage d'essai ne pourrait pas la montrer.
+    NOMA_EXTERNAL_FAKE: "1",
     NOMA_AUTH_ORIGIN: publicOrigin,
     NOMA_AUTH_SECRET: authSecret,
     NOMA_AUTH_PROXY_SECRET: proxySecret,

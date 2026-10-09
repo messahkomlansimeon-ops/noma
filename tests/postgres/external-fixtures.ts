@@ -41,6 +41,9 @@ export function barrier(): { wait: Promise<void>; open: () => void } {
   return { wait, open };
 }
 
+/** Environnement qui rend les connecteurs FICTIFS disponibles : la recherche active n'est vendable que si la collecte externe peut fournir des annonces (lot RA1-bis). */
+export const FAKE_ENV: Readonly<Record<string, string>> = Object.freeze({ NOMA_EXTERNAL_FAKE: "1" });
+
 export const IPHONE = { category: "Téléphones", brand: "Apple", model: "iPhone 12" } as const;
 
 /** Un besoin (actif par défaut) d'un nouvel utilisateur ou de `ownerId`. */

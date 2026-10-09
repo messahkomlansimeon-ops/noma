@@ -29,7 +29,7 @@ test("configuration de code : espaces de verrou tous distincts, sources d'un boo
   assert.equal(BOOST_PURCHASE_HTTP_BODY_MAX_BYTES, 2048);
 });
 
-test("les listes du code sont EXACTEMENT celles des migrations 0015 et 0021 (source d'un boost, types de transaction, durées)", () => {
+test("les listes du code sont EXACTEMENT celles des migrations 0015, 0021 et 0028 (source d'un boost, types de transaction, durées)", () => {
   const sql = source("database/migrations/0015_boost_purchases.sql");
   const list = (constraint: string): string[] => {
     const match = new RegExp(`${constraint}\\s+CHECK \\((?:source|kind|duration_code) IN \\(([^)]*)\\)`, "m").exec(sql.replace(/\n\s+/g, " "));
@@ -38,13 +38,19 @@ test("les listes du code sont EXACTEMENT celles des migrations 0015 et 0021 (sou
   };
   assert.deepEqual(list("chk_offer_boosts_source"), [...BOOST_RECORD_SOURCES]);
   assert.deepEqual(list("chk_boost_purchases_duration_code"), [...BOOST_DURATION_CODES]);
-  // Les types de transaction : la dernière définition de la contrainte est celle de la migration 0021 (lot PRO1), qui ajoute les trois types de l'offre Pro à ceux de 0015.
+  // Les types de transaction : la définition de 0021 (lot PRO1) ajoute les trois types de l'offre Pro à ceux de 0015.
   assert.deepEqual(list("chk_wallet_transactions_kind"), ["topup", "adjustment", "boost_purchase", "boost_refund"]);
   const proSql = source("database/migrations/0021_pro_subscriptions.sql").replace(/\n\s+/g, " ");
   const proKinds = /chk_wallet_transactions_kind\s+CHECK \(kind IN \(([^)]*)\)/m.exec(proSql);
   assert.ok(proKinds, "contrainte chk_wallet_transactions_kind introuvable dans 0021");
-  assert.deepEqual([...proKinds[1].matchAll(/'([a-z0-9_]+)'/g)].map((entry) => entry[1]), [...WALLET_TRANSACTION_KINDS]);
-  assert.deepEqual([...WALLET_TRANSACTION_KINDS], ["topup", "adjustment", "boost_purchase", "boost_refund", "subscription_charge", "subscription_refund", "promo_expiry"]);
+  const proList = [...proKinds[1].matchAll(/'([a-z0-9_]+)'/g)].map((entry) => entry[1]);
+  assert.deepEqual(proList, ["topup", "adjustment", "boost_purchase", "boost_refund", "subscription_charge", "subscription_refund", "promo_expiry"]);
+  // Lot RA1 : la migration 0028 ajoute les deux types de la recherche active ; sa définition est la DERNIÈRE de la contrainte, celle que reflète le code.
+  const searchSql = source("database/migrations/0028_active_search.sql").replace(/\n\s+/g, " ");
+  const searchKinds = /chk_wallet_transactions_kind\s+CHECK \(kind IN \(([^)]*)\)/m.exec(searchSql);
+  assert.ok(searchKinds, "contrainte chk_wallet_transactions_kind introuvable dans 0028");
+  assert.deepEqual([...searchKinds[1].matchAll(/'([a-z0-9_]+)'/g)].map((entry) => entry[1]), [...WALLET_TRANSACTION_KINDS]);
+  assert.deepEqual([...WALLET_TRANSACTION_KINDS], [...proList, "search_purchase", "search_refund"]);
 });
 
 test("erreurs de domaine de l'achat : un message fixe par code, sans donnée (ni identifiant, ni montant)", () => {

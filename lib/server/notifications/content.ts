@@ -80,3 +80,36 @@ export interface DeliveryContent {
 export function buildDeliveryContent(input: { title: string; price: NotificationPrice | null; demandId: string; offerId: string }): DeliveryContent {
   return { title: input.title, price: input.price, link: offerLink(input.demandId, input.offerId) };
 }
+
+// ───────────── annonces d'AUTRES SITES (lot RA1, recherche active) ─────────────
+
+/** Titre d'une annonce d'un autre site : 120 caractères au plus, au plus 12 chiffres au total ; sinon le texte de repli. */
+export const EXTERNAL_TITLE_MAX_LENGTH = 120;
+export const EXTERNAL_TITLE_MAX_DIGITS = 12;
+export const EXTERNAL_TITLE_FALLBACK = "Nouvelle annonce d'un autre site";
+export const EXTERNAL_SOURCE_NAME_MAX_LENGTH = 80;
+export const EXTERNAL_SOURCE_FALLBACK = "un autre site";
+
+/**
+ * Titre d'une annonce d'un autre site, nettoyé comme tout texte venu d'un tiers : normalisation NFKC, caractères de contrôle, de direction ou invisibles refusés, aucun texte qui
+ * ressemble à un numéro de téléphone, au plus 12 chiffres ; sinon « Nouvelle annonce d'un autre site ». Jamais l'URL de l'annonce.
+ */
+export function buildExternalNotificationTitle(title: string | null | undefined): string {
+  if (typeof title !== "string") return EXTERNAL_TITLE_FALLBACK;
+  const text = normalizePublicText(title.replace(/\s+/g, " ").trim()).replace(/\s+/g, " ").trim();
+  if (text === "" || hasUnsafeCharacters(text) || looksLikePhoneNumber(text) || countDigits(text) > EXTERNAL_TITLE_MAX_DIGITS) return EXTERNAL_TITLE_FALLBACK;
+  return text.length > EXTERNAL_TITLE_MAX_LENGTH ? `${text.slice(0, EXTERNAL_TITLE_MAX_LENGTH - 1).trimEnd()}…` : text;
+}
+
+/** Nom de la source (« Annonces Démo A ») nettoyé de la même façon ; « un autre site » s'il est refusé. */
+export function buildExternalSourceName(name: string | null | undefined): string {
+  if (typeof name !== "string") return EXTERNAL_SOURCE_FALLBACK;
+  const text = normalizePublicText(name.replace(/\s+/g, " ").trim()).replace(/\s+/g, " ").trim();
+  if (text === "" || text.length > EXTERNAL_SOURCE_NAME_MAX_LENGTH || hasUnsafeCharacters(text) || looksLikePhoneNumber(text)) return EXTERNAL_SOURCE_FALLBACK;
+  return text;
+}
+
+/** Contenu figé d'un envoi externe pour une annonce d'un autre site : titre, prix, et le lien vers la page du BESOIN (jamais l'URL de l'annonce externe). */
+export function buildExternalDeliveryContent(input: { title: string; price: NotificationPrice | null; demandId: string }): DeliveryContent {
+  return { title: input.title, price: input.price, link: demandLink(input.demandId) };
+}

@@ -31,6 +31,7 @@ import { buildDeliveryContent, buildNotificationPrice, buildNotificationTitle } 
  *    exception : le balayage de réactivation d'un VENDEUR (`user.reactivated`) garde la règle de N1 ;
  *  - le couple a DÉJÀ été une correspondance confirmée (réévaluation, recalcul en masse, changement de scoring) ou a déjà sa notification.
  * Au-delà de 20 notifications par besoin ou de 50 par utilisateur et par jour UTC : un seul résumé par besoin et par jour (item_count qui augmente remet read_at à NULL).
+ * Lot RA1 : les notifications d'annonces d'AUTRES SITES (`new_external_match`, recherche active payante) comptent dans les MÊMES plafonds que les annonces internes.
  * Toute annonce, résumée ou non, a sa ligne d'envoi externe pour un utilisateur qui l'a demandé : le message regroupé en compte tout. Voir NOTIFICATIONS.md.
  */
 
@@ -191,7 +192,7 @@ export async function recordNewMatchNotification(executor: SqlExecutor, input: N
   await client.query("SELECT pg_advisory_xact_lock($1, hashtext($2))", [NOTIFICATION_CAP_LOCK_NAMESPACE, `${input.demandOwnerId}:${day}`]);
   const counted = await client.query<{ demand_count: number; user_count: number }>(
     `SELECT count(*) FILTER (WHERE demand_id = $1::uuid)::int AS demand_count, count(*)::int AS user_count FROM notifications
-      WHERE user_id = $3::uuid AND kind = 'new_match'
+      WHERE user_id = $3::uuid AND kind IN ('new_match', 'new_external_match')
         AND created_at >= ($2::date)::timestamp AT TIME ZONE 'UTC'
         AND created_at < (($2::date) + 1)::timestamp AT TIME ZONE 'UTC'`,
     [input.demandId, day, input.demandOwnerId],

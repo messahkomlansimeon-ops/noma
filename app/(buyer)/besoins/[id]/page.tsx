@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { ActiveSearchCard } from "@/components/active-search-card";
 import { ExternalSection } from "@/components/external/external-section";
 import { BuyerMatchCard } from "@/components/matches/match-parts";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
@@ -49,6 +50,8 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  // Un achat de recherche active change le plafond du suivi (180 jours) : le panneau de suivi est relu.
+  const [trackingKey, setTrackingKey] = useState(0);
   // « Actualiser » ouvre une nouvelle génération : une réponse de « Voir plus » partie avant est ignorée.
   const guard = useRef(createGenerationGuard());
   const busy = refreshing || loadingMore;
@@ -149,7 +152,11 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
         </div>
       </div>
 
-      {demand.status === "active" ? <TrackingPanel demandId={demandId} /> : null}
+      {demand.status === "active" ? <TrackingPanel demandId={demandId} key={`tracking-${trackingKey}`} /> : null}
+
+      {/* Lot RA1 : option payante « Recherche active » (annonces d'autres sites notifiées, collecte plus fréquente, suivi jusqu'à 180 jours). */}
+      {/* Un besoin « satisfait » SUSPEND l'option en cours (la carte le dit, sans bouton d'achat) ; pour tout autre statut, la carte ne s'affiche pas. */}
+      {demand.status === "active" || demand.status === "satisfied" ? <ActiveSearchCard demandId={demandId} onChanged={() => setTrackingKey((key) => key + 1)} /> : null}
 
       {notActive ? (
         <p role="status" className="mt-4 rounded-2xl bg-wash p-4 text-[14px] font-semibold text-ink-soft">

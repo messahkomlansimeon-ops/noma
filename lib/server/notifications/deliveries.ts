@@ -185,6 +185,15 @@ function verdictQuery(): { text: string; values: unknown[] } {
              WHEN dem.id IS NULL OR dem.status <> 'active' OR dem.archived_at IS NOT NULL THEN 'demand_inactive'
              WHEN dem.notify_paused THEN 'tracking_paused'
              WHEN dem.notify_until <= $2::timestamptz THEN 'tracking_expired'
+             -- Annonce d'un AUTRE SITE (recherche active, lot RA1) : l'option doit être en vigueur et l'annonce encore disponible.
+             WHEN nd.external_listing_id IS NOT NULL AND NOT EXISTS (
+               SELECT 1 FROM active_search_purchases asp
+                WHERE asp.demand_id = nd.demand_id AND asp.status = 'active' AND asp.refunded_at IS NULL
+                  AND asp.starts_at <= $2::timestamptz AND asp.ends_at > $2::timestamptz) THEN 'search_inactive'
+             WHEN nd.external_listing_id IS NOT NULL AND NOT EXISTS (
+               SELECT 1 FROM external_listings el WHERE el.id = nd.external_listing_id AND el.availability_status = 'available') THEN 'listing_unavailable'
+             WHEN nd.external_listing_id IS NOT NULL AND nd.created_at < $2::timestamptz - ($${3 + freshness.values.length}::bigint * interval '1 millisecond') THEN 'expired'
+             WHEN nd.external_listing_id IS NOT NULL THEN NULL
              WHEN ofr.id IS NULL OR ofr.status <> 'published' OR ofr.archived_at IS NOT NULL
                   OR ofr.availability_status IS NOT DISTINCT FROM 'unavailable' THEN 'offer_unavailable'
              WHEN NOT EXISTS (

@@ -101,8 +101,13 @@ export function notificationView(item: BuyerHomeNotification): BuyerNotification
           ? `Nouveau message : ${item.title ?? "annonce"}`
           : item.kind === "mission_coverage"
             ? `Mission : ${item.title ?? "achat en volume"}`
-            : (item.title ?? "Nouvelle annonce"),
-    subtitle: item.kind === "new_matches_digest" || item.kind === "new_message" || item.kind === "mission_coverage" ? null : formatMoney(item.price),
+            : item.kind === "active_search_expiring"
+              ? "Votre recherche active se termine bientôt"
+              : item.kind === "new_external_match"
+                ? `Autre site : ${item.title ?? "nouvelle annonce"}`
+                : (item.title ?? "Nouvelle annonce"),
+    subtitle:
+      item.kind === "new_matches_digest" || item.kind === "new_message" || item.kind === "mission_coverage" || item.kind === "active_search_expiring" ? null : formatMoney(item.price),
     unread: item.unread,
     href: item.link,
   };

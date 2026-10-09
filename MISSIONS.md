@@ -203,6 +203,10 @@ réponses `no-store`, textes d'erreur fixes, journal serveur limité à un code.
 - Les vendeurs d'une proposition sont étiquetés (« Vendeur N », voir plus haut) ; la proposition ne porte aucun identifiant de vendeur ni numéro.
 - Une notification de couverture ne porte que le produit et deux quantités : jamais de budget ni de vendeur.
 
+## Recherche active payante (lot RA1) et intégration
+
+Le besoin PORTEUR d'une mission n'a pas l'option « Recherche active » : il n'est pas un besoin de l'acheteur, l'option ne s'y lit ni ne s'y achète (même 404 `resource_not_found` qu'un besoin d'autrui, quel que soit l'état de la mission) et il n'accélère jamais la collecte (voir `RECHERCHE-ACTIVE.md`, « Le besoin porteur d'une mission »). Les contraintes de la table `notifications` sont recréées par la migration `0028_active_search` (qui passe après la 0027) en gardant le genre `mission_coverage` et la colonne `mission_id` : preuve dans `npm run test:notifications-constraints`. Dans le runner, l'étape `missions` précède `notify` et l'étape `activeSearch` passe en tout dernier.
+
 ## Base : migration 0027
 
 Additive (jamais appliquée à `noma_dev` sans instruction explicite). Table `missions` (CHECK sur chaque borne, sur le cycle de vie et sur les textes ; déclencheur de transitions et de contenu figé ;

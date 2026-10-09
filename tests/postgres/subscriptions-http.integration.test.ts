@@ -49,7 +49,9 @@ const noticesRead = (cookie: string | null, body: unknown) => subscription.notic
 const importCatalog = (cookie: string | null, body: unknown, origin?: string | null) =>
   subscription.importCatalog(request("POST", "/api/offers/import", { cookie, body, origin })).then(reply);
 
-const SUBSCRIBE_BODY = () => ({ planCode: "pro", idempotencyKey: randomUUID() });
+/** Prix mensuel de la dernière version du plan Pro, tel que l'écran l'afficherait (change quand une nouvelle version est créée). */
+let proPrice = 10_000;
+const SUBSCRIBE_BODY = () => ({ planCode: "pro", idempotencyKey: randomUUID(), expectedPriceXof: proPrice });
 
 // ═════════════ 1. Abonnement ═════════════
 
@@ -83,7 +85,12 @@ test("POST /api/subscription : origine AVANT la session, JSON strict (clés exac
   assert.equal((await subscribe(user.cookie, valid, "https://evil.test")).status, 403, "origine étrangère");
   assert.equal((await subscribe(null, valid, "https://evil.test")).status, 403, "l'origine est vérifiée avant la session");
   assert.equal((await subscribe(null, valid)).status, 401);
-  for (const body of [{}, { planCode: "pro" }, { ...valid, extra: 1 }, { planCode: 5, idempotencyKey: valid.idempotencyKey }, { planCode: "pro", idempotencyKey: "pas-un-uuid" }, [valid], "texte"]) {
+  for (const body of [
+    {}, { planCode: "pro" }, { ...valid, extra: 1 }, { ...valid, planCode: 5 }, { ...valid, idempotencyKey: "pas-un-uuid" }, [valid], "texte",
+    // A6 : le prix AFFICHÉ est obligatoire, entier, positif.
+    { planCode: "pro", idempotencyKey: valid.idempotencyKey }, { ...valid, expectedPriceXof: "10000" }, { ...valid, expectedPriceXof: 10_000.5 }, { ...valid, expectedPriceXof: 0 },
+    { ...valid, expectedPriceXof: -10_000 }, { ...valid, expectedPriceXof: null }, { ...valid, expectedPriceXof: true }, { ...valid, expectedPriceXof: Number.MAX_SAFE_INTEGER + 2 },
+  ]) {
     assert.equal((await subscribe(user.cookie, body)).status, 400, JSON.stringify(body));
   }
   // Content-Type et JSON piégé.
@@ -92,9 +99,18 @@ test("POST /api/subscription : origine AVANT la session, JSON strict (clés exac
   })).then(reply);
   assert.equal(wrongType.status, 400);
   const doubleKey = await subscription.subscribe(new Request(`${ORIGIN}/api/subscription`, {
-    method: "POST", headers: { cookie: user.cookie, origin: ORIGIN, "content-type": "application/json" }, body: `{"planCode":"pro","planCode":"free","idempotencyKey":"${valid.idempotencyKey}"}`,
+    method: "POST", headers: { cookie: user.cookie, origin: ORIGIN, "content-type": "application/json" }, body: `{"planCode":"pro","planCode":"free","idempotencyKey":"${valid.idempotencyKey}","expectedPriceXof":10000}`,
   })).then(reply);
   assert.equal(doubleKey.status, 400, "clé en double refusée par le lecteur strict");
+  // A6 : un prix affiché qui n'est pas le prix courant → 409 price_changed, texte fixe, rien d'écrit (même avec un solde suffisant plus bas).
+  const beforeGuard = await count(env.pool, "wallet_transactions");
+  for (const expectedPriceXof of [9_999, 10_001, 1, 12_000]) {
+    const stale = await subscribe(user.cookie, { ...valid, expectedPriceXof });
+    assert.equal(stale.status, 409, String(expectedPriceXof));
+    assert.deepEqual(errorOf(stale), { code: "price_changed", message: "Le prix de l'abonnement a changé : rechargez la page, puis réessayez." });
+  }
+  assert.equal(await count(env.pool, "wallet_transactions"), beforeGuard);
+  assert.equal(await count(env.pool, "subscriptions", `user_id = '${user.userId}'`), 0);
   // Solde insuffisant : 409, texte fixe, rien d'écrit.
   const before = await count(env.pool, "wallet_transactions");
   const poor = await subscribe(user.cookie, valid);
@@ -122,11 +138,14 @@ test("POST /api/subscription : origine AVANT la session, JSON strict (clés exac
   assert.equal(replay.status, 200);
   assert.equal(obj(replay.json).reused, true);
   assert.equal(await count(env.pool, "subscription_periods", `user_id = '${user.userId}'`), 1);
+  // Le rejeu avec un autre prix affiché que celui payé : price_changed, jamais « déjà enregistré ».
+  assert.equal(errorOf(await subscribe(user.cookie, { ...valid, expectedPriceXof: 12_000 })).code, "price_changed");
+  assert.equal(await count(env.pool, "subscription_periods", `user_id = '${user.userId}'`), 1);
   // Autre clé : 409 already_subscribed ; plan gratuit ou inconnu.
   assert.equal(errorOf(await subscribe(user.cookie, SUBSCRIBE_BODY())).code, "already_subscribed");
   const other = await login(env.pool);
-  assert.equal(errorOf(await subscribe(other.cookie, { planCode: "free", idempotencyKey: randomUUID() })).code, "plan_not_subscribable");
-  const unknown = await subscribe(other.cookie, { planCode: "inconnu", idempotencyKey: randomUUID() });
+  assert.equal(errorOf(await subscribe(other.cookie, { planCode: "free", idempotencyKey: randomUUID(), expectedPriceXof: 10_000 })).code, "plan_not_subscribable");
+  const unknown = await subscribe(other.cookie, { planCode: "inconnu", idempotencyKey: randomUUID(), expectedPriceXof: 10_000 });
   assert.deepEqual([unknown.status, unknown.json], [404, NOT_FOUND]);
   // Le porte-monnaie distingue crédits et crédits promotionnels (GET /api/wallet).
   const wallet = createWalletHttpHandlers({ pool: env.pool, env: { NOMA_AUTH_ORIGIN: ORIGIN } });
@@ -347,6 +366,13 @@ test("administration : versions en lecture, abonnés ARRONDIS À 5 PRÈS, revenu
   assert.deepEqual([renewed.currentPriceXof, renewed.renewalPriceXof], [10_000, 10_000]);
   const fresh = await login(env.pool);
   await fund(env.pool, fresh.userId, 20_000);
+  // A6 : l'écran affichait encore 10 000 (version 1) : le nouveau prix de 12 000 est refusé tant qu'il n'est pas relu, sans débit.
+  const beforeStale = await count(env.pool, "wallet_transactions");
+  const staleScreen = await subscribe(fresh.cookie, SUBSCRIBE_BODY());
+  assert.equal(staleScreen.status, 409);
+  assert.equal(errorOf(staleScreen).code, "price_changed");
+  assert.equal(await count(env.pool, "wallet_transactions"), beforeStale, "aucun débit au prix périmé");
+  proPrice = 12_000;
   const subscribed = obj(obj((await subscribe(fresh.cookie, SUBSCRIBE_BODY())).json).subscription);
   assert.equal(subscribed.currentPriceXof, 12_000);
   assert.equal((await env.pool.query<{ balance: string }>("SELECT balance::text FROM wallet_accounts WHERE kind = 'user' AND owner_id = $1", [fresh.userId])).rows[0].balance, "8000");

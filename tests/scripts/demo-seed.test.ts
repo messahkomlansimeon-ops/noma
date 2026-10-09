@@ -255,12 +255,15 @@ describe("verrou consultatif de demo:seed (lot D3)", () => {
     assert.deepEqual(declared.get("1314664982"), ["lib/server/external/config.ts:EXTERNAL_GROUP_LOCK_NAMESPACE"]);
     // Lot MV1 : l'espace 985 (créations et activations de missions d'un même acheteur) est déclaré une seule fois, dans la configuration du lot.
     assert.deepEqual(declared.get("1314664985"), ["lib/server/missions/config.ts:MISSION_OWNER_LOCK_NAMESPACE"]);
+    // Recherche active payante (lot RA1) : 990, déclaré une seule fois, dans la configuration du lot.
+    assert.deepEqual(declared.get("1314664990"), ["lib/server/active-search/config.ts:ACTIVE_SEARCH_USER_LOCK_NAMESPACE"]);
     // La liste de scripts/demo-seed-plan.ts les mentionne (elle est la référence documentaire des espaces utilisés).
     const plan = readFileSync(join(root, "scripts/demo-seed-plan.ts"), "utf8");
     assert.match(plan, /977 \(budgets SMS/);
     assert.match(plan, /978 \(comptage des défis de connexion non vérifiés/);
     assert.match(plan, /981 et 982 \(collecte externe/);
     assert.match(plan, /985 \(missions d'achat en volume/);
+    assert.match(plan, /990 \(recherche active payante/);
   });
 });
 

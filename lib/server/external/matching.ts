@@ -2,7 +2,8 @@ import "server-only";
 
 import type { Pool } from "pg";
 import { CatalogValidationError } from "../catalog/errors";
-import type { Money, OfferRecord } from "../catalog/types";
+import type { DemandRecord, Money, OfferRecord } from "../catalog/types";
+import type { SqlExecutor } from "../postgres/client";
 import { evaluateOfflineMatching } from "../matching/offline";
 import { loadSourceDemand } from "../matching/service";
 import { computeMatchingScore } from "../matching/scoring";
@@ -73,7 +74,7 @@ export interface ExternalMatchesQuery {
   now?: Date;
 }
 
-interface CandidateRow {
+export interface CandidateRow {
   id: string;
   source_code: string;
   source_name: string;
@@ -125,7 +126,7 @@ export function externalListingAsOffer(
   };
 }
 
-interface Evaluated {
+export interface Evaluated {
   row: CandidateRow;
   candidate: DuplicateCandidate;
   score: number;
@@ -178,15 +179,28 @@ function validateLimit(limit: number | undefined): number {
   return limit;
 }
 
+export interface CollapsedListing {
+  /** Annonce présentée (la moins chère du groupe de doublons). */
+  entry: Evaluated;
+  /** Autres sources où la même annonce a été trouvée. */
+  alsoOn: ExternalSourceRef[];
+  /**
+   * Identifiants des annonces ABSORBÉES par celle-ci : seulement les membres du groupe qui sont ENCORE des doublons de l'annonce présentée (revérifiés comme à la lecture). Un membre qui
+   * n'est plus un doublon (prix, capacité ou titre ayant évolué) n'est jamais absorbé : il est présenté à part. La recherche active (lot RA1) marque « vues » l'annonce présentée ET
+   * ces seules annonces, jamais un membre de groupe que la lecture montre séparément.
+   */
+  absorbedIds: string[];
+}
+
 /**
  * Regroupe les doublons : par groupe, l'annonce la moins chère est présentée et les autres sources où la même annonce a été trouvée sont listées (`alsoOn`). Un membre qui n'est
- * plus un doublon (prix ou titre ayant évolué) est présenté séparément : le groupe enregistré n'est jamais cru sur parole.
+ * plus un doublon (prix, capacité ou titre ayant évolué) est présenté séparément : le groupe enregistré n'est jamais cru sur parole.
  */
-export function collapseDuplicates(evaluated: readonly Evaluated[]): Array<{ entry: Evaluated; alsoOn: ExternalSourceRef[] }> {
+export function collapseDuplicates(evaluated: readonly Evaluated[]): CollapsedListing[] {
   const byGroup = new Map<string, Evaluated[]>();
-  const result: Array<{ entry: Evaluated; alsoOn: ExternalSourceRef[] }> = [];
+  const result: CollapsedListing[] = [];
   for (const entry of evaluated) {
-    if (entry.row.duplicate_group_id === null) result.push({ entry, alsoOn: [] });
+    if (entry.row.duplicate_group_id === null) result.push({ entry, alsoOn: [], absorbedIds: [] });
     else byGroup.set(entry.row.duplicate_group_id, [...(byGroup.get(entry.row.duplicate_group_id) ?? []), entry]);
   }
   const cheaper = (a: Evaluated, b: Evaluated): number => {
@@ -207,27 +221,33 @@ export function collapseDuplicates(evaluated: readonly Evaluated[]): Array<{ ent
         seen.add(other.row.source_code);
         alsoOn.push({ code: other.row.source_code, name: other.row.source_name });
       }
-      result.push({ entry: representative, alsoOn });
+      result.push({ entry: representative, alsoOn, absorbedIds: absorbed.map((other) => other.row.id) });
     }
   }
   return result;
 }
 
-/** Annonces externes compatibles avec un besoin ACTIF de l'utilisateur, en lecture seule. 404 pour un besoin d'autrui, 400 pour un besoin inactif (comme la lecture interne). */
-export async function listExternalMatchesForDemand(query: ExternalMatchesQuery): Promise<ExternalMatchesPage> {
-  const ownerId = requireUuid(query.ownerId, "ownerId").toLowerCase();
-  const demandId = requireUuid(query.demandId, "demandId").toLowerCase();
-  const limit = validateLimit(query.limit);
-  const cursor = decodeExternalCursor(query.cursor);
-  const now = query.now ?? new Date();
-  const demand = await loadSourceDemand(ownerId, demandId, query.pool);
-  const key = productKeyOf({ category: demand.category, brand: demand.brand, model: demand.model, variant: demand.variant, location: demand.location });
-  const empty: ExternalMatchesPage = { items: [], nextCursor: null, hasMore: false };
-  if (key === null) return empty;
-  const watch = await readWatchByKey(query.pool, key);
-  if (watch === null) return empty;
+export interface ExternalEvaluation {
+  /** Surveillance de la clé du besoin ; null s'il n'y en a pas (besoin sans clé, ou surveillance jamais créée). */
+  watch: Awaited<ReturnType<typeof readWatchByKey>>;
+  /** Annonces COMPATIBLES (mêmes filtres que le matching interne), VUES il y a moins de 48 h, doublons repliés, triées : score, prix, identifiant. */
+  items: CollapsedListing[];
+  /** Les mêmes annonces AVANT le repli des doublons (une entrée par annonce) : la recherche active compare une annonce nouvelle à ce qu'elle a déjà vu. */
+  candidates: Evaluated[];
+}
 
-  const rows = await query.pool.query<CandidateRow>(
+/**
+ * Évalue les annonces d'autres sites visibles pour un besoin DÉJÀ chargé (contrôles d'accès faits par l'appelant) : mêmes filtres, même fraîcheur (`last_seen_at` de moins de 48 h), même
+ * score que le matching interne, doublons repliés, tri stable. Lecture seule, sur l'exécuteur fourni (un client de transaction, par exemple). Sert à la lecture de l'acheteur ET à la
+ * recherche active (annonces nouvelles).
+ */
+export async function evaluateExternalForDemand(executor: SqlExecutor, demand: DemandRecord, now: Date): Promise<ExternalEvaluation> {
+  const key = productKeyOf({ category: demand.category, brand: demand.brand, model: demand.model, variant: demand.variant, location: demand.location });
+  if (key === null) return { watch: null, items: [], candidates: [] };
+  const watch = await readWatchByKey(executor, key);
+  if (watch === null) return { watch: null, items: [], candidates: [] };
+
+  const rows = await executor.query<CandidateRow>(
     `SELECT l.id, l.source_code, s.name AS source_name, l.canonical_url, l.title, l.price_amount::text AS price_amount, l.price_currency, l.location_text, l.listed_at,
             l.availability_confirmed_at, l.last_seen_at, l.first_seen_at, l.duplicate_group_id, a.analysis
        FROM source_observations o
@@ -258,8 +278,21 @@ export async function listExternalMatchesForDemand(query: ExternalMatchesQuery):
       candidate: { sourceCode: row.source_code, priceAmount: price, priceCurrency: row.price_currency, tokens: analysis.tokens, url: row.canonical_url },
     });
   }
+  return { watch, items: collapseDuplicates(evaluated).sort((a, b) => compareEvaluated(a.entry, b.entry)), candidates: evaluated };
+}
 
-  const collapsed = collapseDuplicates(evaluated).sort((a, b) => compareEvaluated(a.entry, b.entry));
+/** Annonces externes compatibles avec un besoin ACTIF de l'utilisateur, en lecture seule. 404 pour un besoin d'autrui, 400 pour un besoin inactif (comme la lecture interne). */
+export async function listExternalMatchesForDemand(query: ExternalMatchesQuery): Promise<ExternalMatchesPage> {
+  const ownerId = requireUuid(query.ownerId, "ownerId").toLowerCase();
+  const demandId = requireUuid(query.demandId, "demandId").toLowerCase();
+  const limit = validateLimit(query.limit);
+  const cursor = decodeExternalCursor(query.cursor);
+  const now = query.now ?? new Date();
+  const demand = await loadSourceDemand(ownerId, demandId, query.pool);
+  const { watch, items: collapsed } = await evaluateExternalForDemand(query.pool, demand, now);
+  const empty: ExternalMatchesPage = { items: [], nextCursor: null, hasMore: false };
+  if (watch === null) return empty;
+
   const after = cursor === null ? collapsed : collapsed.filter((item) => compareEvaluated(item.entry, { score: cursor.s, price: cursor.p, row: { id: cursor.i } }) > 0);
   const page = after.slice(0, limit);
   const hasMore = after.length > limit;

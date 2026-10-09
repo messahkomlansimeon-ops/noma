@@ -17,6 +17,7 @@ import { runNotificationStep, type NotifyHooks, type NotifyStepResult } from "..
 import { resolveNotificationTransport, type NotificationTransport } from "../notifications/transport";
 import { runSubscriptionStep, type SubscriptionStepResult } from "../subscriptions/lifecycle";
 import { emptyCollectResult, runCollectStep, type CollectStepOptions, type CollectStepResult } from "../external/collect";
+import { activeSearchWork, emptyActiveSearchStepResult, runActiveSearchStep, type ActiveSearchStepResult } from "../active-search/step";
 import { EMPTY_CATCHUP_RESULT, runSublymusCatchupStep, type CatchupStepResult } from "../wallet/sublymus/catchup";
 import { projectOutboxBatch, type ProjectOutboxBatchResult } from "./projection";
 import { runTemporalExpirySweep } from "./temporal";
@@ -79,9 +80,15 @@ export interface MatchingCycleResult {
    * pas appliquée (étape ignorée sans erreur) ; `noConnectors: true` : aucun connecteur disponible, rien collecté. Une panne d'une source n'est pas une erreur du cycle. Voir COLLECTE-EXTERNE.md.
    */
   collect: CollectStepResult;
-  /** Aucun progrès : rien périmé, aucun boost expiré, rien lu par la projection, rien en maintenance, aucun job exécuté, aucune mission échue, relue, notifiée ou libérée, aucune recharge Sublymus examinée par le rattrapage, aucune surveillance collectée, aucun envoi traité (un utilisateur en erreur ou laissé à un autre processus compte comme « au repos »). */
+  /**
+   * Étape « activeSearch » (lot RA1, exécutée en tout dernier, APRÈS « collect », dans son propre `try`) : entretien de la recherche active payante (fins, arrêts, retour du suivi à 90 jours,
+   * avis d'échéance) et notifications des annonces NOUVELLES d'autres sites pour les besoins qui ont l'option (jamais pour un besoin porteur d'une mission). Budget : 3 s de balayage et 25 besoins
+   * au plus par passage. `skipped: true` : la migration 0028 n'est pas appliquée (étape ignorée sans erreur). Voir RECHERCHE-ACTIVE.md.
+   */
+  activeSearch: ActiveSearchStepResult;
+  /** Aucun progrès : rien périmé, aucun boost expiré, rien lu par la projection, rien en maintenance, aucun job exécuté, aucune mission échue, relue, notifiée ou libérée, aucune recharge Sublymus examinée par le rattrapage, aucune surveillance collectée, aucune fin, aucun arrêt, aucun avis ni aucune notification de recherche active, aucun envoi traité (un utilisateur en erreur ou laissé à un autre processus compte comme « au repos »). */
   idle: boolean;
-  /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`, `mission_<étape>_<code>` ou `missions_error_<code>`, `notify_error_<code>`, `market_error_<code>`, `catchup_error_<code>`, `collect_error_<code>`). */
+  /** Codes stables des étapes en échec (`temporal_error_<code>`, `boost_error_<code>`, `projection_error_<code>`, `maintenance_error_<code>`, `job_error_<code>`, `mission_<étape>_<code>` ou `missions_error_<code>`, `notify_error_<code>`, `market_error_<code>`, `catchup_error_<code>`, `collect_error_<code>`, `active_search_error_<code>`). */
   errors: string[];
 }
 
@@ -111,6 +118,8 @@ export interface RunMatchingCycleOptions {
   marketNow?: () => Date;
   /** Étape « collect » (lot EXT1) : connecteurs, horloge, analyseur… Absent : connecteurs résolus depuis l'environnement (aucun sans `NOMA_EXTERNAL_FAKE=1`, jamais en production). Réservé aux tests. */
   collect?: Omit<CollectStepOptions, "pool" | "signal">;
+  /** Étape « activeSearch » (lot RA1) : horloge, budget de temps et nombre de besoins par passage : réservés aux tests. */
+  activeSearch?: { now?: () => Date; budgetMs?: number; maxDemands?: number };
   /** Étape « catchup » (lot PAY1) : environnement, appels sortants et horloge : réservés aux tests (qui les branchent sur la FAUSSE API locale). */
   paymentCatchup?: { env?: Record<string, string | undefined>; fetch?: typeof fetch; now?: Date };
 }
@@ -256,6 +265,15 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
   } catch (error) {
     errors.push(`collect_error_${errorCodeOf(error)}`);
   }
+  // Étape « activeSearch » (lot RA1) : isolée dans son propre `try`, APRÈS « collect » (les annonces qu'il vient de collecter sont balayées dans le même cycle). Ne lève jamais (codes stables) ;
+  // budget borné : elle n'allonge le cycle que de quelques secondes. Sans la migration 0028, ignorée sans erreur.
+  let activeSearch = emptyActiveSearchStepResult();
+  try {
+    activeSearch = await runActiveSearchStep({ pool, ...(options.activeSearch ?? {}) });
+    for (const code of activeSearch.errors) errors.push(`active_search_error_${code}`);
+  } catch (error) {
+    errors.push(`active_search_error_${errorCodeOf(error)}`);
+  }
   return {
     temporal,
     boost,
@@ -268,6 +286,7 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
     paymentCatchup,
     market,
     collect,
+    activeSearch,
     // Au repos : l'utilisateur laissé à un autre processus (busy) ET l'utilisateur en erreur (une erreur de l'étape notify compte comme « au repos » : ses lignes ont
     // une tentative de plus et une attente croissante, `recordUserFailure`) ne comptent pas comme du travail ; sinon un échec permanent ferait tourner la boucle sans pause.
     idle: temporal.expired === 0 && boost.expired === 0 && projected.selected === 0 && maintenance.deadLettered === 0 && jobs.length === 0
@@ -275,7 +294,8 @@ export async function runMatchingCycle(options: RunMatchingCycleOptions): Promis
       && missions.expired === 0 && missions.changed === 0 && missions.notified === 0 && missions.released === 0
       && subscriptions.renewed + subscriptions.pastDue + subscriptions.ended + subscriptions.promoExpired === 0
       && paymentCatchup.examined === 0
-      && collect.watchesProcessed === 0,
+      && collect.watchesProcessed === 0
+      && activeSearchWork(activeSearch) === 0,
     errors,
   };
 }
@@ -293,7 +313,7 @@ export interface RunMatchingWorkerLoopOptions {
   /** Journal injectable (une ligne de texte, sans donnée métier). Défaut : console.error. */
   log?: (line: string) => void;
   /** Étape « notify » de chaque cycle (transport, horloge, crochets) : réservé aux tests. */
-  notification?: Pick<RunMatchingCycleOptions, "notificationTransport" | "notificationNow" | "notificationHooks" | "paymentCatchup">;
+  notification?: Pick<RunMatchingCycleOptions, "notificationTransport" | "notificationNow" | "notificationHooks" | "paymentCatchup" | "activeSearch">;
 }
 
 export interface MatchingWorkerLoopResult {

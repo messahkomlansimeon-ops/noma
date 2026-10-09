@@ -20,6 +20,10 @@
  *      page « Offre Pro » aux prix PROVISOIRES, crédits promotionnels, achat d'un boost payé avec les crédits promotionnels EN PREMIER) ; import de catalogue par CSV (aperçu, application, rejeu, numéro
  *      de téléphone refusé) ; un second vendeur, sans le droit, est refusé à l'import, recharge son porte-monnaie par le paiement simulé puis souscrit à l'offre Pro (double clic : un seul débit),
  *      reçoit ses crédits promotionnels et le badge ; administration /admin/offres (abonnés arrondis, revenus du mois, nouvelle version), refusée à l'acheteur (page 404 standard) ; wallet:check sans écart.
+ *  11. LOT RA1 (recherche active payante, prix PROVISOIRE, argent simulé) : la carte « Recherche active » de la page d'un besoin (règles dites AVANT l'achat), achat avec confirmation et double clic (UN seul débit
+ *      de 2 000 FCFA, crédits payés), suivi prolongeable jusqu'à 180 jours, `active-search:simulate` (annonce fictive d'un autre site) → notification « Autre site » dans /notifications et sur l'accueil (lien vers le
+ *      besoin, jamais vers le site), besoin satisfait = option suspendue puis reprise à la réactivation, administration /admin/recherche-active (arrondi à 5 près, revenus du mois), 404 indiscernable pour autrui ET pour le besoin
+ *      PORTEUR d'une mission (lot MV1 : ni lecture ni achat, carte absente de sa page), page 404 standard pour l'acheteur ; wallet:check sans écart. (Les connecteurs fictifs sont actifs dans `dev:try` : sans eux l'option est « pas encore disponible ».)
  *  10. LOT H1, H1-bis et H1-ter : `demo:seed` écrit 90 jours de relevés de prix synthétiques (rejouable : 0 relevé au rejeu) ; la fiche d'une annonce montre l'encart « Prix demandés dans les annonces »
  *      REMPLI (médiane, fourchette « la moitié des prix demandés est entre … », effectif « environ N annonces d'environ M vendeurs », période, comparabilité, phrase sur ce que contiennent les chiffres, mini-courbe
  *      SVG de 12 semaines, bouton de période), SANS aucune ligne de ventes ni « prix du marché » ; le formulaire d'annonce du vendeur affiche « Prix demandés dans les annonces pour ce
@@ -33,7 +37,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
-import { E2E_BASE, E2E_SERVER_LOG, awaitOtpLine, demoSeedByAdministration, otpSourceSize, waitForValue, walletCheckByAdministration } from "./e2e-common";
+import { E2E_BASE, E2E_SERVER_LOG, activeSearchSimulateByAdministration, awaitOtpLine, demoSeedByAdministration, otpSourceSize, waitForValue, walletCheckByAdministration } from "./e2e-common";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require("../poc/node_modules/playwright") as typeof import("../poc/node_modules/playwright");
@@ -142,7 +146,12 @@ async function main(): Promise<void> {
   assert.match(first, /3 message\(s\) écrit\(s\), favori ajouté, commande de démonstration proposée au vendeur démo, rôle admin attribué au compte Admin démo/);
   assert.match(first, /offre Pro : vendeur démo abonné \(crédits promotionnels émis\)/);
   assert.match(first, /photos : 30 photo\(s\) synthétique\(s\) ajoutée\(s\) \(0 déjà présente\(s\)\), une par annonce/);
-  assert.match(first, /demo:seed : collecte externe \(sources FICTIVES, aucun réseau\) : 3 surveillance\(s\) pour l'acheteur démo, \d+ annonce\(s\) externe\(s\) créée\(s\) \(0 déjà présente\(s\)\), 0 panne\(s\) de source/);
+  // `dev:try` active les connecteurs FICTIFS (lot RA1-bis) : le worker peut déjà avoir collecté une partie des annonces des trois surveillances pendant que `demo:seed` écrit ; ce qui compte est
+  // que l'ensemble (créées + déjà présentes) soit complet, puis stable au rejeu.
+  const externalFirst = /demo:seed : collecte externe \(sources FICTIVES, aucun réseau\) : 3 surveillance\(s\) pour l'acheteur démo, (\d+) annonce\(s\) externe\(s\) créée\(s\) \((\d+) déjà présente\(s\)\), 0 panne\(s\) de source/.exec(first);
+  assert.ok(externalFirst, "collecte externe du premier passage");
+  const externalTotal = Number(externalFirst[1]) + Number(externalFirst[2]);
+  assert.ok(externalTotal >= 6, `annonces externes des trois surveillances (${externalTotal})`);
   const created = Number(/: (\d+) annonce\(s\) publiée\(s\)/.exec(first)?.[1]);
   const history = Number(/historique des prix : (\d+) relevé\(s\) synthétique\(s\) écrit\(s\)/.exec(first)?.[1]);
   assert.ok(history > 1_000, `historique des prix synthétique écrit (${history} relevés)`);
@@ -154,7 +163,7 @@ async function main(): Promise<void> {
   assert.match(second, /historique des prix : 0 relevé\(s\) synthétique\(s\) écrit\(s\) \(annonces et ventes fictives des 90 derniers jours ; déjà présents\)/);
   assert.match(second, /offre Pro : vendeur démo déjà abonné/, "rejeu : le vendeur démo n'est jamais abonné deux fois");
   assert.match(second, /photos : 0 photo\(s\) synthétique\(s\) ajoutée\(s\) \(30 déjà présente\(s\)\), une par annonce/);
-  assert.match(second, /3 surveillance\(s\) pour l'acheteur démo, 0 annonce\(s\) externe\(s\) créée\(s\) \(\d+ déjà présente\(s\)\)/);
+  assert.match(second, new RegExp(`3 surveillance\\(s\\) pour l'acheteur démo, 0 annonce\\(s\\) externe\\(s\\) créée\\(s\\) \\(${externalTotal} déjà présente\\(s\\)\\)`), "rejeu : aucune annonce externe de plus, toutes déjà présentes");
   ok(`premier passage : ${created} annonce(s) et ${history} relevé(s) de prix synthétiques ; rejeu : 0 annonce, 0 besoin, 0 compte, 0 ouverture, 0 contact, crédits et boost déjà présents`);
 
   const browser = await chromium.launch({ executablePath: CHROME });
@@ -1173,10 +1182,150 @@ async function main(): Promise<void> {
     const planStatuses = await buyer.evaluate(async () => [(await fetch("/api/admin/plans")).status, (await fetch("/api/admin/plans/pro/versions", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status]);
     assert.deepEqual(planStatuses, [404, 404], "l'acheteur reçoit le 404 indiscernable sur les routes d'administration des offres");
     ok("/admin/offres refusée à l'acheteur : page 404 standard (statut 404, sans titre ni onglet Admin) et 404 sur les routes d'administration des offres");
+    step("RA1 · Recherche active (option payante, prix PROVISOIRE) : carte de la page d'un besoin, achat, annonce d'un autre site notifiée, administration");
+    // (Le besoin « iPhone 12 » a été satisfait par la commande confirmée de l'étape D2 : l'option se propose sur un besoin ACTIF, le Galaxy S21.)
+    await buyer.goto(`${BASE}/`);
+    await buyer.locator("[data-buyer-demands] a", { hasText: "Galaxy S21" }).first().click();
+    await buyer.waitForURL(/\/besoins\/[0-9a-f-]{36}$/);
+    const raDemandId = /\/besoins\/([0-9a-f-]{36})$/.exec(buyer.url())?.[1] ?? "";
+    assert.match(raDemandId, UUID);
+    await buyer.getByTestId("active-search-card").waitFor();
+    assert.equal(await buyer.getByTestId("active-search-card").getAttribute("data-tone"), "off");
+    assert.equal(await buyer.getByTestId("active-search-headline").innerText(), "Recherche active : désactivée");
+    const raRules = fr(await buyer.getByTestId("active-search-rules").innerText());
+    assert.match(raRules, /Elle se paie avec vos crédits, pas avec vos crédits promotionnels\./);
+    assert.match(raRules, /Aucun renouvellement automatique/);
+    assert.match(raRules, /Si le besoin est marqué satisfait, l'option est suspendue : rien n'est notifié, mais la période continue de courir, sans prolongation ni remboursement, et elle reprend si vous réactivez le besoin\./);
+    assert.match(raRules, /Si le besoin est archivé, l'option s'arrête sans remboursement\./);
+    assert.match(raRules, /Aucun remboursement automatique\./);
+    assert.match(await buyer.getByTestId("active-search-price-notice").innerText(), /^Prix provisoire/);
+    assert.match(fr(await buyer.getByTestId("active-search-benefits").innerText()), /NOUVELLE annonce d'un autre site[\s\S]*jusqu'à toutes les heures au lieu de toutes les 6 heures[\s\S]*180 jours au lieu de 90/);
+    assert.equal(fr(await buyer.getByTestId("active-search-buy").innerText()), "Activer — 2 000 FCFA pour 30 jours");
+    await checkClean(buyer, "page d'un besoin avec la carte « Recherche active »");
+    await shot(buyer, "40-recherche-active-carte");
+    ok("carte « Recherche active » : désactivée, ce que l'option apporte, règles dites AVANT l'achat (crédits payés, aucun renouvellement, suspension si satisfait, arrêt sans remboursement si archivé), « Prix provisoire »");
+    // Achat : confirmation (montant, fin, solde après) puis double clic : UN seul débit.
+    await buyer.getByTestId("active-search-buy").click();
+    await buyer.getByTestId("active-search-confirmation").waitFor();
+    assert.match(fr(await buyer.getByTestId("active-search-confirmation").innerText()), /Activer la recherche active : 2 000 FCFA seront débités de vos crédits payés, jusqu'au \d{2}\/\d{2}\/\d{4} à \d{2}:\d{2}\. Il vous restera 8 000 FCFA\./);
+    await shot(buyer, "41-recherche-active-confirmation");
+    await buyer.getByTestId("active-search-confirm").dblclick();
+    await buyer.getByTestId("active-search-done").waitFor({ timeout: 60_000 });
+    assert.match(await buyer.getByTestId("active-search-done").innerText(), /^Recherche active activée jusqu'au \d{2}\/\d{2}\/\d{4}\.$/);
+    assert.equal(await buyer.getByTestId("active-search-card").getAttribute("data-active"), "true");
+    assert.match(fr(await buyer.getByTestId("active-search-buy").innerText()), /^Prolonger de 30 jours — 2 000 FCFA$/);
+    await buyer.goto(`${BASE}/compte/porte-monnaie`);
+    await buyer.getByTestId("wallet-balance").waitFor();
+    assert.equal(fr(await buyer.getByTestId("wallet-balance").innerText()), "8 000 FCFA", "UN seul débit de 2 000 FCFA sur 10 000");
+    assert.equal(await buyer.locator('[data-testid="wallet-row"][data-kind="search_purchase"]').count(), 1, "une seule ligne d'achat : jamais deux débits");
+    assert.match(fr(await buyer.locator('[data-testid="wallet-row"][data-kind="search_purchase"]').innerText()), /Recherche active[\s\S]*−2 000 FCFA/);
+    await shot(buyer, "42-porte-monnaie-recherche-active");
+    ok("achat confirmé (montant, fin, solde après), double clic : UN débit de 2 000 FCFA en crédits payés, option en vigueur, « Prolonger de 30 jours »");
+    // Le suivi du besoin est maintenant prolongeable jusqu'à 180 jours.
+    const raTracking = await buyer.evaluate(async (id) => (await (await fetch(`/api/demands/${id}/tracking`)).json()) as { tracking: { maxUntil: string; readAt: string } }, raDemandId);
+    const raDays = Math.round((Date.parse(raTracking.tracking.maxUntil) - Date.parse(raTracking.tracking.readAt)) / 86_400_000);
+    assert.equal(raDays, 180, "plafond du suivi de 180 jours pendant l'option");
+    ok("suivi du besoin prolongeable jusqu'à 180 jours pendant l'option");
+    // Une annonce fictive d'un autre site apparaît : le VRAI service la collecte et notifie.
+    const simulated = await activeSearchSimulateByAdministration(raDemandId);
+    assert.match(simulated, /1 notification\(s\) d'annonce d'un autre site créée\(s\)/);
+    await buyer.goto(`${BASE}/notifications`);
+    await buyer.getByTestId("notifications-heading").waitFor();
+    const externalRow = buyer.locator('[data-testid="notification-row"][data-kind="new_external_match"]');
+    await externalRow.first().waitFor();
+    assert.equal(await externalRow.count(), 1, "une seule notification d'annonce d'un autre site");
+    assert.equal(await externalRow.getByTestId("notification-badge").innerText(), "Autre site");
+    assert.match(fr(await externalRow.innerText()), /Voir mon besoin/);
+    assert.match(fr(await externalRow.innerText()), /Annonces Démo A, autre site/);
+    assert.equal(await externalRow.locator("a").getAttribute("href"), `/besoins/${raDemandId}`, "le lien mène à la page du besoin, jamais au site de l'annonce");
+    assert.equal((await buyer.content()).includes("annonces-demo-a.example"), false, "aucune adresse d'un autre site dans la page");
+    await checkClean(buyer, "notifications avec une annonce d'un autre site");
+    await shot(buyer, "43-notification-autre-site");
+    await buyer.goto(`${BASE}/`);
+    await buyer.locator("[data-unread-summary]").waitFor();
+    await buyer.getByText(/^Autre site : /).first().waitFor();
+    assert.match(fr(await buyer.locator("body").innerText()), /Autre site : /);
+    await shot(buyer, "44-accueil-autre-site");
+    ok("`active-search:simulate` : UNE notification « Autre site » (pastille, source, lien vers le besoin, aucune adresse externe) dans /notifications et sur l'accueil");
+    // Lot RA1-bis : un besoin marqué SATISFAIT suspend l'option (la carte le dit, sans bouton d'achat) ; réactivé, l'option reprend telle quelle.
+    const raTransition = (action: "satisfy" | "activate") => buyer.evaluate(async ({ id, action: verb }) => {
+      const read = (await (await fetch(`/api/demands/${id}`)).json()) as { demand: { contentVersion: number } };
+      const response = await fetch(`/api/demands/${id}/${verb}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ expectedContentVersion: read.demand.contentVersion }) });
+      return response.status;
+    }, { id: raDemandId, action });
+    assert.equal(await raTransition("satisfy"), 200);
+    await buyer.goto(`${BASE}/besoins/${raDemandId}`);
+    await buyer.getByTestId("active-search-card").waitFor();
+    assert.equal(await buyer.getByTestId("active-search-card").getAttribute("data-tone"), "paused");
+    assert.match(await buyer.getByTestId("active-search-headline").innerText(), /^Recherche active suspendue jusqu'au \d{2}\/\d{2}\/\d{4}$/);
+    assert.match(fr(await buyer.getByTestId("active-search-detail").innerText()), /marqué satisfait : rien n'est notifié tant qu'il ne redevient pas actif\. La période continue de courir/);
+    assert.equal(await buyer.getByTestId("active-search-buy").count(), 0, "aucun achat pendant la suspension");
+    await shot(buyer, "46-recherche-active-suspendue");
+    assert.equal(await raTransition("activate"), 200);
+    await buyer.goto(`${BASE}/besoins/${raDemandId}`);
+    await buyer.getByTestId("active-search-card").waitFor();
+    assert.equal(await buyer.getByTestId("active-search-card").getAttribute("data-tone"), "active");
+    assert.equal(await buyer.getByTestId("active-search-card").getAttribute("data-active"), "true");
+    assert.match(fr(await buyer.getByTestId("active-search-buy").innerText()), /^Prolonger de 30 jours — 2 000 FCFA$/);
+    ok("besoin satisfait : option SUSPENDUE (carte « suspendue jusqu'au », aucun achat) ; réactivé : l'option reprend, « Prolonger de 30 jours » (aucun remboursement, aucun nouveau débit)");
+    // 404 indiscernable pour autrui ; page 404 standard et 404 JSON pour l'acheteur sur l'administration.
+    const foreign = await vendor.evaluate(async (id) => {
+      const known = await fetch(`/api/demands/${id}/active-search`);
+      const unknown = await fetch("/api/demands/00000000-0000-4000-8000-000000000001/active-search");
+      return { known: [known.status, await known.text()], unknown: [unknown.status, await unknown.text()] };
+    }, raDemandId);
+    assert.deepEqual(foreign.known, foreign.unknown, "le besoin d'un autre acheteur est indiscernable d'un besoin inconnu");
+    assert.equal(foreign.known[0], 404);
+    const adminRefused = await buyer.goto(`${BASE}/admin/recherche-active`);
+    assert.equal(adminRefused?.status(), 404, "statut HTTP 404 pour un compte ordinaire");
+    await buyer.getByText("This page could not be found.").waitFor();
+    assert.equal(/Recherche active|Options en vigueur|Revenus du mois/.test(await buyer.evaluate(() => document.body.innerText)), false, "aucun texte de l'administration sur la page 404");
+    assert.equal(await buyer.evaluate(async () => (await fetch("/api/admin/active-search")).status), 404);
+    ok("autrui : 404 indiscernable d'un besoin inconnu ; /admin/recherche-active refusée à l'acheteur (page 404 standard, route 404)");
+    // Intégration avec les missions (lots MV1 et RA1) : le besoin PORTEUR d'une mission n'est pas un besoin de l'acheteur (il le voit dans « Mes missions »). L'option ne s'y lit ni ne s'y achète :
+    // MÊME 404 qu'un besoin inconnu, en lecture comme en achat (rien n'est débité), et la carte « Recherche active » n'est pas affichée sur sa page.
+    // (Aucune fonction nommée dans le corps : le code est sérialisé vers le navigateur, où l'aide `__name` de l'outil de compilation n'existe pas.)
+    const carrierProbe = await buyer.evaluate(async () => {
+      const list = (await (await fetch("/api/missions")).json()) as { missions: Array<{ demandId: string | null }> };
+      const carrierId = list.missions.find((entry) => entry.demandId !== null)?.demandId ?? "";
+      const results: Array<[number, string]> = [];
+      for (const id of [carrierId, "00000000-0000-4000-8000-000000000001"]) {
+        const response = await fetch(`/api/demands/${id}/active-search`);
+        results.push([response.status, await response.text()]);
+      }
+      for (const id of [carrierId, "00000000-0000-4000-8000-000000000001"]) {
+        const response = await fetch(`/api/demands/${id}/active-search`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idempotencyKey: crypto.randomUUID(), expectedPriceXof: 2000 }) });
+        results.push([response.status, await response.text()]);
+      }
+      return { carrierId, get: [results[0], results[1]], post: [results[2], results[3]] };
+    });
+    assert.match(carrierProbe.carrierId, UUID, "le besoin porteur d'une mission de l'acheteur");
+    assert.equal(carrierProbe.get[0][0], 404);
+    assert.deepEqual(carrierProbe.get[0], carrierProbe.get[1], "lecture : le besoin porteur est indiscernable d'un besoin inconnu");
+    assert.equal(carrierProbe.post[0][0], 404);
+    assert.deepEqual(carrierProbe.post[0], carrierProbe.post[1], "achat : le besoin porteur est indiscernable d'un besoin inconnu");
+    await buyer.goto(`${BASE}/besoins/${carrierProbe.carrierId}`);
+    await buyer.locator("main, [data-testid], h1").first().waitFor();
+    await sleep(2_500);
+    assert.equal(await buyer.getByTestId("active-search-card").count(), 0, "aucune carte « Recherche active » sur le besoin porteur d'une mission");
+    assert.equal(await buyer.getByTestId("active-search-error").count(), 0, "ni message d'erreur ni « Réessayer »");
+    ok("besoin PORTEUR d'une mission : GET et POST de l'option répondent le MÊME 404 qu'un besoin inconnu (aucun débit), la carte « Recherche active » n'est pas affichée sur sa page");
+    // Administration : options en vigueur arrondies à 5 près, revenus du mois.
+    await adminPage.goto(`${BASE}/admin`);
+    await adminPage.getByTestId("admin-active-search-link").click();
+    await adminPage.waitForURL("**/admin/recherche-active");
+    await adminPage.getByTestId("admin-active-search").waitFor();
+    assert.match(await adminPage.getByTestId("admin-active-search-provisional").innerText(), /Prix provisoire : 2 000 FCFA pour 30 jours/);
+    assert.equal(fr(await adminPage.locator('[data-tile="active"] [data-tile-value]').innerText()), "moins de 5", "une option en vigueur : arrondi à 5 près, jamais le compte exact");
+    assert.equal(fr(await adminPage.locator('[data-tile="revenue"] [data-tile-value]').innerText()), "2 000 FCFA", "revenus du mois lus dans le grand livre");
+    await checkClean(adminPage, "administration de la recherche active");
+    await shot(adminPage, "45-admin-recherche-active");
+    ok("administration : options en vigueur « moins de 5 » (arrondi à 5 près), revenus du mois 2 000 FCFA, prix provisoire annoncé");
+
     await adminContext.close();
     const checkOutput = await walletCheckByAdministration();
     assert.match(checkOutput, /aucun écart/);
-    ok("wallet:check : aucun écart après les abonnements, les crédits promotionnels, le boost et l'import");
+    ok("wallet:check : aucun écart après les abonnements, les crédits promotionnels, le boost, l'import et la recherche active");
 
     assert.deepEqual(pageErrors, [], "aucune exception de page");
     assert.deepEqual(consoleErrors, [], "aucune erreur de console");

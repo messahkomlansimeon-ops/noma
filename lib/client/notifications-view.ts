@@ -9,6 +9,7 @@
  */
 
 import type { DemandTracking, NotificationItem, NotificationPreferences, TrackingAction } from "./api";
+import { EXPIRING_BADGE, EXPIRING_SUBTITLE, EXTERNAL_MATCH_BADGE, externalMatchSubtitle, expiringTitle } from "./active-search-view";
 import { formatMoney } from "./catalog-view";
 import { offerDetailPath } from "./metrics-view";
 import { formatDateFr, formatDateTimeFr } from "./wallet-view";
@@ -128,6 +129,8 @@ export interface NotificationRowView {
   /** Page interne reconstruite depuis les identifiants (jamais le lien tel quel) ; null si un identifiant est illisible. */
   href: string | null;
   linkLabel: string;
+  /** Pastille de la ligne, pour les notifications de la recherche active seulement : « Autre site » (annonce d'un autre site) ou « Recherche active » (avis d'échéance). Absente des autres genres. */
+  badge?: string;
 }
 
 export function summaryTitle(count: number): string {
@@ -146,6 +149,34 @@ export function notificationRow(item: NotificationItem): NotificationRowView {
       unread: item.readAt === null,
       href: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.demandId) ? `/besoins/${item.demandId}` : null,
       linkLabel: OPEN_NEED_LABEL,
+    };
+  }
+  const demandHref = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.demandId) ? `/besoins/${item.demandId}` : null;
+  if (item.kind === "new_external_match") {
+    // Annonce d'un AUTRE SITE (recherche active) : titre, prix et source ; le lien mène à la page du BESOIN (reconstruite), jamais à l'adresse de l'annonce externe.
+    return {
+      id: item.id,
+      kind: item.kind,
+      title: item.title ?? "Nouvelle annonce d'un autre site",
+      subtitle: externalMatchSubtitle(formatMoney(item.price), item.sourceName),
+      dateText: date,
+      unread: item.readAt === null,
+      href: demandHref,
+      linkLabel: OPEN_NEED_LABEL,
+      badge: EXTERNAL_MATCH_BADGE,
+    };
+  }
+  if (item.kind === "active_search_expiring") {
+    return {
+      id: item.id,
+      kind: item.kind,
+      title: expiringTitle(item.endsAt),
+      subtitle: EXPIRING_SUBTITLE,
+      dateText: date,
+      unread: item.readAt === null,
+      href: demandHref,
+      linkLabel: OPEN_NEED_LABEL,
+      badge: EXPIRING_BADGE,
     };
   }
   if (item.kind === "new_message") {

@@ -40,7 +40,7 @@ test("configuration : droits de la liste blanche, plans de départ, grâce de 72
 
 test("erreurs de domaine de l'offre Pro : un message fixe par code, sans donnée", () => {
   const codes: SubscriptionErrorCode[] = [
-    "plan_not_found", "plan_not_subscribable", "already_subscribed", "no_subscription", "period_ended", "idempotency_conflict", "entitlement_required", "period_not_found",
+    "plan_not_found", "plan_not_subscribable", "price_changed", "already_subscribed", "no_subscription", "period_ended", "idempotency_conflict", "entitlement_required", "period_not_found",
     "already_refunded", "invalid_plan_version", "plans_unavailable", "import_too_many_rows", "import_invalid_file",
   ];
   for (const code of codes) {
@@ -55,6 +55,17 @@ test("erreurs de domaine de l'offre Pro : un message fixe par code, sans donnée
   }
   assert.equal(new Set(codes.map((code) => SUBSCRIPTION_ERROR_MESSAGES[code])).size, codes.length, "messages tous différents");
   assert.equal(Object.keys(SUBSCRIPTION_ERROR_MESSAGES).length, codes.length, "aucun code sans test");
+  assert.equal(SUBSCRIPTION_ERROR_MESSAGES.price_changed, "Le prix de l'abonnement a changé : rechargez la page, puis réessayez.", "A6 : texte fixe du refus de prix");
+});
+
+test("A6 : la route et le service comparent le prix AFFICHÉ au prix de la dernière version ; la route exige trois clés exactes dont expectedPriceXof", () => {
+  const http = source("lib/server/subscriptions/http.ts").replace(/\/\/.*$/gm, "");
+  const lifecycle = source("lib/server/subscriptions/lifecycle.ts").replace(/\/\/.*$/gm, "");
+  assert.match(http, /keys\.length !== 3/);
+  assert.match(http, /typeof expectedPriceXof !== "number" \|\| !Number\.isSafeInteger\(expectedPriceXof\) \|\| expectedPriceXof <= 0\) return invalidRequest\(\)/);
+  assert.match(http, /subscribeToPlan\(\{ pool, userId, planCode, idempotencyKey, expectedPriceXof \}\)/);
+  assert.match(lifecycle, /choice\.price !== expectedPrice\) throw new SubscriptionError\("price_changed"\)/);
+  assert.match(lifecycle, /BigInt\(replay\.rows\[0\]\.price\) !== expectedPrice\) throw new SubscriptionError\("price_changed"\)/);
 });
 
 // ───────────── validation d'une nouvelle version ─────────────

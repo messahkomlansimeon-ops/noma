@@ -45,6 +45,9 @@ import { requireWalletPool } from "./ledger";
  *    `subscription_revenue` = périodes payées − périodes remboursées ;
  *  - périodes d'abonnement : écritures du débit (`subscription_period_mismatch`), du remboursement (`subscription_refund_mismatch`), transactions orphelines, état de l'abonnement égal à sa
  *    dernière période (`subscription_state_mismatch`).
+ * Recherche active payante (lot RA1, voir RECHERCHE-ACTIVE.md) : compte système `active_search_revenue` ; contrôles `active_search_revenue_mismatch` (solde = achats − remboursements),
+ * `active_search_purchase_mismatch` et `active_search_refund_mismatch` (écritures exactes : acheteur en crédits PAYÉS), transactions orphelines, `active_search_horizon_exceeded` (fin > achat + 180 jours),
+ * `active_search_overlap` (périodes EN VIGUEUR qui se chevauchent), `active_search_period_mismatch` (durée différente de `duration_days`), `active_search_owner_mismatch` (acheteur différent du propriétaire du besoin) ; `promo_account_misuse` couvre aussi ce compte (un crédit promotionnel ne paie jamais cette option).
  * Avertissements : `promo_expiry_overdue` (une émission échue depuis plus de 15 minutes n'est pas encore expirée : le worker retarde) et `subscription_overdue` (un abonnement échu depuis
  * plus d'une heure n'est pas encore traité).
  *
@@ -106,7 +109,16 @@ export type WalletCheckCode =
   | "sublymus_checkout_missing"
   | "sublymus_checkout_mismatch"
   | "sublymus_credit_origin_unknown"
-  | "sublymus_event_provider_mismatch";
+  | "sublymus_event_provider_mismatch"
+  | "active_search_revenue_mismatch"
+  | "active_search_purchase_mismatch"
+  | "active_search_purchase_transaction_orphan"
+  | "active_search_refund_mismatch"
+  | "active_search_refund_transaction_orphan"
+  | "active_search_horizon_exceeded"
+  | "active_search_overlap"
+  | "active_search_period_mismatch"
+  | "active_search_owner_mismatch";
 
 export type WalletCheckWarningCode =
   | "succeeded_event_rejected_amount"
@@ -175,9 +187,9 @@ const CHECKS: ReadonlyArray<{ code: WalletCheckCode; sql: string }> = [
   {
     // Exactement un compte de chaque type système (aucun manquant, aucun en double).
     code: "system_account_invalid",
-    // Les comptes de l'offre Pro (lot PRO1) sont recréés à la demande : au plus un de chacun (zéro est permis, aucune écriture n'ayant pu les toucher).
+    // Les comptes de l'offre Pro (lot PRO1) et de la recherche active (lot RA1) sont recréés à la demande : au plus un de chacun (zéro est permis, aucune écriture n'ayant pu les toucher).
     sql: `SELECT k.kind AS kind, (SELECT count(*) FROM wallet_accounts a WHERE a.kind = k.kind)::text AS found
-            FROM (VALUES ('provider_clearing', 1), ('boost_revenue', 1), ('subscription_revenue', 0), ('promo_issuance', 0), ('promo_consumed', 0), ('promo_expired', 0)) AS k(kind, minimum)
+            FROM (VALUES ('provider_clearing', 1), ('boost_revenue', 1), ('subscription_revenue', 0), ('promo_issuance', 0), ('promo_consumed', 0), ('promo_expired', 0), ('active_search_revenue', 0)) AS k(kind, minimum)
            WHERE (SELECT count(*) FROM wallet_accounts a WHERE a.kind = k.kind) NOT BETWEEN k.minimum AND 1`,
   },
   {
@@ -457,7 +469,7 @@ const CHECKS: ReadonlyArray<{ code: WalletCheckCode; sql: string }> = [
             FROM wallet_entries e
             JOIN wallet_accounts a ON a.id = e.account_id
             JOIN wallet_transactions t ON t.id = e.transaction_id
-           WHERE a.kind IN ('user_promo', 'promo_issuance', 'promo_consumed', 'promo_expired', 'subscription_revenue')
+           WHERE a.kind IN ('user_promo', 'promo_issuance', 'promo_consumed', 'promo_expired', 'subscription_revenue', 'active_search_revenue')
              AND NOT COALESCE(CASE a.kind
                    WHEN 'user_promo' THEN (t.kind IN ('subscription_charge', 'boost_refund') AND e.amount > 0)
                                        OR (t.kind IN ('boost_purchase', 'promo_expiry', 'subscription_refund') AND e.amount < 0)
@@ -465,6 +477,7 @@ const CHECKS: ReadonlyArray<{ code: WalletCheckCode; sql: string }> = [
                    WHEN 'promo_consumed' THEN (t.kind = 'boost_purchase' AND e.amount > 0) OR (t.kind = 'boost_refund' AND e.amount < 0)
                    WHEN 'promo_expired' THEN t.kind IN ('promo_expiry', 'subscription_refund', 'boost_refund') AND e.amount > 0
                    WHEN 'subscription_revenue' THEN (t.kind = 'subscription_charge' AND e.amount > 0) OR (t.kind = 'subscription_refund' AND e.amount < 0)
+                   WHEN 'active_search_revenue' THEN (t.kind = 'search_purchase' AND e.amount > 0) OR (t.kind = 'search_refund' AND e.amount < 0)
                  END, FALSE)`,
   },
   {
@@ -583,6 +596,73 @@ const CHECKS: ReadonlyArray<{ code: WalletCheckCode; sql: string }> = [
     sql: `SELECT ev.provider_event_id AS event_id, ev.intent_id::text AS intent_id
             FROM payment_events ev JOIN payment_intents i ON i.id = ev.intent_id
            WHERE ev.provider <> i.provider`,
+  },
+  {
+    // Lot RA1 : active_search_revenue = achats de recherche active payés − achats remboursés.
+    code: "active_search_revenue_mismatch",
+    sql: `SELECT q.balance::text AS balance, (q.charged - q.refunded)::text AS expected
+            FROM (SELECT COALESCE((SELECT sum(a.balance) FROM wallet_accounts a WHERE a.kind = 'active_search_revenue'), 0) AS balance,
+                         COALESCE((SELECT sum(p.price_xof) FROM active_search_purchases p), 0) AS charged,
+                         COALESCE((SELECT sum(p.price_xof) FROM active_search_purchases p WHERE p.refunded_at IS NOT NULL), 0) AS refunded) q
+           WHERE q.balance <> q.charged - q.refunded`,
+  },
+  {
+    // Chaque achat a son débit : acheteur −prix en crédits PAYÉS, active_search_revenue +prix, exactement deux écritures, référence dérivée de l'achat.
+    code: "active_search_purchase_mismatch",
+    sql: `SELECT p.id::text AS purchase_id, COALESCE(t.id::text, '') AS transaction_id, p.price_xof::text AS amount
+            FROM active_search_purchases p LEFT JOIN wallet_transactions t ON t.id = p.transaction_id
+           WHERE t.id IS NULL OR NOT active_search_ledger_matches(t.id, 'search_purchase', p.id, p.user_id, p.price_xof)`,
+  },
+  {
+    // Aucune transaction de débit de recherche active sans son achat (une seule, de référence dérivée).
+    code: "active_search_purchase_transaction_orphan",
+    sql: `SELECT t.id::text AS transaction_id, t.reference AS reference
+            FROM wallet_transactions t
+           WHERE t.kind = 'search_purchase'
+             AND (SELECT count(*) FROM active_search_purchases p WHERE p.transaction_id = t.id AND t.reference = 'search_purchase:' || p.id::text) <> 1`,
+  },
+  {
+    // Chaque achat remboursé a son remboursement INTÉGRAL ; aucun remboursement sans date, aucune date sans remboursement.
+    code: "active_search_refund_mismatch",
+    sql: `SELECT p.id::text AS purchase_id, COALESCE(t.id::text, '') AS refund_transaction_id, p.price_xof::text AS amount
+            FROM active_search_purchases p LEFT JOIN wallet_transactions t ON t.id = p.refund_transaction_id
+           WHERE (p.refunded_at IS NOT NULL OR p.refund_transaction_id IS NOT NULL)
+             AND NOT (p.refunded_at IS NOT NULL AND t.id IS NOT NULL AND active_search_ledger_matches(t.id, 'search_refund', p.id, p.user_id, p.price_xof))`,
+  },
+  {
+    code: "active_search_refund_transaction_orphan",
+    sql: `SELECT t.id::text AS transaction_id, t.reference AS reference
+            FROM wallet_transactions t
+           WHERE t.kind = 'search_refund'
+             AND (SELECT count(*) FROM active_search_purchases p
+                   WHERE p.refund_transaction_id = t.id AND p.refunded_at IS NOT NULL AND t.reference = 'search_refund:' || p.id::text) <> 1`,
+  },
+  {
+    // La fin d'une période ne dépasse jamais l'achat + 180 jours.
+    code: "active_search_horizon_exceeded",
+    sql: `SELECT p.id::text AS purchase_id, p.ends_at::text AS ends_at, p.created_at::text AS purchased_at
+            FROM active_search_purchases p WHERE p.ends_at > p.created_at + interval '180 days'`,
+  },
+  {
+    // Deux périodes EN VIGUEUR (statut `active`, comme le déclencheur de non-chevauchement) d'un même besoin ne se chevauchent jamais. Une période terminée, arrêtée ou remboursée ne compte plus :
+    // un nouvel achat après un remboursement ou un arrêt est légitime.
+    code: "active_search_overlap",
+    sql: `SELECT a.id::text AS purchase_id, b.id::text AS other_purchase_id
+            FROM active_search_purchases a JOIN active_search_purchases b ON a.demand_id = b.demand_id AND a.id < b.id
+           WHERE a.status = 'active' AND b.status = 'active' AND tstzrange(a.starts_at, a.ends_at) && tstzrange(b.starts_at, b.ends_at)`,
+  },
+  {
+    // La période dure EXACTEMENT `duration_days` jours (calcul en UTC, comme l'achat et le déclencheur d'insertion).
+    code: "active_search_period_mismatch",
+    sql: `SELECT p.id::text AS purchase_id, p.starts_at::text AS starts_at, p.ends_at::text AS ends_at, p.duration_days::text AS duration_days
+            FROM active_search_purchases p
+           WHERE p.ends_at <> ((p.starts_at AT TIME ZONE 'UTC') + make_interval(days => p.duration_days)) AT TIME ZONE 'UTC'`,
+  },
+  {
+    // L'acheteur est le PROPRIÉTAIRE du besoin : personne n'achète l'option du besoin d'un autre.
+    code: "active_search_owner_mismatch",
+    sql: `SELECT p.id::text AS purchase_id, p.user_id::text AS user_id, d.owner_id::text AS demand_owner_id
+            FROM active_search_purchases p JOIN demands d ON d.id = p.demand_id WHERE p.user_id <> d.owner_id`,
   },
 ];
 

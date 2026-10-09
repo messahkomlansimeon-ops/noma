@@ -27,8 +27,9 @@ export const DEMO_HISTORY_SELLER_COUNT = 6;
  * Espace du verrou consultatif qui sérialise deux `demo:seed`. Constante DÉDIÉE (lot D3) : l'ancienne valeur, 1_314_664_955, était celle du plafond de notifications
  * (`NOTIFICATION_CAP_LOCK_NAMESPACE`) ; deux verrous d'usages différents ne partagent jamais un espace. Liste des espaces utilisés : 1_314_664_945 (migrations), 946 et 947 (matching),
  * 948 et 949 (boost : périmètre, devis), 950 (recharges), 951 (achat de boost), 952 (cadence des devis), 953 (dev:seed), 954 (contacts), 955 et 956 (notifications), 957 à 959 (messagerie,
- * conversations, favoris), 960 (demo:seed), 970 et 971 (photos), 972 (abonnements), 977 (budgets SMS, lot SMS1), 978 (comptage des défis de connexion non vérifiés d'une adresse ou d'un préfixe, lot SMS1-ter), 981 et 982 (collecte externe, lot EXT1 : analyse par empreinte, regroupement entre sources ; plage réservée par l'orchestrateur), 985 (missions d'achat en volume, lot MV1 : créations et activations d'un même acheteur). Un test
- * (`tests/scripts/demo-seed.test.ts`) vérifie qu'aucun espace n'est déclaré deux fois, que 977 appartient à `lib/server/sms/journal.ts`, 978 à `lib/server/auth/otp.ts`, 981 et 982 à `lib/server/external/config.ts` et que 985 appartient à `lib/server/missions/config.ts`.
+ * conversations, favoris), 960 (demo:seed), 970 et 971 (photos), 972 (abonnements), 977 (budgets SMS, lot SMS1), 978 (comptage des défis de connexion non vérifiés d'une adresse ou d'un préfixe, lot SMS1-ter), 981 et 982 (collecte externe, lot EXT1 : analyse par empreinte, regroupement entre sources ; plage réservée par l'orchestrateur), 985 (missions d'achat en volume, lot MV1 : créations et activations d'un même acheteur), 990 (recherche active payante, lot RA1 : achats d'un même utilisateur,
+ * balayage d'un même besoin). Un test (`tests/scripts/demo-seed.test.ts`) vérifie qu'aucun espace n'est déclaré deux fois, que 977 appartient à `lib/server/sms/journal.ts`, 978 à `lib/server/auth/otp.ts`, 981 et 982 à `lib/server/external/config.ts`, que 985 appartient à
+ * `lib/server/missions/config.ts` et que 990 appartient à `lib/server/active-search/config.ts`.
  */
 export const DEMO_SEED_LOCK_NAMESPACE = 1_314_664_960;
 /** Repère placé dans le texte de chaque annonce et de chaque besoin de démonstration : c'est lui qui rend la commande rejouable sans doublon. */
@@ -40,6 +41,12 @@ export const DEMO_SEED_USAGE = "Usage : npm run demo:seed (aucune option) ; DATA
 export const DEMO_VENDOR_CREDIT_XOF = 25_000;
 /** Référence du crédit (unique : le crédit n'est écrit qu'une fois). */
 export const DEMO_VENDOR_CREDIT_REFERENCE = "adjustment:demo-seed-vendor-credit";
+/**
+ * Lot RA1 : crédit PAYÉ du porte-monnaie de l'acheteur démo (FCFA), de quoi acheter la recherche active (2 000 FCFA pour 30 jours, prix PROVISOIRE) pendant la démonstration. Écrit une
+ * seule fois (référence unique), par un ajustement d'administration comme le crédit du vendeur : ce sont des crédits PAYÉS, pas des crédits promotionnels.
+ */
+export const DEMO_BUYER_CREDIT_XOF = 10_000;
+export const DEMO_BUYER_CREDIT_REFERENCE = "adjustment:demo-seed-buyer-credit";
 /**
  * Lot PRO1 : le vendeur démo est abonné à l'offre Pro (badge « Vendeur Pro », 5 000 FCFA de crédits promotionnels, import de catalogue). L'abonnement se paie avec les VRAIS services
  * (`subscribeToPlan`) : le crédit d'abonnement est ajouté en plus du crédit de démonstration, pour que le solde de crédits du vendeur reste DEMO_VENDOR_CREDIT_XOF après l'abonnement.

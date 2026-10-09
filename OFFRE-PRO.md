@@ -45,7 +45,7 @@ Aucun droit ne vient du client. `GET /api/subscription` expose `current` (plan, 
 
 ## Abonnement : souscription, période, renouvellement, grâce, fin, annulation
 
-**Souscription** (`subscribeToPlan`, `POST /api/subscription { planCode, idempotencyKey }`) : **une transaction SQL**, sous le verrou de l'utilisateur :
+**Souscription** (`subscribeToPlan`, `POST /api/subscription { planCode, idempotencyKey, expectedPriceXof }`) : **une transaction SQL**, sous le verrou de l'utilisateur. **Prix affiché** (lot RA1-bis) : `expectedPriceXof` est le prix mensuel que l'écran AFFICHE pour ce plan ; il est obligatoire (entier positif) pour la route HTTP et comparé au prix de la **dernière version** du plan : s'il diffère (un nouveau tarif a été publié entre l'affichage et le clic), 409 `price_changed` (« Le prix de l'abonnement a changé : rechargez la page, puis réessayez. »), **rien n'est écrit ni débité**, l'écran referme la confirmation et relit le prix. Le rejeu d'une clé avec un autre prix affiché que celui payé est refusé de la même façon. Le service accepte l'omission du prix pour les outils internes (`demo:seed`, essais) ; la route ne l'accepte jamais :
 
 1. rejeu de la clé d'idempotence (même plan : l'abonnement existant est renvoyé, `reused: true`, **aucun nouveau débit** ; autre plan : `idempotency_conflict` 409) ;
 2. plan connu (`plan_not_found` 404) et payant (`plan_not_subscribable` 409) ; aucun abonnement en vigueur (`already_subscribed` 409) ;
@@ -174,7 +174,7 @@ Toutes : `Cache-Control: no-store`, `nosniff`, JSON ; **origine vérifiée AVANT
 | Méthode | Chemin | Corps | Réponse |
 |---|---|---|---|
 | `GET` | `/api/subscription` | — | 200 `{ contractVersion: "subscription/v1", pricesProvisional, plans, current, onlineOffers, subscription, promo, notices, unreadNotices, readAt }` |
-| `POST` | `/api/subscription` | `{ planCode, idempotencyKey }` | 201 (ou 200 rejeu : `reused: true`) l'état ci-dessus |
+| `POST` | `/api/subscription` | `{ planCode, idempotencyKey, expectedPriceXof }` | 201 (ou 200 rejeu : `reused: true`) l'état ci-dessus ; 409 `price_changed` si le prix affiché n'est plus le prix courant |
 | `POST` | `/api/subscription/auto-renew` | `{ autoRenew }` | 200 l'état ; 409 `no_subscription`, `period_ended` |
 | `POST` | `/api/subscription/notices/read` | `{ all: true }` ou `{ ids }` | 200 `{ unreadNotices }` ; 404 avis inconnu ou d'autrui (identique) |
 | `POST` | `/api/offers/import` | `{ csv, dryRun }` | 200 aperçu ou rejeu, 201 application ; 403 `entitlement_required` ; 400 `too_many_rows`, `invalid_file` |
@@ -182,7 +182,7 @@ Toutes : `Cache-Control: no-store`, `nosniff`, JSON ; **origine vérifiée AVANT
 | `POST` | `/api/admin/plans/{code}/versions` | `{ name, monthlyPriceXof, promoCreditsXof, maxOnlineOffers, entitlements }` | 201 la nouvelle version (administrateur) |
 
 Autres codes : 400 `invalid_request`, 401 `authentication_required`, 403 `invalid_origin`, 404 `resource_not_found` (plan inconnu, et **le même 404 pour tout ce qui n'est pas un administrateur
-actif** sur `/api/admin/plans*`), 409 `insufficient_balance`, `already_subscribed`, `plan_not_subscribable`, `idempotency_conflict`, 503 `subscription_unavailable`. La publication au-delà de la
+actif** sur `/api/admin/plans*`), 409 `insufficient_balance`, `already_subscribed`, `plan_not_subscribable`, `price_changed`, `idempotency_conflict`, 503 `subscription_unavailable`. La publication au-delà de la
 limite répond **409 `offer_limit_reached`** (`POST /api/offers/{id}/publish`). `GET /api/wallet` renvoie en plus `promoBalanceXof` et `promoExpiresAt`, et `promoAmountXof` par ligne ;
 `POST /api/offers/{id}/boost-purchases` renvoie `promoAmountXof` (part payée en crédits promotionnels).
 
@@ -202,6 +202,7 @@ de Next** (statut 404, sans titre ni sélecteur d'espace, donc aucun onglet Admi
   mouvements ; avertissements `promo_expiry_overdue` et `subscription_overdue` (le worker retarde).
 - Rôle PostgreSQL de l'application : mêmes règles que `WALLET.md` ; `SELECT` et `INSERT` sur les tables nouvelles, `UPDATE` sur `subscriptions`, `subscription_periods`, `promo_grants`
   (expiration), ni `DELETE` ni `TRUNCATE`.
+- Recherche active payante (lot RA1) : elle ne se paie **jamais** en crédits promotionnels (garde de la base et du service, `RECHERCHE-ACTIVE.md`) ; son verrou par utilisateur (`1_314_664_990`) est distinct de celui des abonnements (`1_314_664_972`), les deux finissent par les comptes du grand livre dans le même ordre.
 - Ordre des verrous (jamais à l'envers) : verrou de l'utilisateur (espace consultatif `1_314_664_972`) → ligne de l'abonnement → lignes d'annonces → émissions promotionnelles → comptes du grand
   livre (identifiant croissant). L'achat de boost prend ses verrous métier, puis les émissions (6b), puis les comptes (7) : `BOOST-PURCHASE.md`.
 - `demo:seed` : le **vendeur démo devient Pro**, avec des crédits promotionnels, de façon idempotente (`scripts/demo-seed.ts`, `scripts/demo-seed-plan.ts`).

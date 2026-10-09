@@ -337,12 +337,18 @@ export function createProClient(options: ProClientOptions = {}) {
       },
 
       /**
-       * POST /api/subscription `{ planCode, idempotencyKey }` : souscrit avec les crédits payés (201 ; 200 pour un rejeu de la même clé : `reused`, aucun second débit). La clé est un UUID
-       * généré UNE fois par tentative et réutilisé à chaque nouvel essai.
+       * POST /api/subscription `{ planCode, idempotencyKey, expectedPriceXof }` : souscrit avec les crédits payés au prix AFFICHÉ (409 `price_changed` s'il a changé, aucun débit ; 201 ; 200 pour
+       * un rejeu de la même clé : `reused`, aucun second débit). La clé est un UUID généré UNE fois par tentative et réutilisé à chaque nouvel essai ; `expectedPriceXof` est le prix mensuel
+       * que l'écran affiche pour ce plan.
        */
-      async subscribe(request: { planCode: string; idempotencyKey: string }, requestOptions?: RequestOptions): Promise<SubscribeResult> {
-        if (typeof request?.planCode !== "string" || !/^[a-z][a-z0-9_]{1,29}$/.test(request.planCode) || !isUuid(request.idempotencyKey)) throw argument();
-        const { status, json } = await send("POST", "/api/subscription", { planCode: request.planCode, idempotencyKey: request.idempotencyKey }, requestOptions);
+      async subscribe(request: { planCode: string; idempotencyKey: string; expectedPriceXof: number }, requestOptions?: RequestOptions): Promise<SubscribeResult> {
+        if (
+          typeof request?.planCode !== "string" || !/^[a-z][a-z0-9_]{1,29}$/.test(request.planCode) || !isUuid(request.idempotencyKey)
+          || typeof request.expectedPriceXof !== "number" || !Number.isSafeInteger(request.expectedPriceXof) || request.expectedPriceXof <= 0
+        ) throw argument();
+        const { status, json } = await send(
+          "POST", "/api/subscription", { planCode: request.planCode, idempotencyKey: request.idempotencyKey, expectedPriceXof: request.expectedPriceXof }, requestOptions,
+        );
         if (!isObject(json) || typeof json.reused !== "boolean") bad(status);
         return { reused: (json as Json).reused as boolean, state: parseState(status, json) };
       },
