@@ -170,7 +170,7 @@ n'incrémente jamais `content_version` et n'émet aucun événement de matching.
 | --- | --- |
 | `extend` | `notify_until` + 30 jours à partir de l'échéance (de maintenant si elle est passée), **plafonné à maintenant + 90 jours** (**180 jours pendant la recherche active payante du besoin**, lot RA1 : `trackingMaxDaysFor` ; à la fin de l'option l'entretien ramène le suivi à 90 jours au plus), jamais réduit ; sans effet au plafond |
 | `pause` | `notify_paused = true` (idempotent) |
-| `resume` | `notify_paused = false` (idempotent) ; ne prolonge pas un suivi échu |
+| `resume` | `notify_paused = false` (idempotent) ; ne prolonge pas un suivi échu. **Lot T3** : une reprise EFFECTIVE (le suivi était en pause) avance aussi `demands.updated_at` (sans événement ni version de contenu) : c'est le repère « dernière reprise » de la règle de nouveauté ; une pause, une reprise rejouée et une prolongation ne le changent pas |
 
 Réservé au **propriétaire** (un besoin d'autrui ou inconnu : le même 404). Seul un besoin **actif** a un suivi modifiable (sinon 409 `demand_not_active`). `GET /api/demands/{id}/tracking` renvoie le suivi
 (`until`, `paused`, `active`, `maxUntil`, `demandStatus`).
@@ -242,6 +242,10 @@ Lot SMS1 : le **transport SMS réel** (Meno) existe (`lib/server/sms/notificatio
   repousse la référence : les annonces d'avant ne sont plus nouvelles.
 - Un couple qui a déjà été une correspondance confirmée **et notifiable** ne notifie plus jamais, même si l'annonce a été retirée puis remise en ligne ; une évaluation écrite pendant une pause du suivi compte, elle, comme historique
   (« l'annonce de la pause n'est jamais notifiée après coup »).
+- **Course de la pause (lot T3)** : le worker peut évaluer, APRÈS la reprise, une annonce publiée PENDANT la pause (il était en retard). La règle de nouveauté compare la publication de l'annonce au dernier événement du besoin ET à la dernière
+  reprise du suivi (`demands.updated_at`, avancé par une reprise effective, quand il est postérieur au dernier événement du besoin) : une annonce publiée ou modifiée AVANT la dernière reprise ne notifie pas (`not_new_for_demand`, notée « sans notification possible »),
+  quelle que soit la vitesse du worker ; une annonce publiée OU modifiée après la reprise notifie. Choix : aucun nouveau champ ni migration (`updated_at` du besoin n'est écrit que par le catalogue — contenu, statut — et par la reprise) ; un champ
+  dédié `notify_resumed_at` serait plus explicite mais exigerait une migration.
 - **Une notification peut être perdue après un `dead_letter`** : le rattrapage par `matching:bootstrap` est silencieux (voir `MATCHING-OPERATIONS.md`) ; la correspondance, elle, reste **visible** dans les résultats du besoin.
 - Le plafond de 20 / 50 et le résumé sont comptés par **jour UTC** ; le résumé lui-même ne déclenche pas d'envoi : ce sont les lignes d'envoi de ses annonces qui comptent dans le message externe.
 - Un envoi écarté (`skipped`, motifs de revérification ou expiration à 48 h) n'est jamais repris ; une pause ou une expiration du suivi **entre la naissance et l'envoi** l'écarte (`tracking_paused`, `tracking_expired`), même si le suivi reprend ensuite.

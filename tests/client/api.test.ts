@@ -187,6 +187,15 @@ describe("couche cliente : offres", () => {
     assert.equal(calls[1].url, "/api/offers");
   });
 
+  test("T3 list : la couverture d'une annonce n'est reprise que si c'est un UUID, absente sinon", async () => {
+    const cover = "1a1a1a1a-2b2b-4c3c-8d4d-5e5e5e5e5e5e";
+    const { client } = harness(() => json(200, { offers: [offerFixture({ coverPhotoId: cover }), offerFixture(), offerFixture({ coverPhotoId: "../../etc/passwd" })], pagination: { limit: 20, offset: 0 } }));
+    const result = await client.offers.list();
+    assert.equal(result.offers[0].coverPhotoId, cover);
+    assert.ok(!("coverPhotoId" in result.offers[1]));
+    assert.ok(!("coverPhotoId" in result.offers[2]));
+  });
+
   test("listAll : pages de 100, s'arrête à la première page incomplète", async () => {
     const full = Array.from({ length: PAGE_LIMIT }, (_, index) =>
       offerFixture({ id: `00000000-0000-4000-8000-${index.toString().padStart(12, "0")}` }),

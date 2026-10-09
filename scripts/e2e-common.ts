@@ -76,6 +76,34 @@ export async function awaitOtpLine(offset: number): Promise<{ code: string; tail
   throw new Error("aucune ligne [auth:dev] dans la sortie du serveur (NODE_ENV=development et NOMA_DEV_OTP_CONSOLE=1 ?)");
 }
 
+/**
+ * Lot T3 : attend un ÉTAT STABLE avant de s'en servir comme point de départ d'une vérification. Un état est stable quand le système est au repos (`quiet`) avant ET après deux lectures
+ * identiques (`read`, comparées en JSON) séparées de `gapMs`. Rend la seconde lecture. Un worker qui écrit encore, de façon asynchrone, ne fait ainsi jamais varier ce qu'on mesure.
+ */
+export async function waitForSettledValue<T>(options: {
+  label: string;
+  read: () => Promise<T>;
+  quiet: () => Promise<boolean>;
+  timeoutMs: number;
+  gapMs?: number;
+  hint?: string;
+}): Promise<T> {
+  const gap = options.gapMs ?? 2_000;
+  const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const deadline = Date.now() + options.timeoutMs;
+  while (Date.now() < deadline) {
+    if (await options.quiet()) {
+      const first = await options.read();
+      await pause(gap);
+      const second = await options.read();
+      if (JSON.stringify(first) === JSON.stringify(second) && (await options.quiet())) return second;
+    } else {
+      await pause(gap);
+    }
+  }
+  throw new Error(`${options.label} : délai de ${options.timeoutMs} ms dépassé${options.hint ? ` — ${options.hint}` : ""}`);
+}
+
 /** Numéro ivoirien canonique à 10 chiffres locaux : « 07 » + 6 chiffres issus de l'horloge + les deux chiffres demandés. */
 export function uniquePhone(lastTwoDigits: string): string {
   const middle = `${Date.now() % 1_000_000}`.padStart(6, "0");

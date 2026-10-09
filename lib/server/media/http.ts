@@ -93,7 +93,10 @@ export function createMediaHttpHandlers(dependencies: MediaHttpDependencies = {}
 
   function refuse(error: MediaError): Response {
     const refusal = REFUSALS[error.code];
-    const headers = error.code === "rate_limited" ? { "retry-after": String(error.retryAfterSeconds ?? 60) } : undefined;
+    // Lot T3 : après un 408 (corps lu trop lentement, donc ni lu en entier ni vidé), la connexion est FERMÉE : une connexion persistante réutilisée pour la requête suivante lirait le reste du corps
+    // abandonné comme un début de requête.
+    const headers: Record<string, string> | undefined =
+      error.code === "rate_limited" ? { "retry-after": String(error.retryAfterSeconds ?? 60) } : refusal.status === 408 ? { connection: "close" } : undefined;
     if (error.code === "storage_unavailable") context.journal("storage_unavailable");
     return failure(refusal.status, error.code === "empty_body" ? "invalid_request" : error.code, refusal.message, headers);
   }

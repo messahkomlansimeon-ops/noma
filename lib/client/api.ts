@@ -58,6 +58,8 @@ export interface OfferRecord extends CatalogRecordCommon {
   status: OfferStatus;
   price: Money | null;
   availabilityStatus: AvailabilityStatus | null;
+  /** Lot T3 : photo de couverture, présente dans la LISTE « Mes annonces » quand l'annonce a une photo. */
+  coverPhotoId?: string;
 }
 
 export interface DemandRecord extends CatalogRecordCommon {
@@ -690,7 +692,12 @@ function parseOffer(status: number, value: unknown): OfferRecord {
   ) {
     throw fixedError(status, API_INVALID_RESPONSE);
   }
-  return { ...common, status: record.status, price: record.price, availabilityStatus: record.availabilityStatus } as OfferRecord;
+  const offer = { ...common, status: record.status, price: record.price, availabilityStatus: record.availabilityStatus } as OfferRecord;
+  // Lot T3 : la couverture de la LISTE « Mes annonces » n'est reprise que si c'est un UUID (`parseCommon` laisse passer les champs en trop : on retire une valeur arbitraire).
+  const cover = parseCoverPhotoId(record.coverPhotoId);
+  if (cover === null) delete offer.coverPhotoId;
+  else offer.coverPhotoId = cover;
+  return offer;
 }
 
 function parseDemand(status: number, value: unknown): DemandRecord {

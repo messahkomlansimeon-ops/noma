@@ -780,3 +780,54 @@ describe("relais de développement : aucun secret dans les journaux", () => {
     assert.equal(output.includes(ATTACKER_SECRET), false);
   });
 });
+
+describe("relais de développement : après une 408 la connexion du client est fermée (lot T3)", () => {
+  /** Envoie une requête HTTP/1.1 persistante sur une connexion brute ; rend la réponse reçue et si le relais a fermé la connexion dans les 1,5 s. */
+  function rawExchange(port: number): Promise<{ head: string; closedByProxy: boolean }> {
+    return new Promise((resolve, reject) => {
+      const socket = net.connect(port, "127.0.0.1");
+      let received = "";
+      let closed = false;
+      socket.on("data", (chunk: Buffer) => (received += chunk.toString("latin1")));
+      socket.on("close", () => (closed = true));
+      socket.on("error", reject);
+      socket.on("connect", () => socket.write("POST /api/offers/x/photos HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\nContent-Length: 0\r\n\r\n"));
+      setTimeout(() => {
+        const snapshot = { head: received, closedByProxy: closed };
+        socket.destroy();
+        resolve(snapshot);
+      }, 1_500);
+    });
+  }
+
+  test("une 408 de la cible : le relais répond « Connection: close » et ferme la connexion ; une 200 ordinaire garde la connexion ouverte", async () => {
+    const upstream = await startUpstream((req, res) => {
+      const status = req.url?.includes("/photos") ? 408 : 200;
+      res.writeHead(status, { "content-type": "application/json", "content-length": 2 });
+      res.end("{}");
+    });
+    const { port } = await startProxy(upstream.origin);
+    const timeout = await rawExchange(port);
+    assert.match(timeout.head, /^HTTP\/1\.1 408 /);
+    assert.match(timeout.head, /\r\nconnection: close\r\n/i);
+    assert.equal(timeout.closedByProxy, true, "connexion fermée après la 408");
+    // Contrôle : la même requête qui reçoit une 200 laisse la connexion persistante ouverte.
+    const ordinary = await new Promise<{ head: string; closedByProxy: boolean }>((resolve, reject) => {
+      const socket = net.connect(port, "127.0.0.1");
+      let received = "";
+      let closed = false;
+      socket.on("data", (chunk: Buffer) => (received += chunk.toString("latin1")));
+      socket.on("close", () => (closed = true));
+      socket.on("error", reject);
+      socket.on("connect", () => socket.write("GET /ok HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n"));
+      setTimeout(() => {
+        const snapshot = { head: received, closedByProxy: closed };
+        socket.destroy();
+        resolve(snapshot);
+      }, 1_500);
+    });
+    assert.match(ordinary.head, /^HTTP\/1\.1 200 /);
+    assert.equal(/\r\nconnection: close\r\n/i.test(ordinary.head), false);
+    assert.equal(ordinary.closedByProxy, false, "une 200 ne ferme pas la connexion");
+  });
+});

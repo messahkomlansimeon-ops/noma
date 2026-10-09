@@ -65,6 +65,14 @@ export function orderOf(photos: readonly OfferPhoto[]): string[] {
   return [...photos].sort((a, b) => a.position - b.position).map((photo) => photo.id);
 }
 
+/**
+ * Lot T3 : photo de COUVERTURE d'une fiche d'annonce (la première photo, dans l'ordre de l'annonce) ; `null` quand l'annonce n'a pas de photo. La vignette à côté du titre montre cette photo
+ * quand elle existe et l'icône de la catégorie sinon (jamais l'icône alors qu'une photo existe).
+ */
+export function coverPhotoIdOf(photos: ReadonlyArray<{ id: string }> | undefined): string | null {
+  return photos !== undefined && photos.length > 0 ? photos[0].id : null;
+}
+
 /** Texte alternatif d'une photo de la galerie. */
 export function galleryAlt(title: string, index: number, total: number): string {
   return total > 1 ? `${title} : photo ${index + 1} sur ${total}` : `${title} : photo`;

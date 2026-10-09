@@ -152,8 +152,29 @@ export interface NoticeRowView {
   unread: boolean;
 }
 
+const annonces = (count: number): string => (count === 1 ? "1 annonce" : `${count} annonces`);
+
+/**
+ * Détail de l'avis « annonces remises en ligne » (lot T3) : combien ont été remises en ligne, combien restent en pause et POURQUOI (la limite du plan, ou le vendeur lui-même). `stillPaused` est
+ * relu à l'affichage (annonces en pause à cet instant) ; `null` (serveur plus ancien) : la phrase d'avant, sans nombre.
+ */
+export function restoredDetail(restored: number, stillPaused: { planLimit: number; byOwner: number } | null, maxOnlineOffers: number | null): string {
+  const base = "Votre offre Pro est de nouveau active : les annonces mises en pause à la fin de votre précédent abonnement ont été remises en ligne, les plus récentes d'abord, dans la limite de votre offre.";
+  if (stillPaused === null) return `${base} Celles que vous aviez mises en pause vous-même restent en pause.`;
+  const parts = [base, `Remises en ligne : ${restored}.`];
+  if (stillPaused.planLimit > 0) {
+    const limit = maxOnlineOffers !== null && maxOnlineOffers > 0 ? ` (votre offre permet ${annonces(maxOnlineOffers)} en ligne)` : "";
+    parts.push(
+      `Toujours en pause : ${annonces(stillPaused.planLimit)}, faute de place dans la limite de votre offre${limit} ou parce que ${stillPaused.planLimit === 1 ? "son contenu ne respecte" : "leur contenu ne respecte"} plus les règles de publication. Mettez-en une autre en pause pour en remettre une en ligne.`,
+    );
+  }
+  if (stillPaused.byOwner > 0) parts.push(`Toujours en pause : ${annonces(stillPaused.byOwner)} que vous aviez mise${stillPaused.byOwner === 1 ? "" : "s"} en pause vous-même.`);
+  if (stillPaused.planLimit === 0 && stillPaused.byOwner === 0) parts.push("Aucune annonce ne reste en pause.");
+  return parts.join(" ");
+}
+
 /** Texte fixe d'un avis (renouvellement refusé, abonnement terminé, annonces mises en pause, annonces remises en ligne) : jamais un code. */
-export function noticeView(notice: SubscriptionNoticeView, timeZone?: string): NoticeRowView {
+export function noticeView(notice: SubscriptionNoticeView, timeZone?: string, maxOnlineOffers?: number | null): NoticeRowView {
   let title: string;
   let detail: string;
   switch (notice.code) {
@@ -174,7 +195,7 @@ export function noticeView(notice: SubscriptionNoticeView, timeZone?: string): N
     case "listings_restored": {
       const count = notice.listingCount ?? 0;
       title = count === 1 ? "1 annonce remise en ligne" : `${count} annonces remises en ligne`;
-      detail = "Votre offre Pro est de nouveau active : les annonces mises en pause à la fin de votre précédent abonnement ont été remises en ligne, les plus récentes d'abord, dans la limite de votre offre. Celles que vous aviez mises en pause vous-même restent en pause.";
+      detail = restoredDetail(count, notice.stillPaused ?? null, maxOnlineOffers ?? null);
       break;
     }
     default:

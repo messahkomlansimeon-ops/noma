@@ -16,6 +16,7 @@ import {
   marketQueryFromProduct,
   periodShortText,
   periodText,
+  rangeText,
   sparklineGeometry,
   trendSummary,
 } from "../../lib/client/market-view";
@@ -78,6 +79,16 @@ describe("textes honnêtes", () => {
     assert.equal(view.comparedTo, "Comparé à : iPhone 12 128 Go, Occasion");
     assert.equal(view.widened, false);
     assert.equal(view.insufficient, null);
+  });
+
+  test("T3 : une fourchette de largeur nulle (bornes arrondies égales) ne s'écrit JAMAIS « entre X et X » : « La plupart des prix demandés sont autour de X »", () => {
+    const flat = listingsView(published({ median: 162_500, range: { q1: 162_500, q3: 162_500 } }));
+    assert.equal(NBSP(flat.range as string), "La plupart des prix demandés sont autour de 162 500 FCFA");
+    assert.equal(/entre/.test(flat.range as string), false);
+    assert.equal(flat.rangeNote, null, "la fourchette existe (10 vendeurs) : pas la note « il faut au moins 10 vendeurs »");
+    // Une fourchette qui a de la largeur, même d'un seul pas d'arrondi, garde la phrase « entre … et … ».
+    assert.equal(NBSP(listingsView(published({ median: 162_500, range: { q1: 162_500, q3: 170_500 } })).range as string), "La moitié des prix demandés est entre 162 500 FCFA et 170 500 FCFA");
+    assert.equal(NBSP(rangeText({ q1: 40_000, q3: 40_000 })), "La plupart des prix demandés sont autour de 40 000 FCFA");
   });
 
   test("moins de 10 vendeurs : la médiane seule, et le dit ; annonces aux prix atypiques écartées : arrondies, jamais un compte exact", () => {

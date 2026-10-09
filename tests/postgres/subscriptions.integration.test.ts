@@ -939,6 +939,8 @@ test("re-souscription Pro : les annonces mises en pause par la fin de l'abonneme
   const restored = notices.filter((notice) => notice.code === "listings_restored");
   assert.equal(restored.length, 1);
   assert.equal(restored[0].listingCount, 3);
+  assert.deepEqual(restored[0].stillPaused, { planLimit: 0, byOwner: 1 }, "T3 : plus rien en pause par la limite ; l'annonce mise en pause par le vendeur reste en pause");
+  assert.ok(notices.filter((notice) => notice.code !== "listings_restored").every((notice) => notice.stillPaused === null), "T3 : seulement l'avis « remises en ligne »");
   assert.equal(await balanceOf(pool, userId), big(20_000), "un seul débit (deux souscriptions de 10 000 sur 40 000)");
   await assertWalletGreen(pool, "après une re-souscription");
   // Une seconde souscription (après une nouvelle fin) ne touche jamais l'annonce du vendeur : elle n'a pas de raison.
@@ -958,6 +960,7 @@ test("re-souscription : la remise en ligne s'arrête à la limite du nouveau pla
   for (const offer of offers.slice(0, 3)) assert.deepEqual([await statusOf(offer.id), await pausedReason(offer.id)], ["paused", "plan_limit"]);
   const notice = (await listSubscriptionNotices(pool, userId)).notices.find((entry) => entry.code === "listings_restored");
   assert.equal(notice?.listingCount, 2);
+  assert.deepEqual(notice?.stillPaused, { planLimit: 3, byOwner: 0 }, "T3 : trois annonces restent en pause faute de place dans la limite du plan");
   // Un vendeur dont aucune annonce n'avait été mise en pause par la limite : aucun avis « remises en ligne ».
   const plain = await makePro(pool, 10_000);
   assert.equal((await listSubscriptionNotices(pool, plain.userId)).notices.filter((entry) => entry.code === "listings_restored").length, 0);

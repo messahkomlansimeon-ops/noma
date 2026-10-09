@@ -11,7 +11,7 @@ import { Thumb } from "../../components/thumb";
 import type { StoredMatch } from "../../lib/client/api";
 import { PHOTO_ACCEPT_ATTRIBUTE } from "../../lib/client/photos-api";
 import { addPicked, type PickedFile } from "../../lib/client/photos-queue";
-import { PHONE_REMINDER } from "../../lib/client/photos-view";
+import { PHONE_REMINDER, coverPhotoIdOf } from "../../lib/client/photos-view";
 
 /** Écrans des photos (lot PH1) : vignette de couverture avec repli sur l'icône, galerie de la fiche, sélecteur du formulaire, rappel au vendeur, garde-fous du code source. */
 
@@ -56,6 +56,28 @@ describe("vignette de couverture", () => {
     const covered = renderToString(<ul><BuyerMatchCard item={{ ...item, coverPhotoId: PHOTO_A }} detailHref="/besoins/x/offres/y" /></ul>);
     assert.match(covered, new RegExp(`src="/api/media/${PHOTO_A}"`));
     assert.equal(covered.match(/<img/g)?.length, 1);
+  });
+});
+
+describe("vignette de la fiche d'une annonce (lot T3)", () => {
+  test("coverPhotoIdOf : la première photo de l'annonce, null sans photo", () => {
+    assert.equal(coverPhotoIdOf(undefined), null);
+    assert.equal(coverPhotoIdOf([]), null);
+    assert.equal(coverPhotoIdOf([{ id: PHOTO_B }, { id: PHOTO_C }]), PHOTO_B);
+  });
+
+  test("la vignette à côté du titre : la couverture quand une photo existe (jamais l'icône de remplacement), l'icône sinon", () => {
+    const withPhoto = renderToString(<Thumb art="phone" className="size-20" iconClassName="size-10" photoId={coverPhotoIdOf([{ id: PHOTO_A }])} />);
+    assert.match(withPhoto, new RegExp(`<img[^>]*src="/api/media/${PHOTO_A}"`));
+    assert.ok(!withPhoto.includes("<svg"), "pas d'icône à côté de la photo");
+    const without = renderToString(<Thumb art="phone" className="size-20" iconClassName="size-10" photoId={coverPhotoIdOf([])} />);
+    assert.ok(without.includes("<svg") && !without.includes("<img"));
+  });
+
+  test("la fiche de l'acheteur passe la couverture à la vignette ; la liste « Mes annonces » du vendeur aussi", () => {
+    const fiche = read("app/(buyer)/besoins/[id]/offres/[offerId]/page.tsx");
+    assert.match(fiche, /<Thumb art=\{artForCategory\(detail\.item\.candidate\.category\)\}[^>]*photoId=\{coverPhotoIdOf\(detail\.details\.photos\)/);
+    assert.match(read("app/(vendor)/vendeur/annonces/page.tsx"), /<Thumb art=\{artForCategory\(offer\.category\)\}[^>]*photoId=\{offer\.coverPhotoId\}/);
   });
 });
 

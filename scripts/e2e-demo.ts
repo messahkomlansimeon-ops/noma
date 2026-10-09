@@ -302,7 +302,11 @@ async function main(): Promise<void> {
     const listingsMedian = await clean("market-listings-median");
     assert.match(listingsMedian, /^\d{3} \d{3} FCFA$/, "médiane des prix demandés");
     assert.equal(Number(listingsMedian.replace(/\D/g, "")) % 500, 0, `${listingsMedian} : arrondi à 500 FCFA`);
-    assert.match(await clean("market-listings-range"), /^La moitié des prix demandés est entre \d{3} \d{3} FCFA et \d{3} \d{3} FCFA$/);
+    // Lot T3 : le produit phare de la démonstration a une VRAIE fourchette (prix étalés de ±20 % autour de la base) : « entre X et Y » avec X < Y, jamais « entre X et X ».
+    const rangeLine = await clean("market-listings-range");
+    const rangeMatch = /^La moitié des prix demandés est entre (\d{3} \d{3}) FCFA et (\d{3} \d{3}) FCFA$/.exec(rangeLine);
+    assert.ok(rangeMatch, `fourchette du produit phare : ${rangeLine}`);
+    assert.ok(Number(rangeMatch[1].replace(/\D/g, "")) < Number(rangeMatch[2].replace(/\D/g, "")), `${rangeLine} : une fourchette de largeur non nulle`);
     const countText = await clean("market-listings-count");
     assert.match(countText, /^environ \d+ annonces d'environ \d+ vendeurs$/);
     // Lot H1-ter : l'unité est le vendeur. Le produit phare de la démonstration compte assez de vendeurs fictifs distincts (au moins 20 affichés, le minimum d'un point de tendance ; la démonstration en donne 24) pour que la tendance s'affiche.

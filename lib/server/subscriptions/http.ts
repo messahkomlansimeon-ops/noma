@@ -87,6 +87,7 @@ export function subscriptionStateDto(state: SubscriptionState) {
       id: notice.id,
       code: notice.code,
       listingCount: notice.listingCount,
+      ...(notice.stillPaused === null ? {} : { stillPaused: notice.stillPaused }),
       createdAt: notice.createdAt.toISOString(),
       readAt: notice.readAt === null ? null : notice.readAt.toISOString(),
     })),

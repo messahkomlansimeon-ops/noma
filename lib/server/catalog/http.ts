@@ -10,6 +10,8 @@ import {
   readJsonBodyCapped,
   readSingleCookie,
 } from "../http/protection";
+import { readCoverPhotoIdsSafely } from "../media/read";
+import { getPostgresPool } from "../postgres/client";
 import {
   ArchivedCatalogResourceError,
   CatalogAttributeKeyError,
@@ -411,6 +413,8 @@ interface ResourceDefinition<RecordType extends PublicCatalogRecord, CreateInput
   parseUpdate(value: unknown): { expectedContentVersion: number; changes: UpdateChanges };
   create(ownerId: string, input: CreateInput): Promise<RecordType>;
   list(ownerId: string, pagination: CatalogPagination): Promise<RecordType[]>;
+  /** Lot T3 : complète les éléments de la liste déjà mis en forme (décor : ne fait jamais échouer la liste). */
+  decorateList?(items: Array<Record<string, unknown>>): Promise<void>;
   read(ownerId: string, id: string): Promise<RecordType | null>;
   update(
     ownerId: string,
@@ -490,8 +494,10 @@ export function createCatalogHttpHandlers(
         try {
           const pagination = parsePagination(request);
           const records = await definition.list(authenticated.ownerId, pagination);
+          const items = records.map(publicRecord);
+          if (definition.decorateList) await definition.decorateList(items);
           return noStoreJsonResponse(200, {
-            [definition.pluralKey]: records.map(publicRecord),
+            [definition.pluralKey]: items,
             pagination,
           });
         } catch (error) {
@@ -595,6 +601,15 @@ export function createCatalogHttpHandlers(
     parseUpdate: parseOfferUpdate,
     create: (ownerId, input) => createOffer({ ...input, ownerId }, dependencies.pool),
     list: (ownerId, pagination) => listOffersByOwner(ownerId, dependencies.pool, pagination),
+    // Lot T3 : la liste « Mes annonces » du vendeur porte la couverture de chaque annonce qui a une photo (sinon l'écran n'afficherait que l'icône). Le vendeur lit SES annonces : aucun autre droit à prouver.
+    decorateList: async (items) => {
+      const ids = items.flatMap((item) => (typeof item.id === "string" ? [item.id] : []));
+      const covers = await readCoverPhotoIdsSafely(dependencies.pool ?? getPostgresPool(), ids);
+      for (const item of items) {
+        const cover = typeof item.id === "string" ? covers.get(item.id) : undefined;
+        if (cover !== undefined) item.coverPhotoId = cover;
+      }
+    },
     read: (ownerId, id) => getOfferById(ownerId, id, dependencies.pool),
     update: (ownerId, id, expectedContentVersion, changes) => updateOffer({
       id,

@@ -122,7 +122,7 @@ export function ProOfferScreen() {
         ) : (
           <>
             {state.notices.slice(0, 5).map((notice) => {
-              const view = noticeView(notice);
+              const view = noticeView(notice, undefined, state.current.maxOnlineOffers);
               return (
                 <section key={notice.id} data-testid="pro-notice" data-code={notice.code} className="mt-4 rounded-2xl border border-carrot/50 bg-carrot-soft p-4">
                   <div className="text-[14px] font-extrabold text-carrot-ink">{view.title}</div>

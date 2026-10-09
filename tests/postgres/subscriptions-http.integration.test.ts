@@ -219,6 +219,28 @@ test("avis : un renouvellement refusé puis la fin de l'abonnement créent des a
   for (const body of [{}, { all: false }, { all: true, ids: ids }, { ids: [] }, { ids: ["x"] }]) assert.equal((await noticesRead(user.cookie, body)).status, 400, JSON.stringify(body));
 });
 
+test("T3 avis « remises en ligne » : la réponse dit combien d'annonces RESTENT en pause (par la limite du plan / par le vendeur) ; la clé n'existe que pour cet avis", async () => {
+  const user = await login(env.pool);
+  await fund(env.pool, user.userId, 10_000);
+  await subscribe(user.cookie, SUBSCRIBE_BODY());
+  const end = new Date((await env.pool.query<{ e: Date }>("SELECT current_period_end AS e FROM subscriptions WHERE user_id = $1", [user.userId])).rows[0].e);
+  for (let index = 0; index < 13; index += 1) await makeOffer(env.pool, user.userId);
+  await runSubscriptionStep({ pool: env.pool, userId: user.userId, now: new Date(end.getTime() + 3_600_000) });
+  await runSubscriptionStep({ pool: env.pool, userId: user.userId, now: new Date(end.getTime() + 80 * 3_600_000) });
+  // Le vendeur met lui-même une annonce en pause, puis se réabonne : les trois annonces de la fin d'abonnement reviennent, la sienne reste en pause.
+  const own = await makeOffer(env.pool, user.userId, { status: "paused" });
+  assert.ok(own.id);
+  await fund(env.pool, user.userId, 10_000);
+  const resubscribed = await subscribe(user.cookie, SUBSCRIBE_BODY());
+  assert.equal(resubscribed.status, 201, JSON.stringify(resubscribed.json));
+  const notices = obj((await state(user.cookie)).json).notices as Json[];
+  const restored = notices.find((notice) => notice.code === "listings_restored");
+  assert.equal(restored?.listingCount, 3);
+  assert.deepEqual(restored?.stillPaused, { planLimit: 0, byOwner: 1 }, "plus rien en pause par la limite du plan ; une annonce mise en pause par le vendeur lui-même");
+  assert.deepEqual(Object.keys(restored as Json).sort(), ["code", "createdAt", "id", "listingCount", "readAt", "stillPaused"]);
+  for (const notice of notices.filter((entry) => entry.code !== "listings_restored")) assert.equal("stillPaused" in notice, false, String(notice.code));
+});
+
 test("la publication au-delà de la limite d'annonces en ligne répond 409 `offer_limit_reached` (texte fixe) par la route du catalogue", async () => {
   const user = await login(env.pool);
   const catalog = createCatalogHttpHandlers({ pool: env.pool, env: { NOMA_AUTH_ORIGIN: ORIGIN } });

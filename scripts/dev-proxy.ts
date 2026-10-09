@@ -276,6 +276,13 @@ export function createDevProxy(options: DevProxyOptions): DevProxy {
 
   /** Liste plate [nom, valeur, …] des en-têtes de la réponse, sans les en-têtes de saut ; Location vers la cible → vers le relais. */
   function responseHeaders(upstream: IncomingMessage): string[] {
+    const list = relayedResponseHeaders(upstream);
+    // Lot T3 : après une 408 (corps de requête lu trop lentement, donc ni lu en entier ni vidé), la connexion du CLIENT est fermée aussi : « Connection » est un en-tête de saut, le relais le pose lui-même.
+    if (upstream.statusCode === 408) list.push("Connection", "close");
+    return list;
+  }
+
+  function relayedResponseHeaders(upstream: IncomingMessage): string[] {
     const extraHopByHop = connectionTokens(upstream.headers);
     const list: string[] = [];
     for (let index = 0; index + 1 < upstream.rawHeaders.length; index += 2) {

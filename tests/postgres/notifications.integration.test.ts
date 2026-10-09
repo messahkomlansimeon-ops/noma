@@ -407,6 +407,79 @@ test("besoin en pause : le matching continue (l'évaluation est écrite) mais AU
   assert.equal((await pool.query("SELECT 1 FROM notifications WHERE offer_id = $1", [second.id])).rowCount, 0, "l'annonce de la pause n'est pas notifiée après coup");
 });
 
+test("T3 course de la pause (VRAI worker, déterministe) : une annonce publiée PENDANT la pause et évaluée par le worker APRÈS la reprise ne notifie jamais ; une annonce publiée après la reprise notifie ; une annonce de la pause MODIFIÉE après la reprise notifie une fois", async () => {
+  await resetAll();
+  const { seller, buyer } = await people();
+  const first = await createOffer(offerInput(seller.id, { rawText: "annonce avant le besoin" }), pool);
+  const demand = await createDemand(demandInput(buyer.id), pool);
+  await drain();
+  assert.equal((await evaluationRows()).filter((row) => row.offer_id === first.id && row.is_confirmed_match).length >= 1, true, "l'annonce d'avant le besoin est dans les résultats");
+  assert.equal((await matchRows()).length, 0, "annonce publiée AVANT l'activation du besoin : pas nouvelle");
+  await applyTrackingAction({ pool, ownerId: buyer.id, demandId: demand.id, action: "pause" });
+  // Publiée pendant la pause, mais PAS encore évaluée : le worker est en retard (la course).
+  const duringPause = await createOffer(offerInput(seller.id, { rawText: "annonce pendant la pause" }), pool);
+  await applyTrackingAction({ pool, ownerId: buyer.id, demandId: demand.id, action: "resume" });
+  await drain();
+  const evaluated = (await evaluationRows()).filter((row) => row.offer_id === duringPause.id);
+  assert.ok(evaluated.length >= 1 && evaluated.every((row) => row.is_confirmed_match), "l'annonce de la pause est dans les résultats (le matching ne s'arrête pas)");
+  assert.equal((await pool.query("SELECT 1 FROM notifications WHERE offer_id = $1", [duringPause.id])).rowCount, 0, "publiée avant la reprise : jamais notifiée, même évaluée après");
+  assert.equal((await matchRows()).length, 0);
+  // Publiée APRÈS la reprise : notifie.
+  const afterResume = await createOffer(offerInput(seller.id, { rawText: "annonce après la reprise" }), pool);
+  await drain();
+  assert.deepEqual((await matchRows()).map((row) => row.offer_id), [afterResume.id]);
+  // Une annonce de la pause MODIFIÉE après la reprise est une nouvelle version publiée : elle notifie, une seule fois.
+  await updateOffer({ id: duringPause.id, ownerId: seller.id, expectedContentVersion: duringPause.contentVersion, changes: { price: { amount: 240_000, currency: "XOF" } } }, pool);
+  await drain();
+  await drain();
+  assert.deepEqual((await matchRows()).map((row) => row.offer_id).sort(), [afterResume.id, duringPause.id].sort());
+  assert.equal((await pool.query("SELECT 1 FROM notifications WHERE offer_id = $1", [first.id])).rowCount, 0, "l'annonce d'avant l'activation reste silencieuse");
+});
+
+test("T3 repère de la reprise (appel direct) : seule une reprise EFFECTIVE avance le repère ; une pause, une reprise rejouée ou une prolongation le laissent ; une annonce publiée avant la reprise n'est pas nouvelle, après elle l'est", async () => {
+  await resetAll();
+  const seller = await makePerson(pool);
+  const buyer = await makePerson(pool);
+  const demand = await makeDemand(pool, buyer.id);
+  await pool.query("DELETE FROM matching_outbox_events");
+  const event = async (type: string, aggregate: "offer" | "demand", id: string): Promise<void> => {
+    await pool.query(
+      `INSERT INTO matching_outbox_events (event_type, aggregate_type, aggregate_id, aggregate_version, occurred_at)
+       VALUES ($1, $2, $3, (SELECT coalesce(max(aggregate_version), 0) + 1 FROM matching_outbox_events WHERE aggregate_type = $2 AND aggregate_id = $3), clock_timestamp())`,
+      [type, aggregate, id],
+    );
+  };
+  const touched = async (): Promise<Date> => (await pool.query<{ updated_at: Date }>("SELECT updated_at FROM demands WHERE id = $1", [demand.id])).rows[0].updated_at;
+  const OFFER_JOB = { jobType: "evaluate_offer_candidates" };
+  const outcomeOf = async (offer: OfferRecord): Promise<string> => {
+    await pool.query("DELETE FROM notifications");
+    await pool.query("DELETE FROM matching_evaluations WHERE offer_id = $1 AND demand_id = $2", [offer.id, demand.id]);
+    return (await directOutcome(offer, demand, await insertEvaluation(pool, { offer, demand }), OFFER_JOB)).kind;
+  };
+  await event("demand.activated", "demand", demand.id);
+  const base = await touched();
+  const old = await makeOffer(pool, seller.id, { price: 210_001 });
+  await event("offer.published", "offer", old.id);
+  await applyTrackingAction({ pool, ownerId: buyer.id, demandId: demand.id, action: "pause" });
+  assert.equal((await touched()).getTime(), base.getTime(), "une pause ne change pas le repère");
+  const duringPause = await makeOffer(pool, seller.id, { price: 210_002 });
+  await event("offer.published", "offer", duringPause.id);
+  await applyTrackingAction({ pool, ownerId: buyer.id, demandId: demand.id, action: "resume" });
+  const resumedAt = await touched();
+  assert.ok(resumedAt.getTime() > base.getTime(), "la reprise effective avance le repère");
+  assert.equal((await pool.query("SELECT content_version FROM demands WHERE id = $1", [demand.id])).rows[0].content_version, demand.contentVersion, "aucune version de contenu");
+  await applyTrackingAction({ pool, ownerId: buyer.id, demandId: demand.id, action: "resume" });
+  await applyTrackingAction({ pool, ownerId: buyer.id, demandId: demand.id, action: "extend" });
+  assert.equal((await touched()).getTime(), resumedAt.getTime(), "une reprise rejouée et une prolongation ne changent pas le repère");
+  assert.equal(await outcomeOf(old), "not_new_for_demand", "publiée avant la pause");
+  assert.equal(await outcomeOf(duringPause), "not_new_for_demand", "publiée pendant la pause, évaluée après la reprise");
+  const afterResume = await makeOffer(pool, seller.id, { price: 210_003 });
+  await event("offer.published", "offer", afterResume.id);
+  assert.equal(await outcomeOf(afterResume), "created", "publiée après la reprise");
+  await event("offer.updated", "offer", duringPause.id);
+  assert.equal(await outcomeOf(duringPause), "created", "modifiée après la reprise");
+});
+
 test("suivi expiré : le matching continue, aucune notification ; prolonger la rétablit", async () => {
   await resetAll();
   const { seller, buyer } = await people();

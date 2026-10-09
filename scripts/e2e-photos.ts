@@ -12,6 +12,7 @@
  * NOMA_MEDIA_DIR (le MÊME dossier que le serveur : le script y lit les fichiers stockés). Voir scripts/e2e-common.ts et PHOTOS.md.
  */
 import assert from "node:assert/strict";
+import http from "node:http";
 import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -169,6 +170,13 @@ async function main(): Promise<void> {
     const offer = offers.offers.find((entry) => entry.rawText.includes(title));
     assert.ok(offer && offer.status === "published", "l'annonce est publiée");
     const offerId = offer.id;
+    // Lot T3 : la liste « Mes annonces » du vendeur montre la vignette de couverture (jamais l'icône de remplacement alors qu'une photo existe).
+    const ownCover = vendor.getByTestId("photo-cover").first();
+    await ownCover.waitFor();
+    assert.match((await ownCover.getAttribute("src")) ?? "", new RegExp(`^/api/media/${UUID_TEXT}$`));
+    assert.deepEqual(await decodedSize(vendor, `[data-testid="photo-cover"]`), [200, 300]);
+    ok("liste « Mes annonces » : la carte de l'annonce porte la vignette de couverture (photo décodée, orientation conservée), plus l'icône");
+    await shot(vendor, "01b-mes-annonces-vignette");
 
     step("Page de l'annonce (vendeur) : gestion des photos");
     await vendor.goto(`${BASE}/vendeur/annonces/${offerId}`);
@@ -288,6 +296,13 @@ async function main(): Promise<void> {
     await buyer.waitForFunction(([src]) => document.querySelector('[data-testid="gallery-main"]')?.getAttribute("src") === src, [`/api/media/${secondId}`]);
     assert.deepEqual(await decodedSize(buyer, `[data-testid="gallery-main"]`), [320, 240]);
     ok("fiche : galerie de deux photos (la première en grand, vignettes dessous) ; la deuxième vignette affiche le PNG, décodé");
+    // Lot T3 : à côté du titre, la vignette est la COUVERTURE (jamais l'icône de remplacement alors qu'une photo existe).
+    const ficheCover = buyer.locator('[data-testid="offer-detail"] [data-testid="photo-cover"]');
+    await ficheCover.waitFor();
+    assert.equal(await ficheCover.getAttribute("src"), `/api/media/${firstId}`, "fiche : la vignette du titre est la couverture");
+    assert.deepEqual(await decodedSize(buyer, '[data-testid="offer-detail"] [data-testid="photo-cover"]'), [200, 300]);
+    assert.equal(await buyer.locator('[data-testid="offer-detail"] h1').locator("xpath=ancestor::div[contains(@class,'items-center')][1]").locator("svg.lucide-smartphone").count(), 0, "fiche : pas d'icône de téléphone à côté du titre");
+    ok("fiche : la vignette à côté du titre est la photo de couverture (plus l'icône de téléphone)");
     await shot(buyer, "04-fiche-galerie");
     const html = await buyer.content();
     assert.equal(/sha256|offer_id|owner/i.test(html), false, "la page ne contient ni empreinte ni identifiant de propriétaire");
@@ -370,6 +385,43 @@ async function main(): Promise<void> {
     const replay = await post(replayBytes);
     assert.deepEqual([created.status, replay.status], [201, 200]);
     ok("le même fichier envoyé deux fois : 201 puis 200 (rejeu idempotent, une seule photo)");
+
+    step("Corps lent : la réponse 408 demande la fermeture de la connexion (à travers le relais) et la connexion est fermée");
+    // Lot T3 : un corps annoncé de 100 000 octets dont 10 seulement arrivent. Après le délai de lecture (30 s), le serveur répond 408 ; la réponse du relais porte « Connection: close » et la connexion est
+    // réellement fermée (sinon le reste d'un corps abandonné serait lu comme le début de la requête suivante sur une connexion persistante).
+    const slowUrl = new URL(BASE);
+    const agent = new http.Agent({ keepAlive: true });
+    const slow = await new Promise<{ status: number; connection: string | undefined; closedWithinMs: number | null; message: string }>((resolve, reject) => {
+      const request = http.request(
+        {
+          host: slowUrl.hostname, port: Number(slowUrl.port || 80), method: "POST", path: `/api/offers/${apiOffer.offer.id}/photos`, agent,
+          headers: { origin: BASE, cookie: vendorApi.cookieHeader(), "content-type": "application/octet-stream", "content-length": "100000", connection: "keep-alive" },
+        },
+        (response) => {
+          const chunks: Buffer[] = [];
+          response.on("data", (chunk: Buffer) => chunks.push(chunk));
+          response.on("end", () => {
+            const answeredAt = Date.now();
+            const socket = response.socket;
+            const finish = (closedWithinMs: number | null) => resolve({ status: response.statusCode ?? 0, connection: response.headers.connection, closedWithinMs, message: Buffer.concat(chunks).toString("utf8") });
+            if (socket.destroyed) finish(0);
+            else {
+              const timer = setTimeout(() => finish(null), 3_000);
+              socket.once("close", () => { clearTimeout(timer); finish(Date.now() - answeredAt); });
+            }
+          });
+        },
+      );
+      request.on("error", reject);
+      request.write(Buffer.alloc(10, 1));
+      // (le corps n'est jamais terminé : on attend la réponse du serveur)
+    });
+    agent.destroy();
+    assert.equal(slow.status, 408, slow.message);
+    assert.match(slow.message, /request_timeout/);
+    assert.equal(slow.connection, "close", "la réponse porte « Connection: close »");
+    assert.notEqual(slow.closedWithinMs, null, "la connexion a été fermée après la 408 (au plus 3 s plus tard)");
+    ok(`corps annoncé de 100 000 octets dont 10 reçus : 408 « request_timeout », « Connection: close », connexion fermée ${slow.closedWithinMs} ms après la réponse`);
 
     step("Dossier de stockage : seulement des UUID, aucune donnée GPS");
     const names = readdirSync(MEDIA_DIR);

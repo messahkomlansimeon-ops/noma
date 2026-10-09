@@ -197,7 +197,7 @@ function MesAnnonces() {
               return (
                 <div key={offer.id} className="rounded-2xl border border-line bg-white p-3.5">
                   <div className="flex items-center gap-3">
-                    <Thumb art={artForCategory(offer.category)} className="size-14" iconClassName="size-7" />
+                    <Thumb art={artForCategory(offer.category)} className="size-14" iconClassName="size-7" photoId={offer.coverPhotoId} />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[15px] font-bold text-ink">
                         {recordTitle(offer)}

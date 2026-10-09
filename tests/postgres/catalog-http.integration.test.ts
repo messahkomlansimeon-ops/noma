@@ -300,6 +300,35 @@ if (!configuredUrl?.trim()) {
       ), demand.id)).status, 404);
     });
 
+    test("T3 : la liste « Mes annonces » porte la photo de couverture des seules annonces qui en ont une (celles du propriétaire) ; une lecture ou une création n'en portent pas", async () => {
+      const make = async (rawText: string): Promise<string> => {
+        const created = await handlers.offers.create(httpRequest("POST", "/api/offers", owner.cookie, { rawText }));
+        return (await created.json() as { offer: { id: string } }).offer.id;
+      };
+      const withPhotos = await make("annonce avec photos T3");
+      const withoutPhoto = await make("annonce sans photo T3");
+      const cover = randomUUID();
+      const second = randomUUID();
+      await pool.query(
+        "INSERT INTO offer_photos (id, offer_id, position, mime, bytes, width, height, sha256) VALUES ($1, $3, 0, 'image/png', 100, 300, 300, $4), ($2, $3, 1, 'image/png', 100, 300, 300, $5)",
+        [cover, second, withPhotos, "a".repeat(64), "b".repeat(64)],
+      );
+      const listed = await handlers.offers.list(httpRequest("GET", "/api/offers?limit=100&offset=0", owner.cookie));
+      assert.equal(listed.status, 200);
+      const offers = (await listed.json() as { offers: Array<{ id: string; coverPhotoId?: string }> }).offers;
+      assert.equal(offers.find((item) => item.id === withPhotos)?.coverPhotoId, cover, "la couverture est la photo de position 0");
+      const plain = offers.find((item) => item.id === withoutPhoto);
+      assert.ok(plain && !("coverPhotoId" in plain), "sans photo : pas de clé");
+      // Un autre compte ne voit ni l'annonce ni sa couverture dans sa liste.
+      const foreign = await handlers.offers.list(httpRequest("GET", "/api/offers?limit=100&offset=0", other.cookie));
+      assert.equal(JSON.stringify(await foreign.json()).includes(cover), false);
+      // La lecture d'une annonce et la liste des besoins ne portent pas de couverture.
+      const read = await handlers.offers.read(httpRequest("GET", `/api/offers/${withPhotos}`, owner.cookie), withPhotos);
+      assert.equal("coverPhotoId" in ((await read.json()) as { offer: object }).offer, false);
+      const demands = await handlers.demands.list(httpRequest("GET", "/api/demands?limit=100&offset=0", owner.cookie));
+      assert.equal(JSON.stringify(await demands.json()).includes("coverPhotoId"), false);
+    });
+
     test("conflit de version concurrent et archivage irréversible", async () => {
       const created = await handlers.offers.create(httpRequest(
         "POST",

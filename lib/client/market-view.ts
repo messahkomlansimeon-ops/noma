@@ -144,7 +144,10 @@ export interface ListingsView {
   published: boolean;
   /** Médiane des prix demandés : « 165 000 FCFA » ; `null` si non publié. */
   headline: string | null;
-  /** « La moitié des prix demandés est entre X et Y » ; `null` sans fourchette (moins de 10 vendeurs) ou non publié. */
+  /**
+   * « La moitié des prix demandés est entre X et Y » ; quand les deux bornes arrondies sont égales (largeur nulle), « La plupart des prix demandés sont autour de X » (jamais « entre X et X ») ;
+   * `null` sans fourchette (moins de 10 vendeurs) ou non publié.
+   */
   range: string | null;
   /** « Fourchette non affichée : il faut au moins 10 vendeurs. » quand la médiane est publiée sans fourchette ; sinon `null`. */
   rangeNote: string | null;
@@ -164,6 +167,12 @@ export interface ListingsView {
 
 const LISTINGS_TITLE = "Annonces en ligne";
 
+/** Fourchette (Q1, Q3) en phrase : « entre X et Y » ; si les bornes arrondies sont égales, une fourchette de largeur nulle ne s'écrit jamais « entre X et X » : « autour de X ». */
+export function rangeText(range: { q1: number; q3: number }): string {
+  if (range.q1 === range.q3) return `La plupart des prix demandés sont autour de ${priceText(range.q1)}`;
+  return `La moitié des prix demandés est entre ${priceText(range.q1)} et ${priceText(range.q3)}`;
+}
+
 export function listingsView(source: MarketListings): ListingsView {
   if (source.status === "insufficient") {
     return {
@@ -175,7 +184,7 @@ export function listingsView(source: MarketListings): ListingsView {
     title: LISTINGS_TITLE,
     published: true,
     headline: priceText(source.median),
-    range: source.range === null ? null : `La moitié des prix demandés est entre ${priceText(source.range.q1)} et ${priceText(source.range.q3)}`,
+    range: source.range === null ? null : rangeText(source.range),
     rangeNote: source.range === null ? MARKET_RANGE_MISSING_NOTE : null,
     countText: listingsAndSellers(source.count, source.sellers),
     excludedText: source.excluded === null ? null : `${countWithNoun(source.excluded, "annonces")} aux prix atypiques écartées`,

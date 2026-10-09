@@ -78,6 +78,17 @@ describe("abonnement", () => {
     assert.deepEqual([result.notices[0].code, result.notices[0].listingCount], ["listings_restored", 3]);
   });
 
+  test("T3 state : « toujours en pause » de l'avis « remises en ligne » est relu (entiers sûrs), absent = null ; ailleurs ou invalide = invalid_response", async () => {
+    const restoredNotice = (extra: Record<string, unknown>) => ({ id: UUID_A, code: "listings_restored", listingCount: 3, createdAt: NOW, readAt: null, ...extra });
+    const read = (notice: Record<string, unknown>) => client(() => ({ status: 200, body: state({ notices: [notice] }) })).api.subscription.state();
+    assert.deepEqual((await read(restoredNotice({ stillPaused: { planLimit: 2, byOwner: 1, userId: "x" } }))).notices[0].stillPaused, { planLimit: 2, byOwner: 1 });
+    assert.equal((await read(restoredNotice({}))).notices[0].stillPaused, null, "serveur plus ancien");
+    for (const stillPaused of [{ planLimit: -1, byOwner: 0 }, { planLimit: 1.5, byOwner: 0 }, { planLimit: 1 }, "2", { planLimit: 2 ** 60, byOwner: 0 }]) {
+      await assert.rejects(read(restoredNotice({ stillPaused })), (error: unknown) => error instanceof ApiError && error.code === "invalid_response", JSON.stringify(stillPaused));
+    }
+    await assert.rejects(read({ id: UUID_A, code: "listings_paused", listingCount: 3, stillPaused: { planLimit: 1, byOwner: 0 }, createdAt: NOW, readAt: null }), (error: unknown) => error instanceof ApiError && error.code === "invalid_response");
+  });
+
   test("state : réponse hors liste blanche = invalid_response (contrat, montant non sûr, droit inconnu, statut, avis incohérent, date illisible)", async () => {
     const bad = (override: Record<string, unknown>) => client(() => ({ status: 200, body: state(override) })).api.subscription.state();
     for (const override of [

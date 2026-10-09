@@ -56,6 +56,8 @@ export interface SubscriptionNoticeView {
   id: string;
   code: SubscriptionNoticeCode;
   listingCount: number | null;
+  /** Lot T3, avis « annonces remises en ligne » seulement : annonces TOUJOURS en pause à la lecture (par la limite du plan, ou par le vendeur lui-même) ; `null` sinon (ou serveur plus ancien). */
+  stillPaused?: { planLimit: number; byOwner: number } | null;
   createdAt: string;
   readAt: string | null;
 }
@@ -189,8 +191,13 @@ function parseNotice(status: number, value: unknown): SubscriptionNoticeView {
     || (value.code === "listings_paused" || value.code === "listings_restored") !== (value.listingCount !== null)
   ) bad(status);
   const notice = value as Json;
+  // Lot T3 : « toujours en pause » n'existe que pour l'avis « remises en ligne » ; absent chez un serveur plus ancien (null), sinon deux entiers sûrs positifs ou nuls.
+  const paused = notice.stillPaused;
+  if (!(paused === undefined || paused === null || (isObject(paused) && isAmount(paused.planLimit) && isAmount(paused.byOwner)))) bad(status);
+  if (paused !== undefined && paused !== null && notice.code !== "listings_restored") bad(status);
   return {
     id: notice.id as string, code: notice.code as SubscriptionNoticeCode, listingCount: notice.listingCount as number | null,
+    stillPaused: paused === undefined || paused === null ? null : { planLimit: (paused as Json).planLimit as number, byOwner: (paused as Json).byOwner as number },
     createdAt: notice.createdAt as string, readAt: notice.readAt as string | null,
   };
 }

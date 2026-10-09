@@ -29,6 +29,7 @@ import { buildDeliveryContent, buildNotificationPrice, buildNotificationTitle } 
  *    résultats sous les yeux ; seules les annonces NOUVELLES pour le besoin notifient ;
  *  - l'annonce (sa publication, ou sa dernière version publiée) n'est pas postérieure à l'activation du besoin (ou à sa dernière modification) ;
  *    exception : le balayage de réactivation d'un VENDEUR (`user.reactivated`) garde la règle de N1 ;
+ *    après la REPRISE d'un suivi (lot T3), « postérieure » s'entend de la dernière reprise : une annonce publiée ou modifiée avant elle ne notifie pas ;
  *  - le couple a DÉJÀ été une correspondance confirmée (réévaluation, recalcul en masse, changement de scoring) ou a déjà sa notification.
  * Au-delà de 20 notifications par besoin ou de 50 par utilisateur et par jour UTC : un seul résumé par besoin et par jour (item_count qui augmente remet read_at à NULL).
  * Lot RA1 : les notifications d'annonces d'AUTRES SITES (`new_external_match`, recherche active payante) comptent dans les MÊMES plafonds que les annonces internes.
@@ -153,15 +154,21 @@ export async function recordNewMatchNotification(executor: SqlExecutor, input: N
   if (input.jobType !== undefined && input.jobType !== null) {
     const sellerReactivation = sourceEventType === SELLER_REACTIVATION_EVENT_TYPE && input.jobType === OFFER_SIDE_JOB_TYPE;
     if (!sellerReactivation) {
-      const times = await client.query<{ offer_at: Date | null; demand_at: Date | null }>(
+      const times = await client.query<{ offer_at: Date | null; demand_at: Date | null; demand_touched_at: Date | null }>(
         `SELECT (SELECT max(occurred_at) FROM matching_outbox_events
                   WHERE aggregate_type = 'offer' AND aggregate_id = $1::uuid AND event_type = ANY($3::text[])) AS offer_at,
                 (SELECT max(occurred_at) FROM matching_outbox_events
-                  WHERE aggregate_type = 'demand' AND aggregate_id = $2::uuid AND event_type = ANY($4::text[])) AS demand_at`,
+                  WHERE aggregate_type = 'demand' AND aggregate_id = $2::uuid AND event_type = ANY($4::text[])) AS demand_at,
+                (SELECT updated_at FROM demands WHERE id = $2::uuid) AS demand_touched_at`,
         [input.offerId, input.demandId, [...OFFER_PUBLICATION_EVENT_TYPES], [...DEMAND_SIDE_EVENT_TYPES]],
       );
       const offerAt = times.rows[0]?.offer_at ?? null;
-      const demandAt = times.rows[0]?.demand_at ?? null;
+      let demandAt = times.rows[0]?.demand_at ?? null;
+      // Lot T3 (course de la pause) : la REPRISE du suivi (`applyTrackingAction`) avance `demands.updated_at` sans émettre d'événement. Quand cette date est postérieure au dernier
+      // événement du besoin, c'est la dernière reprise : seules les annonces publiées OU modifiées APRÈS elle notifient. Une annonce publiée pendant la pause, évaluée par le
+      // worker après la reprise, ne notifie jamais (sans cela, l'issue dépendait de la vitesse du worker).
+      const touchedAt = times.rows[0]?.demand_touched_at ?? null;
+      if (demandAt !== null && touchedAt !== null && touchedAt.getTime() > demandAt.getTime()) demandAt = touchedAt;
       if (offerAt === null || (demandAt !== null && offerAt.getTime() <= demandAt.getTime())) {
         await markSilentEvaluation(client, input.evaluationId, "not_new_for_demand");
         return { kind: "not_new_for_demand" };

@@ -18,6 +18,11 @@ export interface SubscriptionNotice {
   code: SubscriptionNoticeCode;
   /** `listings_paused` et `listings_restored` seulement : nombre d'annonces mises en pause, ou remises en ligne. */
   listingCount: number | null;
+  /**
+   * `listings_restored` seulement (lot T3) : ce qui est TOUJOURS en pause À LA LECTURE (annonces non archivées) : `planLimit` = mises en pause par la fin d'un abonnement et pas (ou pas encore) remises en ligne,
+   * faute de place dans la limite du plan ou parce qu'elles ne passent plus la règle de publication ; `byOwner` = mises en pause par le vendeur lui-même (jamais remises en ligne par le système). `null` pour les autres avis.
+   */
+  stillPaused: { planLimit: number; byOwner: number } | null;
   createdAt: Date;
   readAt: Date | null;
 }
@@ -54,8 +59,20 @@ export async function listSubscriptionNotices(executor: SqlExecutor, userId: str
     [user, SUBSCRIPTION_NOTICES_LIMIT],
   );
   const unread = await executor.query<{ n: number }>("SELECT count(*)::int AS n FROM subscription_notices WHERE user_id = $1::uuid AND read_at IS NULL", [user]);
+  // Lot T3 : l'avis « annonces remises en ligne » dit aussi combien d'annonces restent en pause et pourquoi (lecture unique, seulement si un tel avis est affiché).
+  let stillPaused: { planLimit: number; byOwner: number } | null = null;
+  if (rows.rows.some((row) => row.code === "listings_restored")) {
+    const paused = await executor.query<{ plan_limit: number; by_owner: number }>(
+      `SELECT count(*) FILTER (WHERE paused_reason = 'plan_limit')::int AS plan_limit, count(*) FILTER (WHERE paused_reason IS NULL)::int AS by_owner
+         FROM offers WHERE owner_id = $1::uuid AND status = 'paused' AND archived_at IS NULL`,
+      [user],
+    );
+    stillPaused = { planLimit: paused.rows[0].plan_limit, byOwner: paused.rows[0].by_owner };
+  }
   return {
-    notices: rows.rows.map((row) => ({ id: row.id, code: row.code, listingCount: row.listing_count, createdAt: row.created_at, readAt: row.read_at })),
+    notices: rows.rows.map((row) => ({
+      id: row.id, code: row.code, listingCount: row.listing_count, stillPaused: row.code === "listings_restored" ? stillPaused : null, createdAt: row.created_at, readAt: row.read_at,
+    })),
     unreadCount: unread.rows[0].n,
   };
 }

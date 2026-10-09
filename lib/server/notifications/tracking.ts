@@ -117,7 +117,12 @@ export async function applyTrackingAction(input: {
       updated = result.rows[0];
     } else {
       const result = await client.query<TrackingRow>(
-        `UPDATE demands SET notify_paused = $2::boolean WHERE id = $1::uuid
+        // Lot T3 : une REPRISE EFFECTIVE (le suivi était en pause) avance `updated_at` : repère « postérieur à la dernière reprise » de la règle de nouveauté (creation.ts). Rejouer une
+        // reprise sur un suivi déjà actif, ou une pause, ne change pas cette date. Aucun événement de matching, aucune version de contenu.
+        `UPDATE demands
+            SET notify_paused = $2::boolean,
+                updated_at = CASE WHEN $2::boolean = FALSE AND notify_paused = TRUE THEN clock_timestamp() ELSE updated_at END
+          WHERE id = $1::uuid
           RETURNING status, archived_at IS NOT NULL AS archived, notify_until, notify_paused`,
         [demandId, input.action === "pause"],
       );

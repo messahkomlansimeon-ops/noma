@@ -107,6 +107,19 @@ describe("comparaison et état", () => {
   assert.equal(noticeView(notice("listings_restored", 3), "UTC").title, "3 annonces remises en ligne");
   assert.match(noticeView(notice("listings_restored", 3), "UTC").detail, /les plus récentes d'abord, dans la limite de votre offre\. Celles que vous aviez mises en pause vous-même restent en pause\./);
   assert.equal(noticeView(notice("listings_restored", 3), "UTC").unread, true);
+  // Lot T3 : l'avis dit combien d'annonces sont remises en ligne, combien RESTENT en pause et pourquoi.
+  const restored = (stillPaused: { planLimit: number; byOwner: number } | null, max?: number) => noticeView({ ...notice("listings_restored", 3), stillPaused }, "UTC", max).detail;
+  const both = restored({ planLimit: 2, byOwner: 1 }, 12);
+  assert.match(both, /Remises en ligne : 3\./);
+  assert.match(both, /Toujours en pause : 2 annonces, faute de place dans la limite de votre offre \(votre offre permet 12 annonces en ligne\) ou parce que leur contenu ne respecte plus les règles de publication\./);
+  assert.match(both, /Mettez-en une autre en pause pour en remettre une en ligne\./);
+  assert.match(both, /Toujours en pause : 1 annonce que vous aviez mise en pause vous-même\./);
+  assert.match(restored({ planLimit: 1, byOwner: 0 }), /Toujours en pause : 1 annonce, faute de place dans la limite de votre offre ou parce que son contenu ne respecte plus/);
+  assert.equal(/vous-même/.test(restored({ planLimit: 1, byOwner: 0 })), false, "aucune annonce du vendeur en pause : pas de phrase sur elles");
+  assert.match(restored({ planLimit: 0, byOwner: 2 }), /Toujours en pause : 2 annonces que vous aviez mises en pause vous-même\./);
+  assert.equal(/faute de place/.test(restored({ planLimit: 0, byOwner: 2 })), false);
+  assert.match(restored({ planLimit: 0, byOwner: 0 }), /Aucune annonce ne reste en pause\./);
+  assert.equal(/Remises en ligne|Toujours en pause/.test(restored(null)), false, "serveur plus ancien : la phrase d'avant, sans nombre inventé");
   assert.equal(noticeView(notice("listings_paused", 5), "UTC").unread, true);
     assert.equal(noticeView(notice("listings_paused", 5, NOW), "UTC").unread, false);
     assert.equal(noticeView(notice("listings_paused", 5), "UTC").dateText, "06/10/2026 à 10:00");

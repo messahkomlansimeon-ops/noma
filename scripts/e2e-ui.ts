@@ -1974,7 +1974,9 @@ async function main(): Promise<void> {
     ok("« Mettre en pause » : « Suivi en pause », bouton « Reprendre », et la phrase « Vos résultats restent à jour, mais vous ne recevez plus de notification pour ce besoin. »");
     await shot(nPage, "54-suivi-en-pause");
     const nSecond = await nPublish("A2", "55 000");
-    await refreshUntil(nPage, "la deuxième annonce dans les résultats du besoin (le matching continue pendant la pause)", async () => (await nPage.getByTestId("match-card").count()) >= 3);
+    // Lot T3 : on attend CETTE annonce (son lien vers la fiche, par identifiant), pas un nombre de cartes : un nombre peut être atteint avant que le worker ait évalué l'annonce de la pause.
+    await refreshUntil(nPage, "l'annonce de la pause (A2, 55 000 FCFA) dans les résultats du besoin (le matching continue pendant la pause)", async () => (await nPage.locator(`[data-testid="match-card"] a[href$="/offres/${nSecond.id}"]`).count()) === 1);
+    assert.equal(await nPage.getByTestId("match-card").count(), 3, "les trois annonces (A1, A1b et A2) sont dans les résultats");
     ok("pendant la pause, la nouvelle annonce apparaît dans les résultats : le matching continue");
     await sleep(2_000);
     await nPage.goto(`${BASE}/alertes`);

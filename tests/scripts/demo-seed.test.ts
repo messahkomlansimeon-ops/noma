@@ -391,6 +391,8 @@ describe("historique de prix synthétique (pur, déterministe)", () => {
         assert.equal(stats.listings.comparedTo.scope, "exact", `${day} ${group.key}`);
         if (group.listingSlots === DEMO_MARKET_POPULAR_SLOTS) {
           assert.notEqual(stats.listings.range, null, `${day} ${group.key} : fourchette`);
+          // Lot T3 : les prix de démonstration sont assez étalés pour que la fourchette des produits phares ait une VRAIE largeur (jamais « entre X et X »), quel que soit le jour de lancement.
+          if (stats.listings.range !== null) assert.ok(stats.listings.range.q1 < stats.listings.range.q3, `${day} ${group.key} : fourchette de largeur non nulle (${stats.listings.range.q1} / ${stats.listings.range.q3})`);
           assert.ok(stats.listings.trend.every((point) => point.median !== null), `${day} ${group.key} : 12 points de tendance`);
         } else {
           assert.ok(stats.listings.trend.every((point) => point.median === null), `${day} ${group.key} : pas de tendance pour un produit secondaire`);

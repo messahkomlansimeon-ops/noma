@@ -8,7 +8,7 @@
  * commande sont fictifs (aucune annonce ni commande de la base ne leur correspond : un relevé est un fait historique, sans clé étrangère).
  *
  * Cohérence : le prix demandé d'un produit baisse lentement avec le temps (−0,08 % par jour, de +7 % il y a 90 jours à 0 % le jour de référence), chaque annonce fictive est en ligne
- * 30 jours sur 36 et baisse son prix de 5 % après 18 jours ; les ventes se concluent 5 à 10 % sous le prix demandé. Les vendeurs et les acheteurs sont tournés pour que sept jours de
+ * 30 jours sur 36 et baisse son prix de 5 % après 18 jours ; les ventes se concluent 5 à 15 % sous le prix de base (lot T3 : 10 à 15 % depuis que les prix demandés sont étalés de ±20 %, pour rester sous le prix demandé médian). Les vendeurs et les acheteurs sont tournés pour que sept jours de
  * ventes consécutifs aient 7 vendeurs et 7 acheteurs distincts (des acteurs variés pour le nombre de ventes confirmées de l'administration).
  *
  * Lot H1-ter : l'unité statistique est le VENDEUR (HISTORIQUE-PRIX.md), un point de tendance exige 20 vendeurs distincts dans la semaine. Les annonces fictives sont donc réparties entre
@@ -193,7 +193,8 @@ export function buildDemoMarketHistory(today: string, groups: readonly DemoMarke
         const age = shifted - cycle * DEMO_MARKET_CYCLE_DAYS;
         if (age >= DEMO_MARKET_ONLINE_DAYS) continue;
         const startIndex = dayIndex - age;
-        const asking = basePriceOn(group, startIndex) * (0.94 + 0.12 * unit(group.key, "listing-price", slot, cycle));
+        // Lot T3 : prix étalés de ±20 % autour de la base (±6 % au lot H1) : les quartiles arrondis en relatif (5 % de la médiane) restaient à 0 dans 3 cas sur 4, d'où une fourchette « entre X et X » ; à ±20 % les produits phares ont toujours une fourchette de largeur non nulle.
+        const asking = basePriceOn(group, startIndex) * (0.80 + 0.40 * unit(group.key, "listing-price", slot, cycle));
         const price = roundTo500(age >= DEMO_MARKET_MARKDOWN_AFTER_DAYS ? asking * 0.95 : asking);
         rows.push({
           source: "listing",
@@ -207,7 +208,7 @@ export function buildDemoMarketHistory(today: string, groups: readonly DemoMarke
       }
       // Ventes fictives : une vente ce jour-là avec la probabilité du produit ; vendeurs et acheteurs tournés.
       if (unit(group.key, "sale-day", dayIndex) < group.salesPerDay) {
-        const sold = basePriceOn(group, dayIndex) * (0.9 + 0.1 * unit(group.key, "sale-price", dayIndex));
+        const sold = basePriceOn(group, dayIndex) * (0.85 + 0.1 * unit(group.key, "sale-price", dayIndex));
         rows.push({
           source: "sale",
           referenceId: demoMarketReference(group.key, "sale", dayIndex),

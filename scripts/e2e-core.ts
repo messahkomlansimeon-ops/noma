@@ -62,6 +62,7 @@ import {
   pollUntil,
   seedExamplesByAdministration,
   uniquePhone,
+  waitForSettledValue,
   walletCheckByAdministration,
 } from "./e2e-common";
 
@@ -1682,7 +1683,18 @@ async function main(): Promise<void> {
     try {
       const statuses = async () => (await db.query<{ status: string; reason: string | null; n: number }>(
         "SELECT status, reason, count(*)::int AS n FROM notification_deliveries WHERE demand_id = $1 GROUP BY status, reason ORDER BY status, reason", [nDemand.id])).rows;
-      const before = await statuses();
+      // Lot T3 : l'état de départ doit être STABLE. Le worker écrit encore, de façon asynchrone, des lignes d'envoi des étapes précédentes (la notification de la dernière annonce pour CE besoin n'est
+      // pas attendue plus haut) : un instantané pris trop tôt voyait un envoi « en attente » de moins que ce que la satisfaction annule (attendu 1, obtenu 2). On attend donc qu'il n'y ait plus ni événement
+      // à projeter, ni tâche d'évaluation en attente ou en cours, et que l'instantané des envois soit identique à deux lectures séparées de 2 secondes. Ce qui est vérifié après ne change pas.
+      const settled = async (): Promise<boolean> => Number((await db.query(
+        "SELECT (SELECT count(*) FROM matching_outbox_events WHERE dispatch_status = 'pending') + (SELECT count(*) FROM matching_jobs WHERE status = 'running' OR (status IN ('pending', 'failed') AND scheduled_at <= clock_timestamp())) AS n")).rows[0].n) === 0;
+      const before = await waitForSettledValue({
+        label: "l'état des envois du besoin est stable (plus d'événement ni de tâche d'évaluation en cours, deux lectures identiques)",
+        read: statuses,
+        quiet: settled,
+        timeoutMs: WORKER_TIMEOUT_MS,
+        hint: "le worker de matching a-t-il fini ses tâches sur la même base ?",
+      });
       const pendingBefore = before.filter((row) => row.status === "pending").reduce((sum, row) => sum + row.n, 0);
       await nBuyerApi.demands.satisfy(nDemand.id, (await nBuyerApi.demands.get(nDemand.id)).contentVersion);
       const after = await statuses();

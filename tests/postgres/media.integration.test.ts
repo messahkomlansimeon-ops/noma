@@ -445,6 +445,8 @@ test("corps lent : un octet toutes les 40 ms est coupé au délai total (408) sa
   const elapsed = performance.now() - started;
   assert.equal(response.status, 408);
   assert.deepEqual((response.json as Json).error, { code: "request_timeout", message: PHOTO_ERROR_MESSAGES.request_timeout });
+  // Lot T3 : après une 408 le serveur demande la FERMETURE de la connexion (le reste du corps abandonné ne doit pas être lu comme la requête suivante) ; aucun autre refus ne le fait.
+  assert.equal(response.headers.get("connection"), "close");
   assert.ok(elapsed >= 70 && elapsed < 2_000, `coupé au délai : ${elapsed.toFixed(0)} ms`);
   assert.ok(pulled < 20, `le flux n'a pas été lu longtemps (${pulled} octets)`);
   assert.equal(await count(env.pool, "offer_photos"), 0);
@@ -458,7 +460,9 @@ test("corps lent : un octet toutes les 40 ms est coupé au délai total (408) sa
   assert.equal(await count(env.pool, "offer_photo_uploads"), 6);
   // Après 30 corps lents, le compte est limité (429) même pour un bon fichier : la place ne se récupère pas par un 408.
   for (let index = 0; index < PHOTO_UPLOADS_PER_HOUR - 6; index += 1) assert.equal((await send(drip())).status, 408);
-  assert.equal((await reply(await upload(market.offer.id, distinctPng()))).status, 429);
+  const limited = await reply(await upload(market.offer.id, distinctPng()));
+  assert.equal(limited.status, 429);
+  assert.equal(limited.headers.get("connection"), null, "T3 : seule la 408 demande la fermeture de la connexion");
   // Un corps rapide n'est pas touché par le délai ; le défaut (30 s) est vérifié par les essais du lecteur de corps.
   await env.pool.query("TRUNCATE offer_photo_uploads");
   assert.equal((await reply(await slow.photos.upload(binaryRequest("POST", `/api/offers/${market.offer.id}/photos`, { cookie: market.seller.cookie, body: distinctPng() }), market.offer.id))).status, 201);

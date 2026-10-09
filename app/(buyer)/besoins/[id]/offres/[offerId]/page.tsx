@@ -23,6 +23,7 @@ import {
 } from "@/lib/client/api";
 import { artForCategory } from "@/lib/client/catalog-view";
 import { marketQueryFromProduct } from "@/lib/client/market-view";
+import { coverPhotoIdOf } from "@/lib/client/photos-view";
 import {
   CONTACT_BUTTON_LABEL,
   CONTACT_HINT,
@@ -121,7 +122,7 @@ function Fiche({ demandId, offerId }: { demandId: string; offerId: string }) {
       {view.sponsoredBadge ? <SponsoredNotice badge={view.sponsoredBadge} notice={view.sponsoredNotice} /> : null}
       <PhotoGallery photos={detail.details.photos ?? []} title={view.title} />
       <div className="flex items-center gap-3">
-        <Thumb art={artForCategory(detail.item.candidate.category)} className="size-20" iconClassName="size-10" />
+        <Thumb art={artForCategory(detail.item.candidate.category)} className="size-20" iconClassName="size-10" photoId={coverPhotoIdOf(detail.details.photos) ?? detail.item.coverPhotoId ?? null} />
         <div className="min-w-0 flex-1">
           <h1 data-testid="offer-title" className="font-display text-[22px] font-extrabold leading-tight text-ink">
             {view.title}
