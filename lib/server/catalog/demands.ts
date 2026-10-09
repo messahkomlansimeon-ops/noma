@@ -18,6 +18,7 @@ import {
   mapDemand,
   type DemandRow,
 } from "./shared";
+import { reconcilePlacesAfterDemandChange } from "../active-search/places-run";
 import { invalidateMatchesForDemand } from "../matching/persistence";
 import { recordDemandMutation } from "../matching/outbox";
 import type {
@@ -119,6 +120,13 @@ export async function listDemandsByOwner(
   return result.rows.map(mapDemand);
 }
 
+/** Le changement touche-t-il ce qui décide de l'accélération d'une option : le statut ou un composant de la clé produit (catégorie, marque, modèle, variante, lieu) ? */
+function changesAcceleration(before: DemandRow, after: DemandRow): boolean {
+  const left = before as unknown as Record<string, unknown>;
+  const right = after as unknown as Record<string, unknown>;
+  return ["status", "category", "brand", "model", "variant", "location_text"].some((column) => left[column] !== right[column]);
+}
+
 export async function updateDemand(
   input: UpdateDemandInput,
   db: SqlExecutor = getPostgresPool(),
@@ -183,6 +191,9 @@ export async function updateDemand(
     if (result.rowCount) {
       await invalidateMatchesForDemand(tx, id, "demand_updated");
       await recordDemandMutation(tx, mapDemand(result.rows[0]), mapDemand(previous));
+      // Lot RA1-ter : un changement de CLÉ produit ou de statut peut faire perdre sa place à l'option d'un besoin, ou la lui faire demander (réactivation, nouveau modèle) : la fonction unique
+      // d'attribution des places décide, sous le verrou global d'admission, jamais au-delà de la capacité. Elle ne fait jamais échouer la modification.
+      if (changesAcceleration(previous, result.rows[0])) await reconcilePlacesAfterDemandChange(tx, id);
       return mapDemand(result.rows[0]);
     }
     return mapDemand(previous);
@@ -266,6 +277,8 @@ async function transitionDemandStatus(
     const reason = targetStatus === "satisfied" ? "demand_satisfied" : "demand_updated";
     await invalidateMatchesForDemand(client, id, reason);
     await recordDemandMutation(client, mapDemand(updateResult.rows[0]), mapDemand(row));
+    // Lot RA1-ter : une réactivation (« satisfait » → actif) redemande une place de collecte accélérée à l'option encore en vigueur ; « satisfait » la libère (voir updateDemand).
+    await reconcilePlacesAfterDemandChange(client, id);
     return mapDemand(updateResult.rows[0]);
   }, targetPool);
 }

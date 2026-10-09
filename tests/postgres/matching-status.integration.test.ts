@@ -19,7 +19,7 @@ before(async () => {
   admin = opened.pool;
   await admin.query(`CREATE SCHEMA ${quoted}`);
   pool = await openVerifiedIsolatedPool(opened.target, schema);
-  assert.equal((await runMigrations(pool)).applied.length, 28);
+  assert.equal((await runMigrations(pool)).applied.length, 29);
 });
 
 after(async () => {
@@ -99,7 +99,7 @@ test("base saine : code 0, aucun avertissement, compteurs exacts (sortie lisible
 
   const human = await statusScript();
   assert.equal(human.code, 0, human.output);
-  assert.match(human.output, /Schéma : prêt \(28 migration\(s\), dernière 0028_active_search\)/);
+  assert.match(human.output, /Schéma : prêt \(29 migration\(s\), dernière 0029_active_search_places\)/);
   assert.match(human.output, /Événements pending : catalog\.bootstrap_sync=1/);
   assert.match(human.output, /Événements projected : catalog\.bootstrap_sync=1/);
   assert.match(human.output, /Avertissements : aucun/);
@@ -107,7 +107,7 @@ test("base saine : code 0, aucun avertissement, compteurs exacts (sortie lisible
   const { code, report } = await statusJson();
   assert.equal(code, 0);
   assert.equal(report.schemaReady, true);
-  assert.deepEqual(report.migrations, { count: 28, latest: "0028_active_search" });
+  assert.deepEqual(report.migrations, { count: 29, latest: "0029_active_search_places" });
   assert.deepEqual(report.outbox.pendingByType, { "catalog.bootstrap_sync": 1 });
   assert.deepEqual(report.outbox.projectedByType, { "catalog.bootstrap_sync": 1 });
   assert.equal(report.outbox.oldestPending?.eventType, "catalog.bootstrap_sync");
@@ -264,7 +264,7 @@ test("boost_settings_missing : sans ligne « default » → code 2 et message fi
       const bare = await statusJson();
       assert.equal(bare.code, 0);
       assert.deepEqual(bare.report.warnings, []);
-      assert.deepEqual(bare.report.migrations, { count: 27, latest: "0028_active_search" });
+      assert.deepEqual(bare.report.migrations, { count: 28, latest: "0029_active_search_places" });
     } finally {
       await pool.query("INSERT INTO noma_schema_migrations (version, checksum) VALUES ($1, $2)", [migration.version, migration.checksum]);
     }
@@ -308,7 +308,7 @@ test("boost_pricing_missing : sans ligne « default » tarifaire → code 2 et m
       const bare = await statusJson();
       assert.equal(bare.code, 0);
       assert.deepEqual(bare.report.warnings, []);
-      assert.deepEqual(bare.report.migrations, { count: 27, latest: "0028_active_search" });
+      assert.deepEqual(bare.report.migrations, { count: 28, latest: "0029_active_search_places" });
     } finally {
       await pool.query("INSERT INTO noma_schema_migrations (version, checksum) VALUES ($1, $2)", [migration.version, migration.checksum]);
     }

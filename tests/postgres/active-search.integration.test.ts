@@ -101,9 +101,10 @@ test("migration 0028 : le compte système, les tables, les déclencheurs et les 
   const { runMigrations } = await import("../../lib/server/postgres/migrations");
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.at(-1), "0028_active_search");
+  assert.equal(rerun.skipped.at(-1), "0029_active_search_places");
+  assert.ok(rerun.skipped.includes("0028_active_search"));
   assert.equal(await scalar(pool, "SELECT count(*)::int AS n FROM wallet_accounts WHERE kind = 'active_search_revenue'"), 1);
-  for (const table of ["active_search_purchases", "active_search_state", "active_search_seen"]) {
+  for (const table of ["active_search_purchases", "active_search_state", "active_search_seen", "active_search_places"]) {
     assert.equal(await scalar(pool, "SELECT to_regclass($1) IS NOT NULL AS n", [table]), true, table);
   }
   const triggers = (await pool.query<{ tgname: string }>(
@@ -922,19 +923,22 @@ test("M4 / P2-e : rejeu de la clé d'un achat REMBOURSÉ → « option rembours�
 
 test("A5 : ADMISSION — au quota par défaut (200 par jour et par source) au plus 4 produits accélérés à la fois ; une clé déjà engagée (autre acheteur, prolongation) n'ajoute rien ; refus sans écriture ; sous concurrence, jamais plus que la capacité", async () => {
   const t0 = at(new Date(), 400);
+  // Plafond par utilisateur (RA1-ter) : deux produits distincts au plus par acheteur, donc quatre produits = deux acheteurs.
   const buyer = await makeDemand(pool, {});
-  await fund(pool, buyer.ownerId, 100_000);
+  const second = await makeDemand(pool, {});
+  const third = await makeDemand(pool, {});
+  for (const owner of [buyer.ownerId, second.ownerId, third.ownerId]) await fund(pool, owner, 100_000);
   const make = async (model: string, owner = buyer.ownerId): Promise<World> => {
     const demand = await makeDemand(pool, { ownerId: owner, brand: "Google", model });
     return { userId: owner, demandId: demand.id, t0 };
   };
-  const options = [await make("Pixel 1"), await make("Pixel 2"), await make("Pixel 3"), await make("Pixel 4"), await make("Pixel 5"), await make("Pixel 6")];
+  const options = [await make("Pixel 1"), await make("Pixel 2"), await make("Pixel 3", second.ownerId), await make("Pixel 4", second.ownerId), await make("Pixel 5", third.ownerId), await make("Pixel 6", third.ownerId)];
   for (const target of options.slice(0, 4)) assert.equal(await code(buy(target)), "ok");
   const before = await snapshot();
   assert.equal(await code(buy(options[4])), "capacity", "5e produit distinct : capacité atteinte");
   assert.equal(await code(buy(options[5])), "capacity");
   assert.deepEqual(await snapshot(), before, "le refus n'écrit rien et ne débite rien");
-  const state = await readActiveSearchState({ env: FAKE_ENV, executor: pool, ownerId: buyer.ownerId, demandId: options[4].demandId, now: t0 });
+  const state = await readActiveSearchState({ env: FAKE_ENV, executor: pool, ownerId: third.ownerId, demandId: options[4].demandId, now: t0 });
   assert.deepEqual([state.canPurchase, state.blockedReason], [false, "capacity"]);
   // Prolonger une option déjà engagée : toujours possible.
   assert.equal((await buy(options[0], { now: at(t0, 5) })).kind, "extension");
@@ -945,18 +949,23 @@ test("A5 : ADMISSION — au quota par défaut (200 par jour et par source) au pl
   // Quota d'une source plus petit : la capacité suit le plus petit quota des sources actives (100 → 2 surveillances), sans rien casser de l'existant.
   await withSources("UPDATE external_sources SET daily_quota = 100 WHERE code = 'demo_a'", "UPDATE external_sources SET daily_quota = 200", async () => {
     const late = at(new Date(), 800);
-    const lateOptions = [await make("Galaxy A1"), await make("Galaxy A2"), await make("Galaxy A3")];
+    const lateOptions = [await make("Galaxy A1"), await make("Galaxy A2", second.ownerId), await make("Galaxy A3", third.ownerId)];
     const outcomes: string[] = [];
     for (const target of lateOptions) outcomes.push(await code(buy({ ...target, t0: late })));
     assert.deepEqual(outcomes, ["ok", "ok", "capacity"], "quota 100 → 50 requêtes accélérées → 2 surveillances de 24");
   });
-  // Concurrence (verrou global d'admission) : 6 activations simultanées de produits distincts ne dépassent jamais 4.
+  // Concurrence (verrou global d'admission) : 6 activations simultanées de produits distincts (six acheteurs) ne dépassent jamais 4.
   const crowd = at(new Date(), 1_200);
   const racers: World[] = [];
-  for (let index = 1; index <= 6; index += 1) racers.push({ ...(await make(`Redmi ${index}`)), t0: crowd });
+  for (let index = 1; index <= 6; index += 1) {
+    const racer = await makeDemand(pool, {});
+    await fund(pool, racer.ownerId, 10_000);
+    racers.push({ ...(await make(`Redmi ${index}`, racer.ownerId)), t0: crowd });
+  }
   const raced = await Promise.all(racers.map((target) => code(buy(target, { pool: wide }))));
   assert.equal(raced.filter((entry) => entry === "ok").length, 4, raced.join(","));
   assert.equal(raced.filter((entry) => entry === "capacity").length, 2, raced.join(","));
+  assert.equal(await scalar(pool, "SELECT count(*)::int AS n FROM active_search_places"), 4, "jamais plus de places que la capacité");
   await assertWalletGreen(pool, "après les refus de capacité");
 });
 

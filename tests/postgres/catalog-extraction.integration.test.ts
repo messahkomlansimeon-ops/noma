@@ -103,6 +103,7 @@ if (!configuredUrl?.trim()) {
         "0026_sublymus_payments",
         "0027_missions",
         "0028_active_search",
+        "0029_active_search_places",
       ]);
     });
 

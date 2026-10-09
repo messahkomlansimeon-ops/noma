@@ -8,6 +8,7 @@ import { TRACKING_MAX_DAYS } from "../notifications/config";
 import { WALLET_MAX_SAFE_AMOUNT } from "../wallet/config";
 import { INSTANT_TEXT_SQL } from "../subscriptions/time";
 import { acceleratedCapacity, capacityAllows, externalCollectionAvailable, type Environment } from "./availability";
+import { userCapAllows, userKeysInForce } from "./places";
 import { ELIGIBILITY_COLUMNS, demandIneligibility, eligibilityKeyOf, type DemandEligibilityInput, type DemandIneligibility } from "./eligibility";
 import {
   ACTIVE_SEARCH_DURATION_DAYS,
@@ -57,7 +58,7 @@ export function computeCoverage(periods: readonly PeriodRow[], now: Date): Cover
   return { current, chainEnd: end };
 }
 
-export type ExtendBlockedReason = Exclude<DemandIneligibility, "mission_carrier"> | "capacity" | "max_horizon";
+export type ExtendBlockedReason = Exclude<DemandIneligibility, "mission_carrier"> | "user_cap" | "capacity" | "max_horizon";
 
 export interface ActiveSearchState {
   demandId: string;
@@ -69,6 +70,11 @@ export interface ActiveSearchState {
    * la réactivation du besoin la reprend telle quelle, que le worker soit passé ou non. Seul l'archivage arrête l'option.
    */
   suspended: boolean;
+  /**
+   * Option en vigueur MAINTENANT mais SANS place de collecte accélérée (lot RA1-ter : « accélération en attente de place »). Les notifications des annonces d'autres sites restent actives sur la
+   * collecte ordinaire ; la surveillance du produit passera à la fréquence rapide dès qu'une place se libère (plus ancien achat d'abord). Aucun remboursement automatique.
+   */
+  accelerationPending: boolean;
   startsAt: Date | null;
   /** Fin de la chaîne en vigueur (la dernière période payée qui s'enchaîne). */
   endsAt: Date | null;
@@ -90,10 +96,14 @@ export interface ActiveSearchState {
   readAt: Date;
 }
 
-/** Les tables de la migration 0028 existent-elles ? Une base pas encore migrée n'est jamais une erreur : rien n'est en vigueur. */
+/**
+ * Les tables des migrations 0028 et 0029 (places de collecte accélérée) existent-elles ? Une base pas encore migrée n'est jamais une erreur : rien n'est en vigueur. La migration s'applique
+ * AVANT le code qui la lit ; une base à 0028 seulement est traitée comme une base sans la recherche active (option indisponible, étape ignorée) jusqu'à l'application de la 0029.
+ */
 export async function activeSearchSchemaPresent(executor: SqlExecutor): Promise<boolean> {
   const result = await executor.query<{ present: boolean }>(
-    "SELECT (to_regclass('active_search_purchases') IS NOT NULL AND to_regclass('active_search_state') IS NOT NULL AND to_regclass('active_search_seen') IS NOT NULL) AS present",
+    `SELECT (to_regclass('active_search_purchases') IS NOT NULL AND to_regclass('active_search_state') IS NOT NULL AND to_regclass('active_search_seen') IS NOT NULL
+             AND to_regclass('active_search_places') IS NOT NULL) AS present`,
   );
   return result.rows[0]?.present === true;
 }
@@ -133,7 +143,7 @@ function jsonInteger(value: string | number | bigint): number {
 /**
  * État de la recherche active d'un besoin DU propriétaire (un besoin d'autrui ou inconnu : la même erreur « introuvable »). Lecture seule ; n'écrit rien. `env` : l'environnement qui dit
  * si la collecte externe peut fournir des annonces (défaut : `process.env`). Raison d'un achat impossible (`blockedReason`), dans l'ordre : éligibilité du besoin (`demand_not_active`,
- * `no_product_key`, `unavailable`, une seule fonction pour l'achat et l'écran ; le besoin porteur d'une mission est « introuvable » comme celui d'autrui), capacité de collecte accélérée (`capacity`), horizon de 180 jours (`max_horizon`).
+ * `no_product_key`, `unavailable`, une seule fonction pour l'achat et l'écran ; le besoin porteur d'une mission est « introuvable » comme celui d'autrui), plafond par utilisateur (`user_cap`, lot RA1-ter), capacité de collecte accélérée (`capacity`, pour une nouvelle activation), horizon de 180 jours (`max_horizon`).
  */
 export async function readActiveSearchState(input: { executor: SqlExecutor; ownerId: string; demandId: string; now?: Date; env?: Environment }): Promise<ActiveSearchState> {
   const ownerId = requireUuid(input.ownerId, "ownerId").toLowerCase();
@@ -163,12 +173,19 @@ export async function readActiveSearchState(input: { executor: SqlExecutor; owne
   const base = coverage.chainEnd === null ? now : coverage.chainEnd.endsAt;
   const nextEndsAt = new Date(base.getTime() + ACTIVE_SEARCH_DURATION_DAYS * DAY_MS);
   let blockedReason: ExtendBlockedReason | null = null;
+  let accelerationPending = false;
   // Sans la migration 0028, la collecte n'est jamais « disponible » : `unavailable` (jamais une erreur).
   if (ineligible !== null) blockedReason = ineligible;
   else {
     const key = eligibilityKeyOf(row);
+    const keyText = key === null ? null : productKeyString(key);
     const capacity = await acceleratedCapacity(input.executor, input.env ?? process.env, now);
-    if (key !== null && !capacityAllows(capacity, productKeyString(key))) blockedReason = "capacity";
+    // Option en vigueur sans place : ses notifications restent actives (collecte ordinaire), seule l'accélération attend.
+    accelerationPending = demandActive && coverage.current !== null && keyText !== null && !capacity.keys.includes(keyText);
+    // Plafond par utilisateur (lot RA1-ter), à l'achat comme à la prolongation : la MÊME fonction que l'achat.
+    if (keyText !== null && !userCapAllows(await userKeysInForce(input.executor, ownerId, now), keyText)) blockedReason = "user_cap";
+    // Capacité : seule une NOUVELLE activation (aucune option en vigueur) a besoin d'une place libre ; une prolongation n'ajoute rien.
+    else if (coverage.chainEnd === null && keyText !== null && !capacityAllows(capacity, keyText)) blockedReason = "capacity";
     else if (nextEndsAt.getTime() > maxEndsAt.getTime()) blockedReason = "max_horizon";
   }
   const chainEnd = coverage.chainEnd;
@@ -177,6 +194,7 @@ export async function readActiveSearchState(input: { executor: SqlExecutor; owne
     demandStatus: row.status,
     active: demandActive && coverage.current !== null,
     suspended: demandSuspended && coverage.current !== null,
+    accelerationPending,
     startsAt: coverage.current === null ? null : coverage.current.startsAt,
     endsAt: chainEnd === null ? null : chainEnd.endsAt,
     remainingDays: chainEnd === null ? null : Math.max(0, Math.ceil((chainEnd.endsAt.getTime() - now.getTime()) / DAY_MS)),

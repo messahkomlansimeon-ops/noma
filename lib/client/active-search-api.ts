@@ -10,8 +10,8 @@ import { API_ABORTED, API_INVALID_ARGUMENT, API_INVALID_ID, API_INVALID_RESPONSE
 
 export const ACTIVE_SEARCH_CONTRACT_VERSION = "active-search/v1";
 
-export type ActiveSearchBlockedReason = "demand_not_active" | "no_product_key" | "unavailable" | "capacity" | "max_horizon";
-const BLOCKED_REASONS: readonly string[] = ["demand_not_active", "no_product_key", "unavailable", "capacity", "max_horizon"];
+export type ActiveSearchBlockedReason = "demand_not_active" | "no_product_key" | "unavailable" | "user_cap" | "capacity" | "max_horizon";
+const BLOCKED_REASONS: readonly string[] = ["demand_not_active", "no_product_key", "unavailable", "user_cap", "capacity", "max_horizon"];
 export type ActiveSearchPurchaseKind = "activation" | "extension";
 
 export interface ActiveSearchState {
@@ -24,6 +24,11 @@ export interface ActiveSearchState {
   active: boolean;
   /** L'option est SUSPENDUE : le besoin est « satisfait » alors qu'une période court encore (rien n'est notifié ; la réactivation du besoin la reprend). */
   suspended: boolean;
+  /**
+   * L'option est en vigueur mais SANS place de collecte accélérée (lot RA1-ter) : les notifications des annonces d'autres sites restent actives sur la collecte ordinaire, et la consultation
+   * rapide démarre dès qu'une place se libère. Aucun remboursement automatique.
+   */
+  accelerationPending: boolean;
   startsAt: string | null;
   /** Fin de la dernière période payée (la chaîne en vigueur). */
   endsAt: string | null;
@@ -84,6 +89,7 @@ function parseState(status: number, value: unknown): ActiveSearchState {
   if (
     !isObject(value) || value.contractVersion !== ACTIVE_SEARCH_CONTRACT_VERSION || typeof value.priceProvisional !== "boolean" || value.paidCreditsOnly !== true || value.autoRenew !== false
     || !isUuid(value.demandId) || typeof value.demandStatus !== "string" || !/^[a-z_]{1,20}$/.test(value.demandStatus) || typeof value.active !== "boolean" || typeof value.suspended !== "boolean"
+    || typeof value.accelerationPending !== "boolean"
     || !isIsoOrNull(value.startsAt) || !isIsoOrNull(value.endsAt) || !(value.remainingDays === null || (Number.isSafeInteger(value.remainingDays) && (value.remainingDays as number) >= 0))
     || !isAmount(value.purchasedPeriods) || !isIsoOrNull(value.nextEndsAt) || !isIso(value.maxEndsAt) || typeof value.canPurchase !== "boolean"
     || !(value.blockedReason === null || (typeof value.blockedReason === "string" && BLOCKED_REASONS.includes(value.blockedReason))) || typeof value.expiringSoon !== "boolean"
@@ -92,6 +98,8 @@ function parseState(status: number, value: unknown): ActiveSearchState {
     || value.canPurchase !== (value.blockedReason === null) || (value.canPurchase === true) !== (value.nextEndsAt !== null) || (value.active === true && value.endsAt === null)
     // Une option suspendue n'est jamais en vigueur, et a une fin connue.
     || (value.suspended === true && (value.active === true || value.endsAt === null))
+    // L'accélération n'attend une place que pour une option en vigueur.
+    || (value.accelerationPending === true && value.active !== true)
   ) bad(status);
   const body = value as Json;
   return {
@@ -102,6 +110,7 @@ function parseState(status: number, value: unknown): ActiveSearchState {
     demandStatus: body.demandStatus as string,
     active: body.active as boolean,
     suspended: body.suspended as boolean,
+    accelerationPending: body.accelerationPending as boolean,
     startsAt: body.startsAt as string | null,
     endsAt: body.endsAt as string | null,
     remainingDays: body.remainingDays as number | null,

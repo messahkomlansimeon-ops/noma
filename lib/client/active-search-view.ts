@@ -26,7 +26,7 @@ export const ACTIVE_SEARCH_INTRO = "Soyez prévenu plus vite quand une annonce d
 /** Ce que l'option apporte (listes fermées, textes fixes). */
 export const ACTIVE_SEARCH_BENEFITS: readonly string[] = Object.freeze([
   "Vous êtes prévenu quand une NOUVELLE annonce d'un autre site correspond à votre besoin (les annonces déjà présentes à l'activation ne vous sont pas envoyées).",
-  "Les autres sites sont consultés jusqu'à toutes les heures au lieu de toutes les 6 heures, dans la limite de ce que chaque site autorise. La surveillance de ce produit est partagée : les autres acheteurs du même produit en profitent aussi.",
+  "Les autres sites sont consultés jusqu'à toutes les heures au lieu de toutes les 6 heures, selon la place disponible et dans la limite de ce que chaque site autorise. La surveillance de ce produit est partagée : les autres acheteurs du même produit en profitent aussi.",
   "Le suivi de ce besoin peut durer jusqu'à 180 jours au lieu de 90.",
 ]);
 
@@ -34,6 +34,7 @@ export const ACTIVE_SEARCH_BENEFITS: readonly string[] = Object.freeze([
 export const ACTIVE_SEARCH_RULES: readonly string[] = Object.freeze([
   "Elle se paie avec vos crédits, pas avec vos crédits promotionnels.",
   "Aucun renouvellement automatique : vous êtes prévenu 3 jours avant la fin, et vous pouvez la prolonger.",
+  "Les places de consultation rapide sont limitées, et chaque compte peut suivre au plus deux produits différents. Si aucune place n'est libre, vous êtes quand même prévenu des nouvelles annonces, mais les autres sites restent consultés à leur rythme ordinaire : la consultation rapide démarre dès qu'une place se libère, sans remboursement.",
   "Si le besoin est marqué satisfait, l'option est suspendue : rien n'est notifié, mais la période continue de courir, sans prolongation ni remboursement, et elle reprend si vous réactivez le besoin.",
   "Si le besoin est archivé, l'option s'arrête sans remboursement.",
   "Aucun remboursement automatique.",
@@ -59,9 +60,13 @@ const BLOCKED_TEXT: Readonly<Record<ActiveSearchBlockedReason, string>> = Object
   demand_not_active: "La recherche active n'est disponible que pour un besoin actif.",
   no_product_key: "Option indisponible pour ce besoin : il faut au moins une catégorie, une marque et un modèle.",
   unavailable: "La recherche active n'est pas encore disponible : aucune annonce d'un autre site n'est collectée pour le moment.",
+  user_cap: "Vous suivez déjà deux produits différents en recherche active, c'est le maximum par compte : attendez la fin de l'une des deux options pour en démarrer ou prolonger une autre.",
   capacity: "La collecte accélérée est complète pour le moment : réessayez plus tard.",
   max_horizon: "La recherche active ne peut pas dépasser 180 jours à partir d'aujourd'hui : vous pourrez la prolonger plus tard.",
 });
+
+/** Option en vigueur sans place de consultation rapide (lot RA1-ter) : ce qui est garanti, et ce qui attend. */
+export const ACCELERATION_PENDING_NOTE = "La consultation rapide de ce produit attend une place. Vous êtes prévenu des nouvelles annonces d'autres sites comme prévu ; les autres sites restent consultés à leur rythme ordinaire jusqu'à ce qu'une place se libère, puis la consultation rapide démarre toute seule.";
 
 /** Durée en mots : « 30 jours ». */
 function daysText(days: number): string {
@@ -135,7 +140,7 @@ export function activeSearchView(state: ActiveSearchState): ActiveSearchView {
     };
   }
   if (state.active && state.endsAt !== null) {
-    const base = "Vous êtes prévenu des nouvelles annonces d'autres sites.";
+    const base = state.accelerationPending ? `Vous êtes prévenu des nouvelles annonces d'autres sites. ${ACCELERATION_PENDING_NOTE}` : "Vous êtes prévenu des nouvelles annonces d'autres sites.";
     const tail = state.expiringSoon
       ? " Elle se termine bientôt : prolongez-la pour continuer à être prévenu."
       : state.remainingDays === null ? "" : ` Il reste ${daysText(state.remainingDays)}.`;

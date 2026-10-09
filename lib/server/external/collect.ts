@@ -22,6 +22,7 @@ import { sanitizeBatch, type SanitizedBatch } from "./sanitize";
 import { readPseudonymKey } from "./secret";
 import { isListingDataError, isStoreConflict, storeSearchResult, type Analyzer, type StoreOutcome } from "./store";
 import { productKeyOfWatch, type ClaimedWatch, type ConnectorContext, type ProductKey, type SourceConnector, type SourceRow } from "./types";
+import { reconcilePlacesForCycle } from "../active-search/places-run";
 import { claimDueWatches, finishWatch, readLeasedFrequency, releaseWatches, renewLease, syncMarketWatches, type SyncResult } from "./watches";
 
 /**
@@ -542,8 +543,16 @@ export async function runCollectStep(options: CollectStepOptions): Promise<Colle
       result.skipped = true;
       return result;
     }
-    result.sync = await syncMarketWatches(pool, clock());
     const list = options.connectors === undefined ? resolveConnectors(process.env) : (options.connectors ?? []);
+    // Lot RA1-ter : AVANT la synchronisation, la fonction unique d'attribution des places de collecte accélérée réattribue celles que le cycle précédent a libérées (option terminée, besoin
+    // satisfait, archivé ou modifié) aux options en attente, plus ancien achat d'abord, et retire les places au-delà de la capacité des connecteurs de ce cycle. Une panne ici (verrou tenu) n'arrête
+    // pas le cycle : les places restent celles du passage précédent (jamais plus que la capacité d'alors).
+    try {
+      await reconcilePlacesForCycle(pool, { connectorCodes: list.map((connector) => connector.code), now: clock() });
+    } catch (error) {
+      result.errors.push(`places_${collectErrorCode(error)}`);
+    }
+    result.sync = await syncMarketWatches(pool, clock());
     if (list.length === 0) {
       result.noConnectors = true;
       return result;

@@ -23,11 +23,11 @@ utilisé** (la recharge du porte-monnaie passe par une page de paiement SIMULÉ)
    `npm run dev:try`, voir ci-dessous). La commande ne lit aucun fichier `.env` pour la deviner, et elle refuse de démarrer
    si la base n'est pas sur **votre ordinateur** (`127.0.0.1`, `localhost` ou `::1`).
 
-   **La base d'essai doit être migrée jusqu'au bout : 28 migrations** (de `0001` à `0020`, puis `0021`, `0022`, `0023`, `0024`, `0025`, `0026`, `0027` et `0028` ; dont le porte-monnaie `0014`,
+   **La base d'essai doit être migrée jusqu'au bout : 29 migrations** (de `0001` à `0020`, puis `0021`, `0022`, `0023`, `0024`, `0025`, `0026`, `0027`, `0028` et `0029` ; dont le porte-monnaie `0014`,
    l'achat de boost `0015`, la portée visible d'un devis de boost `0016`, son estimation bornée `0017`, les mesures d'efficacité
-   `0018` : ouvertures de la fiche et contacts, les notifications et le suivi des besoins `0019`, les favoris, la messagerie en direct, les commandes et l'administration `0020`, l'offre Pro : plans, abonnements, crédits promotionnels, import de catalogue `0021`, les photos des annonces `0022`, l'historique des prix demandés `0023`, le journal des envois de SMS `0024`, la collecte d'annonces externes mutualisée `0025`, le paiement Wave via Sublymus : sessions, livraisons de webhook, anomalies de rapprochement `0026`, les missions d'achat en volume : missions, quantité des commandes, notifications de couverture `0027`, et la recherche active payante d'un besoin : achats, état, annonces vues, notifications d'annonces d'autres sites `0028`). Si votre base d'essai a
+   `0018` : ouvertures de la fiche et contacts, les notifications et le suivi des besoins `0019`, les favoris, la messagerie en direct, les commandes et l'administration `0020`, l'offre Pro : plans, abonnements, crédits promotionnels, import de catalogue `0021`, les photos des annonces `0022`, l'historique des prix demandés `0023`, le journal des envois de SMS `0024`, la collecte d'annonces externes mutualisée `0025`, le paiement Wave via Sublymus : sessions, livraisons de webhook, anomalies de rapprochement `0026`, les missions d'achat en volume : missions, quantité des commandes, notifications de couverture `0027`, et la recherche active payante d'un besoin : achats, état, annonces vues, notifications d'annonces d'autres sites `0028`, et ses places de collecte accélérée `0029`). Si votre base d'essai a
    été créée avant ces lots, relancez simplement la deuxième commande ci-dessus (elle n'applique que ce qui manque). Contrôle : la
-   commande suivante doit afficher `28`.
+   commande suivante doit afficher `29`.
 
    ```
    docker exec deploy-postgres-1 psql -U noma_local -d noma_essai -tAc "select count(*) from noma_schema_migrations"

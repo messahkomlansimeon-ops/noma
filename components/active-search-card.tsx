@@ -155,6 +155,7 @@ export function ActiveSearchCardView(props: ActiveSearchCardViewProps) {
       data-testid="active-search-card"
       data-tone={view.tone}
       data-active={state.active ? "true" : "false"}
+      data-acceleration={state.accelerationPending ? "pending" : state.active ? "running" : "none"}
     >
       <div className="flex items-start gap-2.5">
         <Radar className={`mt-0.5 size-5 shrink-0 ${view.tone === "active" ? "text-forest" : "text-ink-soft"}`} aria-hidden />

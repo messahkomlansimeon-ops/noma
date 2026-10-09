@@ -17,11 +17,12 @@ import {
   ACTIVE_SEARCH_PRICE_XOF,
   ACTIVE_SEARCH_USER_LOCK_NAMESPACE,
 } from "./config";
-import { acceleratedCapacity, capacityAllows, externalCollectionAvailable, type Environment } from "./availability";
+import { acceleratedLimit, capacityAllows, externalCollectionAvailable, type Environment } from "./availability";
 import { markBaselinePending, takeBaseline } from "./baseline";
 import { ELIGIBILITY_COLUMNS, demandIneligibility, eligibilityKeyOf, type DemandEligibilityInput } from "./eligibility";
 import { ActiveSearchError } from "./errors";
-import { computeCoverage, readLivePeriods } from "./state";
+import { lockAdmission, reconcileAcceleratedPlaces, userCapAllows, userKeysInForce } from "./places";
+import { activeSearchSchemaPresent, computeCoverage, readLivePeriods } from "./state";
 
 /**
  * Achat d'une période de RECHERCHE ACTIVE pour un besoin (lots RA1 et RA1-bis). UNE transaction SQL, sous le verrou de l'utilisateur :
@@ -31,12 +32,14 @@ import { computeCoverage, readLivePeriods } from "./state";
  *     externe disponible : `demand_not_active`, `no_product_key`, `unavailable`) ;
  *  3. le PRIX AFFICHÉ (`expectedPriceXof`) est le prix courant, sinon `price_changed` : l'acheteur ne paie jamais un prix qu'il n'a pas vu ;
  *  4. la période : une ACTIVATION commence maintenant ; une EXTENSION commence exactement à la fin de la chaîne en vigueur (périodes contiguës) ; la fin ne dépasse jamais
- *     maintenant + 180 jours (`max_horizon`) ; une ACTIVATION d'une clé produit pas encore accélérée est soumise au contrôle d'ADMISSION (`capacity` : les quotas des sources ne portent qu'un
- *     nombre borné de surveillances accélérées, voir RECHERCHE-ACTIVE.md), sous un verrou global qui sérialise les activations ;
+ *     maintenant + 180 jours (`max_horizon`) ; PLAFOND PAR UTILISATEUR (lot RA1-ter, `user_cap`) : un acheteur n'a jamais des options en vigueur sur plus de deux clés produit distinctes, à l'ACHAT
+ *     comme à la PROLONGATION ; une ACTIVATION d'une clé produit qui n'a pas encore de place est soumise au contrôle d'ADMISSION (`capacity` : les quotas des sources ne portent qu'un
+ *     nombre borné de surveillances accélérées, voir RECHERCHE-ACTIVE.md), sous un verrou global qui sérialise les attributions de places (`places.ts`, fonction unique appelée avant le
+ *     contrôle puis après l'écriture de l'achat, pour une activation comme pour une prolongation) ;
  *  5. le débit, en crédits PAYÉS seulement (`search_purchase` : acheteur −prix, revenus de la recherche active +prix) : solde insuffisant, tout est annulé, rien n'est écrit ;
  *  6. l'achat, le suivi des notifications du besoin (au moins jusqu'à la fin de l'option), et, pour une activation, le relevé des annonces d'autres sites DÉJÀ PRÉSENTES (elles ne
  *     notifieront jamais) : fait tout de suite si la surveillance a une collecte RÉUSSIE de moins de 48 h, sinon en attente de la première collecte réussie.
- * Pas de renouvellement automatique. Ordre des verrous : utilisateur → ligne du besoin → périodes du besoin → verrou global d'admission (activations seulement) → comptes du grand livre.
+ * Pas de renouvellement automatique. Ordre des verrous : utilisateur → ligne du besoin → périodes du besoin → verrou global d'admission → comptes du grand livre.
  */
 
 const ZERO = BigInt(0);
@@ -100,6 +103,8 @@ export async function purchaseActiveSearch(input: {
   return withPostgresTransaction(async (client) => {
     await client.query(`SET LOCAL lock_timeout = '${ACTIVE_SEARCH_LOCK_TIMEOUT_MS}ms'`);
     await client.query("SELECT pg_advisory_xact_lock($1::int, hashtext($2))", [ACTIVE_SEARCH_USER_LOCK_NAMESPACE, userId]);
+    // Base à laquelle il manque une migration de la recherche active (0028, 0029) : l'option n'est pas vendable, jamais une erreur SQL (la migration s'applique AVANT le code).
+    if (!(await activeSearchSchemaPresent(client))) throw new ActiveSearchError("unavailable");
 
     const replay = await client.query<{ id: string; demand_id: string; kind: "activation" | "extension"; price: string; starts_at: Date; ends_at: Date; refunded: boolean }>(
       `SELECT id, demand_id, kind, price_xof::text AS price, starts_at, ends_at, (refunded_at IS NOT NULL) AS refunded
@@ -134,12 +139,18 @@ export async function purchaseActiveSearch(input: {
     const now = new Date(nowText);
     const coverage = computeCoverage(await readLivePeriods(client, demandId, { lock: true }), now);
     const extension = coverage.chainEnd !== null;
-    if (!extension) {
-      // ADMISSION : une nouvelle surveillance accélérée n'est acceptée que si les quotas des sources la portent encore. Verrou global (jamais attendu plus de 5 s) : deux activations
-      // simultanées ne dépassent pas ensemble la capacité. Une prolongation, ou une clé déjà accélérée par un autre acheteur, n'ajoute rien.
-      await client.query("SELECT pg_advisory_xact_lock($1::int, hashtext('capacity'))", [ACTIVE_SEARCH_USER_LOCK_NAMESPACE]);
-      if (!capacityAllows(await acceleratedCapacity(client, env, now), keyText)) throw new ActiveSearchError("capacity");
-    }
+    // PLAFOND PAR UTILISATEUR, à l'achat comme à la prolongation, avant tout verrou global et tout débit : les clés produit distinctes de ses options en vigueur (suspendues comprises),
+    // plus celle de ce besoin, ne dépassent jamais le plafond. Une prolongation garde sa clé mais ne passe pas si l'utilisateur a entre-temps d'autres options au-delà du plafond.
+    if (!userCapAllows(await userKeysInForce(client, userId, nowText), keyText)) throw new ActiveSearchError("user_cap");
+    // ADMISSION et PLACES : verrou global (jamais attendu plus de 5 s). La fonction unique d'attribution (places.ts) est appelée AVANT le contrôle, pour qu'il voie l'état réel (places libérées
+    // réattribuées, places devenues invalides retirées), puis APRÈS l'écriture de l'achat pour attribuer la place à ce besoin. Une activation d'une clé SANS place est refusée (`capacity`)
+    // quand toutes les places sont prises ; une prolongation, ou une clé qui a déjà une place, n'ajoute rien.
+    await lockAdmission(client);
+    // L'instant des places est lu APRÈS le verrou : il ne précède jamais un achat qu'un autre processus vient de valider.
+    const placesNow = await currentInstant(client, input.now);
+    const limit = await acceleratedLimit(client, env);
+    const before = await reconcileAcceleratedPlaces(client, { now: placesNow, limit, trim: false });
+    if (!extension && !capacityAllows({ maxWatches: limit, keys: before.held }, keyText)) throw new ActiveSearchError("capacity");
     const startsAt = coverage.chainEnd !== null ? coverage.chainEnd.endsAtText : nowText;
     const endsAt = await addDays(client, startsAt, ACTIVE_SEARCH_DURATION_DAYS);
     const horizon = await client.query<{ beyond: boolean }>(
@@ -171,6 +182,9 @@ export async function purchaseActiveSearch(input: {
 
     // Suivi des notifications : au moins jusqu'à la fin de l'option (jamais raccourci). Une pause choisie par l'acheteur est conservée.
     await client.query("UPDATE demands SET notify_until = GREATEST(notify_until, $2::timestamptz) WHERE id = $1::uuid", [demandId, endsAt]);
+
+    // Le besoin a maintenant une option en vigueur : sa place (ou son attente) est décidée par la MÊME fonction, sous le même verrou.
+    await reconcileAcceleratedPlaces(client, { now: placesNow, limit, trim: false });
 
     if (!extension) {
       // Nouvelle ACTIVATION : les annonces d'autres sites déjà présentes ne notifieront jamais. Le relevé se fait tout de suite si la surveillance du besoin a une collecte RÉUSSIE de moins de

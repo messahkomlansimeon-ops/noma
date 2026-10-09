@@ -26,7 +26,7 @@ before(async () => {
   admin = opened.pool;
   await admin.query(`CREATE SCHEMA ${quoted}`);
   pool = await openVerifiedIsolatedPool(opened.target, schema);
-  assert.equal((await runMigrations(pool)).applied.length, 28);
+  assert.equal((await runMigrations(pool)).applied.length, 29);
 });
 
 after(async () => {

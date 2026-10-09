@@ -1217,6 +1217,8 @@ async function main(): Promise<void> {
     await buyer.getByTestId("active-search-done").waitFor({ timeout: 60_000 });
     assert.match(await buyer.getByTestId("active-search-done").innerText(), /^Recherche active activée jusqu'au \d{2}\/\d{2}\/\d{4}\.$/);
     assert.equal(await buyer.getByTestId("active-search-card").getAttribute("data-active"), "true");
+    // Lot RA1-ter : la place de collecte accélérée est attribuée à l'achat (capacité libre) : la consultation rapide n'est pas « en attente ».
+    assert.equal(await buyer.getByTestId("active-search-card").getAttribute("data-acceleration"), "running");
     assert.match(fr(await buyer.getByTestId("active-search-buy").innerText()), /^Prolonger de 30 jours — 2 000 FCFA$/);
     await buyer.goto(`${BASE}/compte/porte-monnaie`);
     await buyer.getByTestId("wallet-balance").waitFor();
@@ -1270,6 +1272,8 @@ async function main(): Promise<void> {
     await buyer.getByTestId("active-search-card").waitFor();
     assert.equal(await buyer.getByTestId("active-search-card").getAttribute("data-tone"), "active");
     assert.equal(await buyer.getByTestId("active-search-card").getAttribute("data-active"), "true");
+    // Lot RA1-ter : la réactivation (route HTTP) a redemandé une place : il en restait, l'option reprend accélérée.
+    assert.equal(await buyer.getByTestId("active-search-card").getAttribute("data-acceleration"), "running");
     assert.match(fr(await buyer.getByTestId("active-search-buy").innerText()), /^Prolonger de 30 jours — 2 000 FCFA$/);
     ok("besoin satisfait : option SUSPENDUE (carte « suspendue jusqu'au », aucun achat) ; réactivé : l'option reprend, « Prolonger de 30 jours » (aucun remboursement, aucun nouveau débit)");
     // 404 indiscernable pour autrui ; page 404 standard et 404 JSON pour l'acheteur sur l'administration.

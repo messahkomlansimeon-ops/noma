@@ -2355,6 +2355,7 @@ export const ACTIVE_SEARCH_ERROR_MESSAGES: Readonly<Record<string, string>> = Ob
   demand_not_active: "La recherche active n'est disponible que pour un besoin actif.",
   no_product_key: "Option indisponible pour ce besoin : il faut au moins une catégorie, une marque et un modèle.",
   unavailable: "La recherche active n'est pas encore disponible : aucune annonce d'un autre site n'est collectée pour le moment.",
+  user_cap: "Vous suivez déjà deux produits différents en recherche active, c'est le maximum par compte : attendez la fin de l'une des deux options.",
   capacity: "La collecte accélérée est complète pour le moment : réessayez plus tard.",
   price_changed: "Le prix de la recherche active a changé : rechargez la page, puis réessayez.",
   purchase_refunded: "Cette option a été remboursée : démarrez une nouvelle option si vous la souhaitez.",

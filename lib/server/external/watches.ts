@@ -108,7 +108,8 @@ export async function syncMarketWatches(executor: SqlExecutor, now: Date): Promi
 }
 
 /**
- * Clés des besoins ACTIFS (propriétaire actif) dont la recherche active est en vigueur à `now`. Sans la migration 0028, aucune. Lot MV1 : un besoin PORTEUR d'une mission (en pause ou non)
+ * Clés des besoins ACTIFS (propriétaire actif) dont la recherche active est en vigueur à `now`, AVEC OU SANS place de collecte accélérée (lot RA1-ter : la place est `readAcceleratedKeys`, qui seule
+ * accélère une surveillance). Sans la migration 0028, aucune. Lot MV1 : un besoin PORTEUR d'une mission (en pause ou non)
  * n'accélère JAMAIS une surveillance (il n'est pas un besoin de l'acheteur : l'option ne s'y achète pas, et une éventuelle ligne d'achat n'aurait aucun effet sur la collecte).
  */
 export async function readActiveSearchKeys(executor: SqlExecutor, now: Date): Promise<string[]> {
@@ -136,10 +137,35 @@ export async function readActiveSearchKeys(executor: SqlExecutor, now: Date): Pr
 }
 
 /**
- * Fréquence d'une surveillance PARTAGÉE (lots RA1 et RA1-bis) : la plus élevée demandée par ses besoins actifs. Si au moins un besoin ACTIF de la clé a la recherche active en vigueur, la
- * surveillance passe à `LEAST(intervalle actuel, 1 h)` et `GREATEST(budget actuel, 24 requêtes par jour et par source)` : l'accélération ne ralentit JAMAIS une surveillance déjà plus
+ * Clés produit qui ont une PLACE de collecte accélérée à `now` (lot RA1-ter) : les lignes de `active_search_places` dont le besoin porteur est toujours actif, d'un propriétaire actif, non porteur
+ * d'une mission et avec une période de recherche active en vigueur. C'est cet ensemble — et lui seul — qui accélère les surveillances : une option en vigueur SANS place (accélération en attente)
+ * n'accélère rien. Le nombre de places est borné par la capacité des sources (places.ts) ; ce filtre ne fait qu'écarter une place dont le porteur vient de cesser d'être valide, entre deux
+ * passages de la réattribution (le cycle de collecte la libère ou la transfère ensuite).
+ */
+export async function readAcceleratedKeys(executor: SqlExecutor, now: Date): Promise<string[]> {
+  if (!(await activeSearchSchemaPresent(executor))) return [];
+  const missions = await executor.query<{ present: boolean }>("SELECT to_regclass('missions') IS NOT NULL AS present");
+  const carriers = missions.rows[0]?.present === true ? "AND NOT EXISTS (SELECT 1 FROM missions mc WHERE mc.demand_id = d.id)" : "";
+  const rows = await executor.query<{ product_key: string }>(
+    `SELECT pl.product_key
+       FROM active_search_places pl
+       JOIN demands d ON d.id = pl.demand_id
+       JOIN users u ON u.id = d.owner_id
+      WHERE d.status = 'active' AND d.archived_at IS NULL AND u.status = 'active' AND u.archived_at IS NULL
+        ${carriers}
+        AND EXISTS (SELECT 1 FROM active_search_purchases p
+                     WHERE p.demand_id = d.id AND p.status = 'active' AND p.refunded_at IS NULL AND p.starts_at <= $1::timestamptz AND p.ends_at > $1::timestamptz)
+      ORDER BY pl.product_key`,
+    [now],
+  );
+  return rows.rows.map((row) => row.product_key);
+}
+
+/**
+ * Fréquence d'une surveillance PARTAGÉE (lots RA1, RA1-bis et RA1-ter) : la plus élevée demandée par ses besoins actifs. Si la clé a une PLACE de collecte accélérée (`readAcceleratedKeys` : un besoin ACTIF de la clé a la recherche
+ * active en vigueur ET la capacité des sources a pu la porter), la surveillance passe à `LEAST(intervalle actuel, 1 h)` et `GREATEST(budget actuel, 24 requêtes par jour et par source)` : l'accélération ne ralentit JAMAIS une surveillance déjà plus
  * rapide ou mieux dotée. Ses valeurs d'AVANT sont gardées (`base_frequency_seconds`, `base_daily_request_budget`, `accelerated`) et rétablies quand plus aucun besoin actif de la clé n'a
- * l'option (un besoin SATISFAIT suspend l'option : il n'accélère rien). Une surveillance qu'aucun changement ne concerne (déjà au moins aussi rapide et dotée) n'est pas marquée accélérée.
+ * de place (un besoin SATISFAIT suspend l'option : il n'accélère rien, et sa place est libérée). Une surveillance qu'aucun changement ne concerne (déjà au moins aussi rapide et dotée) n'est pas marquée accélérée.
  * Les quotas journaliers de chaque SOURCE s'appliquent toujours, et les surveillances accélérées ne peuvent en consommer que la moitié (`reserveRequest`). Quand la fréquence monte, la
  * prochaine collecte est avancée (jamais pendant le bail d'une collecte en cours : `claim_token` doit être vide ; la collecte en cours relit la fréquence à sa clôture,
  * `readLeasedFrequency`). À la décélération, des valeurs réglées à la main depuis l'accélération ne sont pas écrasées. Instructions sans attente de verrou (`SKIP LOCKED`) : une
@@ -147,7 +173,7 @@ export async function readActiveSearchKeys(executor: SqlExecutor, now: Date): Pr
  */
 async function syncWatchFrequencies(executor: SqlExecutor, now: Date): Promise<{ accelerated: number; decelerated: number }> {
   if (!(await activeSearchSchemaPresent(executor))) return { accelerated: 0, decelerated: 0 };
-  const boosted = await readActiveSearchKeys(executor, now);
+  const boosted = await readAcceleratedKeys(executor, now);
   const accelerated = await executor.query(
     `UPDATE market_watches
         SET base_frequency_seconds = frequency_seconds, base_daily_request_budget = daily_request_budget, accelerated = TRUE,

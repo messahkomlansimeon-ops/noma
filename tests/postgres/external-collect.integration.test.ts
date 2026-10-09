@@ -438,7 +438,7 @@ test("sans la migration 0025 : l'étape est ignorée sans erreur et le cycle tra
   await opened.pool.query(`CREATE SCHEMA ${quoteTemporarySchema(schema)}`);
   const bare = new Pool({ connectionString: opened.target.connectionString, max: 2, options: `-c search_path=${schema}` });
   try {
-    assert.equal((await runMigrations(bare)).applied.at(-1), "0028_active_search");
+    assert.equal((await runMigrations(bare)).applied.at(-1), "0029_active_search_places");
     await bare.query("DROP TABLE source_observations, external_listings, duplicate_groups, external_analyses, external_collect_runs, external_source_usage, market_watch_usage, market_watches, external_sources CASCADE");
     await bare.query("DELETE FROM noma_schema_migrations WHERE version = '0025_external_collection'");
     const direct = await runCollectStep({ pool: bare, connectors: fakes, now: clock.now });

@@ -21,7 +21,7 @@ function harness(responder: (request: Captured, index: number) => Response | Pro
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 const stateDto = (overrides: Record<string, unknown> = {}) => ({
-  contractVersion: ACTIVE_SEARCH_CONTRACT_VERSION, priceProvisional: true, paidCreditsOnly: true, autoRenew: false, demandId: DEMAND_ID, demandStatus: "active", active: false, suspended: false, startsAt: null, endsAt: null,
+  contractVersion: ACTIVE_SEARCH_CONTRACT_VERSION, priceProvisional: true, paidCreditsOnly: true, autoRenew: false, demandId: DEMAND_ID, demandStatus: "active", active: false, suspended: false, accelerationPending: false, startsAt: null, endsAt: null,
   remainingDays: null, purchasedPeriods: 0, nextEndsAt: "2031-02-01T10:00:00.000Z", maxEndsAt: "2031-07-01T10:00:00.000Z", canPurchase: true, blockedReason: null, expiringSoon: false, priceXof: 2_000,
   durationDays: 30, balanceXof: 5_000, readAt: "2031-01-02T10:00:00.000Z", ...overrides,
 });
@@ -55,14 +55,14 @@ describe("client.state", () => {
     assert.equal(calls[0].init.cache, "no-store");
     assert.equal(calls[0].init.body, undefined);
     assert.deepEqual(Object.keys(state).sort(), [
-      "active", "autoRenew", "balanceXof", "blockedReason", "canPurchase", "demandId", "demandStatus", "durationDays", "endsAt", "expiringSoon", "maxEndsAt", "nextEndsAt", "paidCreditsOnly", "priceProvisional",
+      "accelerationPending", "active", "autoRenew", "balanceXof", "blockedReason", "canPurchase", "demandId", "demandStatus", "durationDays", "endsAt", "expiringSoon", "maxEndsAt", "nextEndsAt", "paidCreditsOnly", "priceProvisional",
       "priceXof", "purchasedPeriods", "readAt", "remainingDays", "startsAt", "suspended",
     ]);
     assert.deepEqual([state.priceProvisional, state.paidCreditsOnly, state.autoRenew, state.priceXof, state.durationDays, state.balanceXof], [true, true, false, 2_000, 30, 5_000]);
   });
 
   test("B1 / A4 : toutes les raisons de blocage du serveur et l'option suspendue sont relues", async () => {
-    for (const reason of ["demand_not_active", "no_product_key", "unavailable", "capacity", "max_horizon"] as const) {
+    for (const reason of ["demand_not_active", "no_product_key", "unavailable", "user_cap", "capacity", "max_horizon"] as const) {
       const { client } = harness(() => json(200, stateDto({ canPurchase: false, nextEndsAt: null, blockedReason: reason })));
       const state = await client.state(DEMAND_ID);
       assert.deepEqual([state.canPurchase, state.blockedReason], [false, reason]);
@@ -160,7 +160,7 @@ describe("client.purchase", () => {
   });
 
   test("refus du serveur : le code est conservé, le message affiché est TOUJOURS le texte fixe du client", async () => {
-    for (const [status, code] of [[409, "insufficient_balance"], [409, "demand_not_active"], [409, "no_product_key"], [409, "unavailable"], [409, "capacity"], [409, "price_changed"], [409, "purchase_refunded"], [409, "max_horizon"], [409, "idempotency_conflict"], [404, "resource_not_found"], [400, "invalid_request"], [503, "active_search_unavailable"]] as const) {
+    for (const [status, code] of [[409, "insufficient_balance"], [409, "demand_not_active"], [409, "no_product_key"], [409, "unavailable"], [409, "user_cap"], [409, "capacity"], [409, "price_changed"], [409, "purchase_refunded"], [409, "max_horizon"], [409, "idempotency_conflict"], [404, "resource_not_found"], [400, "invalid_request"], [503, "active_search_unavailable"]] as const) {
       const { client } = harness(() => json(status, { error: { code, message: "Texte du serveur qui ne doit pas s'afficher" } }));
       const error = await rejection(client.purchase(DEMAND_ID, KEY, 2_000));
       assert.equal(error.code, code);
@@ -198,5 +198,26 @@ describe("client.adminOverview", () => {
     }
     const notAdmin = harness(() => json(404, { error: { code: "resource_not_found", message: "Ressource introuvable." } }));
     assert.equal((await rejection(notAdmin.client.adminOverview.read())).status, 404);
+  });
+});
+
+describe("accélération en attente de place (lot RA1-ter)", () => {
+  test("accelerationPending est un booléen exigé ; il n'est vrai que pour une option en vigueur ; relu tel quel", async () => {
+    const pending = await harness(() => json(200, activeDto({ accelerationPending: true }))).client.state(DEMAND_ID);
+    assert.deepEqual([pending.active, pending.accelerationPending], [true, true]);
+    const running = await harness(() => json(200, activeDto())).client.state(DEMAND_ID);
+    assert.equal(running.accelerationPending, false);
+    for (const accelerationPending of [undefined, "oui", 1, null]) {
+      const { client } = harness(() => json(200, activeDto({ accelerationPending })));
+      assert.equal((await rejection(client.state(DEMAND_ID))).code, API_INVALID_RESPONSE, String(accelerationPending));
+    }
+    const inactive = harness(() => json(200, stateDto({ accelerationPending: true })));
+    assert.equal((await rejection(inactive.client.state(DEMAND_ID))).code, API_INVALID_RESPONSE, "en attente de place sans option en vigueur : incohérent");
+  });
+
+  test("plafond par compte : la raison user_cap est relue et son message est fixe", async () => {
+    const { client } = harness(() => json(200, stateDto({ canPurchase: false, nextEndsAt: null, blockedReason: "user_cap" })));
+    assert.equal((await client.state(DEMAND_ID)).blockedReason, "user_cap");
+    assert.match(ACTIVE_SEARCH_ERROR_MESSAGES.user_cap, /deux produits différents/);
   });
 });

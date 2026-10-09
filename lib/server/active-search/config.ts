@@ -38,6 +38,25 @@ export const ACTIVE_SEARCH_WATCH_DAILY_BUDGET = 24;
  */
 export const ACTIVE_SEARCH_ACCELERATED_QUOTA_SHARE_PERCENT = 50;
 
+/**
+ * Plafond PAR UTILISATEUR (lot RA1-ter) : un acheteur ne porte jamais plus de DEUX clés produit accélérées distinctes. Sans lui, un seul acheteur (4 options à 8 000 FCFA) confisquait toute la
+ * capacité de la plateforme et la gardait par prolongations. Contrôlé à l'achat ET à la prolongation (refus `user_cap`, avant tout débit) sur les clés distinctes de ses options en vigueur ; et par
+ * la fonction unique d'attribution des places (places.ts) pour la réactivation d'un besoin suspendu et la modification d'un besoin : au-delà, l'option reste en vigueur mais sans accélération.
+ */
+export const ACTIVE_SEARCH_MAX_ACCELERATED_KEYS_PER_USER = 2;
+
+/**
+ * Tolérance (millisecondes) sur le DÉBUT d'une période quand la fonction d'attribution des places décide qu'une option est « en vigueur » : l'instant `now` d'un appelant peut être lu AVANT qu'il
+ * obtienne le verrou global, donc quelques instants avant le début d'un achat validé entre-temps par un autre processus. Sans cette tolérance, ce processus verrait l'option toute neuve comme « pas
+ * encore commencée » et lui retirerait sa place (course constatée entre deux achats). La fin d'une période, elle, est strictement comparée.
+ */
+export const ACTIVE_SEARCH_PLACES_START_TOLERANCE_MS = 5_000;
+
+/** Clé (texte) du verrou consultatif GLOBAL d'admission, dans l'espace ci-dessous : il sérialise toute attribution, tout transfert et tout retrait de place. */
+export const ACTIVE_SEARCH_ADMISSION_LOCK_KEY = "capacity";
+/** Attente maximale de ce verrou depuis un changement de besoin (réactivation, modification) : au-delà, la réattribution est laissée à la synchronisation des surveillances (jamais un échec du changement). */
+export const ACTIVE_SEARCH_ADMISSION_HOOK_LOCK_TIMEOUT_MS = 2_000;
+
 /** Part accélérée du quota journalier d'une source (entier, arrondi à l'inférieur). */
 export function acceleratedQuotaShare(dailyQuota: number): number {
   return Math.floor((Math.max(0, dailyQuota) * ACTIVE_SEARCH_ACCELERATED_QUOTA_SHARE_PERCENT) / 100);

@@ -480,18 +480,22 @@ test("QUOTAS respectés : le quota du jour de CHAQUE source borne la collecte ac
   const w = await world();
   await collect();
   await buy(w);
-  await pool.query("UPDATE external_sources SET daily_quota = 3 WHERE code = 'demo_a'");
+  // Quota de la source A à 48 : la part accélérée est de 24 (la moitié), soit exactement UNE surveillance accélérée de 24 requêtes (capacité 1, la place reste attribuée). 23 requêtes accélérées
+  // ont DÉJÀ été consommées aujourd'hui sur cette source (par d'autres surveillances) : une seule requête accélérée de plus est possible, le plafond par REQUÊTE refuse les autres.
+  await pool.query("UPDATE external_sources SET daily_quota = 48 WHERE code = 'demo_a'");
+  await pool.query("UPDATE external_source_usage SET requests = requests + 23, accelerated_requests = accelerated_requests + 23 WHERE source_code = 'demo_a'");
   let quotaSkipped = 0;
   for (let index = 0; index < 8; index += 1) {
     clock.advance(10 * 60_000);
     quotaSkipped += (await collect()).quotaSkipped;
   }
+  assert.equal(await count(pool, "active_search_places"), 1, "la place reste attribuée : la capacité (48 → 24 → 1 surveillance) la porte");
   const usage = (await pool.query<{ source_code: string; requests: number; accelerated_requests: number }>("SELECT source_code, requests, accelerated_requests FROM external_source_usage ORDER BY source_code")).rows;
-  assert.equal(usage.find((row) => row.source_code === "demo_a")?.requests, 2, "la source A (quota 3) : 1 requête ordinaire d'avant l'achat + 1 accélérée (la moitié du quota), jamais plus");
-  assert.equal(usage.find((row) => row.source_code === "demo_a")?.accelerated_requests, 1, "la part accélérée du quota de 3 est de 1");
+  assert.equal(usage.find((row) => row.source_code === "demo_a")?.requests, 25, "la source A (quota 48) : 1 requête ordinaire d'avant l'achat + 23 accélérées déjà consommées + 1 seule accélérée de plus");
+  assert.equal(usage.find((row) => row.source_code === "demo_a")?.accelerated_requests, 24, "la part accélérée du quota de 48 est de 24 : atteinte, jamais dépassée");
   assert.ok((usage.find((row) => row.source_code === "demo_b")?.requests ?? 0) >= 9, "la source B (quota 200) est interrogée à chaque collecte forcée : 9 fois, au-delà des 4 d'une surveillance ordinaire");
   assert.ok(quotaSkipped >= 5, `quota refusé ${quotaSkipped} fois`);
-  assert.equal(a.controls.calls, 2, "la source A n'a reçu que 2 requêtes en tout (la première, avant l'achat, comprise)");
+  assert.equal(a.controls.calls, 2, "la source A n'a reçu que 2 requêtes réelles en tout (la première, avant l'achat, comprise)");
 });
 
 test("une option achetée PENDANT la collecte de la surveillance : la prochaine échéance est dans 1 h (la fréquence est relue à la clôture), jamais 6 h", async () => {
@@ -1088,31 +1092,36 @@ test("M6 : l'accélération ne RALENTIT jamais une surveillance déjà plus rapi
   assert.deepEqual([row.frequency_seconds, row.daily_request_budget, row.accelerated], [1_800, 4, false], "base restaurée exactement");
 });
 
-test("A5 / P4 : 12 options de UN acheteur + 1 surveillance ordinaire d'un autre sur une journée simulée (quota 200) → l'admission n'accepte que 4 produits, la surveillance ordinaire garde ses 4 collectes par source, les requêtes accélérées restent sous la moitié du quota", async () => {
-  const payer = await makePerson(pool);
-  await fund(pool, payer.id, 50_000);
+test("A5 / P4 : 12 options (six acheteurs, deux produits chacun) + 1 surveillance ordinaire d'un autre sur une journée simulée (quota 200) → l'admission n'accepte que 4 produits, chaque surveillance accélérée admise reçoit ses 24 requêtes par source, la surveillance ordinaire garde ses 4 collectes par source, les requêtes accélérées restent sous la moitié du quota", async () => {
   const other = await makePerson(pool);
   await makeDemand(pool, { ownerId: other.id, model: "Galaxy S21", brand: "Samsung" });
   const outcomes: string[] = [];
-  for (let index = 1; index <= 12; index += 1) {
-    const demand = await makeDemand(pool, { ownerId: payer.id, brand: "Google", model: `Pixel ${index}` });
-    try {
-      await buy({ userId: payer.id, demandId: demand.id, keyOf: () => randomUUID() });
-      outcomes.push("ok");
-    } catch (error) {
-      outcomes.push((error as { code?: string }).code ?? "erreur");
+  const payers: string[] = [];
+  for (let buyer = 0; buyer < 6; buyer += 1) {
+    const payer = await makePerson(pool);
+    await fund(pool, payer.id, 10_000);
+    payers.push(payer.id);
+    for (let product = 1; product <= 2; product += 1) {
+      const demand = await makeDemand(pool, { ownerId: payer.id, brand: "Google", model: `Pixel ${buyer * 2 + product}` });
+      try {
+        await buy({ userId: payer.id, demandId: demand.id, keyOf: () => randomUUID() });
+        outcomes.push("ok");
+      } catch (error) {
+        outcomes.push((error as { code?: string }).code ?? "erreur");
+      }
     }
   }
   assert.equal(outcomes.filter((entry) => entry === "ok").length, 4, outcomes.join(","));
   assert.equal(outcomes.filter((entry) => entry === "capacity").length, 8, outcomes.join(","));
-  assert.equal(await pool.query("SELECT balance::text AS b FROM wallet_accounts WHERE kind = 'user' AND owner_id = $1", [payer.id]).then((result) => result.rows[0].b), String(50_000 - 4 * ACTIVE_SEARCH_PRICE_XOF), "seuls 4 achats débités");
+  const debited = await pool.query("SELECT sum(balance)::text AS b FROM wallet_accounts WHERE kind = 'user' AND owner_id = ANY($1::uuid[])", [payers]).then((result) => result.rows[0].b);
+  assert.equal(debited, String(6 * 10_000 - 4 * ACTIVE_SEARCH_PRICE_XOF), "seuls 4 achats débités");
   const simulateDay = async (): Promise<void> => {
     for (let hour = 0; hour < 24; hour += 1) {
       clock.set(new Date(BASE.getTime() + hour * HOUR));
       for (let loop = 0; loop < 10; loop += 1) {
         clock.advance(60_000);
-        const run = await runCollectStep({ pool, connectors: fakes, now: clock.now, sleep: timer.sleep, pseudonymKey: TEST_PSEUDONYM_KEY, maxWatches: 3 });
-        if (run.claimed === 0) break;
+        // Les dix minutes sont toutes parcourues (pas d'arrêt à la première minute sans surveillance due) : une surveillance due à :08 ne doit pas sauter son heure à cause de l'échantillonnage du test.
+        await runCollectStep({ pool, connectors: fakes, now: clock.now, sleep: timer.sleep, pseudonymKey: TEST_PSEUDONYM_KEY, maxWatches: 3 });
       }
     }
   };
@@ -1125,13 +1134,20 @@ test("A5 / P4 : 12 options de UN acheteur + 1 surveillance ordinaire d'un autre 
     assert.ok(row.accelerated_requests <= 100, `${row.source_code} : requêtes accélérées ${row.accelerated_requests} ≤ moitié du quota (100)`);
     assert.ok(row.requests <= 200, `${row.source_code} : quota total respecté`);
   }
+  // RA1-ter : les surveillances accélérées ADMISES reçoivent réellement leur budget (24 requêtes par jour et par source), au lieu de 8 ou 9 quand trop de clés se partageaient la moitié du quota.
+  const accelerated = (await pool.query<{ product_key: string; source_code: string; requests: number }>(
+    "SELECT w.product_key, u.source_code, u.requests FROM market_watch_usage u JOIN market_watches w ON w.id = u.watch_id WHERE w.accelerated ORDER BY w.product_key, u.source_code")).rows;
+  assert.equal(accelerated.length, 8, "4 surveillances accélérées × 2 sources");
+  assert.deepEqual([Math.min(...accelerated.map((row) => row.requests)), Math.max(...accelerated.map((row) => row.requests))], [24, 24], "chaque surveillance accélérée : 24 requêtes par source et par jour (min = max)");
 });
 
 test("A5 : le plafond de la moitié du quota est aussi appliqué à CHAQUE requête (pas seulement à l'achat) : un quota réduit après l'achat limite les requêtes accélérées, la part ordinaire reste intacte", async () => {
-  const payer = await makePerson(pool);
-  await fund(pool, payer.id, 50_000);
   const demands = [] as Array<{ userId: string; demandId: string; keyOf: () => string }>;
+  // Deux produits au plus par acheteur (plafond par utilisateur, RA1-ter) : deux acheteurs pour quatre produits.
+  const payers = [await makePerson(pool), await makePerson(pool)];
+  for (const payer of payers) await fund(pool, payer.id, 10_000);
   for (let index = 1; index <= 4; index += 1) {
+    const payer = payers[index <= 2 ? 0 : 1];
     const demand = await makeDemand(pool, { ownerId: payer.id, brand: "Google", model: `Pixel ${index}` });
     demands.push({ userId: payer.id, demandId: demand.id, keyOf: () => randomUUID() });
   }
@@ -1155,4 +1171,6 @@ test("A5 : le plafond de la moitié du quota est aussi appliqué à CHAQUE requ�
   const ordinary = (await pool.query<{ requests: number }>(
     "SELECT u.requests FROM market_watch_usage u JOIN market_watches w ON w.id = u.watch_id WHERE w.product_key LIKE '%galaxy s21%'")).rows;
   assert.ok(ordinary.length > 0 && ordinary.every((row) => row.requests >= 4), "la surveillance ordinaire garde ses 4 collectes");
+  // Le quota réduit (60 → part accélérée 30 → UNE surveillance accélérée de 24) : les places au-delà de la capacité sont retirées à la collecte suivante (jamais plus de places que la capacité).
+  assert.equal(await count(pool, "active_search_places"), 1, "une seule place subsiste après la baisse du quota");
 });

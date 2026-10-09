@@ -41,6 +41,7 @@ export function activeSearchStateDto(state: ActiveSearchState) {
     demandStatus: state.demandStatus,
     active: state.active,
     suspended: state.suspended,
+    accelerationPending: state.accelerationPending,
     startsAt: state.startsAt === null ? null : state.startsAt.toISOString(),
     endsAt: state.endsAt === null ? null : state.endsAt.toISOString(),
     remainingDays: state.remainingDays,

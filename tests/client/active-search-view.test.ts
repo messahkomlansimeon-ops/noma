@@ -11,7 +11,7 @@ import {
 
 const plain = (text: string): string => text.replace(/[  ]/g, " ");
 const state = (overrides: Partial<ActiveSearchState> = {}): ActiveSearchState => ({
-  priceProvisional: true, paidCreditsOnly: true, autoRenew: false, demandId: "22222222-2222-4222-8222-222222222222", demandStatus: "active", active: false, suspended: false, startsAt: null, endsAt: null,
+  priceProvisional: true, paidCreditsOnly: true, autoRenew: false, demandId: "22222222-2222-4222-8222-222222222222", demandStatus: "active", active: false, suspended: false, accelerationPending: false, startsAt: null, endsAt: null,
   remainingDays: null, purchasedPeriods: 0, nextEndsAt: "2031-02-01T10:00:00.000Z", maxEndsAt: "2031-07-01T10:00:00.000Z", canPurchase: true, blockedReason: null, expiringSoon: false,
   priceXof: 2_000, durationDays: 30, balanceXof: 5_000, readAt: "2031-01-02T10:00:00.000Z", ...overrides,
 });
@@ -33,7 +33,7 @@ describe("règles dites avant l'achat", () => {
   test("ce que l'option apporte : annonces NOUVELLES d'autres sites, collecte toutes les heures partagée, suivi jusqu'à 180 jours ; le prix est dit PROVISOIRE", () => {
     const benefits = ACTIVE_SEARCH_BENEFITS.join(" ");
     assert.match(benefits, /NOUVELLE annonce d'un autre site/);
-    assert.match(benefits, /jusqu'à toutes les heures au lieu de toutes les 6 heures, dans la limite de ce que chaque site autorise/, "A5 : jamais une promesse ferme d'une collecte horaire");
+    assert.match(benefits, /jusqu'à toutes les heures au lieu de toutes les 6 heures, selon la place disponible et dans la limite de ce que chaque site autorise/, "A5 : jamais une promesse ferme d'une collecte horaire (lot RA1-ter : selon la place disponible)");
     assert.equal(/(?<!jusqu'à )toutes les heures/.test(benefits), false, "« toutes les heures » n'apparaît que précédé de « jusqu'à »");
     assert.match(benefits, /partagée : les autres acheteurs du même produit en profitent aussi/);
     assert.match(benefits, /180 jours au lieu de 90/);
@@ -164,5 +164,25 @@ describe("besoin porteur d'une mission (lot MV1) : la carte ne s'affiche pas", (
     for (const failure of [new ApiError(500, "unavailable", "x"), new ApiError(503, "active_search_unavailable", "x"), new ApiError(401, "unauthorized", "x"), new ApiError(409, "demand_not_active", "x"), new Error("réseau"), null, undefined, "404"]) {
       assert.equal(hidesCardOnLoadFailure(failure), false, String(failure));
     }
+  });
+});
+
+describe("places de collecte accélérée et plafond par compte (lot RA1-ter)", () => {
+  test("plafond par compte : l'achat est bloqué avec un texte fixe qui dit deux produits au plus ; la règle est dite AVANT l'achat", () => {
+    assert.deepEqual(purchaseState(state({ canPurchase: false, blockedReason: "user_cap", nextEndsAt: null })), {
+      kind: "blocked", reason: "user_cap", text: "Vous suivez déjà deux produits différents en recherche active, c'est le maximum par compte : attendez la fin de l'une des deux options pour en démarrer ou prolonger une autre.",
+    });
+    assert.match(ACTIVE_SEARCH_RULES.join(" "), /chaque compte peut suivre au plus deux produits différents/);
+    assert.match(ACTIVE_SEARCH_RULES.join(" "), /la consultation rapide démarre dès qu'une place se libère, sans remboursement/);
+  });
+
+  test("option en vigueur SANS place : la carte dit ce qui est garanti (notifications) et ce qui attend (consultation rapide), sans bouton en moins", () => {
+    const pending = activeSearchView(activeState({ accelerationPending: true }));
+    assert.equal(pending.tone, "active");
+    assert.match(pending.detail, /Vous êtes prévenu des nouvelles annonces d'autres sites\. La consultation rapide de ce produit attend une place\./);
+    assert.match(pending.detail, /à leur rythme ordinaire jusqu'à ce qu'une place se libère, puis la consultation rapide démarre toute seule/);
+    assert.equal(pending.isExtension, true);
+    const running = activeSearchView(activeState());
+    assert.equal(running.detail.includes("attend une place"), false);
   });
 });

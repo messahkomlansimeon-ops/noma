@@ -9,9 +9,10 @@ import {
   ACTIVE_SEARCH_ACCELERATED_QUOTA_SHARE_PERCENT, ACTIVE_SEARCH_FRESH_COLLECTION_MS, acceleratedQuotaShare, acceleratedWatchLimit,
   ACTIVE_SEARCH_CONTRACT_VERSION, ACTIVE_SEARCH_DURATION_DAYS, ACTIVE_SEARCH_MAX_HORIZON_DAYS, ACTIVE_SEARCH_NOTICE_DAYS, ACTIVE_SEARCH_NOTIFY_BATCH, ACTIVE_SEARCH_PRICE_XOF,
   ACTIVE_SEARCH_SCAN_LOCK_TIMEOUT_MS, ACTIVE_SEARCH_STEP_BUDGET_MS, ACTIVE_SEARCH_STEP_MAX_DEMANDS, ACTIVE_SEARCH_TRACKING_MAX_DAYS, ACTIVE_SEARCH_USER_LOCK_NAMESPACE,
-  ACTIVE_SEARCH_WATCH_DAILY_BUDGET, ACTIVE_SEARCH_WATCH_FREQUENCY_SECONDS,
+  ACTIVE_SEARCH_WATCH_DAILY_BUDGET, ACTIVE_SEARCH_WATCH_FREQUENCY_SECONDS, ACTIVE_SEARCH_MAX_ACCELERATED_KEYS_PER_USER,
 } from "../../lib/server/active-search/config";
 import { capacityAllows } from "../../lib/server/active-search/availability";
+import { userCapAllows } from "../../lib/server/active-search/places";
 import { ELIGIBILITY_COLUMNS, demandIneligibility, eligibilityKeyOf } from "../../lib/server/active-search/eligibility";
 import { activeSearchStateDto } from "../../lib/server/active-search/http";
 import { needsScan, selectFreshListings } from "../../lib/server/active-search/notify";
@@ -76,7 +77,7 @@ describe("réglages de départ", () => {
 
   test("refus de domaine : codes stables et textes fixes, jamais une donnée de la base", () => {
     const codes: ActiveSearchErrorCode[] = [
-      "demand_not_active", "no_product_key", "unavailable", "capacity", "price_changed", "purchase_refunded", "max_horizon", "idempotency_conflict", "purchase_not_found", "already_refunded", "later_period_exists",
+      "demand_not_active", "no_product_key", "unavailable", "user_cap", "capacity", "price_changed", "purchase_refunded", "max_horizon", "idempotency_conflict", "purchase_not_found", "already_refunded", "later_period_exists",
     ];
     assert.deepEqual(Object.keys(ACTIVE_SEARCH_ERROR_MESSAGES).sort(), [...codes].sort());
     for (const code of codes) {
@@ -327,7 +328,7 @@ describe("contenu des notifications d'annonces d'autres sites (liste blanche)", 
 
 describe("DTO de l'état : liste blanche, prix provisoire, crédits payés, aucun renouvellement", () => {
   const state: ActiveSearchState = {
-    demandId: "22222222-2222-4222-8222-222222222222", demandStatus: "active", active: true, suspended: false, startsAt: NOW, endsAt: new Date(NOW.getTime() + 30 * DAY), remainingDays: 30, purchasedPeriods: 1,
+    demandId: "22222222-2222-4222-8222-222222222222", demandStatus: "active", active: true, suspended: false, accelerationPending: false, startsAt: NOW, endsAt: new Date(NOW.getTime() + 30 * DAY), remainingDays: 30, purchasedPeriods: 1,
     nextEndsAt: new Date(NOW.getTime() + 60 * DAY), canPurchase: true, blockedReason: null, maxEndsAt: new Date(NOW.getTime() + 180 * DAY), expiringSoon: false, priceXof: 2_000, durationDays: 30,
     balanceXof: 5_000, readAt: NOW,
   };
@@ -335,7 +336,7 @@ describe("DTO de l'état : liste blanche, prix provisoire, crédits payés, aucu
   test("clés exactes ; jamais d'identifiant d'achat, de transaction ou de compte", () => {
     const dto = activeSearchStateDto(state);
     assert.deepEqual(Object.keys(dto).sort(), [
-      "active", "autoRenew", "balanceXof", "blockedReason", "canPurchase", "contractVersion", "demandId", "demandStatus", "durationDays", "endsAt", "expiringSoon", "maxEndsAt", "nextEndsAt",
+      "accelerationPending", "active", "autoRenew", "balanceXof", "blockedReason", "canPurchase", "contractVersion", "demandId", "demandStatus", "durationDays", "endsAt", "expiringSoon", "maxEndsAt", "nextEndsAt",
       "paidCreditsOnly", "priceProvisional", "priceXof", "purchasedPeriods", "readAt", "remainingDays", "startsAt", "suspended",
     ]);
     assert.equal(dto.priceProvisional, true);
@@ -426,5 +427,48 @@ describe("code : étape du worker, crédits payés, entretien sans attente, aucu
     const simulate = strip(read("scripts/active-search-simulate.ts"));
     assert.match(simulate, /checkDemoSeedEnvironment\(process\.env\)/);
     assert.ok(simulate.indexOf("checkDemoSeedEnvironment") < simulate.indexOf("simulateNewExternalListing("), "le garde-fou passe avant toute écriture");
+  });
+});
+
+describe("places de collecte accélérée et plafond par compte (lot RA1-ter)", () => {
+  test("plafond de deux clés produit distinctes par acheteur : une clé déjà suivie n'ajoute rien, une troisième clé est refusée", () => {
+    assert.equal(ACTIVE_SEARCH_MAX_ACCELERATED_KEYS_PER_USER, 2);
+    assert.equal(userCapAllows(new Set(), "a"), true);
+    assert.equal(userCapAllows(new Set(["a"]), "b"), true);
+    assert.equal(userCapAllows(new Set(["a", "b"]), "a"), true, "prolonger une clé déjà suivie");
+    assert.equal(userCapAllows(new Set(["a", "b"]), "c"), false, "troisième produit");
+    assert.equal(userCapAllows(new Set(["a", "b", "c"]), "a"), false, "au-delà du plafond (réactivation, modification) : la prolongation est refusée aussi");
+  });
+
+  test("migration 0029 : une table de places par clé produit, sans clé étrangère (verrou global jamais en attente d'un verrou de ligne du besoin)", () => {
+    const sql = strip(read("database/migrations/0029_active_search_places.sql").replace(/^--.*$/gm, ""));
+    assert.match(sql, /CREATE TABLE active_search_places \(\s*product_key TEXT PRIMARY KEY CHECK \(char_length\(product_key\) BETWEEN 3 AND 600\)/);
+    assert.equal(/REFERENCES/.test(sql), false, "aucune clé étrangère vers demands ou users");
+    assert.match(sql, /idx_active_search_places_user/);
+    assert.equal((sql.match(/CREATE TABLE/g) ?? []).length, 1, "additive : une seule table");
+    assert.equal(/ALTER TABLE|DROP /.test(sql), false, "aucune modification d'une table existante");
+  });
+
+  test("une seule fonction écrit les places (places.ts) ; achat, changement de besoin et cycle de collecte l'appellent ; la lecture des clés accélérées vient des places", () => {
+    const writers: string[] = [];
+    for (const file of ["lib/server/active-search/places.ts", "lib/server/active-search/places-run.ts", "lib/server/active-search/purchase.ts", "lib/server/active-search/maintenance.ts", "lib/server/active-search/notify.ts",
+      "lib/server/active-search/refund.ts", "lib/server/active-search/state.ts", "lib/server/external/watches.ts", "lib/server/external/collect.ts", "lib/server/catalog/demands.ts"]) {
+      if (/(INSERT INTO|DELETE FROM|UPDATE) active_search_places/.test(strip(read(file)))) writers.push(file);
+    }
+    assert.deepEqual(writers, ["lib/server/active-search/places.ts"], "UNE seule fonction écrit la table des places");
+    const purchase = strip(read("lib/server/active-search/purchase.ts"));
+    assert.equal((purchase.match(/reconcileAcceleratedPlaces\(/g) ?? []).length, 2, "avant le contrôle d'admission, puis après l'écriture de l'achat");
+    assert.match(purchase, /userCapAllows\(/, "plafond par compte contrôlé pour l'activation comme pour la prolongation");
+    assert.equal(/if \(!extension\) \{[^}]*userCapAllows/.test(purchase), false, "le plafond ne dépend pas du genre d'achat");
+    const demands = strip(read("lib/server/catalog/demands.ts"));
+    assert.equal((demands.match(/reconcilePlacesAfterDemandChange\(/g) ?? []).length, 2, "modification d'un besoin et transition de statut (réactivation, satisfait)");
+    assert.match(strip(read("lib/server/external/collect.ts")), /reconcilePlacesForCycle\(/);
+    assert.match(strip(read("lib/server/external/watches.ts")), /const boosted = await readAcceleratedKeys\(/, "seules les clés avec une place accélèrent une surveillance");
+    assert.match(strip(read("lib/server/active-search/places-run.ts")), /SAVEPOINT active_search_places/, "un changement de besoin ne fait jamais échouer à cause de l'accélération");
+  });
+
+  test("la recherche active est absente (jamais une erreur SQL) tant que la migration 0029 manque", () => {
+    assert.match(strip(read("lib/server/active-search/state.ts")), /to_regclass\('active_search_places'\) IS NOT NULL/);
+    assert.match(strip(read("lib/server/active-search/purchase.ts")), /activeSearchSchemaPresent\(client\)\)\) throw new ActiveSearchError\("unavailable"\)/);
   });
 });

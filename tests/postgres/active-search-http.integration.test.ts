@@ -80,7 +80,7 @@ test("GET /api/demands/{id}/active-search : session obligatoire, UUID valide, au
   assert.equal(answer.status, 200);
   const dto = obj(answer.json);
   assert.deepEqual(Object.keys(dto).sort(), [
-    "active", "autoRenew", "balanceXof", "blockedReason", "canPurchase", "contractVersion", "demandId", "demandStatus", "durationDays", "endsAt", "expiringSoon", "maxEndsAt", "nextEndsAt",
+    "accelerationPending", "active", "autoRenew", "balanceXof", "blockedReason", "canPurchase", "contractVersion", "demandId", "demandStatus", "durationDays", "endsAt", "expiringSoon", "maxEndsAt", "nextEndsAt",
     "paidCreditsOnly", "priceProvisional", "priceXof", "purchasedPeriods", "readAt", "remainingDays", "startsAt", "suspended",
   ]);
   assert.deepEqual([dto.contractVersion, dto.priceProvisional, dto.paidCreditsOnly, dto.autoRenew], ["active-search/v1", true, true, false]);
@@ -140,7 +140,7 @@ test("POST : origine AVANT la session, JSON strict (clé exacte, UUID), solde in
   assert.equal(created.status, 201);
   const dto = obj(created.json);
   assert.deepEqual(Object.keys(dto).sort(), [
-    "active", "autoRenew", "balanceXof", "blockedReason", "canPurchase", "contractVersion", "demandId", "demandStatus", "durationDays", "endsAt", "expiringSoon", "maxEndsAt", "nextEndsAt",
+    "accelerationPending", "active", "autoRenew", "balanceXof", "blockedReason", "canPurchase", "contractVersion", "demandId", "demandStatus", "durationDays", "endsAt", "expiringSoon", "maxEndsAt", "nextEndsAt",
     "paidCreditsOnly", "priceProvisional", "priceXof", "purchase", "purchasedPeriods", "readAt", "remainingDays", "startsAt", "suspended",
   ]);
   assert.deepEqual(Object.keys(obj(dto.purchase)).sort(), ["endsAt", "kind", "priceXof", "reused", "startsAt"], "ni identifiant d'achat ni de transaction");
@@ -416,14 +416,16 @@ test("A4 : besoin satisfait → le GET montre l'option SUSPENDUE (suspended vrai
   assert.equal((await purchase(buyer.cookie, demandId, body())).status, 201, "une nouvelle clé rachète");
 });
 
-test("A5 : l'admission de capacité par HTTP — au-delà de 4 produits accélérés distincts, 409 capacity avec texte fixe, sans écriture", async () => {
-  const buyer = await login(env.pool);
-  await fund(env.pool, buyer.userId, 40_000);
+test("A5 : l'admission de capacité par HTTP — au-delà de 4 produits accélérés distincts (deux par acheteur au plus), 409 capacity avec texte fixe, sans écriture", async () => {
   const engaged = (await acceleratedCapacity(env.pool, FAKE_ENV, new Date())).keys.length;
   const room = Math.max(0, 4 - engaged);
   const statuses: number[] = [];
   let refusal: Reply | null = null;
+  // Plafond par utilisateur (RA1-ter) : deux produits distincts au plus par acheteur, donc trois acheteurs pour six produits.
+  const buyers = [await login(env.pool), await login(env.pool), await login(env.pool)];
+  for (const buyer of buyers) await fund(env.pool, buyer.userId, 40_000);
   for (let index = 1; index <= 6; index += 1) {
+    const buyer = buyers[Math.floor((index - 1) / 2)];
     const demand = await createDemand({ ownerId: buyer.userId, rawText: `Je cherche un Redmi ${index}`, category: "Téléphones", brand: "Xiaomi", model: `Redmi ${index}`, location: "Abidjan", budget: { amount: 200_000, currency: "XOF" }, status: "active" }, env.pool);
     const before = await count(env.pool, "wallet_transactions");
     const answer = await purchase(buyer.cookie, demand.id, body());

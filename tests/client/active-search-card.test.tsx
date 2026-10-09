@@ -10,7 +10,7 @@ import type { ActiveSearchState } from "../../lib/client/active-search-api";
 
 const DEMAND_ID = "22222222-2222-4222-8222-222222222222";
 const state = (overrides: Partial<ActiveSearchState> = {}): ActiveSearchState => ({
-  priceProvisional: true, paidCreditsOnly: true, autoRenew: false, demandId: DEMAND_ID, demandStatus: "active", active: false, suspended: false, startsAt: null, endsAt: null, remainingDays: null, purchasedPeriods: 0,
+  priceProvisional: true, paidCreditsOnly: true, autoRenew: false, demandId: DEMAND_ID, demandStatus: "active", active: false, suspended: false, accelerationPending: false, startsAt: null, endsAt: null, remainingDays: null, purchasedPeriods: 0,
   nextEndsAt: "2031-02-01T10:00:00.000Z", maxEndsAt: "2031-07-01T10:00:00.000Z", canPurchase: true, blockedReason: null, expiringSoon: false, priceXof: 2_000, durationDays: 30, balanceXof: 5_000,
   readAt: "2031-01-02T10:00:00.000Z", ...overrides,
 });
@@ -174,5 +174,31 @@ describe("A6 : la carte envoie le prix qu'elle AFFICHE", () => {
   test("la carte est montée pour un besoin actif ET satisfait (option suspendue visible), jamais pour un autre statut", () => {
     const page = readFileSync(join(import.meta.dirname, '../../app/(buyer)/besoins/[id]/page.tsx'), "utf8").replace(/\/\/.*$/gm, "");
     assert.match(page, /demand\.status === "active" \|\| demand\.status === "satisfied" \? <ActiveSearchCard/);
+  });
+});
+
+describe("accélération en attente de place (lot RA1-ter)", () => {
+  const live = { active: true, startsAt: "2031-01-02T10:00:00.000Z", endsAt: "2031-02-01T10:00:00.000Z", remainingDays: 30, purchasedPeriods: 1, nextEndsAt: "2031-03-03T10:00:00.000Z" };
+
+  test("option en vigueur sans place : la carte le marque et le dit (notifications actives, consultation rapide en attente), le bouton Prolonger reste", () => {
+    const html = view({ state: state({ ...live, accelerationPending: true }) });
+    assert.match(html, /data-acceleration="pending"/);
+    assert.match(text(html), /La consultation rapide de ce produit attend une place\./);
+    assert.match(text(html), /Vous êtes prévenu des nouvelles annonces d'autres sites comme prévu/);
+    assert.match(html, /data-testid="active-search-buy"[^>]*>Prolonger de 30 jours/);
+    assert.match(text(html), /selon la place disponible/, "ce qui est garanti : jusqu'à toutes les heures, selon la place disponible");
+  });
+
+  test("option en vigueur avec place : marquée en cours ; sans option : aucune accélération", () => {
+    assert.match(view({ state: state({ ...live }) }), /data-acceleration="running"/);
+    assert.match(view({ state: state() }), /data-acceleration="none"/);
+    assert.equal(text(view({ state: state({ ...live }) })).includes("attend une place"), false);
+  });
+
+  test("plafond par compte : le texte dit deux produits au plus, aucun bouton d'achat", () => {
+    const html = view({ state: state({ canPurchase: false, blockedReason: "user_cap", nextEndsAt: null }) });
+    assert.match(html, /data-testid="active-search-blocked"/);
+    assert.match(text(html), /Vous suivez déjà deux produits différents en recherche active/);
+    assert.equal(html.includes('data-testid="active-search-buy"'), false);
   });
 });
