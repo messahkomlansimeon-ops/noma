@@ -11,8 +11,9 @@
  * contacter de vrais sites, sans IA, sans captcha) et NOMA_FAKE_PAYMENTS=1 (prestataire de paiement FICTIF : la recharge du
  * porte-monnaie passe par la page « paiement simulé », aucun argent réel). Les secrets NOMA_AUTH_SECRET, NOMA_AUTH_PROXY_SECRET
  * et NOMA_FAKE_PAYMENT_SECRET sont lus dans l'environnement s'ils existent (le dernier : 32 octets au moins, sinon refus) ;
- * sinon ils sont générés au hasard à chaque démarrage (les sessions ne survivent alors pas à un redémarrage ; le secret du
- * prestataire fictif n'est jamais affiché).
+ * sinon ils sont générés au hasard à chaque démarrage (un code de connexion demandé avant un redémarrage n'est plus valable après ; les sessions déjà ouvertes, elles, survivent,
+ * car elles sont en base ; le secret du prestataire fictif n'est jamais affiché). Lot FIN1 : `next dev` n'écoute que sur 127.0.0.1 (NOMA_DEV_NEXT_HOSTNAME fixé ici) et son
+ * indicateur de développement est masqué (next.config.ts, `devIndicators`) : il interceptait les clics sur la barre du bas.
  *
  * Garde-fous (refus clair, code de sortie 1, rien n'est démarré) :
  *  - DATABASE_URL est OBLIGATOIRE dans l'environnement de lancement (aucune valeur par défaut, aucun fichier .env* lu ici : un
@@ -32,6 +33,7 @@ import net from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isValidSmsApiKey, readSmsConfig } from "../lib/server/sms/config";
+import { NEXT_DEV_HOSTNAME } from "./dev-full-args";
 import { DEV_PROXY_MIN_SECRET_BYTES, checkDevelopmentNodeEnv, createDevProxy } from "./dev-proxy";
 
 export const DEV_TRY_NEXT_PORT = 3211;
@@ -183,7 +185,7 @@ export function prepareDevTry(
   } else {
     authSecret = random(32).toString("base64");
     warnings.push(
-      "NOMA_AUTH_SECRET n'est pas défini : un secret temporaire est généré. Les sessions ne survivent pas à un redémarrage.",
+      "NOMA_AUTH_SECRET n'est pas défini : un secret temporaire est généré. Un code de connexion demandé avant un redémarrage n'est plus valable après ; les sessions déjà ouvertes survivent.",
     );
   }
 
@@ -237,6 +239,8 @@ export function prepareDevTry(
     NOMA_AUTH_ORIGIN: publicOrigin,
     NOMA_AUTH_SECRET: authSecret,
     NOMA_AUTH_PROXY_SECRET: proxySecret,
+    // Lot FIN1 : `next dev` n'écoute que sur la boucle locale (127.0.0.1), quoi que dise l'environnement : personne d'autre que ce poste ne le joint, ni directement ni autrement que par le relais.
+    NOMA_DEV_NEXT_HOSTNAME: NEXT_DEV_HOSTNAME,
     // La recherche anonyme (POST /api/search) lit le même secret sous un autre nom : une seule valeur pour le relais.
     NOMA_PROXY_SECRET: proxySecret,
     PORT: String(nextPort),

@@ -259,13 +259,15 @@ describe("administration : tableau « Marché »", () => {
     assert.equal(answer.status, 200);
     const body = answer.json as { contractVersion: string; currency: string; roundingXof: number; period: Json; rows: Array<Json> };
     assert.deepEqual(Object.keys(body).sort(), ["contractVersion", "currency", "period", "roundingXof", "rows"]);
-    assert.equal(body.contractVersion, "market-admin/v3");
+    assert.equal(body.contractVersion, "market-admin/v4");
     assert.ok(body.rows.length >= 1);
-    for (const row of body.rows) assert.deepEqual(Object.keys(row).sort(), ["confirmedSales", "label", "listings"]);
+    for (const row of body.rows) assert.deepEqual(Object.keys(row).sort(), ["confirmedSales", "historicalSales", "label", "listings"]);
     const top = body.rows.find((row) => row.label === "Apple iPhone 12");
     assert.ok(top, "le produit de référence figure au tableau");
     assert.equal((top?.listings as Json).status, "published");
-    assert.deepEqual(top?.confirmedSales, { kind: "approx", value: 5 }, "7 ventes confirmées → environ 5");
+    // Lot FIN1 : les 7 relevés de vente de ce monde n'ont pas de commande (relevés directs) : historique de démonstration, à part ; aucune vente confirmée réelle.
+    assert.deepEqual(top?.historicalSales, { kind: "approx", value: 5 }, "7 relevés de vente sans commande → environ 5, à part");
+    assert.deepEqual(top?.confirmedSales, { kind: "below", bound: 5 }, "aucune commande réelle confirmée");
     for (const secret of [...sellerIds, ...buyerIds, ...SALE_PRICES.map(String)]) assert.equal(answer.text.includes(secret), false, secret);
     assert.equal((await get(boss.cookie, "?x=1")).status, 400, "aucun paramètre admis");
   });

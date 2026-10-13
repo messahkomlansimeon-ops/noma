@@ -49,7 +49,8 @@ export async function simulateNewExternalListing(input: { pool: Pool; demandId: 
   const price = round500(budget === null ? reference : Math.min(reference, budget * 0.9));
   const stamp = now().getTime();
   const externalId = `${FAKE_SOURCE_A}-simulation-${stamp}`;
-  const product = titleCase(describeProductKey(key));
+  // Lot FIN1 : le produit s'écrit comme le besoin l'écrit (« Apple iPhone 12 »), pas comme sa clé normalisée en minuscules remise en majuscules (« Apple Iphone 12 »).
+  const product = [demand.brand, demand.model, demand.variant].filter((part): part is string => typeof part === "string" && part.trim() !== "").map((part) => part.trim()).join(" ") || titleCase(describeProductKey(key));
   const title = input.title ?? `${product} comme neuf, nouvelle annonce du jour`;
   const location = key.zone === "" || key.zone === "abidjan" ? "Cocody" : titleCase(key.zone);
   const connectors = createFakeConnectors();

@@ -328,11 +328,13 @@ test("lot H1 : 90 jours de relevés de prix synthétiques entre vendeurs et ache
   if (hp.listings.status === "published") {
     assert.ok(hp.listings.trend.every((point) => point.median === null));
   }
-  // Administration : le tableau « Marché » donne, par produit, un NOMBRE arrondi de ventes confirmées (les ventes synthétiques), jamais un prix de vente.
+  // Administration : le tableau « Marché » donne, par produit, un NOMBRE arrondi de ventes confirmées (les ventes synthétiques sont étiquetées « historique de démonstration », à part), jamais un prix de vente.
   const admin = await readAdminMarket(pool);
   const iphoneRow = admin.rows.find((row) => row.label === "Apple iPhone 12 · 128 Go · Occasion");
   assert.ok(iphoneRow, "le produit principal figure au tableau");
-  assert.ok(iphoneRow?.confirmedSales.kind === "approx" && iphoneRow.confirmedSales.value >= 50, `ventes confirmées : ${JSON.stringify(iphoneRow?.confirmedSales)}`);
+  // Lot FIN1 : les ventes synthétiques n'ont aucune commande derrière elles : « historique de démonstration », à part ; elles ne sont plus comptées comme ventes confirmées.
+  assert.ok(iphoneRow?.historicalSales.kind === "approx" && iphoneRow.historicalSales.value >= 50, `historique de démonstration : ${JSON.stringify(iphoneRow?.historicalSales)}`);
+  assert.deepEqual(iphoneRow?.confirmedSales, { kind: "below", bound: 5 }, "aucune des ventes synthétiques n'est une vente confirmée");
   // La sortie ne porte aucun identifiant des comptes fictifs.
   const text = JSON.stringify([ninety, admin]);
   for (const id of (await pool.query<{ id: string }>("SELECT id FROM users")).rows.map((row) => row.id)) assert.equal(text.includes(id), false);

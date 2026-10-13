@@ -27,7 +27,9 @@ import { computeMissionAllocation } from "./proposal";
  *     pendant un recalcul. La première lecture après l'activation pose la base de comparaison SANS notification (comme N1 : créer un besoin ne notifie pas ce que l'acheteur voit déjà) ;
  *  3. NOTIFICATION : si la couverture lue dépasse le PLUS HAUT niveau dont l'acheteur a été prévenu (ou qu'il voyait à la première lecture), UNE notification « mission_coverage »
  *     (dans l'application, aucun envoi externe), au plus une par jour UTC et par mission (index unique) ; une hausse retenue ce jour-là part le lendemain. Une baisse puis une remontée
- *     ne notifie jamais ce qui a déjà été annoncé ;
+ *     ne notifie jamais ce qui a déjà été annoncé. Lot FIN1 : la propre DÉCLARATION de l'acheteur ne notifie jamais : la hausse de couverture que seules ses déclarations d'achat
+ *     (commandes créées depuis la dernière lecture : couverture lue moins couverture lue SANS elles) expliquent est absorbée en silence dans le niveau déjà vu (« 8 sur 8 » à l'instant
+ *     où il déclare un achat que le vendeur n'a pas encore confirmé n'est pas une nouvelle) ; le reste de la hausse (annonces nouvelles) notifie comme avant ;
  *  4. LIBÉRATION DES BESOINS PORTEURS : le besoin porteur d'une mission close est archivé 24 h APRÈS sa fin, jamais à l'instant de la fin : un vendeur dont la confirmation termine la
  *     mission ne le devine pas en voyant le besoin disparaître.
  * Sans la migration 0027 : étape ignorée sans erreur (`skipped`). Aucun message, aucune commande n'est jamais créé par cette étape.
@@ -137,20 +139,37 @@ async function evaluateMissions(pool: Pool, batch: number, result: MissionsStepR
         if (!row.rows[0]) return null;
         const mission = mapMission(row.rows[0]);
         const computed = await computeMissionAllocation(client, mission, row.rows[0].read_at);
-        return { covered: computed === null ? 0 : computed.coveredQuantity, readAt: row.rows[0].read_at };
+        const covered = computed === null ? 0 : computed.coveredQuantity;
+        // Lot FIN1 : la part de la couverture que la propre DÉCLARATION de l'acheteur explique = la couverture lue moins celle qu'on lirait SANS les commandes créées depuis la lecture
+        // précédente (même instantané). Calculée seulement quand une commande a été créée depuis (un essai de plus, jamais à chaque lecture).
+        let ownRise = 0;
+        if (computed !== null && mission.evaluatedAt !== null) {
+          const declared = await client.query(
+            "SELECT 1 FROM orders WHERE mission_id = $1::uuid AND status IN ('proposed', 'confirmed') AND created_at > $2::timestamptz AND created_at <= $3::timestamptz LIMIT 1",
+            [id, mission.evaluatedAt, row.rows[0].read_at],
+          );
+          if (declared.rowCount) {
+            const without = await computeMissionAllocation(client, mission, row.rows[0].read_at, { ignoreOrdersAfter: mission.evaluatedAt });
+            ownRise = Math.max(0, covered - (without === null ? 0 : without.coveredQuantity));
+          }
+        }
+        return { covered, ownRise, readAt: row.rows[0].read_at };
       });
       if (read === null) continue;
       const written = await pool.query<{ changed: boolean }>(
         // Base de comparaison : posée sans bruit à la première lecture. Elle ne BAISSE jamais ensuite : c'est le plus haut niveau que l'acheteur a vu ou dont il a été prévenu
         // (une baisse passagère puis une remontée ne notifie pas ce qu'il a déjà vu).
+        // Lot FIN1 : `$4` (`ownRise`) = la hausse de couverture que la propre déclaration de l'acheteur explique. Elle est ajoutée au niveau déjà vu (jamais au-delà de la couverture lue) :
+        // sa déclaration ne le notifie pas ; la part de la hausse due à autre chose (annonces nouvelles) reste à annoncer.
         `WITH previous AS (SELECT covered_quantity FROM missions WHERE id = $1::uuid)
          UPDATE missions SET covered_quantity = $2::int, evaluated_at = $3::timestamptz,
-                notified_quantity = COALESCE(missions.notified_quantity, $2::int),
+                notified_quantity = CASE WHEN missions.notified_quantity IS NULL THEN $2::int
+                                         ELSE missions.notified_quantity + LEAST($4::int, GREATEST($2::int - missions.notified_quantity, 0)) END,
                 updated_at = clock_timestamp()
            FROM previous
           WHERE missions.id = $1::uuid AND missions.status = 'active'
         RETURNING (previous.covered_quantity IS DISTINCT FROM $2::int) AS changed`,
-        [id, read.covered, read.readAt],
+        [id, read.covered, read.readAt, read.ownRise],
       );
       if (written.rowCount) {
         result.evaluated += 1;

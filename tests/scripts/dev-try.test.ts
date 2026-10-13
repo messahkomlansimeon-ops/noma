@@ -244,6 +244,14 @@ describe("dev:try : préparation de l'environnement", () => {
     }
   });
 
+  test("lot FIN1 : `next dev` n'écoute que sur 127.0.0.1, quoi que dise l'environnement (dev:try fixe NOMA_DEV_NEXT_HOSTNAME)", () => {
+    for (const hostname of [undefined, "", "0.0.0.0", "192.168.1.5", "::"]) {
+      const prepared = prepareDevTry({ DATABASE_URL, NOMA_DEV_NEXT_HOSTNAME: hostname });
+      assert.ok(prepared.ok, String(hostname));
+      assert.equal(prepared.plan.env.NOMA_DEV_NEXT_HOSTNAME, "127.0.0.1", String(hostname));
+    }
+  });
+
   test("secrets absents : générés au hasard (valides), avertissements sans valeur secrète ; les deux noms du secret de proxy sont égaux", () => {
     const prepared = prepareDevTry({ DATABASE_URL }, fixedRandom(9));
     assert.ok(prepared.ok);
@@ -252,7 +260,9 @@ describe("dev:try : préparation de l'environnement", () => {
     assert.ok(Buffer.byteLength(env.NOMA_AUTH_PROXY_SECRET as string, "utf8") >= 32);
     assert.equal(env.NOMA_PROXY_SECRET, env.NOMA_AUTH_PROXY_SECRET);
     assert.equal(warnings.length, 2);
-    assert.match(warnings.join(" "), /sessions ne survivent pas à un redémarrage/);
+    // Lot FIN1 : le secret ne protège que les codes de connexion en cours ; les sessions sont en base et SURVIVENT à un redémarrage (l'avertissement ne dit plus le contraire).
+    assert.match(warnings.join(" "), /Un code de connexion demandé avant un redémarrage n'est plus valable après ; les sessions déjà ouvertes survivent\./);
+    assert.equal(/ne survivent pas/.test(warnings.join(" ")), false);
     for (const warning of warnings) {
       assert.equal(warning.includes(env.NOMA_AUTH_SECRET as string), false);
       assert.equal(warning.includes(env.NOMA_AUTH_PROXY_SECRET as string), false);
@@ -600,13 +610,15 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
       "arrondis à 5 près",
       "cinq comptes acheteurs",
       "pas qu'elle a été lue",
-      "aucune vente n'est mesurée",
+      // Lot FIN1 : « aucune vente n'est mesurée » était périmé (les ventes confirmées ont leur bloc depuis le lot D2) : le guide présente ce bloc.
+      "Ventes déclarées et confirmées",
       "MESURES.md",
       "npm run metrics:purge",
       "400 jours",
     ]) {
       assert.ok(normalized.includes(expected), `ESSAYER.md doit contenir « ${expected} »`);
     }
+    assert.equal(/aucune vente n'est mesurée/.test(normalized), false, "lot FIN1 : l'ancienne phrase périmée n'existe plus");
     const contactStep = normalized.indexOf("Contacter le vendeur");
     const boostPurchase = normalized.indexOf("acheter un boost");
     assert.ok(contactStep !== -1 && boostPurchase !== -1 && boostPurchase < contactStep, "le parcours de contact vient après l'achat du boost");
@@ -676,7 +688,7 @@ describe("ESSAYER.md reste cohérent avec les garde-fous de dev:try", () => {
       "jamais en production",
       "résultats d'exemple",
       "aucun vrai site n'est contacté",
-      "n'exposez jamais le port 3212 par un tunnel",
+      "n'exposez jamais les ports 3211 et 3212 par un tunnel",
       "loca.lt",
       "ngrok",
       "besoins",

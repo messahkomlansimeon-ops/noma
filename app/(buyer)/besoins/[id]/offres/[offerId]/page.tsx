@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Phone } from "lucide-react";
 import { IndicatorLine, SponsoredNotice } from "@/components/matches/match-parts";
 import { ProBadge } from "@/components/pro-badge";
@@ -23,6 +23,7 @@ import {
 } from "@/lib/client/api";
 import { artForCategory } from "@/lib/client/catalog-view";
 import { marketQueryFromProduct } from "@/lib/client/market-view";
+import { missionFromSearch } from "@/lib/client/missions-view";
 import { coverPhotoIdOf } from "@/lib/client/photos-view";
 import {
   CONTACT_BUTTON_LABEL,
@@ -45,7 +46,7 @@ type ContactState =
  * serveur), attributs publics et date de l'annonce. Jamais d'identifiant ni de téléphone du vendeur avant le contact. « Contacter le vendeur » révèle son numéro
  * vérifié et le compte comme un contact : le numéro n'est gardé qu'en mémoire de la page (jamais dans le navigateur).
  */
-function Fiche({ demandId, offerId }: { demandId: string; offerId: string }) {
+function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: string; missionId: string | null }) {
   const redirectIfUnauthorized = useUnauthorizedRedirect();
   const [detail, setDetail] = useState<OfferDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -98,8 +99,8 @@ function Fiche({ demandId, offerId }: { demandId: string; offerId: string }) {
           >
             Réessayer
           </button>
-          <Link href={`/besoins/${demandId}`} className="text-[13px] font-semibold text-forest underline">
-            Retour aux résultats de mon besoin
+          <Link href={missionId === null ? `/besoins/${demandId}` : `/missions/${missionId}`} className="text-[13px] font-semibold text-forest underline">
+            {missionId === null ? "Retour aux résultats de mon besoin" : "Retour à la mission"}
           </Link>
         </div>
       </div>
@@ -229,15 +230,19 @@ function Fiche({ demandId, offerId }: { demandId: string; offerId: string }) {
 
 function PageContent() {
   const params = useParams<{ id: string; offerId: string }>();
+  const search = useSearchParams();
   const demandId = typeof params.id === "string" ? params.id : "";
   const offerId = typeof params.offerId === "string" ? params.offerId : "";
   const valid = isUuid(demandId) && isUuid(offerId);
+  // Lot FIN1 : ouverte depuis une mission, la fiche garde le contexte de la mission : la flèche retour revient à la mission (jamais au besoin porteur interne).
+  const missionId = missionFromSearch(search.get("mission"));
+  const back = missionId !== null ? `/missions/${missionId}` : isUuid(demandId) ? `/besoins/${demandId}` : "/alertes";
   return (
     <main>
-      <TopBar back={isUuid(demandId) ? `/besoins/${demandId}` : "/alertes"} title="Annonce" />
+      <TopBar back={back} title="Annonce" />
       <div className="px-4 pb-6">
         {valid ? (
-          <Fiche demandId={demandId} offerId={offerId} />
+          <Fiche demandId={demandId} offerId={offerId} missionId={missionId} />
         ) : (
           <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
             Annonce introuvable.
@@ -251,7 +256,10 @@ function PageContent() {
 export default function FicheAnnoncePage() {
   return (
     <SessionGate>
-      <PageContent />
+      {/* useSearchParams exige une frontière Suspense pour que le reste de la page reste pré-rendu. */}
+      <Suspense fallback={null}>
+        <PageContent />
+      </Suspense>
     </SessionGate>
   );
 }

@@ -133,34 +133,45 @@ describe("ce que voit un vendeur", () => {
     assert.equal(missionOf(await readMissionCall(h, buyer.cookie, live.id)).status, "active");
   });
 
-  test("l'acheteur voit sa mission ; les vendeurs de la proposition y sont anonymes (« Vendeur 1 »…) sans identifiant ni numéro, et sans pseudonyme stable : les MÊMES vendeurs n'ont pas la même étiquette d'une mission à l'autre", async () => {
+  test("l'acheteur voit sa mission ; les vendeurs de la proposition y sont anonymes (« Vendeur 1 »…) sans identifiant ni numéro, stables pour une mission mais SANS pseudonyme stable : les MÊMES vendeurs n'ont pas toujours la même étiquette d'une mission à l'autre", async () => {
     const x = await login(env.pool);
     const y = await login(env.pool);
-    /** Une mission avec les deux mêmes vendeurs, dans l'ordre de pertinence donné : l'étiquette que l'acheteur lit pour chacun d'eux. */
+    /** Une mission avec les deux mêmes vendeurs : l'étiquette que l'acheteur lit pour chacun d'eux, et la relecture (stabilité). */
     const labelsOf = async (order: Array<{ seller: Login; score: number }>): Promise<{ labels: Map<string, string>; text: string }> => {
-      const live = await startMission(env.pool, h, buyer, { quantity: 4 });
+      // Un acheteur neuf par mission (au plus 5 missions actives par acheteur).
+      const owner = await login(env.pool);
+      const live = await startMission(env.pool, h, owner, { quantity: 4 });
       const owners = new Map<string, string>();
       for (const { seller, score } of order) {
         const entry = await addCandidate(env.pool, live, { quantity: 2, score, seller: { id: seller.userId, phone: seller.phone } });
         owners.set(entry.offer.id, seller.userId);
       }
-      const answer = await proposalCall(h, buyer.cookie, live.id);
-      for (const seller of [x, y]) {
-        assert.ok(!answer.text.includes(seller.userId), "aucun identifiant de vendeur");
-        assert.ok(!answer.text.includes(seller.phone), "aucun numéro de vendeur");
-      }
-      const lines = proposalOf(answer).lines as Array<{ offerId: string; vendor: string }>;
-      assert.equal(lines.length, 2);
-      return { labels: new Map(lines.map((line) => [owners.get(line.offerId) as string, line.vendor])), text: answer.text };
+      const read = async () => {
+        const answer = await proposalCall(h, owner.cookie, live.id);
+        for (const seller of [x, y]) {
+          assert.ok(!answer.text.includes(seller.userId), "aucun identifiant de vendeur");
+          assert.ok(!answer.text.includes(seller.phone), "aucun numéro de vendeur");
+        }
+        const lines = proposalOf(answer).lines as Array<{ offerId: string; vendor: string }>;
+        assert.equal(lines.length, 2);
+        return { labels: new Map(lines.map((line) => [owners.get(line.offerId) as string, line.vendor])), text: answer.text };
+      };
+      const first = await read();
+      const again = await read();
+      assert.deepEqual([...again.labels], [...first.labels], "lot FIN1 : les numéros sont les mêmes d'un affichage à l'autre d'une même mission");
+      return first;
     };
-    const first = await labelsOf([{ seller: x, score: 99 }, { seller: y, score: 90 }]);
-    const second = await labelsOf([{ seller: x, score: 80 }, { seller: y, score: 95 }]);
-    assert.match(first.text, /Vendeur 1/);
-    assert.match(first.text, /Vendeur 2/);
-    assert.deepEqual([first.labels.get(x.userId), first.labels.get(y.userId)], ["Vendeur 1", "Vendeur 2"]);
-    assert.deepEqual([second.labels.get(x.userId), second.labels.get(y.userId)], ["Vendeur 2", "Vendeur 1"]);
-    assert.notEqual(first.labels.get(x.userId), second.labels.get(x.userId), "le vendeur X n'a pas la même étiquette dans les deux missions");
-    assert.notEqual(first.labels.get(y.userId), second.labels.get(y.userId), "le vendeur Y non plus");
+    // L'ordre de pertinence n'a plus d'effet sur les numéros (ils sont stables pour la mission). D'une mission à l'autre, le classement change : sur 24 missions des deux mêmes vendeurs,
+    // X reçoit les deux numéros (aucun pseudonyme stable qui permettrait de le suivre d'une mission à l'autre) ; une probabilité d'échec de 2^-23 si le classement était aléatoire.
+    const seen = new Set<string>();
+    for (let mission = 0; mission < 24; mission += 1) {
+      const result = await labelsOf(mission % 2 === 0 ? [{ seller: x, score: 99 }, { seller: y, score: 90 }] : [{ seller: x, score: 80 }, { seller: y, score: 95 }]);
+      assert.match(result.text, /Vendeur 1/);
+      assert.match(result.text, /Vendeur 2/);
+      assert.deepEqual([result.labels.get(x.userId), result.labels.get(y.userId)].sort(), ["Vendeur 1", "Vendeur 2"]);
+      seen.add(result.labels.get(x.userId) as string);
+    }
+    assert.deepEqual([...seen].sort(), ["Vendeur 1", "Vendeur 2"], "le vendeur X n'a pas toujours la même étiquette d'une mission à l'autre");
   });
 });
 
@@ -177,7 +188,10 @@ describe("étiquettes « Vendeur N » : une étiquette PAR vendeur dans une miss
       owners.set(entry.offer.id, seller.userId);
     }
     const lines = proposalOf(await proposalCall(h, buyer.cookie, live.id)).lines as Array<{ offerId: string; vendor: string }>;
-    assert.deepEqual(lines.map((line) => [owners.get(line.offerId) === same.userId, line.vendor]), [[true, "Vendeur 1"], [false, "Vendeur 2"], [true, "Vendeur 1"]]);
+    assert.deepEqual(lines.map((line) => owners.get(line.offerId) === same.userId), [true, false, true]);
+    assert.equal(lines[0].vendor, lines[2].vendor, "même vendeur, même étiquette");
+    assert.notEqual(lines[0].vendor, lines[1].vendor, "deux vendeurs, deux étiquettes");
+    assert.deepEqual([lines[0].vendor, lines[1].vendor].sort(), ["Vendeur 1", "Vendeur 2"]);
   });
 });
 

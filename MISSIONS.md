@@ -126,8 +126,8 @@ budget total ou la limite de vendeurs) mais pas la couverture maximale ni le co�
 chère, et **un budget total plus grand peut même couvrir moins** (le budget se vide sur l'annonce la plus pertinente) ; deux essais le montrent. La pertinence d'abord est le choix du produit ;
 l'acheteur décide ensuite ligne par ligne.
 
-**Étiquettes « Vendeur N » (information assumée).** Les vendeurs sont étiquetés « Vendeur 1 », « Vendeur 2 »… (les vendeurs déjà engagés d'abord, puis dans l'ordre de remplissage), jamais un
-identifiant, un numéro ni un pseudonyme stable : les mêmes vendeurs n'ont pas les mêmes étiquettes d'une mission à l'autre (essai). **Une étiquette par vendeur** : deux annonces d'un même vendeur
+**Étiquettes « Vendeur N » (information assumée).** Les vendeurs sont étiquetés « Vendeur 1 », « Vendeur 2 »… jamais un
+identifiant, un numéro ni un pseudonyme stable : les mêmes vendeurs n'ont pas les mêmes étiquettes d'une mission à l'autre (essai). **Lot FIN1 : le numéro est STABLE d'un affichage à l'autre d'une même mission** : les vendeurs affichés sont classés par une empreinte (SHA-256) de (mission, vendeur) (`stableSellerIndexes`), jamais montrée, et non plus par l'ordre de remplissage ni selon qu'ils sont déjà engagés (déclarer un achat chez « Vendeur 2 » ne le renomme pas « Vendeur 1 ») ; le numéro ne change que si l'ensemble des vendeurs affichés change. L'empreinte dépend de la mission : le classement est un autre d'une mission à l'autre, il n'y a donc toujours aucun pseudonyme stable qui permettrait de suivre un vendeur d'une mission à l'autre (essai sur 24 missions). **Une étiquette par vendeur** : deux annonces d'un même vendeur
 portent la même étiquette dans une mission. C'est voulu — l'acheteur sait qu'il n'écrit qu'une fois à ce vendeur — mais cela **révèle** à l'acheteur que deux annonces ont le même vendeur ; la
 proposition ne dit jamais *qui* est ce vendeur.
 
@@ -168,7 +168,7 @@ collecte externe) gardent leur ordre. Chaque étape est isolée dans son propre 
 3. **Notification** : la **première** lecture après l'activation pose une base de comparaison **sans bruit** (comme N1 : créer ne notifie pas ce que l'acheteur voit déjà). Cette base est le **plus
    haut niveau de couverture vu ou annoncé** : elle **ne baisse jamais**. Une notification `mission_coverage` (dans l'application ; titre « Apple iPhone 12 : 7 sur 20 », quantité couverte, lien
    `/missions/{id}`) ne part que si la couverture **dépasse** ce plus haut niveau, **au plus une par jour UTC et par mission** (index unique) ; une hausse retenue ce jour-là est signalée le lendemain.
-   Une baisse passagère puis un retour au même niveau (6 → 0 → 6, annonces retirées une minute) ne notifie **rien** : le constat de l'audit est fermé. Pas d'envoi externe, pas de ligne d'outbox.
+   Une baisse passagère puis un retour au même niveau (6 → 0 → 6, annonces retirées une minute) ne notifie **rien** : le constat de l'audit est fermé. **Lot FIN1 : la propre déclaration de l'acheteur ne notifie jamais** : la couverture compte les confirmés et les proposés, mais la hausse qu'expliquent seules ses déclarations d'achat (commandes créées depuis la lecture précédente : couverture lue moins couverture lue SANS elles) est absorbée en silence dans le niveau déjà vu (« 8 sur 8 » à l'instant où il déclare un achat que le vendeur n'a pas encore confirmé n'est pas une nouvelle) ; la part de la hausse due à des annonces nouvelles notifie comme avant. Pas d'envoi externe, pas de ligne d'outbox.
    Une mission en pause ne notifie pas.
 4. **Libération des besoins porteurs** : le besoin porteur d'une mission close depuis plus de **24 h** est archivé (le matching s'arrête) ; la libération est notée sur la mission, une seule fois.
 

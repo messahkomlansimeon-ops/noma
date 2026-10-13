@@ -102,7 +102,7 @@ export function marketAdminDto(result: { period: MarketStats["period"]; rows: Ad
     currency: "XOF" as const,
     roundingXof: MARKET_PRICE_ROUNDING_XOF,
     period: { days: result.period.days, from: result.period.from, to: result.period.to },
-    rows: result.rows.map((row) => ({ label: row.label, listings: listingsDto(row.listings), confirmedSales: countDto(row.confirmedSales) })),
+    rows: result.rows.map((row) => ({ label: row.label, listings: listingsDto(row.listings), confirmedSales: countDto(row.confirmedSales), historicalSales: countDto(row.historicalSales) })),
   };
 }
 

@@ -133,7 +133,7 @@ export const useNoma = create<NomaState>((set, get) => ({
           id: `S-${s.cases.length + 105}`,
           motif,
           offer,
-          meta: `1 signalement · Noma${detail ? " · " + detail : ""}`,
+          meta: `1 signalement · noma${detail ? " · " + detail : ""}`,
           time: "À l'instant",
           art: "box" as const,
           status: "open" as const,

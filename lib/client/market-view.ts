@@ -127,14 +127,19 @@ export function sparklineGeometry(trend: readonly MarketTrendPoint[], width: num
   return { paths, points, known };
 }
 
-/** Phrase de la tendance, pour un lecteur d'écran et sous la courbe : « Tendance en baisse : de 174 000 FCFA à 159 000 FCFA (médiane par semaine) » ; `null` sans courbe. */
+/**
+ * Phrase de la tendance, pour un lecteur d'écran et sous la courbe : « Tendance en baisse sur les 12 dernières semaines : de 174 000 FCFA à 159 000 FCFA (médiane par semaine) » ; `null` sans courbe.
+ * La période de la tendance est DITE (les blocs de 7 jours, de la plus ancienne semaine à la semaine en cours) : elle ne couvre que des semaines entières, donc un peu moins que la période
+ * de la médiane (« Sur les 90 derniers jours » : 12 semaines = 84 jours) ; les deux chiffres ne portent pas sur la même population (la médiane de la période compte une valeur par vendeur, la dernière
+ * de chacune de ses annonces de la période ; chaque point de la tendance, seulement les annonces de sa semaine).
+ */
 export function trendSummary(trend: readonly MarketTrendPoint[]): string | null {
   const values = trend.flatMap((point) => (point.median === null ? [] : [point.median]));
   if (values.length < 2) return null;
   const first = values[0];
   const last = values[values.length - 1];
   const direction = last > first ? "en hausse" : last < first ? "en baisse" : "stable";
-  return `Tendance ${direction} : de ${priceText(first)} à ${priceText(last)} (médiane par semaine)`;
+  return `Tendance ${direction} sur les ${trend.length} dernières semaines : de ${priceText(first)} à ${priceText(last)} (médiane par semaine)`;
 }
 
 // ───────────── les annonces ─────────────
@@ -165,7 +170,7 @@ export interface ListingsView {
   trendSummary: string | null;
 }
 
-const LISTINGS_TITLE = "Annonces en ligne";
+const LISTINGS_TITLE = "Annonces publiées sur la période";
 
 /** Fourchette (Q1, Q3) en phrase : « entre X et Y » ; si les bornes arrondies sont égales, une fourchette de largeur nulle ne s'écrit jamais « entre X et X » : « autour de X ». */
 export function rangeText(range: { q1: number; q3: number }): string {
@@ -236,21 +241,24 @@ export function marketQueryFromForm(input: { category: string | null; brand: str
 export const ADMIN_MARKET_TITLE = "Marché";
 export const ADMIN_MARKET_EMPTY = "Aucun relevé de prix pour le moment.";
 export const ADMIN_MARKET_NOTE =
-  "Les 20 produits les plus relevés sur les 90 derniers jours. Prix demandés : mêmes seuils que pour les utilisateurs (sous les seuils, aucun chiffre). Ventes confirmées : un nombre arrondi, jamais un prix : les prix de vente ne sont pas publiés.";
+  "Les 20 produits les plus relevés sur les 90 derniers jours. Prix demandés : mêmes seuils que pour les utilisateurs (sous les seuils, aucun chiffre). Ventes confirmées : celles des commandes réelles (comme l'aperçu de l'administration), un nombre arrondi, jamais un prix : les prix de vente ne sont pas publiés. L'historique de démonstration (relevés de vente sans commande) est compté à part.";
 
 export interface AdminMarketRowView {
   key: string;
   label: string;
   listings: ListingsView;
-  /** « environ 15 ventes confirmées » / « moins de 5 ventes confirmées » : un nombre arrondi, sans aucun prix. */
+  /** « environ 15 ventes confirmées » / « moins de 5 ventes confirmées » : un nombre arrondi, sans aucun prix (commandes réelles seulement). */
   salesText: string;
+  /** « environ 55 ventes (historique de démonstration, non comptées) » ; `null` quand l'historique de démonstration compte moins de 5 ventes pour ce produit (rien à étiqueter). */
+  historicalText: string | null;
 }
 
-export function adminMarketRows(rows: ReadonlyArray<{ label: string; listings: MarketListings; confirmedSales: MarketCount }>): AdminMarketRowView[] {
+export function adminMarketRows(rows: ReadonlyArray<{ label: string; listings: MarketListings; confirmedSales: MarketCount; historicalSales: MarketCount }>): AdminMarketRowView[] {
   return rows.map((row, index) => ({
     key: `${index}:${row.label}`,
     label: row.label,
     listings: listingsView(row.listings),
     salesText: `${countText(row.confirmedSales)} ventes confirmées`,
+    historicalText: row.historicalSales.kind === "approx" ? `${countText(row.historicalSales)} ventes (historique de démonstration, non comptées)` : null,
   }));
 }

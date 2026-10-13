@@ -398,6 +398,60 @@ describe("la proposition répartit le RESTE ; la couverture lue par l'étape com
   });
 });
 
+describe("notification : la propre déclaration de l'acheteur ne notifie jamais (lot FIN1)", () => {
+  const declare = async (live: Awaited<ReturnType<typeof startMission>>, candidate: Awaited<ReturnType<typeof addCandidate>>, quantity: number) =>
+    orderOf(await reply(await h.social.orders.declare(request("POST", `/api/demands/${live.demandId}/offers/${candidate.offer.id}/orders`, { cookie: buyer.cookie, body: { priceXof: 150_000, quantity } }), live.demandId, candidate.offer.id)));
+
+  test("l'acheteur déclare un achat que le vendeur n'a pas encore confirmé et la couverture monte à « 4 sur 4 » : aucune notification ; la hausse est absorbée dans le niveau déjà vu", async () => {
+    const live = await startMission(env.pool, h, buyer, { quantity: 4 });
+    const seller = await login(env.pool);
+    const candidate = await addCandidate(env.pool, live, { quantity: 2, seller: { id: seller.userId, phone: seller.phone } });
+    await settle(env.pool, live.demandId);
+    await step();
+    assert.deepEqual([(await row(live.id)).covered_quantity, (await row(live.id)).notified_quantity], [2, 2], "base posée sans bruit : 2 sur 4");
+    // Il déclare 4 achats chez ce vendeur (non confirmés) : engagé 4 → couverture 4 sur 4.
+    await declare(live, candidate, 4);
+    const result = await step();
+    assert.deepEqual([result.evaluated, result.changed, result.notified], [1, 1, 0], "sa propre déclaration ne notifie pas");
+    assert.deepEqual([(await row(live.id)).covered_quantity, (await row(live.id)).notified_quantity], [4, 4]);
+    assert.equal(await coverageNotifications(live.id), 0);
+    assert.equal((await step()).notified, 0);
+  });
+
+  test("une hausse due à des annonces NOUVELLES notifie toujours, même quand l'acheteur a déclaré un achat entre-temps ; seule la part expliquée par sa déclaration est absorbée", async () => {
+    const live = await startMission(env.pool, h, buyer, { quantity: 8 });
+    const seller = await login(env.pool);
+    const candidate = await addCandidate(env.pool, live, { quantity: 2, seller: { id: seller.userId, phone: seller.phone } });
+    await settle(env.pool, live.demandId);
+    await step();
+    assert.deepEqual([(await row(live.id)).covered_quantity, (await row(live.id)).notified_quantity], [2, 2]);
+    // Entre deux lectures : une annonce nouvelle (2) ET une déclaration de l'acheteur (+1 au-delà du stock annoncé).
+    await addCandidate(env.pool, live, { quantity: 2 });
+    await declare(live, candidate, 3);
+    const result = await step();
+    assert.equal(result.notified, 1, "les 2 unités de l'annonce nouvelle notifient");
+    const state = await row(live.id);
+    assert.equal(state.covered_quantity, 5, "3 engagés + 2 de la nouvelle annonce");
+    assert.equal(state.notified_quantity, 5, "annoncé : 5 (la part de sa déclaration, 1, absorbée ; la hausse de 2 notifiée)");
+    assert.equal(await coverageNotifications(live.id), 1);
+  });
+
+  test("la confirmation du vendeur (proposé → confirmé) ne change pas la couverture et ne notifie pas ; une déclaration annulée ne laisse rien à annoncer", async () => {
+    const live = await startMission(env.pool, h, buyer, { quantity: 4 });
+    const seller = await login(env.pool);
+    const candidate = await addCandidate(env.pool, live, { quantity: 4, seller: { id: seller.userId, phone: seller.phone } });
+    await settle(env.pool, live.demandId);
+    await step();
+    assert.deepEqual([(await row(live.id)).covered_quantity, (await row(live.id)).notified_quantity], [4, 4]);
+    const order = await declare(live, candidate, 4);
+    assert.equal((await step()).notified, 0);
+    const confirm = await reply(await h.social.orders.act(request("POST", `/api/orders/${order.id}/confirm`, { cookie: seller.cookie, body: {} }), order.id as string, "confirm"));
+    assert.equal(confirm.status, 200);
+    assert.equal((await step()).notified, 0, "le vendeur confirme : pas une nouvelle couverture");
+    assert.equal(await coverageNotifications(live.id), 0);
+  });
+});
+
 describe("notification : le plus haut niveau déjà annoncé", () => {
   test("une baisse passagère (annonces retirées puis revenues) ne notifie jamais ce qui a déjà été annoncé (6 → 0 → 6)", async () => {
     const live = await startMission(env.pool, h, buyer, { quantity: 6 });

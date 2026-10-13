@@ -106,7 +106,7 @@ export function VendorTabBar() {
         { href: "/vendeur", label: "Accueil", icon: House, match: ["/vendeur", "/vendeur/commandes", "/vendeur/devis", "/vendeur/demandes"] },
         { href: "/vendeur/messages", label: "Messages", icon: MessageCircle, match: ["/vendeur/messages"], messages: true },
         { href: "/vendeur/annonces", label: "Annonces", icon: Tag, match: ["/vendeur/annonces"] },
-        { href: "/vendeur/profil", label: "Compte", icon: User, match: ["/vendeur/profil"] },
+        { href: "/vendeur/profil", label: "Compte", icon: User, match: ["/vendeur/profil", "/vendeur/porte-monnaie"] },
       ]}
     />
   );

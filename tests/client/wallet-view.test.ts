@@ -33,6 +33,7 @@ import {
   TRANSACTION_LABELS,
   UNKNOWN_AMOUNT_TEXT,
   UNKNOWN_TRANSACTION_LABEL,
+  VENDOR_WALLET_PATH,
   WALLET_PATH,
   amountTone,
   anchorQuote,
@@ -69,6 +70,7 @@ import {
   schedulePurchaseRechecks,
   transactionLabel,
   walletHref,
+  walletPathFor,
   walletRow,
   type KeyStorage,
 } from "../../lib/client/wallet-view";
@@ -352,7 +354,15 @@ describe("adresses et retours : jamais une URL fournie par l'adresse", () => {
   test("walletHref : recharge ouverte et retour nettoyé", () => {
     assert.equal(walletHref(), WALLET_PATH);
     assert.equal(walletHref({ recharge: true }), `${WALLET_PATH}?recharger=1`);
-    assert.equal(walletHref({ next: `/vendeur/annonces/${OFFER_ID}`, recharge: true }), `${WALLET_PATH}?recharger=1&next=%2Fvendeur%2Fannonces%2F${OFFER_ID}`);
+    // Lot FIN1 : un retour dans l'espace vendeur ouvre le porte-monnaie du VENDEUR (barre d'onglets vendeur), pas celui de l'acheteur.
+    assert.equal(walletHref({ next: `/vendeur/annonces/${OFFER_ID}`, recharge: true }), `${VENDOR_WALLET_PATH}?recharger=1&next=%2Fvendeur%2Fannonces%2F${OFFER_ID}`);
+    assert.equal(walletHref({ next: "/vendeur" }), `${VENDOR_WALLET_PATH}?next=%2Fvendeur`);
+    assert.equal(walletHref({ next: "/vendeur/profil" }), `${VENDOR_WALLET_PATH}?next=%2Fvendeur%2Fprofil`);
+    assert.equal(walletHref({ next: `/besoins/${OFFER_ID}`, recharge: true }), `${WALLET_PATH}?recharger=1&next=%2Fbesoins%2F${OFFER_ID}`, "retour acheteur : porte-monnaie de l'acheteur");
+    assert.equal(walletHref({ next: "/vendeurs-fictifs/x" }), `${WALLET_PATH}?next=%2Fvendeurs-fictifs%2Fx`, "« /vendeurs… » n'est pas l'espace vendeur");
+    assert.equal(walletPathFor("/vendeur/offre-pro"), VENDOR_WALLET_PATH);
+    assert.equal(walletPathFor("https://evil.example/vendeur"), WALLET_PATH, "retour hostile : jamais le chemin vendeur");
+    assert.equal(walletPathFor(undefined), WALLET_PATH);
     assert.equal(walletHref({ next: "https://evil.example/x" }), WALLET_PATH, "next hostile ignoré");
     assert.equal(walletHref({ next: "//evil.example", recharge: true }), `${WALLET_PATH}?recharger=1`);
     assert.equal(walletHref({ next: "/" }), WALLET_PATH);
@@ -374,6 +384,7 @@ describe("adresses et retours : jamais une URL fournie par l'adresse", () => {
 
   test("libellé du lien de retour selon la destination", () => {
     assert.equal(returnLinkLabel(WALLET_PATH), "Voir mon porte-monnaie");
+    assert.equal(returnLinkLabel(VENDOR_WALLET_PATH), "Voir mon porte-monnaie");
     assert.equal(returnLinkLabel(`/vendeur/annonces/${OFFER_ID}`), "Retour à mon annonce");
     assert.equal(returnLinkLabel(`/vendeur/annonces/${OFFER_ID}?x=1`), "Retour à mon annonce");
     assert.equal(returnLinkLabel("/alertes"), "Continuer");

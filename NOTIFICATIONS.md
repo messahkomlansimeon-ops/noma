@@ -42,7 +42,7 @@ Une notification naît seulement si **toutes** ces conditions sont vraies (sinon
 | Aucune notification n'existe déjà pour (acheteur, besoin, annonce) | `already_notified` |
 | Le couple n'a **jamais** été une correspondance confirmée avant (aucune évaluation confirmée dans l'historique de la paire, évaluations périmées comprises, **sauf** celles notées « sans notification possible » : l'acheteur n'a jamais été prévenu) | `already_matched` |
 
-**Exception : le balayage de réactivation d'un vendeur** (`user.reactivated`, jobs côté annonce) garde la règle de N1 : ses annonces redeviennent visibles et sont nouvelles pour les acheteurs, la règle de nouveauté
+**Exception : le balayage de réactivation d'un vendeur** (`user.reactivated`, jobs côté annonce) garde la règle de N1 **pour les couples que l'acheteur n'a jamais vus** (lot FIN1 : un couple déjà montré, c'est-à-dire ayant une évaluation confirmée antérieure, même notée « sans notification », ne notifie JAMAIS : l'acheteur le voyait dans ses résultats avant la suspension) : ses annonces redeviennent visibles et sont nouvelles pour les acheteurs, la règle de nouveauté
 n'est pas appliquée (les jobs côté besoin, eux, restent silencieux). Un appel direct de `recordNewMatchNotification` sans type de job (essais, outils) n'applique ni la règle « côté besoin » ni la règle de nouveauté.
 
 **Pourquoi des évaluations « sans notification possible »** : le job du besoin qui passe avant celui d'une annonce nouvelle l'évalue déjà (silencieusement) ; sans cette note, son évaluation compterait comme « ce couple était

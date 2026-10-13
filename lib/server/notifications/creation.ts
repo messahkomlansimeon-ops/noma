@@ -30,7 +30,9 @@ import { buildDeliveryContent, buildNotificationPrice, buildNotificationTitle } 
  *  - l'annonce (sa publication, ou sa dernière version publiée) n'est pas postérieure à l'activation du besoin (ou à sa dernière modification) ;
  *    exception : le balayage de réactivation d'un VENDEUR (`user.reactivated`) garde la règle de N1 ;
  *    après la REPRISE d'un suivi (lot T3), « postérieure » s'entend de la dernière reprise : une annonce publiée ou modifiée avant elle ne notifie pas ;
- *  - le couple a DÉJÀ été une correspondance confirmée (réévaluation, recalcul en masse, changement de scoring) ou a déjà sa notification.
+ *  - le couple a DÉJÀ été une correspondance confirmée (réévaluation, recalcul en masse, changement de scoring) ou a déjà sa notification. Lot FIN1 : pour le balayage de réactivation
+ *    d'un vendeur, MÊME une évaluation antérieure notée « sans notification » (job du besoin, annonce non nouvelle) compte : l'acheteur avait ces résultats sous les yeux avant la
+ *    suspension, la remise en ligne de l'annonce ne lui annonce jamais « une nouvelle annonce » qu'il connaît déjà.
  * Au-delà de 20 notifications par besoin ou de 50 par utilisateur et par jour UTC : un seul résumé par besoin et par jour (item_count qui augmente remet read_at à NULL).
  * Lot RA1 : les notifications d'annonces d'AUTRES SITES (`new_external_match`, recherche active payante) comptent dans les MÊMES plafonds que les annonces internes.
  * Toute annonce, résumée ou non, a sa ligne d'envoi externe pour un utilisateur qui l'a demandé : le message regroupé en compte tout. Voir NOTIFICATIONS.md.
@@ -45,7 +47,10 @@ export const DEMAND_SIDE_EVENT_TYPES: readonly string[] = Object.freeze(["demand
 export const DEMAND_SIDE_JOB_TYPE = "evaluate_demand_candidates";
 /** Événements d'une ANNONCE : sa publication (ou sa remise en vente) et sa dernière version publiée. */
 export const OFFER_PUBLICATION_EVENT_TYPES: readonly string[] = Object.freeze(["offer.created", "offer.published", "offer.available", "offer.updated"]);
-/** Le balayage de réactivation d'un vendeur garde la règle de N1 (ses annonces redeviennent visibles : elles sont nouvelles pour les acheteurs). */
+/**
+ * Le balayage de réactivation d'un vendeur garde la règle de N1 pour les couples que l'acheteur n'a JAMAIS vus (ses annonces redeviennent visibles : elles sont nouvelles pour eux) ;
+ * un couple déjà montré (toute évaluation confirmée antérieure, même notée « sans notification ») ne notifie jamais (lot FIN1).
+ */
 export const SELLER_REACTIVATION_EVENT_TYPE = "user.reactivated";
 export const OFFER_SIDE_JOB_TYPE = "evaluate_offer_candidates";
 
@@ -151,8 +156,8 @@ export async function recordNewMatchNotification(executor: SqlExecutor, input: N
   // Seules les annonces NOUVELLES pour le besoin notifient : l'annonce (sa publication, ou sa dernière version publiée) doit être postérieure à l'activation du besoin
   // (ou à sa dernière modification). Sans événement de publication connu (annonce d'avant le service), elle n'est pas nouvelle. Le balayage de réactivation d'un vendeur
   // garde la règle de N1. Appel direct (sans type de job) : règle non appliquée.
+  const sellerReactivation = sourceEventType === SELLER_REACTIVATION_EVENT_TYPE && input.jobType === OFFER_SIDE_JOB_TYPE;
   if (input.jobType !== undefined && input.jobType !== null) {
-    const sellerReactivation = sourceEventType === SELLER_REACTIVATION_EVENT_TYPE && input.jobType === OFFER_SIDE_JOB_TYPE;
     if (!sellerReactivation) {
       const times = await client.query<{ offer_at: Date | null; demand_at: Date | null; demand_touched_at: Date | null }>(
         `SELECT (SELECT max(occurred_at) FROM matching_outbox_events
@@ -182,13 +187,14 @@ export async function recordNewMatchNotification(executor: SqlExecutor, input: N
   );
   if (existing.rowCount) return { kind: "already_notified" };
   // « Déjà une correspondance » : une autre évaluation confirmée du couple, SAUF celles écrites sans pouvoir notifier (job du besoin, annonce non nouvelle : l'acheteur n'a
-  // jamais été prévenu). Sans cette exception, un job du besoin passé avant celui de l'annonce la priverait de sa notification.
+  // jamais été prévenu). Sans cette exception, un job du besoin passé avant celui de l'annonce la priverait de sa notification. Exception à l'exception (lot FIN1) : le balayage
+  // de réactivation d'un VENDEUR ne notifie jamais un couple déjà montré à l'acheteur, donc aucune évaluation antérieure n'est écartée.
   const history = await client.query(
     `SELECT 1 FROM matching_evaluations e
       WHERE e.offer_id = $1::uuid AND e.demand_id = $2::uuid AND e.is_confirmed_match = TRUE AND e.id <> $3::uuid
-        AND NOT EXISTS (SELECT 1 FROM notification_silent_evaluations silent WHERE silent.evaluation_id = e.id)
+        AND ($4::boolean OR NOT EXISTS (SELECT 1 FROM notification_silent_evaluations silent WHERE silent.evaluation_id = e.id))
       LIMIT 1`,
-    [input.offerId, input.demandId, input.evaluationId],
+    [input.offerId, input.demandId, input.evaluationId, sellerReactivation],
   );
   if (history.rowCount) return { kind: "already_matched" };
 

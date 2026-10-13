@@ -24,6 +24,8 @@ import {
   WRITE_LABEL,
   engagedLineView,
   lineConversationPath,
+  missionListingPath,
+  orderedProposalLines,
   parseWholeNumber,
   proposalLineView,
   proposalSummary,
@@ -117,7 +119,7 @@ function LineCard({ line, mission, onChanged }: { line: ProposalLine; mission: M
       </div>
 
       {demandId !== null ? (
-        <Link href={`/besoins/${demandId}/offres/${line.offerId}`} className="mt-2 inline-block text-[12px] font-bold text-forest">
+        <Link href={missionListingPath(mission.id, demandId, line.offerId)} className="mt-2 inline-block text-[12px] font-bold text-forest">
           {SEE_LISTING_LABEL} ›
         </Link>
       ) : null}
@@ -315,7 +317,7 @@ export function ProposalSection({ mission, proposal, onChanged }: { mission: Mis
                 <>
                   {proposal.engaged.length > 0 ? <h3 className="mt-4 text-[14px] font-extrabold text-ink">{LINES_TITLE}</h3> : null}
                   <ul aria-label="Lignes de la proposition" className="mt-3 space-y-2.5">
-                    {proposal.lines.map((line) => (
+                    {orderedProposalLines(proposal.lines).map((line) => (
                       <LineCard key={line.offerId} line={line} mission={mission} onChanged={onChanged} />
                     ))}
                   </ul>

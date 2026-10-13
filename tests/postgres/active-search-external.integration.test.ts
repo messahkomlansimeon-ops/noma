@@ -721,6 +721,7 @@ test("outil de démonstration (active-search:simulate) : une annonce fictive COM
   const result = await simulateNewExternalListing({ pool, demandId: paying.demandId, now: clock.now });
   assert.deepEqual([result.created, result.notified, result.sourceFailures, result.errors], [1, 1, 0, []]);
   assert.ok(result.priceAmount > 0 && result.priceAmount <= 200_000, "prix sous le budget");
+  assert.match(result.title, /^Apple iPhone 12 comme neuf, nouvelle annonce du jour$/, "lot FIN1 : le produit est écrit comme le besoin l'écrit (jamais « Apple Iphone 12 »)");
   const rows = await externalNotifications(paying.userId);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].price_amount, String(result.priceAmount));

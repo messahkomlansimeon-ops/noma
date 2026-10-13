@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
@@ -31,6 +32,8 @@ import {
   mergeIfCurrent,
   resultsState,
 } from "@/lib/client/match-view";
+import { missions } from "@/lib/client/missions-api";
+import { missionPath } from "@/lib/client/missions-view";
 import { offerDetailPath } from "@/lib/client/metrics-view";
 
 interface Loaded {
@@ -55,6 +58,22 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
   // « Actualiser » ouvre une nouvelle génération : une réponse de « Voir plus » partie avant est ignorée.
   const guard = useRef(createGenerationGuard());
   const busy = refreshing || loadingMore;
+  // Lot FIN1 : le besoin PORTEUR d'une mission d'achat en volume n'est pas un besoin ordinaire : son suivi et la recherche active ne se gèrent que par la mission (le serveur refuse
+  // tout autre chemin, 409). Il ne s'affiche donc jamais avec « Prolonger », « Pause » ou « Reprendre ». `undefined` : pas encore su ; `null` : besoin ordinaire.
+  const [carrier, setCarrier] = useState<{ id: string; title: string } | null | undefined>(undefined);
+  useEffect(() => {
+    const controller = new AbortController();
+    missions.list(null, { signal: controller.signal }).then(
+      (page) => {
+        const found = page.missions.find((mission) => mission.demandId === demandId);
+        setCarrier(found ? { id: found.id, title: found.title } : null);
+      },
+      () => {
+        if (!controller.signal.aborted) setCarrier(null);
+      },
+    );
+    return () => controller.abort();
+  }, [demandId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -141,6 +160,8 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
   const summary = demandSummary(demand);
   const notActive = demandNotActiveMessage(demand.status);
   const state = notActive ? "inactive" : resultsState({ loaded: true, itemCount: loaded.items.length, processing: loaded.processing });
+  // Un besoin PORTEUR d'une mission n'a pas la carte (`carrier === null` à chaque emplacement) ; actif ou satisfait seulement.
+  const activeSearchCard = demand.status === "active" || demand.status === "satisfied" ? <ActiveSearchCard demandId={demandId} onChanged={() => setTrackingKey((key) => key + 1)} /> : null;
 
   return (
     <>
@@ -152,16 +173,27 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
         </div>
       </div>
 
-      {demand.status === "active" ? <TrackingPanel demandId={demandId} key={`tracking-${trackingKey}`} /> : null}
+      {carrier ? (
+        <div data-testid="mission-carrier-note" className="mt-3 rounded-2xl border border-line bg-white p-3.5">
+          <p className="text-[13px] font-semibold text-ink">Ce besoin appartient à votre mission « {carrier.title} » : il se gère depuis la mission.</p>
+          <Link href={missionPath(carrier.id)} className="mt-2 inline-block text-[13px] font-bold text-forest">
+            Ouvrir la mission ›
+          </Link>
+        </div>
+      ) : null}
+
+      {carrier === null && demand.status === "active" ? <TrackingPanel demandId={demandId} key={`tracking-${trackingKey}`} /> : null}
 
       {/* Lot RA1 : option payante « Recherche active » (annonces d'autres sites notifiées, collecte plus fréquente, suivi jusqu'à 180 jours). */}
       {/* Un besoin « satisfait » SUSPEND l'option en cours (la carte le dit, sans bouton d'achat) ; pour tout autre statut, la carte ne s'affiche pas. */}
-      {demand.status === "active" || demand.status === "satisfied" ? <ActiveSearchCard demandId={demandId} onChanged={() => setTrackingKey((key) => key + 1)} /> : null}
-
+      {/* Lot FIN1 : la carte vient APRÈS les résultats (le premier écran montre la première annonce, pas une carte de réglages longue de plusieurs écrans). */}
       {notActive ? (
-        <p role="status" className="mt-4 rounded-2xl bg-wash p-4 text-[14px] font-semibold text-ink-soft">
-          {notActive}
-        </p>
+        <>
+          <p role="status" className="mt-4 rounded-2xl bg-wash p-4 text-[14px] font-semibold text-ink-soft">
+            {notActive}
+          </p>
+          {carrier === null ? activeSearchCard : null}
+        </>
       ) : (
         <>
           <div className="mt-4 flex items-center justify-between gap-3">
@@ -227,6 +259,8 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
               {loadingMore ? "Chargement…" : "Voir plus"}
             </button>
           ) : null}
+
+          {carrier === null ? activeSearchCard : null}
 
           {/* Lot EXT1 : annonces d'AUTRES SITES, section séparée (jamais dans la liste ni le classement ci-dessus). */}
           <ExternalSection demandId={demandId} />

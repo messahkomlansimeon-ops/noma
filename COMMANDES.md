@@ -16,7 +16,7 @@ L'acheteur déclare « **Je l'ai acheté** » avec un **prix convenu** (XOF, ent
 
 ## Accès
 
-Les deux parties seulement ; tout autre reçoit `404` indiscernable. La déclaration a les **mêmes conditions que le contact** (correspondance confirmée, annonce en ligne : `409 offer_not_available` si l'annonce est retirée). Origine vérifiée sur les `POST`. L'autre partie n'a jamais de nom ni de numéro (« Acheteur intéressé », « Vendeur de l'annonce »).
+Les deux parties seulement ; tout autre reçoit `404` indiscernable. La déclaration a les **mêmes conditions que le contact** (correspondance confirmée, annonce en ligne : `409 offer_not_available` si l'annonce est retirée). Origine vérifiée sur les `POST`. **Lot FIN1** : une deuxième déclaration pour le même couple (besoin, annonce) est refusée `409` avec le texte EXACT de ce qui existe : `order_active_exists` « Une commande est déjà en attente de confirmation du vendeur pour cette annonce. » (commande proposée), `order_already_confirmed` « Cet achat est déjà confirmé par le vendeur pour cette annonce. » (vente confirmée) ; la fiche de l'annonce dit « Achat confirmé » (ou « Achat déclaré ») à la place du bouton « Je l'ai acheté » quand une commande active existe déjà. L'autre partie n'a jamais de nom ni de numéro (« Acheteur intéressé », « Vendeur de l'annonce »).
 
 ## Effets d'une confirmation
 

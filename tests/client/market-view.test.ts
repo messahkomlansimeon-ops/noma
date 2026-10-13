@@ -71,6 +71,7 @@ describe("textes honnêtes", () => {
   test("annonces publiées : médiane, « la moitié des prix demandés est entre … », effectif ARRONDI, comparabilité", () => {
     const view = listingsView(published());
     assert.equal(view.published, true);
+    assert.equal(view.title, "Annonces publiées sur la période", "le titre dit ce que sont les chiffres (des annonces publiées sur la période), pas des annonces « en ligne » aujourd'hui");
     assert.equal(NBSP(view.headline as string), "160 000 FCFA");
     assert.equal(NBSP(view.range as string), "La moitié des prix demandés est entre 152 000 FCFA et 176 000 FCFA");
     assert.equal(view.rangeNote, null);
@@ -159,8 +160,8 @@ describe("textes honnêtes", () => {
 
   test("tableau d'administration : prix demandés et NOMBRE arrondi de ventes confirmées (jamais un prix)", () => {
     const rows = adminMarketRows([
-      { label: "Apple iPhone 12 · 128 Go · Occasion", listings: published(), confirmedSales: { kind: "approx", value: 15 } },
-      { label: "Apple iPhone 13", listings: { status: "insufficient" }, confirmedSales: { kind: "below", bound: 5 } },
+      { label: "Apple iPhone 12 · 128 Go · Occasion", listings: published(), confirmedSales: { kind: "approx", value: 15 }, historicalSales: { kind: "approx", value: 55 } },
+      { label: "Apple iPhone 13", listings: { status: "insufficient" }, confirmedSales: { kind: "below", bound: 5 }, historicalSales: { kind: "below", bound: 5 } },
     ]);
     assert.equal(rows[0].label, "Apple iPhone 12 · 128 Go · Occasion");
     assert.equal(rows[0].listings.published, true);
@@ -168,7 +169,11 @@ describe("textes honnêtes", () => {
     assert.equal(rows[1].salesText, "moins de 5 ventes confirmées");
     assert.equal(rows[1].listings.published, false);
     assert.ok(rows.every((row) => row.key.length > 0 && !/FCFA/.test(row.salesText)), "aucun prix dans la colonne des ventes");
-    assert.deepEqual(Object.keys(rows[0]).sort(), ["key", "label", "listings", "salesText"]);
+    // FIN1 : l'historique de démonstration est ÉTIQUETÉ à part (jamais ajouté aux ventes confirmées) ; rien à étiqueter sous 5 ventes.
+    assert.equal(rows[0].historicalText, "environ 55 ventes (historique de démonstration, non comptées)");
+    assert.equal(rows[1].historicalText, null);
+    assert.ok(!/FCFA/.test(rows[0].historicalText as string));
+    assert.deepEqual(Object.keys(rows[0]).sort(), ["historicalText", "key", "label", "listings", "salesText"]);
   });
 });
 
@@ -199,7 +204,7 @@ describe("mini-courbe", () => {
   });
 
   test("tendance dite en mots : hausse, baisse, stable ; rien sans deux médianes", () => {
-    assert.match(NBSP(trendSummary(trend(150_000, null, 170_000)) as string), /^Tendance en hausse : de 150 000 FCFA à 170 000 FCFA/);
+    assert.match(NBSP(trendSummary(trend(150_000, null, 170_000)) as string), /^Tendance en hausse sur les 3 dernières semaines : de 150 000 FCFA à 170 000 FCFA \(médiane par semaine\)$/);
     assert.match(trendSummary(trend(170_000, 150_000)) as string, /en baisse/);
     assert.match(trendSummary(trend(150_000, 150_000)) as string, /stable/);
     assert.equal(trendSummary(trend(150_000, null)), null);

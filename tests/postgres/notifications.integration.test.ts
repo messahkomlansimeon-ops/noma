@@ -1090,16 +1090,34 @@ test("règle « annonce nouvelle pour le besoin » (appel direct, avec le type d
   assert.deepEqual(await directOutcome(before, demand, await fresh(before), { jobType: "evaluate_demand_candidates", sourceEventId: reactivation }), { kind: "demand_side" }, "acheteur réactivé : jamais");
   // Appel direct sans type de job (outils, essais) : la règle n'est pas appliquée.
   assert.equal((await directOutcome(before, demand, await fresh(before))).kind, "created");
+
+  // Lot FIN1 : un couple DÉJÀ MONTRÉ à l'acheteur (évaluation antérieure notée « sans notification » : l'annonce était ancienne pour le besoin) ne notifie JAMAIS au balayage de
+  // réactivation du vendeur : l'acheteur la voit déjà dans ses résultats. Le même couple, sans l'événement de réactivation, garde son comportement (aucune règle n'est assouplie).
+  for (const reason of ["demand_side", "not_new_for_demand"]) {
+    await pool.query("DELETE FROM notifications");
+    await pool.query("DELETE FROM matching_evaluations WHERE offer_id = $1 AND demand_id = $2", [before.id, demand.id]);
+    const shown = await insertEvaluation(pool, { offer: before, demand });
+    await pool.query("INSERT INTO notification_silent_evaluations (evaluation_id, reason) VALUES ($1, $2)", [shown, reason]);
+    // L'évaluation d'avant la suspension : remplacée (autre version du moteur de score), jamais « la dernière ».
+    await pool.query("UPDATE matching_evaluations SET is_latest = FALSE, engine_scoring_version = 'matching-scoring/v0' WHERE id = $1", [shown]);
+    const reevaluated = await insertEvaluation(pool, { offer: before, demand });
+    assert.deepEqual(
+      await directOutcome(before, demand, reevaluated, { jobType: "evaluate_offer_candidates", sourceEventId: reactivation }),
+      { kind: "already_matched" },
+      `couple déjà montré (évaluation ${reason}) : jamais de notification à la réactivation du vendeur`,
+    );
+    assert.equal(await count("notifications"), 0);
+  }
 });
 
-test("balayage de réactivation d'un vendeur (VRAI worker) : ses annonces anciennes, déjà évaluées sans notification, notifient une fois", async () => {
+test("balayage de réactivation d'un vendeur (VRAI worker) : ses annonces anciennes, DÉJÀ MONTRÉES à l'acheteur (évaluées sans notification), ne notifient JAMAIS (lot FIN1)", async () => {
   await resetAll();
   const { seller, buyer } = await people();
   await createOffer(offerInput(seller.id), pool);
-  const demand = await createDemand(demandInput(buyer.id), pool);
+  await createDemand(demandInput(buyer.id), pool);
   await drain();
   assert.equal(await count("notifications"), 0, "annonce publiée avant le besoin : aucune notification");
-  assert.ok((await evaluationRows()).some((row) => row.is_confirmed_match));
+  assert.ok((await evaluationRows()).some((row) => row.is_confirmed_match), "la correspondance est dans les résultats de l'acheteur");
   const suspended = await updateUser({ id: seller.id, expectedVersion: seller.version, status: "suspended" }, pool);
   await updateUser({ id: seller.id, expectedVersion: suspended.version, status: "active" }, pool);
   for (let round = 0; round < 8; round += 1) {
@@ -1107,8 +1125,31 @@ test("balayage de réactivation d'un vendeur (VRAI worker) : ses annonces ancien
     assert.deepEqual(cycle.errors, []);
     if (cycle.idle) break;
   }
+  assert.equal((await matchRows()).length, 0, "l'acheteur connaissait déjà ce couple : le balayage de réactivation ne le lui annonce pas comme une nouvelle annonce");
+  assert.equal(await count("notifications"), 0);
+});
+
+test("balayage de réactivation d'un vendeur (VRAI worker) : un couple que l'acheteur n'a JAMAIS vu (vendeur suspendu pendant la création du besoin) notifie une fois", async () => {
+  await resetAll();
+  const { seller, buyer } = await people();
+  await createOffer(offerInput(seller.id), pool);
+  const suspended = await updateUser({ id: seller.id, expectedVersion: seller.version, status: "suspended" }, pool);
+  const cyclesUntilIdle = async (label: string) => {
+    for (let round = 0; round < 8; round += 1) {
+      const cycle = await runMatchingCycle({ pool, workerId: `fin1-${label}-${round}`, notificationTransport: null });
+      assert.deepEqual(cycle.errors, []);
+      if (cycle.idle) break;
+    }
+  };
+  await cyclesUntilIdle("suspended");
+  const demand = await createDemand(demandInput(buyer.id), pool);
+  await cyclesUntilIdle("demand");
+  assert.equal(await count("notifications"), 0, "vendeur suspendu : rien à annoncer");
+  assert.equal((await evaluationRows()).filter((row) => row.is_confirmed_match).length, 0, "aucune correspondance montrée à l'acheteur tant que le vendeur est suspendu");
+  await updateUser({ id: seller.id, expectedVersion: suspended.version, status: "active" }, pool);
+  await cyclesUntilIdle("sweep");
   const rows = await matchRows();
-  assert.equal(rows.length, 1, "le balayage de réactivation du vendeur garde la règle de N1 : une notification");
+  assert.equal(rows.length, 1, "une annonce que l'acheteur ne connaissait pas revient en ligne : une notification (règle de N1)");
   assert.equal(rows[0].demand_id, demand.id);
 });
 

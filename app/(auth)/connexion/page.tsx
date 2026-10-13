@@ -136,11 +136,8 @@ function ConnexionScreen() {
           </button>
         </div>
 
-        <div className="relative mt-auto pt-10 text-center text-[12px] text-ink-soft">
-          <span className="font-semibold">Conditions d'utilisation</span>
-          <span className="mx-2">·</span>
-          <span className="font-semibold">Confidentialité</span>
-        </div>
+        {/* Lot FIN1 : plus de « Conditions d'utilisation · Confidentialité » : deux mots qui ressemblaient à des liens sans mener nulle part (aucune page n'existe). */}
+        <div className="mt-auto" />
       </main>
     </div>
   );

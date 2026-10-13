@@ -41,6 +41,11 @@ export interface RelevanceConfig {
     /** Percentiles qui bornent « sous le marché » (≤ p25) et « dans le marché » (≤ p75). */
     readonly lowerPercentile: number;
     readonly upperPercentile: number;
+    /**
+     * Lot FIN1 : quand la référence est celle de l'encart « Prix demandés » (médiane publiée) et qu'il n'a pas de fourchette (moins de 10 vendeurs), « dans le marché » = écart à la
+     * médiane publiée d'au plus ce pourcentage, de part et d'autre ; au-delà « sous » ou « au-dessus ». Avec une fourchette publiée, ses bornes (Q1, Q3) font foi.
+     */
+    readonly publishedBandPercent: number;
   };
   readonly confidence: {
     readonly points: {
@@ -107,6 +112,7 @@ export const RELEVANCE_CONFIG: RelevanceConfig = Object.freeze({
     scores: Object.freeze({ belowMarket: 100, inMarket: 60, aboveMarket: 20 }),
     lowerPercentile: 0.25,
     upperPercentile: 0.75,
+    publishedBandPercent: 10,
   }),
   confidence: Object.freeze({
     points: Object.freeze({

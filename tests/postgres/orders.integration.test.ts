@@ -92,7 +92,7 @@ test("une seule commande active par (besoin, annonce) : la deuxième déclaratio
   const [a, b] = await Promise.all([declare(market, 200_000), declare(market, 210_000)]);
   assert.deepEqual([a.status, b.status].sort(), [201, 409]);
   const loser = a.status === 409 ? a : b;
-  assert.deepEqual(loser.json, { error: { code: "order_active_exists", message: "Une commande est déjà en cours pour cette annonce." } });
+  assert.deepEqual(loser.json, { error: { code: "order_active_exists", message: "Une commande est déjà en attente de confirmation du vendeur pour cette annonce." } });
   assert.equal(await count(env.pool, "orders"), 1);
   const winner = orderOf(a.status === 201 ? a : b);
   // Refusée par le vendeur : une nouvelle déclaration est permise.
@@ -105,7 +105,10 @@ test("une seule commande active par (besoin, annonce) : la deuxième déclaratio
   assert.equal(third.status, 201);
   // Confirmée : plus aucune autre commande active possible.
   assert.equal(orderOf(await act(orderOf(third).id as string, "confirm", market.seller.cookie)).status, "confirmed");
-  assert.equal((await declare(market, 170_000)).status, 409);
+  // Lot FIN1 : le refus dit EXACTEMENT ce qui existe : l'achat est déjà CONFIRMÉ (et non « en cours »).
+  const confirmedAgain = await declare(market, 170_000);
+  assert.equal(confirmedAgain.status, 409);
+  assert.deepEqual(confirmedAgain.json, { error: { code: "order_already_confirmed", message: "Cet achat est déjà confirmé par le vendeur pour cette annonce." } });
   assert.equal(await count(env.pool, "orders"), 3);
   assert.equal(await count(env.pool, "orders", "status IN ('proposed', 'confirmed')"), 1);
 });

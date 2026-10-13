@@ -349,6 +349,8 @@ export async function createTopupWithFreshKey<T extends Pick<WalletTopup, "statu
 // ─── Adresses et retours ────────────────────────────────────────────────────────────────────────
 
 export const WALLET_PATH = "/compte/porte-monnaie";
+/** Lot FIN1 : le porte-monnaie du vendeur, dans l'espace vendeur (même écran, barre d'onglets vendeur). */
+export const VENDOR_WALLET_PATH = "/vendeur/porte-monnaie";
 export const CHECKOUT_PREFIX = "/paiement-simule/";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -362,14 +364,21 @@ export function returnTarget(raw: unknown, fallback: string = WALLET_PATH): stri
   return safeNextPath(raw, fallback);
 }
 
-/** `/compte/porte-monnaie`, avec `?recharger=1` (panneau de recharge ouvert) et `next` (retour, nettoyé) quand ils sont demandés. */
+/** Le porte-monnaie de l'espace d'où l'on vient : un retour dans l'espace vendeur (`/vendeur…`) ouvre celui du vendeur, tout autre cas celui de l'acheteur. */
+export function walletPathFor(next?: unknown): string {
+  const safe = safeNextPath(next, "");
+  return safe === "/vendeur" || safe.startsWith("/vendeur/") ? VENDOR_WALLET_PATH : WALLET_PATH;
+}
+
+/** `/compte/porte-monnaie` (ou `/vendeur/porte-monnaie` quand on vient de l'espace vendeur), avec `?recharger=1` (panneau de recharge ouvert) et `next` (retour, nettoyé) quand ils sont demandés. */
 export function walletHref(options: { next?: string | null; recharge?: boolean } = {}): string {
   const params = new URLSearchParams();
   if (options.recharge) params.set("recharger", "1");
   const next = safeNextPath(options.next, "");
   if (next !== "" && next !== "/") params.set("next", next);
   const text = params.toString();
-  return text ? `${WALLET_PATH}?${text}` : WALLET_PATH;
+  const path = walletPathFor(options.next);
+  return text ? `${path}?${text}` : path;
 }
 
 /** Adresse de la page de paiement simulé (chemin vérifié, retour nettoyé) ; `null` si le chemin du serveur n'a pas la forme attendue. */
@@ -381,7 +390,7 @@ export function checkoutHref(checkoutPath: unknown, next?: string | null): strin
 
 /** Libellé du lien de retour après une recharge réussie. */
 export function returnLinkLabel(path: string): string {
-  if (path === WALLET_PATH) return "Voir mon porte-monnaie";
+  if (path === WALLET_PATH || path === VENDOR_WALLET_PATH) return "Voir mon porte-monnaie";
   if (/^\/vendeur\/annonces\/[^/?#]+$/.test(path.split(/[?#]/, 1)[0])) return "Retour à mon annonce";
   return "Continuer";
 }

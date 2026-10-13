@@ -83,7 +83,8 @@ export function MissionForm({ mode, missionId, initial }: { mode: "create" | "ed
 
   return (
     <main>
-      <TopBar back={mode === "edit" && missionId ? missionPath(missionId) : "/missions"} title={mode === "edit" ? "Modifier la mission" : "Nouvelle mission"} />
+      {/* Lot FIN1 : titre dit une fois (le h1). */}
+      <TopBar back={mode === "edit" && missionId ? missionPath(missionId) : "/missions"} />
       <form
         className="px-4 pb-8"
         onSubmit={(event) => {

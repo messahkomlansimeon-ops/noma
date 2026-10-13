@@ -27,7 +27,7 @@ interface Data {
 /** Vendeurs (lot D2) : liste paginée aux numéros MASQUÉS (sauf les deux derniers chiffres), suspension et réactivation avec confirmation à l'écran, journal d'administration. */
 function Vendors({ data, offset, reload, setOffset }: { data: Data; offset: number; reload: () => void; setOffset: (offset: number) => void }) {
   const redirectIfUnauthorized = useUnauthorizedRedirect();
-  const [confirming, setConfirming] = useState<{ id: string; action: "suspend" | "reactivate"; phone: string } | null>(null);
+  const [confirming, setConfirming] = useState<{ id: string; action: "suspend" | "reactivate"; phone: string; ref: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -70,8 +70,13 @@ function Vendors({ data, offset, reload, setOffset }: { data: Data; offset: numb
             return (
               <li key={row.id} data-testid="vendor-row" data-status={vendor.status} className="rounded-2xl border border-line bg-white p-3.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span data-testid="vendor-phone" className="font-mono text-[15px] font-bold tracking-wide text-ink">
-                    {row.maskedPhone}
+                  <span>
+                    <span data-testid="vendor-phone" className="font-mono text-[15px] font-bold tracking-wide text-ink">
+                      {row.maskedPhone}
+                    </span>
+                    <span data-testid="vendor-ref" className="ml-2 font-mono text-[11px] text-ink-soft">
+                      {row.refText}
+                    </span>
                   </span>
                   <Badge tone={row.suspended ? "carrot" : "sage"}>{row.statusText}</Badge>
                 </div>
@@ -82,7 +87,7 @@ function Vendors({ data, offset, reload, setOffset }: { data: Data; offset: numb
                     onClick={() => {
                       setNotice(null);
                       setError(null);
-                      setConfirming({ id: row.id, action: row.canSuspend ? "suspend" : "reactivate", phone: row.maskedPhone });
+                      setConfirming({ id: row.id, action: row.canSuspend ? "suspend" : "reactivate", phone: row.maskedPhone, ref: row.refText });
                     }}
                     data-testid={row.canSuspend ? "vendor-suspend" : "vendor-reactivate"}
                     className="mt-2 rounded-xl border border-line bg-white px-3.5 py-2 text-[13px] font-bold text-ink"
@@ -114,7 +119,7 @@ function Vendors({ data, offset, reload, setOffset }: { data: Data; offset: numb
           <h2 id="confirm-title" className="text-[14px] font-extrabold text-ink">
             Confirmer
           </h2>
-          <p className="mt-1 text-[13px] text-ink-soft">{confirmText(confirming.action, confirming.phone)}</p>
+          <p className="mt-1 text-[13px] text-ink-soft">{confirmText(confirming.action, confirming.phone, confirming.ref)}</p>
           {error ? (
             <p role="alert" className="mt-2 text-[13px] font-semibold text-carrot-ink">
               {error}

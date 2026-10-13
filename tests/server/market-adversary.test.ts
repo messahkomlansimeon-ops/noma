@@ -196,7 +196,7 @@ describe("(a) prix quelconques : la cible ± 1 donne les mêmes réponses (produ
     }
   });
 
-  test("tout prix publié est un multiple de 500 FCFA, sauf les bornes de la fourchette (multiples de 5 % de la médiane), dans tous les mondes tirés", () => {
+  test("tout prix publié est un multiple de 500 FCFA, bornes de la fourchette comprises (qui ne sont qu'une fonction des multiples de 5 % de la médiane, jamais un quartile exact), dans tous les mondes tirés", () => {
     const random = mulberry(99);
     let ranges = 0;
     for (let index = 0; index < 150; index += 1) {
@@ -210,9 +210,18 @@ describe("(a) prix quelconques : la cible ± 1 donne les mêmes réponses (produ
         if (range !== null) {
           ranges += 1;
           assert.ok(range.q1 > 0 && range.q3 > 0, "jamais une borne ≤ 0");
-          const step = parsed.listings.median / 20;
-          assert.equal(Math.abs(range.q1 - parsed.listings.median) % step, 0, "Q1 : multiple de 5 % de la médiane");
-          assert.equal(Math.abs(range.q3 - parsed.listings.median) % step, 0, "Q3 : multiple de 5 % de la médiane");
+          const median = parsed.listings.median;
+          const step = median / 20;
+          assert.equal(range.q1 % 500, 0, "Q1 : multiple de 500 FCFA");
+          assert.equal(range.q3 % 500, 0, "Q3 : multiple de 500 FCFA");
+          assert.ok(range.q1 < median && median < range.q3, "jamais une borne égale à la médiane");
+          // Une borne est le multiple de 5 % de la médiane (pas relatif) ramené à 500 FCFA, ou, quand il retombe sur la médiane, la médiane écartée de 500 : une fonction des seuls
+          // chiffres relatifs déjà publiés (aucune information de plus que le quartile arrondi en relatif).
+          const rounded500 = (value: number) => Math.floor((value + 250) / 500) * 500;
+          const lowers = new Set([median - 500, ...Array.from({ length: 21 }, (_, k) => rounded500(median - k * step))]);
+          const uppers = new Set([median + 500, ...Array.from({ length: 400 }, (_, k) => rounded500(median + k * step))]);
+          assert.ok(lowers.has(range.q1), `Q1 ${range.q1} : un pas relatif ramené à 500 (médiane ${median})`);
+          assert.ok(uppers.has(range.q3), `Q3 ${range.q3} : un pas relatif ramené à 500 (médiane ${median})`);
         }
       }
     }

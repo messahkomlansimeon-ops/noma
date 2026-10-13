@@ -10,7 +10,7 @@ import { computeMarketStats, type MarketObservation } from "../../lib/server/mar
 import { isMarketMigrationRegistered, observeListingsBatch, observeListingsForDay, runMarketStep } from "../../lib/server/market/observe";
 import { runMatchingCycle } from "../../lib/server/matching/runner";
 import { createSocialHttpHandlers, type SocialHttpHandlers } from "../../lib/server/social/http";
-import { MARKET_NOW, MARKET_TODAY, dayBefore, insertObservation, makeActors, resetObservations } from "./market-fixtures";
+import { MARKET_NOW, MARKET_TODAY, confirmRealSale, dayBefore, insertObservation, makeActors, resetObservations } from "./market-fixtures";
 import { makePerson } from "./metrics-fixtures";
 import { count, makeMarket, openTestSchema, reply, request, resetSocial, type TestSchema } from "./social-fixtures";
 import { createTemporarySchemaName, openVerifiedIsolatedPool, quoteTemporarySchema } from "./test-database";
@@ -604,10 +604,12 @@ describe("tableau « Marché » de l'administration", () => {
     assert.equal(result.rows[19].label, "Apple Modèle 19");
     assert.ok(!result.rows.some((row) => row.label.includes("99") || row.label.includes("20")));
     assert.equal(result.rows[0].listings.status, "published");
-    assert.deepEqual(result.rows[0].confirmedSales, { kind: "approx", value: 5 }, "7 ventes → environ 5");
-    assert.deepEqual(result.rows[1].confirmedSales, { kind: "below", bound: 5 }, "2 ventes → moins de 5");
-    assert.deepEqual(result.rows[2].confirmedSales, { kind: "below", bound: 5 }, "aucune vente → moins de 5");
-    assert.deepEqual(Object.keys(result.rows[0]).sort(), ["confirmedSales", "label", "listings"]);
+    // Lot FIN1 : ces ventes n'ont aucune commande derrière elles (relevés directs) : elles sont l'historique de démonstration, comptées à part, jamais parmi les ventes confirmées.
+    assert.deepEqual(result.rows[0].historicalSales, { kind: "approx", value: 5 }, "7 relevés de vente sans commande → environ 5, à part");
+    assert.deepEqual(result.rows[1].historicalSales, { kind: "below", bound: 5 }, "2 ventes → moins de 5");
+    assert.deepEqual(result.rows[2].historicalSales, { kind: "below", bound: 5 }, "aucune vente → moins de 5");
+    for (const row of result.rows) assert.deepEqual(row.confirmedSales, { kind: "below", bound: 5 }, "aucune commande réelle : aucune vente confirmée");
+    assert.deepEqual(Object.keys(result.rows[0]).sort(), ["confirmedSales", "historicalSales", "label", "listings"]);
     const text = JSON.stringify(result);
     for (const actor of [...sellers, ...buyers]) assert.equal(text.includes(actor.id), false);
     for (const price of ["777000", "777006", "666000", "666001"]) assert.equal(text.includes(price), false, `aucun prix de vente (${price})`);
@@ -615,5 +617,23 @@ describe("tableau « Marché » de l'administration", () => {
 
   test("sans relevé : aucune ligne", async () => {
     assert.deepEqual((await readAdminMarket(pool, { now: MARKET_NOW })).rows, []);
+  });
+});
+
+describe("tableau « Marché » de l'administration : ventes réelles et historique de démonstration (lot FIN1)", () => {
+  test("les ventes confirmées sont celles des commandes RÉELLES (comme l'aperçu de l'administration) ; les relevés de vente sans commande (demo:seed) sont comptés à part, jamais additionnés", async () => {
+    const { sellers, buyers } = await makeActors(pool, 8, 8);
+    // Neuf ventes réelles du produit « Modèle 77 » (annonce, besoin, commande confirmée), et sept relevés de vente synthétiques du MÊME produit (aucune commande).
+    for (let index = 0; index < 9; index += 1) await confirmRealSale(pool, { sellerId: sellers[index % 8].id, buyerId: buyers[index % 8].id, price: 300_000 + index * 1_000, model: "Modèle 77" });
+    const today = await dbToday();
+    for (let index = 0; index < 7; index += 1) await insertObservation(pool, { source: "sale", day: dayBefore(index, today), price: 555_000 + index, sellerId: sellers[index % 8].id, buyerId: buyers[index % 8].id, model: "Modèle 77", variant: null, condition: null });
+    const real = (await pool.query<{ n: number }>("SELECT count(*)::int AS n FROM orders WHERE status = 'confirmed'")).rows[0].n;
+    assert.equal(real, 9, "l'aperçu de l'administration compte 9 commandes confirmées");
+    const row = (await readAdminMarket(pool)).rows.find((entry) => entry.label.includes("Modèle 77"));
+    assert.ok(row, "le produit figure au tableau");
+    assert.deepEqual(row.confirmedSales, { kind: "approx", value: 10 }, "9 ventes réelles → environ 10 (jamais 16 : l'historique n'est pas ajouté)");
+    assert.deepEqual(row.historicalSales, { kind: "approx", value: 5 }, "7 relevés sans commande → environ 5, à part");
+    const text = JSON.stringify(row);
+    for (const price of ["555000", "555006", "300000", "308000"]) assert.equal(text.includes(price), false, `aucun prix de vente (${price})`);
   });
 });

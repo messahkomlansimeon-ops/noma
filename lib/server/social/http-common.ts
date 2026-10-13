@@ -137,7 +137,9 @@ export function createSocialContext(dependencies: SocialHttpDependencies, servic
         case "invalid_price":
           return failure(400, "invalid_price", "Le prix convenu doit être un entier de 1 à 100 000 000 FCFA.");
         case "order_active_exists":
-          return failure(409, "order_active_exists", "Une commande est déjà en cours pour cette annonce.");
+          return failure(409, "order_active_exists", "Une commande est déjà en attente de confirmation du vendeur pour cette annonce.");
+        case "order_already_confirmed":
+          return failure(409, "order_already_confirmed", "Cet achat est déjà confirmé par le vendeur pour cette annonce.");
         case "order_state_conflict":
           return failure(409, "order_state_conflict", "Cette commande ne peut plus changer d'état.");
         case "action_not_allowed":

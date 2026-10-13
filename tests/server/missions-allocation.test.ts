@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { allocateMission, type AllocationCandidate, type AllocationInput, type AllocationResult } from "../../lib/server/missions/allocation";
+import { allocateMission, stableSellerIndexes, type AllocationCandidate, type AllocationInput, type AllocationResult } from "../../lib/server/missions/allocation";
 import { MISSION_SELLERS_MAX, SHORTFALL_REASONS } from "../../lib/missions-rules";
 
 /**
@@ -268,5 +268,51 @@ describe("propriétés (jeux aléatoires, graine fixe)", () => {
     assert.equal(edge({ quantity: 1 }).coveredQuantity, 1);
     assert.equal(edge({ quantity: 10_000, totalBudget: 10_000 }).coveredQuantity, 10_000);
     assert.equal(edge({ quantity: 10_000, totalBudget: 9_999 }).coveredQuantity, 9_999);
+  });
+});
+
+describe("numéros de vendeurs stables d'une mission (lot FIN1)", () => {
+  const MISSION = "11111111-1111-4111-8111-111111111111";
+  const OTHER = "22222222-2222-4222-8222-222222222222";
+
+  test("un rang par vendeur (1 à N, sans trou ni doublon), le même quel que soit l'ordre des clés données ; chaque vendeur une fois", () => {
+    const keys = ["bb", "aa", "cc", "dd", "ee"];
+    const first = stableSellerIndexes(keys, MISSION);
+    assert.deepEqual([...first.values()].sort((a, b) => a - b), [1, 2, 3, 4, 5]);
+    assert.deepEqual(stableSellerIndexes([...keys].reverse(), MISSION), first, "l'ordre des clés données ne change rien");
+    assert.deepEqual(stableSellerIndexes(["aa", "bb", "aa", "bb"], MISSION), stableSellerIndexes(["bb", "aa"], MISSION), "chaque vendeur une fois");
+    assert.deepEqual(stableSellerIndexes([], MISSION), new Map());
+  });
+
+  test("STABLE pour une même mission : le même résultat à chaque affichage ; indépendant de tout ce qui n'est pas (mission, vendeur) : un vendeur absent n'en renomme pas un autre devant lui", () => {
+    const keys = ["seller-1", "seller-2", "seller-3", "seller-4", "seller-5", "seller-6"];
+    const all = stableSellerIndexes(keys, MISSION);
+    for (let read = 0; read < 5; read += 1) assert.deepEqual(stableSellerIndexes(keys, MISSION), all);
+    // Retirer un vendeur ne change pas l'ordre relatif des autres (seuls ceux qui le suivaient reculent d'un rang).
+    for (const removed of keys) {
+      const rest = stableSellerIndexes(keys.filter((key) => key !== removed), MISSION);
+      const order = (map: Map<string, number>) => [...map.entries()].sort((a, b) => a[1] - b[1]).map(([key]) => key).filter((key) => key !== removed);
+      assert.deepEqual(order(rest), order(all), `sans ${removed}`);
+    }
+  });
+
+  test("D'UNE MISSION À L'AUTRE : un autre classement (aucun pseudonyme stable) : sur de nombreuses missions, un même vendeur ne reçoit pas toujours le même numéro", () => {
+    const keys = ["x", "y", "z"];
+    const labelsOfX = new Set<number>();
+    const wholeOrders = new Set<string>();
+    for (let index = 0; index < 60; index += 1) {
+      const mission = `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
+      const ranks = stableSellerIndexes(keys, mission);
+      labelsOfX.add(ranks.get("x") as number);
+      wholeOrders.add(keys.map((key) => ranks.get(key)).join(","));
+    }
+    assert.deepEqual([...labelsOfX].sort(), [1, 2, 3], "X a tenu les trois numéros selon la mission");
+    assert.ok(wholeOrders.size >= 4, `au moins 4 des 6 classements possibles (${wholeOrders.size})`);
+    assert.notDeepEqual(stableSellerIndexes(["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"], MISSION), stableSellerIndexes(["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"], OTHER));
+  });
+
+  test("l'empreinte ne montre rien : ni identifiant, ni numéro dans le résultat (seulement les clés données et leur rang)", () => {
+    const result = stableSellerIndexes(["only-key"], MISSION);
+    assert.deepEqual([...result.entries()], [["only-key", 1]]);
   });
 });

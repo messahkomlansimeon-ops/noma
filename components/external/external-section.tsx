@@ -6,6 +6,8 @@ import { useUnauthorizedRedirect } from "@/components/session-gate";
 import { ApiError } from "@/lib/client/api";
 import { external, type ExternalListing } from "@/lib/client/external-api";
 import {
+  EXTERNAL_DEMO_SITE_HINT,
+  EXTERNAL_DEMO_SITE_LABEL,
   EXTERNAL_LINK_LABEL,
   EXTERNAL_LOADING,
   EXTERNAL_MORE_LABEL,
@@ -51,6 +53,21 @@ export function ExternalCard({ item }: { item: ExternalListing }) {
           {EXTERNAL_LINK_LABEL}
           <ExternalLink className="size-4" aria-hidden />
         </a>
+      ) : row.demoSite ? (
+        <div data-testid="external-link-demo" className="mt-3">
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-line bg-wash py-2.5 text-[14px] font-bold text-ink-soft opacity-70"
+          >
+            {EXTERNAL_LINK_LABEL}
+            <ExternalLink className="size-4" aria-hidden />
+          </button>
+          <p className="mt-1 text-center text-[11px] font-semibold text-ink-soft">
+            {EXTERNAL_DEMO_SITE_LABEL} : {EXTERNAL_DEMO_SITE_HINT}
+          </p>
+        </div>
       ) : null}
     </li>
   );

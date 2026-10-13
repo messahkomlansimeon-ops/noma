@@ -59,6 +59,11 @@ export default function AdminMarche() {
                         <ListingsCell view={row.listings} />
                         <td data-testid="admin-market-sales" className="px-2 py-2 align-top text-ink">
                           {row.salesText}
+                          {row.historicalText ? (
+                            <div data-testid="admin-market-historical" className="text-[11px] text-ink-soft">
+                              {row.historicalText}
+                            </div>
+                          ) : null}
                         </td>
                       </tr>
                     ))}

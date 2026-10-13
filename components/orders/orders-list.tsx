@@ -44,7 +44,8 @@ export function OrdersList({ space }: { space: "buyer" | "vendor" }) {
   const title = buyer ? ORDERS_TITLE_BUYER : ORDERS_TITLE_SELLER;
   return (
     <main>
-      <TopBar back={buyer ? "/compte" : "/vendeur"} title={title} />
+      {/* Lot FIN1 : titre dit une fois (le h1). */}
+      <TopBar back={buyer ? "/compte" : "/vendeur"} />
       <div className="px-4 pb-6">
         <h1 className="font-display text-[22px] font-extrabold text-ink">{title}</h1>
         {error ? (

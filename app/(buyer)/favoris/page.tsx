@@ -62,7 +62,8 @@ function Favorites() {
 
   return (
     <main>
-      <TopBar back="/" title={FAVORITES_TITLE} />
+      {/* Lot FIN1 : le titre n'est dit qu'une fois (le h1) : plus de « Mes favoris » en double dans la barre du haut. */}
+      <TopBar back="/" />
       <div className="px-4 pb-6">
         <h1 className="font-display text-[22px] font-extrabold text-ink">{FAVORITES_TITLE}</h1>
         {error ? (
