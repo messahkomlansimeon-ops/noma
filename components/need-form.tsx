@@ -130,10 +130,11 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
       </div>
 
       <div className="mt-3 rounded-2xl border border-line bg-white p-4">
-        <div className="text-[13px] font-bold text-ink">
+        <label htmlFor="need-text" className="block text-[13px] font-bold text-ink">
           Que cherchez-vous ?
-        </div>
+        </label>
         <textarea
+          id="need-text"
           value={need.text}
           onChange={(e) => setNeed({ text: e.target.value })}
           rows={2}
@@ -143,23 +144,25 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
         />
         <div className="mt-2 grid grid-cols-2 gap-2.5">
           <div className="rounded-xl border border-line bg-cream/60 px-3.5 py-2.5">
-            <div className="text-[11px] font-semibold text-ink-soft">
+            <label htmlFor="need-location" className="block text-[11px] font-semibold text-ink-soft">
               Localisation
               <span className="ml-1 font-normal">(facultatif)</span>
-            </div>
+            </label>
             <Input
+              id="need-location"
               value={need.location}
               onChange={(e) => setNeed({ location: e.target.value })}
-              placeholder="Valeur du texte"
+              placeholder="Ex. Cocody"
               className="mt-0.5 border-0 bg-transparent p-0 text-[14px] font-bold"
             />
           </div>
           <div className="rounded-xl border border-line bg-cream/60 px-3.5 py-2.5">
-            <div className="text-[11px] font-semibold text-ink-soft">
+            <label htmlFor="need-budget" className="block text-[11px] font-semibold text-ink-soft">
               Budget maximum
               <span className="ml-1 font-normal">(facultatif)</span>
-            </div>
+            </label>
             <Input
+              id="need-budget"
               value={need.budgetFcfa}
               onChange={(e) => {
                 setNeed({ budgetFcfa: e.target.value });

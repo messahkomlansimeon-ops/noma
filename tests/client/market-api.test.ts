@@ -90,7 +90,10 @@ describe("réponse relue champ par champ", () => {
     ["jour illisible", { period: { days: 90, from: "hier", to: "2026-10-07" } }],
     ["médiane non arrondie à 500", { listings: listings({ median: 160_001 }) }],
     ["médiane décimale", { listings: listings({ median: 160_000.5 }) }],
-    ["fourchette qui n'est pas un multiple de 5 % de la médiane (quartile exact)", { listings: listings({ range: { q1: 151_250, q3: 176_000 } }) }],
+    ["fourchette qui n'est pas un multiple de 500 FCFA (quartile exact)", { listings: listings({ range: { q1: 151_250, q3: 176_000 } }) }],
+    ["fourchette dont la borne haute n'est pas un multiple de 500 FCFA", { listings: listings({ range: { q1: 152_000, q3: 176_250 } }) }],
+    ["fourchette dont la borne basse est égale à la médiane (jamais « entre X et X »)", { listings: listings({ range: { q1: 160_000, q3: 176_000 } }) }],
+    ["fourchette dont la borne haute est égale à la médiane", { listings: listings({ range: { q1: 152_000, q3: 160_000 } }) }],
     ["fourchette dans le désordre", { listings: listings({ range: { q1: 176_000, q3: 152_000 } }) }],
     ["fourchette qui ne contient pas la médiane", { listings: listings({ range: { q1: 168_000, q3: 176_000 } }) }],
     ["fourchette avec champ en trop", { listings: listings({ range: { q1: 152_000, q3: 176_000, min: 100_000 } }) }],
@@ -135,26 +138,27 @@ describe("réponse relue champ par champ", () => {
 
 describe("administration", () => {
   const adminBody = (rows: unknown[], extra: Record<string, unknown> = {}) => ({
-    contractVersion: "market-admin/v3", currency: "XOF", roundingXof: 500, period: { days: 90, from: "2026-07-10", to: "2026-10-07" }, rows, ...extra,
+    contractVersion: "market-admin/v4", currency: "XOF", roundingXof: 500, period: { days: 90, from: "2026-07-10", to: "2026-10-07" }, rows, ...extra,
   });
-  const row = (label: string, extra: Record<string, unknown> = {}) => ({ label, listings: listings(), confirmedSales: { kind: "approx", value: 5 }, ...extra });
+  const row = (label: string, extra: Record<string, unknown> = {}) => ({ label, listings: listings(), confirmedSales: { kind: "approx", value: 5 }, historicalSales: { kind: "approx", value: 55 }, ...extra });
 
   test("tableau relu (20 lignes au plus) : prix demandés et NOMBRE arrondi de ventes confirmées ; libellé obligatoire", async () => {
     const { api, calls } = client(() => ({ status: 200, body: adminBody([row("Apple iPhone 12 · 128 Go · Occasion")]) }));
     const result = await api.admin();
     assert.equal(result.rows[0].label, "Apple iPhone 12 · 128 Go · Occasion");
     assert.deepEqual(result.rows[0].confirmedSales, { kind: "approx", value: 5 });
+    assert.deepEqual(result.rows[0].historicalSales, { kind: "approx", value: 55 }, "l'historique de démonstration est lu à part");
     assert.equal(calls[0].url, "/api/admin/market");
     await assert.rejects(() => client(() => ({ status: 200, body: adminBody([row("")]) })).api.admin());
     await assert.rejects(() => client(() => ({ status: 200, body: adminBody(Array.from({ length: 21 }, () => row("x"))) })).api.admin());
   });
 
   test("jamais un prix de vente : un prix, un nombre exact ou un champ en trop dans une ligne fait refuser la réponse", async () => {
-    for (const extra of [{ salePrice: 777_000 }, { sales: { median: 777_000 } }, { confirmedSales: { kind: "approx", value: 7 } }, { confirmedSales: 7 }, { confirmedSales: { kind: "approx", value: 5, median: 777_000 } }]) {
+    for (const extra of [{ salePrice: 777_000 }, { sales: { median: 777_000 } }, { confirmedSales: { kind: "approx", value: 7 } }, { confirmedSales: 7 }, { confirmedSales: { kind: "approx", value: 5, median: 777_000 } }, { historicalSales: { kind: "approx", value: 7 } }, { historicalSales: 55 }]) {
       await assert.rejects(() => client(() => ({ status: 200, body: adminBody([row("x", extra)]) })).api.admin(), (error: ApiError) => error.code === "invalid_response", JSON.stringify(extra));
     }
     await assert.rejects(() => client(() => ({ status: 200, body: adminBody([row("x")], { sales: [] }) })).api.admin(), (error: ApiError) => error.code === "invalid_response");
-    await assert.rejects(() => client(() => ({ status: 200, body: { ...adminBody([row("x")]), contractVersion: "market-admin/v1" } })).api.admin(), (error: ApiError) => error.code === "invalid_response");
+    await assert.rejects(() => client(() => ({ status: 200, body: { ...adminBody([row("x")]), contractVersion: "market-admin/v3" } })).api.admin(), (error: ApiError) => error.code === "invalid_response");
   });
 
   test("404 conservé (un compte ordinaire ne devine pas la route)", async () => {

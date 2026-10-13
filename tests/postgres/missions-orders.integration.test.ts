@@ -76,8 +76,8 @@ describe("proposition de répartition", () => {
     assert.equal(proposal.unitBudgetXof, UNIT_BUDGET);
     assert.equal(proposal.sellerCount, 4);
     assert.deepEqual(proposal.reasons, []);
-    // Vendeurs anonymes : « Vendeur 1 » à « Vendeur 4 », aucun identifiant ni numéro.
-    assert.deepEqual(lines.map((line) => line.vendor), ["Vendeur 1", "Vendeur 2", "Vendeur 3", "Vendeur 4"]);
+    // Vendeurs anonymes : « Vendeur 1 » à « Vendeur 4 » (un numéro par vendeur ; lot FIN1 : le numéro est stable pour la mission, il ne suit plus l'ordre de remplissage), aucun identifiant ni numéro.
+    assert.deepEqual(lines.map((line) => line.vendor).sort(), ["Vendeur 1", "Vendeur 2", "Vendeur 3", "Vendeur 4"]);
     for (const entry of [a, b, c, d]) {
       assert.ok(!answer.text.includes(entry.seller.id), "aucun identifiant de vendeur");
       assert.ok(!answer.text.includes(entry.seller.phone ?? "???"), "aucun numéro de vendeur");
@@ -92,8 +92,34 @@ describe("proposition de répartition", () => {
     await addCandidate(env.pool, live, { price: 150_000, quantity: 1, score: 30 });
     const lines = linesOf(await proposalCall(h, buyer.cookie, live.id));
     assert.equal(lines[0].offerId, best.offer.id);
-    assert.equal(lines[0].vendor, "Vendeur 1");
+    assert.deepEqual(lines.map((line) => line.vendor).sort(), ["Vendeur 1", "Vendeur 2"], "deux vendeurs, deux numéros (stables : ils ne suivent pas l'ordre de remplissage)");
     assert.equal(lines.length, 2);
+  });
+
+  test("lot FIN1 : « Vendeur N » est STABLE d'un affichage à l'autre d'une même mission : déclarer un achat ne renomme personne, les relectures donnent les mêmes numéros", async () => {
+    const live = await startMission(env.pool, h, buyer, { quantity: 4 });
+    const a = await sellerWith(live, { price: 150_000, quantity: 2, score: 40 });
+    const b = await sellerWith(live, { price: 150_000, quantity: 2, score: 99 });
+    const label = (lines: Json[], offerId: string) => lines.find((line) => line.offerId === offerId)?.vendor as string;
+    const before = linesOf(await proposalCall(h, buyer.cookie, live.id));
+    const labelA = label(before, a.candidate.offer.id);
+    const labelB = label(before, b.candidate.offer.id);
+    assert.deepEqual([labelA, labelB].sort(), ["Vendeur 1", "Vendeur 2"]);
+    // Relectures : mêmes numéros.
+    for (let read = 0; read < 3; read += 1) {
+      const again = linesOf(await proposalCall(h, buyer.cookie, live.id));
+      assert.deepEqual([label(again, a.candidate.offer.id), label(again, b.candidate.offer.id)], [labelA, labelB]);
+    }
+    // L'acheteur déclare un achat chez B : B passe dans « achats déjà engagés » SANS être renommé, A garde son numéro (avant : l'engagé passait toujours en « Vendeur 1 »).
+    const order = orderOf(await declareCall(live, b.candidate, { priceXof: 150_000, quantity: 2 }));
+    for (let read = 0; read < 3; read += 1) {
+      const after = proposalOf(await proposalCall(h, buyer.cookie, live.id));
+      assert.deepEqual((after.engaged as Json[]).map((entry) => [entry.orderId, entry.vendor]), [[order.id, labelB]], "le vendeur engagé garde SON numéro");
+      assert.deepEqual((after.lines as Json[]).map((line) => [line.offerId, line.vendor]), [[a.candidate.offer.id, labelA]], "l'autre vendeur aussi");
+    }
+    // Un vendeur confirmé ensuite : toujours le même numéro.
+    assert.equal((await actOrder(order.id as string, "confirm", b.seller.cookie)).status, 200);
+    assert.equal((proposalOf(await proposalCall(h, buyer.cookie, live.id)).engaged as Json[])[0].vendor, labelB);
   });
 
   test("quantité plus grande que le stock : couverture partielle et raisons (pas assez d'annonces, budget par unité trop bas)", async () => {
@@ -475,7 +501,7 @@ describe("la proposition répartit seulement le RESTE (quantité et budget engag
     const full = proposalOf(await proposalCall(h, buyer.cookie, live.id));
     assert.deepEqual([full.lines, full.committedQuantity, full.remainingQuantity, full.coveredQuantity, full.coveragePercent], [[], 4, 0, 4, 100]);
     assert.deepEqual((full.engaged as Json[]).map((order) => [order.status, order.quantity]), [["confirmed", 2], ["proposed", 2]]);
-    assert.deepEqual((full.engaged as Json[]).map((order) => order.vendor), ["Vendeur 1", "Vendeur 2"], "chaque vendeur engagé garde son rang : le premier engagé d'abord");
+    assert.deepEqual((full.engaged as Json[]).map((order) => order.vendor).sort(), ["Vendeur 1", "Vendeur 2"], "deux vendeurs engagés, deux numéros (stables pour la mission)");
   });
 
   test("le budget engagé est soustrait : le reste est réparti sous le budget total RESTANT, la raison est dite", async () => {
@@ -511,8 +537,10 @@ describe("la proposition répartit seulement le RESTE (quantité et budget engag
     assert.deepEqual((proposal.lines as Json[]).map((line) => line.unitPriceXof), [128_000, 142_000, 150_000, 158_000, 162_000, 168_000], "l'annonce achetée (165 000) n'est plus proposée");
     assert.deepEqual([proposal.committedQuantity, proposal.committedXof, proposal.remainingQuantity, proposal.coveredQuantity, proposal.coveragePercent], [2, 330_000, 6, 8, 100]);
     assert.deepEqual([proposal.budgetUsedXof, proposal.budgetRemainingXof], [330_000 + 908_000, 162_000]);
-    assert.deepEqual(engagedOf(answer).map((entry) => [entry.status, entry.quantity, entry.unitPriceXof, entry.vendor]), [["confirmed", 2, 165_000, "Vendeur 1"]]);
-    assert.deepEqual((proposal.lines as Json[]).map((line) => line.vendor), ["Vendeur 2", "Vendeur 3", "Vendeur 4", "Vendeur 5", "Vendeur 6", "Vendeur 7"]);
+    assert.deepEqual(engagedOf(answer).map((entry) => [entry.status, entry.quantity, entry.unitPriceXof]), [["confirmed", 2, 165_000]]);
+    // Sept vendeurs affichés (1 engagé + 6 lignes) : « Vendeur 1 » à « Vendeur 7 », chacun une fois ; lot FIN1 : le numéro de l'engagé n'est plus toujours « Vendeur 1 » (il est stable pour la mission).
+    const shown = [engagedOf(answer)[0].vendor as string, ...(proposal.lines as Json[]).map((line) => line.vendor as string)];
+    assert.deepEqual([...shown].sort(), ["Vendeur 1", "Vendeur 2", "Vendeur 3", "Vendeur 4", "Vendeur 5", "Vendeur 6", "Vendeur 7"]);
   });
 
   test("une commande déclinée ou annulée ne compte plus : l'annonce redevient proposée, la quantité à nouveau à acheter", async () => {
@@ -528,7 +556,7 @@ describe("la proposition répartit seulement le RESTE (quantité et budget engag
     assert.deepEqual((proposal.lines as Json[]).map((line) => [line.offerId, line.quantity]), [[a.candidate.offer.id, 4]]);
   });
 
-  test("les vendeurs déjà engagés comptent dans les 10 vendeurs et gardent leur étiquette ; une autre annonce du même vendeur est proposée sous la même étiquette", async () => {
+  test("les vendeurs déjà engagés comptent dans les 10 vendeurs et gardent leur étiquette (stable) ; une autre annonce du même vendeur est proposée sous la même étiquette", async () => {
     const live = await startMission(env.pool, h, buyer, { quantity: 30, unitBudgetXof: 200_000, totalBudgetXof: 50_000_000 });
     const engagedSeller = await login(env.pool);
     const first = await addCandidate(env.pool, live, { price: 100_000, quantity: 1, score: 50, seller: person(engagedSeller) });
@@ -537,11 +565,11 @@ describe("la proposition répartit seulement le RESTE (quantité et budget engag
     assert.equal((await declareCall(live, first, { priceXof: 100_000, quantity: 1 })).status, 201);
     const answer = await proposalCall(h, buyer.cookie, live.id);
     const proposal = proposalOf(answer);
-    assert.equal(engagedOf(answer)[0].vendor, "Vendeur 1", "le vendeur engagé porte le premier rang");
+    const engagedLabel = engagedOf(answer)[0].vendor;
     const lines = proposal.lines as Json[];
     assert.equal(proposal.sellerCount, MISSION_SELLERS_MAX, "1 vendeur engagé + 9 nouveaux = 10");
-    assert.equal(lines.filter((line) => line.vendor !== "Vendeur 1").length, 9);
-    assert.deepEqual(lines.find((line) => line.offerId === second.offer.id)?.vendor, "Vendeur 1", "même vendeur, même étiquette");
+    assert.equal(lines.filter((line) => line.vendor !== engagedLabel).length, 9);
+    assert.deepEqual(lines.find((line) => line.offerId === second.offer.id)?.vendor, engagedLabel, "même vendeur, même étiquette");
     assert.deepEqual((proposal.reasons as Json[]).map((reason) => reason.code), ["not_enough_offers", "seller_limit"]);
   });
 

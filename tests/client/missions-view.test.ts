@@ -9,6 +9,9 @@ import {
   formValuesOf,
   lineConversationPath,
   missionDraftMessage,
+  missionFromSearch,
+  missionListingPath,
+  orderedProposalLines,
   missionPath,
   missionRow,
   orderLine,
@@ -203,5 +206,31 @@ describe("proposition", () => {
     assert.equal(orderLine({ ...order, status: "proposed" }).statusText, "En attente du vendeur");
     assert.equal(orderLine({ ...order, status: "declined" }).statusText, "Refusé");
     assert.equal(orderLine({ ...order, status: "cancelled" }).statusText, "Annulé");
+  });
+});
+
+describe("fiche d'une annonce ouverte depuis une mission (lot FIN1)", () => {
+  test("l'adresse de la fiche porte la mission (UUID) : la flèche retour revient à la mission, jamais au besoin porteur", () => {
+    const path = missionListingPath(ID, OFFER, "33333333-3333-4333-8333-333333333333");
+    assert.equal(path, `/besoins/${OFFER}/offres/33333333-3333-4333-8333-333333333333?mission=${ID}`);
+    assert.equal(missionFromSearch(new URL(path, "https://noma.test").searchParams.get("mission")), ID);
+  });
+
+  test("la mission lue dans l'adresse est un UUID, rien d'autre (aucune redirection libre)", () => {
+    assert.equal(missionFromSearch(null), null);
+    assert.equal(missionFromSearch(""), null);
+    for (const bad of ["../x", "/admin", "https://evil.example", `${ID}/../..`, `${ID}?x=1`, "12345", " " + ID, "javascript:alert(1)"]) assert.equal(missionFromSearch(bad), null, bad);
+    assert.equal(missionFromSearch(ID.toUpperCase()), ID, "minuscules");
+  });
+});
+
+describe("ordre d'affichage des lignes de la proposition (lot FIN1)", () => {
+  test("par numéro de vendeur croissant, puis dans l'ordre reçu ; stable à chaque lecture ; une étiquette sans numéro en dernier ; l'entrée n'est pas modifiée", () => {
+    const entries = [line({ offerId: "a", vendor: "Vendeur 4" }), line({ offerId: "b", vendor: "Vendeur 2" }), line({ offerId: "c", vendor: "Vendeur 4" }), line({ offerId: "d", vendor: "Vendeur 1" }), line({ offerId: "e", vendor: "Vendeur" })];
+    const snapshot = entries.map((entry) => entry.offerId);
+    assert.deepEqual(orderedProposalLines(entries).map((entry) => entry.offerId), ["d", "b", "a", "c", "e"]);
+    assert.deepEqual(entries.map((entry) => entry.offerId), snapshot, "l'entrée n'est pas modifiée");
+    assert.deepEqual(orderedProposalLines([...entries].reverse()).map((entry) => entry.offerId), ["d", "b", "c", "a", "e"], "à numéro égal, l'ordre reçu");
+    assert.deepEqual(orderedProposalLines([]), []);
   });
 });

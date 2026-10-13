@@ -33,7 +33,12 @@ seconde, le score est **plafonné à 30** (jamais relevé) et `insufficient_quan
 `unavailable` (score 0) est inatteignable : une offre indisponible n'est pas éligible.
 
 ### Prix (`price`)
-Position du prix de l'offre dans le marché observé, **hors l'offre elle-même** : **strictement sous p25** →
+**Lot FIN1 : une seule référence de prix avec l'encart « Prix demandés dans les annonces »** (`HISTORIQUE-PRIX.md`). Quand l'encart est publié pour la clé de l'annonce (catégorie, marque, modèle, variante, état ; mêmes
+élargissements, mêmes seuils, même période de 90 jours), la position et l'écart se calculent par rapport à SA médiane et à sa fourchette publiée (Q1, Q3), ou, sans fourchette (moins de 10 vendeurs), à la médiane ±
+`publishedBandPercent` (10 %) : `price-reference.ts`, `sampleSize` = l'effectif arrondi de l'encart, l'annonce évaluée est dans son marché. Sinon (encart non publié), repli sur le marché des offres ci-dessous, avec une
+clé qui INCLUT la variante et l'état. La suite de cette section décrit ce repli (et les seuils communs).
+
+Position du prix de l'offre dans le marché observé, **hors l'offre elle-même** (repli) : **strictement sous p25** →
 `below_market` (100) ; **p25 ≤ prix ≤ p75** → `in_market` (60) ; au-dessus de p75 → `above_market` (20). Dans un marché
 dégénéré (p25 = médiane = p75, par exemple toutes les offres au même prix), un prix égal est donc `in_market`
 (écart 0), jamais `below_market`. Prix absent, marché absent, médiane nulle ou échantillon < 5 →
@@ -137,7 +142,7 @@ change pas), et la liste des correspondances elle-même (fraîcheur) est relue �
 
 Offres retenues : publiées, non archivées, disponibilité ≠ `unavailable` (NULL accepté), propriétaire actif et non
 archivé, prix renseigné, même devise. Clé : `(lower(btrim(category)), lower(btrim(brand)), lower(btrim(model)),
-price_currency)`. **La variante est ignorée en v1.** Sample et percentiles (`percentile_cont` 0,25 / 0,5 / 0,75) par une
+price_currency)`, **et, depuis le lot FIN1, la variante et l'état de l'offre évaluée** (`price_key_part`, comme les relevés de prix : une variante ou un état absent est confondu, un renseigné est exigé à l'identique ; une requête sans variante ni état compare comme avant). Sample et percentiles (`percentile_cont` 0,25 / 0,5 / 0,75) par une
 seule requête par page ; l'offre évaluée est exclue de SON marché (jointure d'exclusion : un percentile se recalcule
 sans l'offre, il ne se soustrait pas). Seuil d'échantillon : 5 (`relevance-config.ts`).
 
@@ -150,7 +155,7 @@ sans l'offre, il ne se soustrait pas). Seuil d'échantillon : 5 (`relevance-conf
 
 ## Limites
 
-- Marché **interne seulement** (offres de la base), aucune source externe ; variante ignorée ; pas d'index sur
+- Marché **interne seulement** (offres de la base et relevés de prix), aucune source externe ; pas d'index sur
   `lower(btrim(...))` (coût proportionnel à la taille du marché par offre de la page, acceptable en développement).
 - **Aucune réputation** (avis, historique de transactions) : la confiance ne mesure que la vérification du téléphone,
   l'ancienneté, la complétude et la confirmation de disponibilité.

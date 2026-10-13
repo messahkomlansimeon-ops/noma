@@ -66,6 +66,11 @@ export function workerView(worker: AdminSummary["worker"]): WorkerView {
 export interface VendorRowView {
   id: string;
   maskedPhone: string;
+  /**
+   * « Réf. 6f1d4f » : les six premiers caractères de l'identifiant du compte (un identifiant aléatoire, sans lien avec le numéro ni avec la personne). Le numéro masqué ne garde que deux
+   * chiffres : deux vendeurs peuvent avoir le même ; cette référence les distingue à l'écran et dans la confirmation d'une suspension.
+   */
+  refText: string;
   offersText: string;
   joinedText: string;
   statusText: string;
@@ -78,6 +83,7 @@ export function vendorRow(vendor: AdminVendor): VendorRowView {
   return {
     id: vendor.id,
     maskedPhone: vendor.maskedPhone ?? "numéro inconnu",
+    refText: `Réf. ${vendor.id.replace(/-/g, "").slice(0, 6).toLowerCase()}`,
     offersText: `${vendor.offerCount} annonce(s) dont ${vendor.publishedCount} en ligne`,
     joinedText: `Inscrit le ${formatDateTimeFr(vendor.createdAt).split(" à ")[0]}`,
     statusText: STATUS_LABELS[vendor.status],
@@ -87,10 +93,11 @@ export function vendorRow(vendor: AdminVendor): VendorRowView {
   };
 }
 
-export function confirmText(action: "suspend" | "reactivate", maskedPhone: string): string {
+export function confirmText(action: "suspend" | "reactivate", maskedPhone: string, refText?: string): string {
+  const who = refText ? `${maskedPhone} (${refText.charAt(0).toLowerCase()}${refText.slice(1)})` : maskedPhone;
   return action === "suspend"
-    ? `Suspendre le vendeur ${maskedPhone} ? Il ne pourra plus se connecter et ses annonces ne seront plus proposées.`
-    : `Réactiver le vendeur ${maskedPhone} ? Ses annonces reviennent dans les correspondances.`;
+    ? `Suspendre le vendeur ${who} ? Il ne pourra plus se connecter et ses annonces ne seront plus proposées.`
+    : `Réactiver le vendeur ${who} ? Ses annonces reviennent dans les correspondances.`;
 }
 
 export const ACTION_LABELS: Readonly<Record<AdminActionEntry["action"], string>> = Object.freeze({

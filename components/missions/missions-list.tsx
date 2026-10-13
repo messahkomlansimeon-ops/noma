@@ -75,7 +75,8 @@ export function MissionsList() {
 
   return (
     <main>
-      <TopBar back="/compte" title={MISSIONS_TITLE} />
+      {/* Lot FIN1 : titre dit une fois (le h1). */}
+      <TopBar back="/compte" />
       <div className="px-4 pb-6">
         <div className="flex items-center justify-between gap-3">
           <h1 className="font-display text-[22px] font-extrabold text-ink">{MISSIONS_TITLE}</h1>

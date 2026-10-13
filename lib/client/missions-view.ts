@@ -100,6 +100,21 @@ export function missionEditPath(id: string): string {
   return `/missions/${id}/modifier`;
 }
 
+const MISSION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Fiche d'une annonce ouverte depuis une ligne de la proposition (lot FIN1) : l'adresse porte la MISSION (un UUID), pour que la fiche s'ouvre « dans le contexte de la mission » et que la flèche
+ * retour revienne à la mission, jamais au besoin porteur interne (qui n'est pas un besoin de l'acheteur : il ne se gère que par la mission).
+ */
+export function missionListingPath(missionId: string, demandId: string, offerId: string): string {
+  return `/besoins/${demandId}/offres/${offerId}?mission=${missionId}`;
+}
+
+/** La mission d'où l'on vient, lue dans l'adresse de la fiche : un UUID seulement, sinon aucune (une adresse trafiquée ne mène nulle part ailleurs que vers `/missions/<uuid>`). */
+export function missionFromSearch(value: string | null): string | null {
+  return value !== null && MISSION_UUID.test(value) ? value.toLowerCase() : null;
+}
+
 /** Page d'une conversation ouverte depuis une ligne de la proposition : quantité et prix visés (deux entiers, jamais un texte) pour pré-remplir le message. */
 export function lineConversationPath(conversationId: string, line: Pick<ProposalLine, "quantity" | "unitPriceXof">): string {
   return `/messages/${conversationId}?quantite=${line.quantity}&prix=${line.unitPriceXof}`;
@@ -180,6 +195,20 @@ export interface ProposalLineView {
   subtotalText: string;
   stockText: string;
   canAct: boolean;
+}
+
+/** Numéro d'une étiquette « Vendeur 3 » (3) ; sans numéro lisible, l'étiquette passe après les autres. */
+function vendorNumber(label: string): number {
+  const match = /(\d+)\s*$/.exec(label);
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+}
+
+/**
+ * Les lignes de la proposition dans l'ordre d'AFFICHAGE (lot FIN1) : par numéro de vendeur croissant (« Vendeur 1 », « Vendeur 2 »…), puis dans l'ordre reçu. Les numéros sont stables pour la
+ * mission (voir `stableSellerIndexes`) : l'écran montre donc les mêmes lignes dans le même ordre à chaque lecture, au lieu de changer d'ordre quand la pertinence bouge.
+ */
+export function orderedProposalLines<T extends { vendor: string }>(lines: readonly T[]): T[] {
+  return lines.map((line, index) => ({ line, index })).sort((a, b) => vendorNumber(a.line.vendor) - vendorNumber(b.line.vendor) || a.index - b.index).map((entry) => entry.line);
 }
 
 export function proposalLineView(line: ProposalLine, missionOpen: boolean): ProposalLineView {

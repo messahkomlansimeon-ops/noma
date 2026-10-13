@@ -36,19 +36,31 @@ describe("section avec des annonces", () => {
     assert.ok(mentions[0].endsWith("vous serez redirigé vers le site."));
   });
 
-  test("le lien sortant : nouvel onglet et rel noopener noreferrer nofollow, vers l'annonce de la source", () => {
-    const anchors = [...html.matchAll(/<a [^>]*data-testid="external-link"[^>]*>/g)].map((match) => match[0]);
-    assert.equal(anchors.length, 2);
-    for (const anchor of anchors) {
-      assert.match(anchor, /target="_blank"/);
-      assert.match(anchor, /rel="noopener noreferrer nofollow"/);
-      assert.match(anchor, /href="https:\/\/annonces-demo-[ab]\.example\/annonce\/demo_a-\d"/);
+  test("lot FIN1 : une annonce d'une source FICTIVE (adresse en .example) n'ouvre AUCUN lien mort : bouton désactivé « Voir sur le site » et mention « Site de démonstration »", () => {
+    assert.equal([...html.matchAll(/<a [^>]*data-testid="external-link"[^>]*>/g)].length, 0, "aucun lien vers un domaine .example");
+    assert.equal(/href="https:\/\/annonces-demo/.test(html), false);
+    const demo = [...html.matchAll(/<div data-testid="external-link-demo"[^>]*>(.*?)<\/div>/g)].map((match) => match[1]);
+    assert.equal(demo.length, 2);
+    for (const block of demo) {
+      assert.match(block, /<button[^>]*disabled=""[^>]*aria-disabled="true"[^>]*>Voir sur le site/);
+      assert.match(block, /Site de démonstration : annonce d(?:'|&#x27;)exemple, ce site n(?:'|&#x27;)existe pas\./);
     }
+  });
+
+  test("une annonce d'un VRAI site garde son lien sortant : nouvel onglet et rel noopener noreferrer nofollow", () => {
+    const real = renderToStaticMarkup(ExternalCard({ item: listing(1, { url: "https://www.exemple-reel.ci/annonce/42" }) }));
+    const anchors = [...real.matchAll(/<a [^>]*data-testid="external-link"[^>]*>/g)].map((match) => match[0]);
+    assert.equal(anchors.length, 1);
+    assert.match(anchors[0], /target="_blank"/);
+    assert.match(anchors[0], /rel="noopener noreferrer nofollow"/);
+    assert.match(anchors[0], /href="https:\/\/www\.exemple-reel\.ci\/annonce\/42"/);
+    assert.equal(/external-link-demo/.test(real), false);
   });
 
   test("aucune action de noma : ni contact, ni favori, ni commande, ni message, ni téléphone, ni lien interne vers une fiche", () => {
     for (const forbidden of [/Contacter/i, /favori/i, /commande/i, /Écrire/i, /tel:/i, /wa\.me/i, /href="\/offre/, /href="\/besoins/, /data-testid="[^"]*(favorite|contact|order|message|boost)/i, /onclick/i]) assert.equal(forbidden.test(html), false, String(forbidden));
-    assert.equal((html.match(/<button/g) ?? []).length, 1, "un seul bouton : « Voir plus »");
+    assert.equal((html.match(/<button/g) ?? []).length, 3, "« Voir plus » et les deux boutons DÉSACTIVÉS des sites de démonstration (aucune action)");
+    assert.equal((html.match(/<button(?![^>]*\sdisabled="")/g) ?? []).length, 1, "un seul bouton actif : « Voir plus »");
   });
 
   test("doublon entre sources : « Aussi trouvée sur … » ; prix et lieu affichés", () => {

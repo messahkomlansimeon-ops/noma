@@ -3,7 +3,7 @@ import { describe, test } from "node:test";
 import type { AdminCollection, AdminCollectionSource, ExternalListing } from "../../lib/client/external-api";
 import {
   ADMIN_COLLECTION_NOTE, ADMIN_COLLECTION_TITLE, BREAKER_LABELS, EXTERNAL_LINK_REL, EXTERNAL_LINK_TARGET, EXTERNAL_MORE_LABEL, EXTERNAL_SECTION_TITLE, UNKNOWN_ERROR_LABEL,
-  adminErrorRows, adminSourceRow, adminWatchSummary, errorLabel, externalCardRow, externalLinkProps, externalMention, mergeExternalItems,
+  adminErrorRows, adminSourceRow, adminWatchSummary, errorLabel, externalCardRow, externalLinkProps, externalMention, isDemoSiteUrl, mergeExternalItems,
 } from "../../lib/client/external-view";
 
 /** Présentation de la section « Sur d'autres sites » et de la page /admin/collecte (lot EXT1) : fonctions pures. */
@@ -28,6 +28,21 @@ describe("section « Sur d'autres sites »", () => {
     assert.deepEqual(externalLinkProps("https://a.example/x"), { href: "https://a.example/x", target: "_blank", rel: "noopener noreferrer nofollow" });
     for (const url of ["javascript:alert(1)", "data:text/html,x", "ftp://a.example", "https://u:p@a.example/", "", "relatif/chemin"]) assert.equal(externalLinkProps(url), null, url);
     assert.equal(externalCardRow(listing({ url: "javascript:alert(1)" })).link, null);
+  });
+
+  test("lot FIN1 : une adresse en .example (source fictive) n'ouvre aucun lien : pas de lien, drapeau « site de démonstration » ; un vrai site garde son lien ; une adresse non sûre n'est jamais « démo »", () => {
+    for (const url of ["https://annonces-demo-a.example/annonce/demo_a-1", "http://x.example/y", "https://A.EXAMPLE/z"]) {
+      assert.equal(isDemoSiteUrl(url), true, url);
+      const row = externalCardRow(listing({ url }));
+      assert.deepEqual([row.link, row.demoSite], [null, true], url);
+    }
+    for (const url of ["https://www.exemple-reel.ci/annonce/1", "https://example.com/a", "https://example.org/a", "https://notexample/x", "https://monexample.fr/x", "javascript:alert(1)", "", "relatif"]) {
+      assert.equal(isDemoSiteUrl(url), false, url);
+    }
+    const real = externalCardRow(listing({ url: "https://www.exemple-reel.ci/annonce/1" }));
+    assert.deepEqual([real.link?.href, real.demoSite], ["https://www.exemple-reel.ci/annonce/1", false]);
+    const unsafe = externalCardRow(listing({ url: "javascript:alert(1)" }));
+    assert.deepEqual([unsafe.link, unsafe.demoSite], [null, false]);
   });
 
   test("ligne d'une annonce : prix en FCFA, lieu, compatibilité, doublons entre sources, date de vue", () => {

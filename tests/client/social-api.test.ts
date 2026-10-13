@@ -161,7 +161,8 @@ describe("messages d'erreur fixes en français", () => {
     assert.match(describeSocialError(error(429, "rate_limited"), "message"), /Trop de messages envoyés/);
     assert.match(describeSocialError(error(429, "rate_limited"), "conversation"), /20 conversations/);
     assert.match(describeSocialError(error(409, "favorites_limit"), "favorites"), /limite de 200 favoris/);
-    assert.match(describeSocialError(error(409, "order_active_exists"), "order"), /déjà en cours/);
+    assert.equal(describeSocialError(error(409, "order_active_exists"), "order"), "Une commande est déjà en attente de confirmation du vendeur pour cette annonce.");
+    assert.equal(describeSocialError(error(409, "order_already_confirmed"), "order"), "Cet achat est déjà confirmé par le vendeur pour cette annonce.");
     assert.match(describeSocialError(error(400, "invalid_price"), "order"), /1 à 100 000 000/);
     assert.match(describeSocialError(error(409, "offer_not_available"), "conversation"), /n'est plus disponible/);
     assert.equal(describeSocialError(error(404, "resource_not_found"), "admin"), "Page introuvable.");

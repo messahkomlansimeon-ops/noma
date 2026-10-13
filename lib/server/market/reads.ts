@@ -96,6 +96,61 @@ export async function readListingObservations(
   }));
 }
 
+/** Un marché : catégorie, marque et modèle déjà NORMALISÉS (`price_key_part`). */
+export interface MarketKeyParts {
+  category: string;
+  brand: string;
+  model: string;
+}
+
+/** Clé d'un marché dans les résultats de `readListingObservationsForMarkets`. */
+export const marketKeyOf = (key: MarketKeyParts): string => JSON.stringify([key.category, key.brand, key.model]);
+
+/**
+ * Les mêmes relevés que `readListingObservations`, pour PLUSIEURS marchés en une seule requête (la lecture des résultats d'un besoin en compare plusieurs : un aller-retour, jamais un par
+ * annonce). Chaque marché reçoit exactement les lignes que `readListingObservations` lui donnerait (même réduction par annonce et par bloc) ; un marché sans relevé reçoit une liste vide.
+ */
+export async function readListingObservationsForMarkets(
+  db: SqlExecutor,
+  keys: readonly MarketKeyParts[],
+  period: { from: string; to: string; days: MarketPeriod },
+): Promise<Map<string, MarketObservation[]>> {
+  const result = new Map<string, MarketObservation[]>();
+  for (const key of keys) result.set(marketKeyOf(key), []);
+  if (keys.length === 0) return result;
+  const blocks = Math.floor(period.days / MARKET_TREND_BLOCK_DAYS);
+  const trendStart = addDays(period.to, -(MARKET_TREND_BLOCK_DAYS * blocks - 1));
+  const rows = await db.query<ObservationRow & { category_key: string; brand_key: string; model_key: string }>(
+    `WITH req AS (
+       SELECT DISTINCT * FROM unnest($1::text[], $2::text[], $3::text[]) AS r(category_key, brand_key, model_key)
+     ), win AS (
+       SELECT p.id, p.category_key, p.brand_key, p.model_key, p.reference_id, p.seller_id, p.price_xof, p.variant_key, p.condition_key, p.observed_on,
+              CASE WHEN p.observed_on >= $6::date THEN (p.observed_on - $6::date) / $7::int ELSE -1 END AS block
+         FROM price_observations p
+         JOIN req r ON r.category_key = p.category_key AND r.brand_key = p.brand_key AND r.model_key = p.model_key
+        WHERE p.source = 'listing' AND p.observed_on BETWEEN $4::date AND $5::date
+     )
+     SELECT DISTINCT ON (category_key, brand_key, model_key, reference_id, block) category_key, brand_key, model_key, reference_id::text AS reference_id, seller_id::text AS seller_id,
+            to_char(observed_on, 'YYYY-MM-DD') AS day, price_xof::text AS price_xof, variant_key, condition_key
+       FROM win
+      ORDER BY category_key, brand_key, model_key, reference_id, block, observed_on DESC, id DESC`,
+    [keys.map((key) => key.category), keys.map((key) => key.brand), keys.map((key) => key.model), period.from, period.to, trendStart, MARKET_TREND_BLOCK_DAYS],
+  );
+  for (const row of rows.rows) {
+    const list = result.get(marketKeyOf({ category: row.category_key, brand: row.brand_key, model: row.model_key }));
+    if (list === undefined) continue;
+    list.push({
+      referenceId: row.reference_id,
+      sellerId: row.seller_id,
+      day: row.day,
+      priceXof: Number(row.price_xof),
+      variantKey: row.variant_key,
+      conditionKey: row.condition_key,
+    });
+  }
+  return result;
+}
+
 /** Normalise les parties de la clé AVEC LA FONCTION DE LA BASE (une seule définition de la normalisation, celle qui a écrit les relevés) et lit « aujourd'hui » (jour UTC). */
 async function resolveKey(db: SqlExecutor, input: MarketQueryInput): Promise<KeyRow> {
   const result = await db.query<KeyRow>(
@@ -141,8 +196,13 @@ export interface AdminMarketRow {
   label: string;
   /** Prix demandés : mêmes seuils, mêmes arrondis que la route publique, sur la clé exacte. */
   listings: ListingsOutcome;
-  /** Ventes confirmées de la clé sur la période : un NOMBRE arrondi (jamais un prix, jamais un compte exact). */
+  /** Ventes confirmées de la clé sur la période, celles d'une commande réelle de la base : un NOMBRE arrondi (jamais un prix, jamais un compte exact). */
   confirmedSales: StatCount;
+  /**
+   * Lot FIN1 : ventes de l'HISTORIQUE DE DÉMONSTRATION de la clé sur la période, arrondies comme les autres mesures : un relevé de vente que ne justifie aucune commande de la base (ceux que
+   * `demo:seed` écrit directement). Elles ne sont jamais ajoutées aux ventes confirmées (l'aperçu de l'administration compte les commandes réelles) : l'écran les étiquette à part.
+   */
+  historicalSales: StatCount;
 }
 
 interface RankedKeyRow {
@@ -153,6 +213,7 @@ interface RankedKeyRow {
   condition_key: string;
   label: string;
   sales: number;
+  historical_sales: number;
 }
 
 /**
@@ -167,13 +228,15 @@ export async function readAdminMarket(db: SqlExecutor, options: { now?: Date } =
   const days = MARKET_ADMIN_PERIOD;
   const from = addDays(today, -(days - 1));
   const ranked = await db.query<RankedKeyRow>(
-    `SELECT category_key, brand_key, model_key, variant_key, condition_key,
-            (array_agg(label ORDER BY observed_on DESC, id DESC))[1] AS label,
-            (count(DISTINCT reference_id) FILTER (WHERE source = 'sale'))::int AS sales
-       FROM price_observations
-      WHERE observed_on BETWEEN $1::date AND $2::date
-      GROUP BY category_key, brand_key, model_key, variant_key, condition_key
-      ORDER BY count(*) DESC, category_key, brand_key, model_key, variant_key, condition_key
+    `SELECT p.category_key, p.brand_key, p.model_key, p.variant_key, p.condition_key,
+            (array_agg(p.label ORDER BY p.observed_on DESC, p.id DESC))[1] AS label,
+            (count(DISTINCT p.reference_id) FILTER (WHERE p.source = 'sale' AND o.id IS NOT NULL))::int AS sales,
+            (count(DISTINCT p.reference_id) FILTER (WHERE p.source = 'sale' AND o.id IS NULL))::int AS historical_sales
+       FROM price_observations p
+       LEFT JOIN orders o ON p.source = 'sale' AND o.id = p.reference_id
+      WHERE p.observed_on BETWEEN $1::date AND $2::date
+      GROUP BY p.category_key, p.brand_key, p.model_key, p.variant_key, p.condition_key
+      ORDER BY count(*) DESC, p.category_key, p.brand_key, p.model_key, p.variant_key, p.condition_key
       LIMIT $3::int`,
     [from, today, MARKET_ADMIN_KEY_LIMIT],
   );
@@ -195,7 +258,7 @@ export async function readAdminMarket(db: SqlExecutor, options: { now?: Date } =
       display: { model: key.model_key, variant: key.variant_key === "" ? null : key.variant_key, condition: key.condition_key === "" ? null : key.condition_key },
       allowWidening: false,
     });
-    rows.push({ label: key.label, listings: stats.listings, confirmedSales: roundCount(key.sales) });
+    rows.push({ label: key.label, listings: stats.listings, confirmedSales: roundCount(key.sales), historicalSales: roundCount(key.historical_sales) });
   }
   return { period: { days, from, to: today }, rows };
 }

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 /**
  * Répartition d'une mission d'achat en volume entre plusieurs vendeurs (lot MV1). Fonction PURE : aucune base, aucune horloge, aucun module serveur (testée par des essais de
  * propriétés sur des jeux aléatoires, `tests/server/missions-allocation.test.ts`).
@@ -208,4 +210,17 @@ export function emptyAllocation(input: { totalBudget: number; engagedSellers?: r
     reasons: [],
     ignored: { noPrice: 0, overUnitBudget: 0, invalid: 0 },
   };
+}
+
+/**
+ * Numéros de vendeurs STABLES d'une mission (lot FIN1) : les vendeurs affichés (engagés ou proposés) sont classés par une empreinte (SHA-256) de (identifiant de la mission, clé interne du
+ * vendeur), jamais montrée ; le rang donne le numéro. Pour UNE mission, le numéro d'un vendeur est le même d'un affichage à l'autre : il ne dépend ni de l'ordre de remplissage, ni de la pertinence,
+ * ni du fait d'être déjà engagé (déclarer un achat chez « Vendeur 2 » ne le renomme pas « Vendeur 1 »). Il ne change que si l'ensemble des vendeurs affichés change (un vendeur dont l'empreinte
+ * se classe avant apparaît ou disparaît). D'une mission à l'autre, le classement est un autre (l'empreinte dépend de la mission) : les mêmes vendeurs n'ont PAS la même étiquette, pas de pseudonyme
+ * stable qui permettrait de les suivre d'une mission à l'autre (MISSIONS.md).
+ */
+export function stableSellerIndexes(sellerKeys: Iterable<string>, missionId: string): Map<string, number> {
+  const rank = (key: string): string => createHash("sha256").update(`noma-mission-vendor:${missionId}:${key}`).digest("hex");
+  const keys = [...new Set(sellerKeys)].map((key) => ({ key, rank: rank(key) })).sort((a, b) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  return new Map(keys.map((entry, index) => [entry.key, index + 1]));
 }

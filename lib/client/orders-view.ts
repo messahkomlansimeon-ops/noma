@@ -103,6 +103,31 @@ export function orderRow(order: OrderView): OrderRowView {
   };
 }
 
+export const OFFER_ORDER_CONFIRMED_LABEL = "Achat confirmé";
+export const OFFER_ORDER_CONFIRMED_HINT = "Le vendeur a confirmé votre achat de cette annonce : il n'y a rien à déclarer de plus.";
+export const OFFER_ORDER_PROPOSED_LABEL = "Achat déclaré";
+export const OFFER_ORDER_PROPOSED_HINT = "En attente de la confirmation du vendeur.";
+
+export interface OfferOrderBanner {
+  kind: "confirmed" | "proposed";
+  label: string;
+  hint: string;
+  href: string;
+}
+
+/**
+ * Ce que la fiche dit d'une commande DÉJÀ passée pour cette annonce dans CE besoin (lot FIN1) : « Achat confirmé » (le bouton « Je l'ai acheté » disparaît : une deuxième déclaration serait
+ * refusée) ou « Achat déclaré, en attente du vendeur ». `null` : aucune commande active, le bouton reste. Une commande refusée ou annulée ne compte pas (une nouvelle est permise).
+ */
+export function offerOrderBanner(orders: readonly OrderView[], demandId: string, offerId: string): OfferOrderBanner | null {
+  const mine = orders.filter((order) => order.role === "buyer" && order.demandId === demandId && order.offerId === offerId);
+  const confirmed = mine.find((order) => order.status === "confirmed");
+  if (confirmed) return { kind: "confirmed", label: OFFER_ORDER_CONFIRMED_LABEL, hint: OFFER_ORDER_CONFIRMED_HINT, href: orderPath("buyer", confirmed.id) };
+  const proposed = mine.find((order) => order.status === "proposed");
+  if (proposed) return { kind: "proposed", label: OFFER_ORDER_PROPOSED_LABEL, hint: OFFER_ORDER_PROPOSED_HINT, href: orderPath("buyer", proposed.id) };
+  return null;
+}
+
 /** Nombre de commandes à confirmer parmi celles du vendeur. */
 export function pendingForSeller(orders: readonly OrderView[]): number {
   return orders.filter((order) => order.role === "seller" && order.canConfirm).length;

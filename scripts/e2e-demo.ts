@@ -254,21 +254,23 @@ async function main(): Promise<void> {
     const mentions = await buyer.getByTestId("external-mention").allInnerTexts();
     assert.equal(mentions.length, 4);
     for (const mention of mentions) assert.match(mention, /^Annonce trouvée sur Annonces Démo [AB] : noma ne garantit ni le prix ni la disponibilité ; vous serez redirigé vers le site\.$/);
-    const links = buyer.getByTestId("external-link");
-    assert.equal(await links.count(), 4);
+    // Lot FIN1 : les sources sont FICTIVES (adresses en `.example`) : aucun lien mort n'est ouvert, un bouton désactivé dit « Site de démonstration ».
+    assert.equal(await buyer.getByTestId("external-link").count(), 0, "aucun lien vers un domaine .example");
+    const demoLinks = buyer.getByTestId("external-link-demo");
+    assert.equal(await demoLinks.count(), 4);
     for (let index = 0; index < 4; index += 1) {
-      const link = links.nth(index);
-      assert.equal(await link.getAttribute("target"), "_blank");
-      assert.equal(await link.getAttribute("rel"), "noopener noreferrer nofollow");
-      assert.match((await link.getAttribute("href")) ?? "", /^https:\/\/annonces-demo-[ab]\.example\/annonce\/demo_[ab]-/);
+      const block = demoLinks.nth(index);
+      assert.equal(await block.getByRole("button", { name: "Voir sur le site" }).isDisabled(), true);
+      assert.match((await block.innerText()).replace(/\s+/g, " "), /Site de démonstration : annonce d'exemple, ce site n'existe pas\./);
+      assert.equal(await block.locator("a").count(), 0);
     }
     const externalText = await buyer.getByTestId("external-section").innerText();
     assert.equal(/Sponsoris|Contacter|favori|tel:/i.test(externalText), false, "aucune action de noma ni mise en avant dans la section externe");
-    assert.equal(await buyer.getByTestId("external-section").locator('a[href^="tel:"], a[href*="wa.me"], button:not([data-testid="external-more"])').count(), 0);
+    assert.equal(await buyer.getByTestId("external-section").locator('a[href^="tel:"], a[href*="wa.me"], button:not([data-testid="external-more"]):not([disabled])').count(), 0);
     assert.match(externalText.replace(/\s+/g, " "), /Aussi trouvée sur Annonces Démo B/, "le doublon entre sources est présenté une fois");
     assert.equal((externalText.match(/Vue le \d{2}\/\d{2}\/\d{4}/g) ?? []).length, 4, "lot EXT1-bis : chaque annonce porte sa date de dernière VUE (« Vue le jj/mm/aaaa »)");
     assert.equal(/0708091011|07 08 09 10 11|appelez/i.test(await buyer.evaluate(() => document.body.innerText)), false, "le numéro de téléphone de l'annonce piégée n'est jamais affiché");
-    ok("section « Sur d'autres sites » : 4 annonces fictives à part, mention obligatoire, liens en nouvel onglet (noopener noreferrer nofollow), aucun numéro, aucune action de noma");
+    ok("section « Sur d'autres sites » : 4 annonces fictives à part, mention obligatoire, boutons « Voir sur le site » DÉSACTIVÉS (site de démonstration, aucun lien mort), aucun numéro, aucune action de noma");
     await checkClean(buyer, "résultats");
     await shot(buyer, "03-resultats-acheteur");
     await sponsored.getByTestId("match-detail-link").click();
@@ -688,7 +690,7 @@ async function main(): Promise<void> {
     await shot(adminPage, "25-admin-vendeurs");
     const target = adminPage.locator('[data-testid="vendor-row"]').filter({ has: adminPage.locator('[data-testid="vendor-phone"]', { hasText: /07$/ }) }).first();
     await target.getByTestId("vendor-suspend").click();
-    assert.match(await adminPage.getByTestId("admin-confirm").innerText(), /Suspendre le vendeur \+•+07 \?/, "confirmation à l'écran");
+    assert.match(await adminPage.getByTestId("admin-confirm").innerText(), /Suspendre le vendeur \+•+07 \(réf\. [0-9a-f]{6}\) \?/, "confirmation à l'écran (lot FIN1 : avec la référence courte du vendeur)");
     await shot(adminPage, "26-admin-confirmation");
     await adminPage.getByTestId("admin-confirm-yes").click();
     await adminPage.getByTestId("admin-notice").filter({ hasText: "Vendeur suspendu." }).waitFor();
@@ -723,8 +725,9 @@ async function main(): Promise<void> {
     const iphoneRow = adminPage.locator("[data-market-row]").filter({ hasText: "Apple iPhone 12 · 128 Go · Occasion" }).first();
     await iphoneRow.waitFor();
     assert.match((await iphoneRow.getByTestId("admin-market-listings").innerText()).replace(/[\u00a0\u202f]/g, " "), /\d{3} \d{3} FCFA\s+environ \d+ annonces d'environ \d+ vendeurs/);
-    const salesCell = (await iphoneRow.getByTestId("admin-market-sales").innerText()).replace(/[\u00a0\u202f]/g, " ");
-    assert.match(salesCell, /^environ \d+ ventes confirmées$/, "un nombre arrondi de ventes");
+    const salesCell = (await iphoneRow.getByTestId("admin-market-sales").innerText()).replace(/[\u00a0\u202f]/g, " ").replace(/\s+/g, " ").trim();
+    // Lot FIN1 : les ventes confirmées sont celles des commandes RÉELLES (ici une seule : « moins de 5 ») ; les ventes synthétiques de demo:seed sont étiquetées à part, jamais comptées avec elles.
+    assert.match(salesCell, /^moins de 5 ventes confirmées environ \d+ ventes \(historique de démonstration, non comptées\)$/, "un nombre arrondi de ventes réelles, puis l'historique de démonstration à part");
     assert.equal(/FCFA|\d{4,}/.test(salesCell), false, "aucun prix de vente");
     const tableText = await adminPage.getByTestId("admin-market").innerText();
     assert.match(tableText, /les prix de vente ne sont pas publiés/);

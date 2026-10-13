@@ -12,6 +12,8 @@ import {
   computeAvailabilityIndicator, computeConfidenceIndicator, computePriceIndicator, computeRelevance, type MarketReference,
 } from "../../lib/server/matching/indicators";
 import { percentileContSorted, readMarketReferences, type MarketQuery } from "../../lib/server/matching/market";
+import { computeMarketStats, type MarketObservation } from "../../lib/server/market/stats";
+import { referenceFromPublished } from "../../lib/server/matching/price-reference";
 import { runMatchingCycle } from "../../lib/server/matching/runner";
 import { computeScoringConfigHash, normalizeScoringConfig } from "../../lib/server/matching/persistence";
 import { RELEVANCE_CONFIG } from "../../lib/server/matching/relevance-config";
@@ -74,8 +76,10 @@ after(async () => {
 
 // ───────────── fixtures ─────────────
 
+// Lot FIN1 : les relevés de prix (historique des annonces, sans clé étrangère) alimentent l'encart « Prix demandés » ET l'indicateur de prix : un test qui repart d'un catalogue vide
+// repart aussi de relevés vides (sinon les annonces des tests précédents forment un marché publié).
 const resetCatalog = () => pool.query(
-  "TRUNCATE matching_evaluations, matching_jobs, matching_outbox_events, demands, offers CASCADE");
+  "TRUNCATE matching_evaluations, matching_jobs, matching_outbox_events, demands, offers, price_observations CASCADE");
 
 /** Propriétaire de test : téléphone vérifié (ou non) et ancienneté de compte réglables par SQL de test. */
 async function makeOwner(options: { verified?: boolean; ageDays?: number } = {}): Promise<string> {
@@ -337,8 +341,33 @@ async function seedTwentyFive(demand: DemandRecord): Promise<Candidate[]> {
   return candidates;
 }
 
-/** Tri de référence : mêmes faits, mêmes fonctions pures, marché recalculé en JS (hors l'offre elle-même). */
-async function referenceOrder(demand: DemandRecord, candidates: Candidate[], universe: OfferRecord[], now: Date): Promise<string[]> {
+/** Une annonce de l'univers du test : ce que la référence JS doit connaître pour recalculer la référence de prix (propriétaire, variante, état). */
+interface Peer { id: string; ownerId: string; price: number; variant: string | null; condition: string | null }
+const peerKey = (value: string | null): string => (value ?? "").trim().toLowerCase();
+
+/**
+ * Référence de prix attendue d'une annonce, recalculée en JS à partir des seules annonces de l'univers (indépendante de la lecture SQL des relevés et de la clé normalisée par la base) :
+ * quand les prix demandés sont publiés pour sa clé (même fonction pure que la route /api/market, mêmes élargissements), la médiane et la fourchette publiées ; sinon le marché des offres
+ * de la base à clé variante + état, hors l'annonce elle-même.
+ */
+function expectedPriceReference(target: Peer, peers: readonly Peer[], today: string): MarketReference {
+  const rows: MarketObservation[] = peers.map((peer) => ({
+    referenceId: peer.id, sellerId: peer.ownerId, day: today, priceXof: peer.price, variantKey: peerKey(peer.variant), conditionKey: peerKey(peer.condition),
+  }));
+  const stats = computeMarketStats(rows, {
+    periodDays: 90, today, variantKey: peerKey(target.variant) || null, conditionKey: peerKey(target.condition) || null,
+    display: { model: "iPhone 13", variant: target.variant, condition: target.condition }, allowWidening: true,
+  });
+  if (stats.listings.status === "published") return referenceFromPublished(stats.listings);
+  const live = peers.filter((peer) => peer.id !== target.id
+    && (peerKey(target.variant) === "" || peerKey(peer.variant) === peerKey(target.variant))
+    && (peerKey(target.condition) === "" || peerKey(peer.condition) === peerKey(target.condition)));
+  return referenceMarket(live.map((peer) => peer.price));
+}
+
+/** Tri de référence : mêmes faits, mêmes fonctions pures, référence de prix recalculée en JS (voir `expectedPriceReference`). */
+async function referenceOrder(demand: DemandRecord, candidates: Candidate[], universe: Peer[], now: Date): Promise<string[]> {
+  const today = (await pool.query<{ today: string }>("SELECT to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS today")).rows[0].today;
   const scored = [];
   for (const candidate of candidates) {
     const owner = (await pool.query<{ created_at: Date; verified: boolean }>(
@@ -346,7 +375,7 @@ async function referenceOrder(demand: DemandRecord, candidates: Candidate[], uni
       [candidate.ownerId])).rows[0];
     const offer = (await pool.query<{ availability_status: "available" | "reserved"; availability_confirmed_at: Date | null; quantity: number | null; condition_text: string | null; location_text: string | null }>(
       "SELECT availability_status, availability_confirmed_at, quantity, condition_text, location_text FROM offers WHERE id = $1", [candidate.offer.id])).rows[0];
-    const market = referenceMarket(universe.filter((other) => other.id !== candidate.offer.id).map((other) => other.price!.amount));
+    const market = expectedPriceReference(universe.find((peer) => peer.id === candidate.offer.id)!, universe, today);
     const availability = computeAvailabilityIndicator({
       status: offer.availability_status, confirmedAt: offer.availability_confirmed_at, quantity: offer.quantity, requestedQuantity: demand.quantity, now,
     });
@@ -389,23 +418,16 @@ async function walkRelevance(demandId: string, limit: number, options: StoredMat
   assert.fail("pagination sans fin");
 }
 
-let sharedWorld: { demand: DemandRecord; candidates: Candidate[]; universe: OfferRecord[] } | null = null;
+let sharedWorld: { demand: DemandRecord; candidates: Candidate[]; universe: Peer[] } | null = null;
 async function twentyFiveWorld() {
   if (sharedWorld) return sharedWorld;
   await resetCatalog();
   await seedMarket();
   const demand = await newDemand(buyer.userId, { quantity: 1 });
   const candidates = await seedTwentyFive(demand);
-  const universeRows = (await pool.query<{ id: string }>("SELECT id FROM offers WHERE status = 'published' AND price_amount IS NOT NULL")).rows;
-  const universe: OfferRecord[] = [];
-  for (const row of universeRows) {
-    const known = candidates.find((candidate) => candidate.offer.id === row.id);
-    if (known) universe.push(known.offer);
-    else {
-      const amount = Number((await pool.query<{ price_amount: string }>("SELECT price_amount::text FROM offers WHERE id = $1", [row.id])).rows[0].price_amount);
-      universe.push({ id: row.id, price: { amount, currency: "XOF" } } as OfferRecord);
-    }
-  }
+  const universe: Peer[] = (await pool.query<{ id: string; owner_id: string; price_amount: string; variant: string | null; condition_text: string | null }>(
+    "SELECT id, owner_id, price_amount::text, variant, condition_text FROM offers WHERE status = 'published' AND price_amount IS NOT NULL")).rows
+    .map((row) => ({ id: row.id, ownerId: row.owner_id, price: Number(row.price_amount), variant: row.variant, condition: row.condition_text }));
   sharedWorld = { demand, candidates, universe };
   return sharedWorld;
 }
@@ -788,7 +810,9 @@ test("information cachée (vrai pipeline : catalogue → cycles jusqu'à idle �
   // Défaut 2 : à prix égal, les offres de référence sont « in_market » (jamais « below_market »), écart nul.
   for (const reference of [...references, a, b]) {
     const price = item(reference).indicators.price!;
-    assert.deepEqual({ position: price.position, score: price.score, delta: price.deltaPercent, factors: price.factors, sample: price.sampleSize }, { position: "in_market", score: 60, delta: 0, factors: [], sample: 8 });
+    // Lot FIN1 : les 9 vendeurs de l'univers (le prix de D, 150 000, est écarté comme atypique : IQR nul) publient la médiane 100 000 ; l'effectif servi est celui de l'encart, ARRONDI
+    // (8 annonces retenues : « environ 5 »), et non plus le nombre exact d'offres.
+    assert.deepEqual({ position: price.position, score: price.score, delta: price.deltaPercent, factors: price.factors, sample: price.sampleSize }, { position: "in_market", score: 60, delta: 0, factors: [], sample: 5 });
   }
 });
 

@@ -124,8 +124,9 @@ export async function declareOrder(input: { pool: Pool; buyerId: string; demandI
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext($2::text))", [`order:${demandId}`, offerId]);
     const access = await readOfferAccess(client, { viewerId: buyerId, demandId, offerId });
     if (!access.ok) throw new SocialError(access.reason === "offer_not_available" ? "offer_not_available" : "resource_not_found");
-    const active = await client.query("SELECT 1 FROM orders WHERE demand_id = $1::uuid AND offer_id = $2::uuid AND status IN ('proposed', 'confirmed')", [demandId, offerId]);
-    if (active.rowCount) throw new SocialError("order_active_exists");
+    const active = await client.query<{ status: string }>("SELECT status FROM orders WHERE demand_id = $1::uuid AND offer_id = $2::uuid AND status IN ('proposed', 'confirmed')", [demandId, offerId]);
+    // Lot FIN1 : le refus dit EXACTEMENT ce qui existe (« en attente de confirmation » pour une commande proposée, « déjà confirmé » pour une vente confirmée), jamais « en cours » pour une vente conclue.
+    if (active.rowCount) throw new SocialError(active.rows.some((row) => row.status === "confirmed") ? "order_already_confirmed" : "order_active_exists");
     const boostId = await readAttributedBoostId(client, { offerId, demandId });
     // Lot MV1 : sur le besoin porteur d'une mission, la commande lui est rattachée (mission active, budgets et quantité respectés ; ligne de la mission verrouillée).
     const mission = await linkOrderToMission(client, { buyerId, demandId, quantity, priceXof: price });

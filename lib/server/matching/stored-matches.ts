@@ -14,7 +14,8 @@ import {
   computeAvailabilityIndicator, computeConfidenceIndicator, computePriceIndicator, computeRelevance,
   type AvailabilityIndicator, type ConfidenceIndicator, type MarketReference, type PriceIndicator, type RelevanceSense,
 } from "./indicators";
-import { readMarketReferences, type MarketQuery } from "./market";
+import type { MarketQuery } from "./market";
+import { readPriceReferences } from "./price-reference";
 import { RELEVANCE_CONFIG, RELEVANCE_WINDOW } from "./relevance-config";
 import {
   MATCHING_CURRENT_CLOCK_CTE,
@@ -491,8 +492,10 @@ async function buildItems<TCandidate extends OfferRecord | DemandRecord, TRow ex
     const known = input.cache?.markets;
     const wanted = (candidates as OfferRecord[]).filter((offer) => !known?.has(offer.id)).map((offer): MarketQuery => ({
       offerId: offer.id, category: offer.category, brand: offer.brand, model: offer.model, currency: offer.price?.currency ?? null,
+      variant: offer.variant, condition: offer.condition,
     }));
-    const fetched = wanted.length > 0 ? await readMarketReferences(client, wanted) : new Map<string, MarketReference>();
+    // Lot FIN1 : la référence est celle de l'encart « Prix demandés » quand il est publié pour la clé de l'annonce, sinon le marché des offres de la base (variante et état inclus).
+    const fetched = wanted.length > 0 ? await readPriceReferences(client, wanted) : new Map<string, MarketReference>();
     if (known) {
       for (const [offerId, reference] of fetched) known.set(offerId, reference);
       markets = known;

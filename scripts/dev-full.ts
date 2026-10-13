@@ -4,10 +4,11 @@ import type { Readable } from "node:stream";
 import { loadEnvConfig } from "@next/env";
 import { Pool } from "pg";
 import { isMatchingSchemaReady } from "../lib/server/matching/schema-ready";
+import { nextDevArgs } from "./dev-full-args";
 
 /**
  * `npm run dev:full` : lance `next dev` ET le worker du matching (mode boucle) ensemble, pour le développement.
- * Ne remplace pas `npm run dev` (inchangé). N'applique AUCUNE migration. Aucun module serveur n'est chargé ici :
+ * Ne remplace pas `npm run dev` (inchangé). N'applique AUCUNE migration. Lot FIN1 : `next dev` n'écoute plus que sur 127.0.0.1 (voir `dev-full-args.ts`). Aucun module serveur n'est chargé ici :
  * ce script n'a donc pas besoin de la condition `react-server` (qu'il retire d'ailleurs de l'environnement de Next).
  *
  * Variable d'environnement RÉSERVÉE AUX TESTS : NOMA_DEV_FULL_NEXT_SCRIPT=<chemin d'un script JS> remplace
@@ -121,7 +122,7 @@ async function main(): Promise<void> {
 
   const nextChild = nextOverride
     ? spawn(process.execPath, [nextOverride], { stdio: "inherit", env: nextEnvironment() })
-    : spawn(join(process.cwd(), "node_modules", ".bin", "next"), ["dev"], { stdio: "inherit", env: nextEnvironment() });
+    : spawn(join(process.cwd(), "node_modules", ".bin", "next"), nextDevArgs(process.env), { stdio: "inherit", env: nextEnvironment() });
   track("next", nextChild);
   log(`next démarré (pid ${nextChild.pid})`);
 

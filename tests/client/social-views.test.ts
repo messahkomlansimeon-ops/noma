@@ -5,7 +5,7 @@ import {
 } from "../../lib/client/admin-view";
 import { favoriteRow, isFavorite } from "../../lib/client/favorites-view";
 import {
-  NO_PAYMENT_NOTICE, ORDER_ACTION_DONE, orderPath, orderRow, parsePriceInput, pendingForSeller, priceProblem, salesView, statusLabel, statusTone,
+  NO_PAYMENT_NOTICE, ORDER_ACTION_DONE, offerOrderBanner, orderPath, orderRow, parsePriceInput, pendingForSeller, priceProblem, salesView, statusLabel, statusTone,
 } from "../../lib/client/orders-view";
 import type { AdminActionEntry, AdminBoostSettings, AdminSummary, AdminVendor, FavoriteItem, OfferSales, OrderView } from "../../lib/client/social-api";
 
@@ -87,6 +87,21 @@ describe("commandes", () => {
     assert.equal(pendingForSeller([order(), order({ role: "seller", canConfirm: true }), order({ role: "seller", canConfirm: false, status: "confirmed" })]), 1);
   });
 
+  test("lot FIN1 : la fiche dit « Achat confirmé » (plus de « Je l'ai acheté ») quand une commande est confirmée pour CETTE annonce dans CE besoin ; « Achat déclaré » tant qu'elle est proposée", () => {
+    const other = "3a3a3a3a-2b2b-4c3c-8d4d-5e5e5e5e5e5e";
+    const confirmed = order({ id: "4a4a4a4a-2b2b-4c3c-8d4d-5e5e5e5e5e5e", status: "confirmed", offerId: OFFER, demandId: DEMAND });
+    assert.deepEqual(offerOrderBanner([confirmed], DEMAND, OFFER), { kind: "confirmed", label: "Achat confirmé", hint: "Le vendeur a confirmé votre achat de cette annonce : il n'y a rien à déclarer de plus.", href: `/commandes/${confirmed.id}` });
+    const proposed = order({ id: "5a5a5a5a-2b2b-4c3c-8d4d-5e5e5e5e5e5e", status: "proposed", offerId: OFFER, demandId: DEMAND });
+    assert.equal(offerOrderBanner([proposed], DEMAND, OFFER)?.kind, "proposed");
+    assert.equal(offerOrderBanner([proposed, confirmed], DEMAND, OFFER)?.kind, "confirmed", "confirmée d'abord");
+    // Aucune commande active pour ce couple : le bouton reste.
+    assert.equal(offerOrderBanner([], DEMAND, OFFER), null);
+    assert.equal(offerOrderBanner([order({ status: "declined", offerId: OFFER, demandId: DEMAND }), order({ status: "cancelled", offerId: OFFER, demandId: DEMAND })], DEMAND, OFFER), null, "refusée ou annulée : une nouvelle est permise");
+    assert.equal(offerOrderBanner([confirmed], DEMAND, other), null, "une autre annonce");
+    assert.equal(offerOrderBanner([confirmed], other, OFFER), null, "un autre besoin");
+    assert.equal(offerOrderBanner([order({ role: "seller", demandId: null, status: "confirmed", offerId: OFFER })], DEMAND, OFFER), null, "jamais une commande de vendeur");
+  });
+
   test("lot MV1 : un achat de plusieurs unités dit la quantité dans la liste ; une seule unité garde le prix seul", () => {
     assert.match(orderRow(order({ quantity: 3 })).priceText, /^3 × 150\s?000 FCFA$/);
     assert.match(orderRow(order({ quantity: 1 })).priceText, /^150\s?000 FCFA$/);
@@ -140,6 +155,14 @@ describe("administration", () => {
     assert.equal(suspended.canSuspend, false);
     assert.equal(vendorRow(vendor({ isAdmin: true })).canSuspend, false);
     assert.equal(vendorRow(vendor({ maskedPhone: null })).maskedPhone, "numéro inconnu");
+    // FIN1 : deux vendeurs au même numéro masqué se distinguent par une référence courte (six caractères de l'identifiant, sans lien avec le numéro).
+    const twin = vendorRow(vendor({ id: "9f8e7d6c-1111-4222-8333-444444444444" }));
+    assert.equal(active.maskedPhone, twin.maskedPhone);
+    assert.equal(active.refText, "Réf. 1a1a1a");
+    assert.equal(twin.refText, "Réf. 9f8e7d");
+    assert.notEqual(active.refText, twin.refText);
+    assert.equal(active.refText.includes("•"), false);
+    assert.match(confirmText("suspend", "+•••03", twin.refText), /Suspendre le vendeur \+•••03 \(réf\. 9f8e7d\) \?/);
     assert.match(confirmText("suspend", "+•••03"), /Suspendre le vendeur \+•••03 \?/);
     assert.match(confirmText("reactivate", "+•••03"), /Réactiver le vendeur/);
   });

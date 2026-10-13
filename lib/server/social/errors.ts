@@ -7,6 +7,7 @@ export type SocialErrorCode =
   | "invalid_message"
   | "invalid_price"
   | "order_active_exists"
+  | "order_already_confirmed"
   | "order_state_conflict"
   | "action_not_allowed";
 
@@ -17,7 +18,8 @@ export const SOCIAL_ERROR_MESSAGES: Readonly<Record<SocialErrorCode, string>> = 
   favorites_limit: "Vous avez atteint la limite de 200 favoris.",
   invalid_message: "Ce message n'est pas valide.",
   invalid_price: "Le prix convenu doit être un entier de 1 à 100 000 000 FCFA.",
-  order_active_exists: "Une commande est déjà en cours pour cette annonce.",
+  order_active_exists: "Une commande est déjà en attente de confirmation du vendeur pour cette annonce.",
+  order_already_confirmed: "Cet achat est déjà confirmé par le vendeur pour cette annonce.",
   order_state_conflict: "Cette commande ne peut plus changer d'état.",
   action_not_allowed: "Cette action n'est pas permise pour votre rôle.",
 });

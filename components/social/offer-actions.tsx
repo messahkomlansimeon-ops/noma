@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { DeclareOrder } from "@/components/orders/declare-order";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
 import { WRITE_TO_SELLER_LABEL, WRITE_TO_SELLER_ONGOING, conversationPath } from "@/lib/client/messages-view";
-import { NO_PAYMENT_NOTICE } from "@/lib/client/orders-view";
+import { NO_PAYMENT_NOTICE, offerOrderBanner, type OfferOrderBanner } from "@/lib/client/orders-view";
 import { describeSocialError, social } from "@/lib/client/social-api";
 
 /**
@@ -19,6 +20,19 @@ export function OfferActions({ demandId, offerId }: { demandId: string; offerId:
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
+  // Lot FIN1 : une commande déjà confirmée (ou déclarée) pour cette annonce dans ce besoin remplace « Je l'ai acheté » (une deuxième déclaration serait refusée).
+  const [banner, setBanner] = useState<OfferOrderBanner | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    social.orders.list("buyer", { signal: controller.signal }).then(
+      (orders) => setBanner(offerOrderBanner(orders, demandId, offerId)),
+      () => {
+        // Sans la liste, le bouton reste : le serveur refuse de toute façon une deuxième déclaration, avec un message exact.
+      },
+    );
+    return () => controller.abort();
+  }, [demandId, offerId]);
 
   const write = async () => {
     if (busy.current) return;
@@ -56,7 +70,19 @@ export function OfferActions({ demandId, offerId }: { demandId: string; offerId:
           {error}
         </p>
       ) : null}
-      <DeclareOrder demandId={demandId} offerId={offerId} />
+      {banner ? (
+        <div data-testid="offer-order-banner" data-kind={banner.kind} className="mt-2 rounded-xl border border-forest/30 bg-sage px-3.5 py-3">
+          <div data-testid="offer-order-label" className="text-[14px] font-bold text-forest">
+            {banner.label}
+          </div>
+          <div className="text-[12px] text-sage-ink">{banner.hint}</div>
+          <Link href={banner.href} className="mt-1 inline-block text-[12px] font-bold text-forest underline">
+            Voir la commande
+          </Link>
+        </div>
+      ) : (
+        <DeclareOrder demandId={demandId} offerId={offerId} />
+      )}
       <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">{NO_PAYMENT_NOTICE}</p>
     </section>
   );

@@ -617,7 +617,8 @@ export function describeSocialError(error: unknown, context: SocialErrorContext)
   if (context === "order") {
     if (error.status === 404) return "Commande introuvable, ou annonce plus disponible pour votre besoin.";
     if (error.code === "invalid_price") return "Le prix convenu doit être un nombre entier de 1 à 100 000 000 FCFA.";
-    if (error.code === "order_active_exists") return "Une commande est déjà en cours pour cette annonce.";
+    if (error.code === "order_active_exists") return "Une commande est déjà en attente de confirmation du vendeur pour cette annonce.";
+    if (error.code === "order_already_confirmed") return "Cet achat est déjà confirmé par le vendeur pour cette annonce.";
     if (error.code === "order_state_conflict") return "Cette commande ne peut plus changer d'état. La page va être actualisée.";
     if (error.code === "action_not_allowed") return "Cette action n'est pas permise pour votre rôle.";
     if (error.code === "offer_not_available") return "Cette annonce n'est plus disponible : aucune commande ne peut être déclarée.";

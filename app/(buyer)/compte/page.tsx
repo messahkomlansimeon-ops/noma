@@ -90,7 +90,7 @@ export default function MonCompte() {
                 Vous vendez ?
               </div>
               <div className="text-[12px] text-sage-ink">
-                Rejoignez les vendeurs Noma.
+                Rejoignez les vendeurs noma.
               </div>
             </div>
           </div>

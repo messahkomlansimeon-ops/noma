@@ -4,11 +4,13 @@ import type { SqlExecutor } from "../postgres/client";
 import type { MarketReference } from "./indicators";
 
 /**
- * Marché observé INTERNE (offres publiées de la base), pour l'indicateur de prix. Lecture seule.
+ * Marché observé INTERNE (offres publiées de la base), pour l'indicateur de prix : REPLI quand les prix demandés publiés (encart de la fiche, `price-reference.ts`) ne le sont pas.
+ * Lecture seule.
  *
- * Clé de regroupement : (lower(btrim(category)), lower(btrim(brand)), lower(btrim(model)), price_currency). La
- * VARIANTE est ignorée en v1 (iPhone 13 « 128 Go » et « 256 Go » partagent le même marché) : documenté dans
- * MATCHING-RELEVANCE.md. Une clé dont la catégorie, la marque ou le modèle est absent n'a pas de marché.
+ * Clé de regroupement : (lower(btrim(category)), lower(btrim(brand)), lower(btrim(model)), price_currency) ET, depuis le lot FIN1, la variante et l'état de l'offre évaluée
+ * (`price_key_part`, comme les relevés de prix) : une variante ou un état absent de la requête est « confondu » (toutes les variantes, tous les états), un renseigné est exigé à
+ * l'identique. Une requête sans variante ni état (`undefined` ou `null`) compare donc comme avant (même marché pour toutes les variantes). Une clé dont la catégorie, la marque ou le
+ * modèle est absent n'a pas de marché.
  */
 export interface MarketQuery {
   /** Offre évaluée : elle est EXCLUE de SON PROPRE marché. Sert aussi de clé du résultat. */
@@ -18,6 +20,10 @@ export interface MarketQuery {
   model: string | null;
   /** Devise du prix de l'offre ; seules les offres de même devise comptent. */
   currency: string | null;
+  /** Variante de l'offre évaluée : exigée à l'identique (clé normalisée) quand elle est renseignée ; absente : toutes les variantes. */
+  variant?: string | null;
+  /** État de l'offre évaluée (texte libre de l'annonce) : exigé à l'identique (clé normalisée) quand il est renseigné ; absent : tous les états. */
+  condition?: string | null;
 }
 
 /** Offres retenues pour le marché : publiées, non archivées, disponibilité ≠ `unavailable` (NULL accepté), propriétaire actif et non archivé, prix et devise renseignés. */
@@ -70,8 +76,44 @@ export async function readMarketReferences(
 
   // Séparateur de la clé : un caractère de contrôle que ni lower() ni btrim() ne produisent à partir d'un texte d'annonce valide ; la clé n'est qu'un
   // regroupement côté JavaScript (la comparaison de fond reste faite par PostgreSQL dans la jointure).
-  const rows = await client.query<MarketRow>(
-    `WITH req AS (
+  // Sans variante ni état dans les requêtes (appel direct, base d'avant la migration 0023 qui définit `price_key_part`) : la requête d'origine, qui n'appelle aucune fonction de la migration.
+  const keyed = usable.some((query) => (query.variant ?? "").trim() !== "" || (query.condition ?? "").trim() !== "");
+  const baseValues = [
+    usable.map((query) => query.offerId),
+    usable.map((query) => query.category),
+    usable.map((query) => query.brand),
+    usable.map((query) => query.model),
+    usable.map((query) => query.currency),
+  ];
+  const rows = keyed
+    ? await client.query<MarketRow>(
+        `WITH req AS (
+       SELECT r.offer_id, r.category, r.brand, r.model, r.currency, price_key_part(r.variant) AS variant, price_key_part(r.condition) AS condition
+         FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[]) AS r(offer_id, category, brand, model, currency, variant, condition)
+     ), keys AS (
+       SELECT DISTINCT lower(btrim(category)) AS c, lower(btrim(brand)) AS b, lower(btrim(model)) AS mo, currency, variant AS v, condition AS cd FROM req
+     )
+     SELECT 'request' AS kind,
+            concat_ws(chr(31), lower(btrim(r.category)), lower(btrim(r.brand)), lower(btrim(r.model)), r.currency, r.variant, r.condition) AS key,
+            r.offer_id::text AS offer_id, NULL::text AS price
+       FROM req r
+     UNION ALL
+     SELECT 'market',
+            concat_ws(chr(31), k.c, k.b, k.mo, k.currency, k.v, k.cd),
+            m.id::text, m.price_amount::text
+       FROM keys k
+       JOIN offers m
+         ON lower(btrim(m.category)) = k.c
+        AND lower(btrim(m.brand)) = k.b
+        AND lower(btrim(m.model)) = k.mo
+        AND m.price_currency = k.currency
+        AND (k.v = '' OR price_key_part(m.variant) = k.v)
+        AND (k.cd = '' OR price_key_part(m.condition_text) = k.cd)
+      WHERE ${MARKET_OFFER_FILTER}`,
+        [...baseValues, usable.map((query) => query.variant ?? null), usable.map((query) => query.condition ?? null)],
+      )
+    : await client.query<MarketRow>(
+        `WITH req AS (
        SELECT * FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::text[]) AS r(offer_id, category, brand, model, currency)
      ), keys AS (
        SELECT DISTINCT lower(btrim(category)) AS c, lower(btrim(brand)) AS b, lower(btrim(model)) AS mo, currency FROM req
@@ -91,14 +133,8 @@ export async function readMarketReferences(
         AND lower(btrim(m.model)) = k.mo
         AND m.price_currency = k.currency
       WHERE ${MARKET_OFFER_FILTER}`,
-    [
-      usable.map((query) => query.offerId),
-      usable.map((query) => query.category),
-      usable.map((query) => query.brand),
-      usable.map((query) => query.model),
-      usable.map((query) => query.currency),
-    ],
-  );
+        baseValues,
+      );
 
   // Marché de chaque clé : prix triés avec l'identifiant de l'offre (pour exclure l'offre évaluée de SON marché).
   const markets = new Map<string, Array<{ id: string; price: number }>>();

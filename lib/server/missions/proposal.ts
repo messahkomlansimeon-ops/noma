@@ -9,7 +9,7 @@ import type { SqlExecutor } from "../postgres/client";
 import { publicFieldText } from "../../phone-text";
 import { buildNotificationTitle } from "../notifications/content";
 import type { ShortfallReason } from "../../missions-rules";
-import { allocateMission, emptyAllocation, type AllocationCandidate, type AllocationResult } from "./allocation";
+import { allocateMission, emptyAllocation, stableSellerIndexes, type AllocationCandidate, type AllocationResult } from "./allocation";
 import { MissionError } from "./errors";
 import { MISSION_COLUMNS, mapMission, type MissionRecord, type MissionRow } from "./missions";
 
@@ -21,8 +21,10 @@ import { MISSION_COLUMNS, mapMission, type MissionRecord, type MissionRow } from
  *    `readDemandOrganicRanking`, même lignes et même prédicat que la lecture des résultats) ; le moteur de matching n'est pas dupliqué ;
  *  - la répartition est `allocateMission` (heuristique gloutonne, voir allocation.ts) : budget par unité, budget total restant, quantité annoncée (1 si elle n'est pas renseignée),
  *    10 vendeurs au plus (les vendeurs déjà engagés comptent dans les 10) ;
- *  - les vendeurs sont ÉTIQUETÉS « Vendeur 1 », « Vendeur 2 »… (les vendeurs déjà engagés d'abord, puis dans l'ordre de remplissage) : la proposition ne porte aucun identifiant de
- *    vendeur ni de numéro. UNE étiquette par vendeur : deux annonces d'un même vendeur portent la même (information assumée, MISSIONS.md) ;
+ *  - les vendeurs sont ÉTIQUETÉS « Vendeur 1 », « Vendeur 2 »… : la proposition ne porte aucun identifiant de vendeur ni de numéro. UNE étiquette par vendeur : deux annonces d'un même
+ *    vendeur portent la même (information assumée, MISSIONS.md). Lot FIN1 : le numéro est STABLE d'un affichage à l'autre d'UNE mission (classement par empreinte de (mission, vendeur) : `stableSellerIndexes`),
+ *    jamais selon l'ordre de remplissage ni le fait d'être déjà engagé : déclarer un achat chez « Vendeur 2 » ne le renomme pas « Vendeur 1 » ; il ne change que si l'ensemble des vendeurs
+ *    affichés change ; d'une mission à l'autre le classement est un autre (aucun pseudonyme stable) ;
  *  - la couverture (`coveredQuantity`) est la quantité engagée PLUS la quantité proposée, plafonnée à la quantité totale : c'est aussi celle que lit l'étape du runner.
  *  - une mission dont l'échéance est passée n'a plus de proposition (`inactive`), même si l'étape du runner ne l'a pas encore marquée échue.
  */
@@ -126,7 +128,16 @@ export interface MissionAllocationRead {
  * La répartition d'une mission et les annonces lues, dans l'instantané de lecture donné. `null` si le besoin porteur n'est plus lisible (inactif, propriétaire suspendu).
  * Les commandes proposées ou confirmées de la mission sont soustraites (quantité et montant), leurs annonces ne sont pas reproposées.
  */
-export async function computeMissionAllocation(client: SqlExecutor, mission: MissionRecord, at: Date): Promise<MissionAllocationRead | null> {
+export async function computeMissionAllocation(
+  client: SqlExecutor,
+  mission: MissionRecord,
+  at: Date,
+  /**
+   * Lot FIN1 : « comme si l'acheteur n'avait rien déclaré depuis cet instant » : les commandes créées APRÈS cet instant ne sont pas lues. Sert à l'étape du runner pour séparer la hausse
+   * de couverture que sa propre déclaration explique de celle que des annonces nouvelles expliquent. Absent : toutes les commandes.
+   */
+  options: { ignoreOrdersAfter?: Date } = {},
+): Promise<MissionAllocationRead | null> {
   if (mission.demandId === null) return null;
   let ranking: Awaited<ReturnType<typeof readDemandOrganicRanking>>;
   try {
@@ -137,8 +148,8 @@ export async function computeMissionAllocation(client: SqlExecutor, mission: Mis
   }
   const orders = await client.query<{ id: string; offer_id: string; seller_id: string; status: "proposed" | "confirmed"; quantity: number; price_amount: string }>(
     `SELECT id, offer_id, seller_id, status, quantity, price_amount::text AS price_amount
-       FROM orders WHERE mission_id = $1::uuid AND status IN ('proposed', 'confirmed') ORDER BY created_at, id`,
-    [mission.id],
+       FROM orders WHERE mission_id = $1::uuid AND status IN ('proposed', 'confirmed') AND ($2::timestamptz IS NULL OR created_at <= $2::timestamptz) ORDER BY created_at, id`,
+    [mission.id, options.ignoreOrdersAfter ?? null],
   );
   const engaged: EngagedOrderRead[] = orders.rows.map((row) => ({
     orderId: row.id,
@@ -230,12 +241,14 @@ export async function readMissionProposal(input: { pool: Pool; ownerId: string; 
     const computed = await computeMissionAllocation(client, mission, readAt);
     if (computed === null) return { mission, proposal: { state: "unavailable" as const, ...base } };
     const { allocation, offers } = computed;
-    const labelOf = (sellerKey: string): string => `Vendeur ${allocation.sellerIndexes.get(sellerKey) as number}`;
+    // Numéros STABLES (lot FIN1), pas ceux de l'ordre de remplissage de `allocation.sellerIndexes`.
+    const stable = stableSellerIndexes(allocation.sellerIndexes.keys(), mission.id);
+    const labelOf = (sellerKey: string): string => `Vendeur ${stable.get(sellerKey) as number}`;
     const lines: ProposalLine[] = allocation.lines.map((line) => {
       const offer = offers.get(line.offerId) as OfferRow;
       return {
         offerId: line.offerId,
-        vendorLabel: `Vendeur ${line.sellerIndex}`,
+        vendorLabel: labelOf(line.sellerKey),
         title: buildNotificationTitle({ brand: offer.brand, model: offer.model, variant: offer.variant }),
         location: publicFieldText(offer.location_text),
         quantity: line.quantity,

@@ -82,9 +82,19 @@ export function frenchDate(iso: string): string | null {
   return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
 }
 
-/** « etat_batterie » → « Etat batterie ». */
+/**
+ * Mots des clés d'attributs publiques que le catalogue écrit sans accent (une clé est en minuscules ASCII) : l'écran les affiche avec leurs accents (« Etat batterie » et « Memoire »
+ * étaient des fautes visibles de la fiche). Seuls les mots de ce tableau sont corrigés ; tout autre mot reste tel quel.
+ */
+const ATTRIBUTE_WORD_ACCENTS: Readonly<Record<string, string>> = Object.freeze({
+  etat: "état", memoire: "mémoire", annee: "année", ecran: "écran", resolution: "résolution", generation: "génération", capacite: "capacité", modele: "modèle", reseau: "réseau",
+  definition: "définition", materiau: "matériau", debloque: "débloqué", deverrouille: "déverrouillé", reconditionne: "reconditionné", systeme: "système",
+});
+
+/** « etat_batterie » → « État batterie », « memoire » → « Mémoire ». */
 export function attributeLabel(key: string): string {
-  const text = key.replace(/_/g, " ").trim();
+  const words = key.replace(/_/g, " ").trim().split(/\s+/).filter((word) => word !== "").map((word) => ATTRIBUTE_WORD_ACCENTS[word] ?? word);
+  const text = words.join(" ");
   return text.length === 0 ? key : `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 }
 
@@ -132,7 +142,8 @@ export function contactLinks(contact: Pick<OfferContact, "phone">): { tel: strin
 export const ATTRIBUTION_SENTENCE =
   "Les ouvertures et les contacts sont attribués au boost seulement si l'acheteur avait vu votre annonce sponsorisée dans les 7 jours qui précèdent ; sinon ils sont comptés comme organiques.";
 export const EXPOSURE_SENTENCE = "Les apparitions dans les résultats ne sont comptées que pendant un boost : sans boost, l'écran ne peut pas dire combien de fois votre annonce a été servie.";
-export const OPEN_SENTENCE = "Une ouverture veut dire que la page de votre annonce a été servie à un acheteur : ce n'est pas la preuve qu'il l'a lue. Aucune vente n'est mesurée.";
+/** Lot FIN1 : plus de « Aucune vente n'est mesurée » : la page de l'annonce a son bloc « Ventes déclarées et confirmées » juste en dessous, la phrase le contredisait. */
+export const OPEN_SENTENCE = "Une ouverture veut dire que la page de votre annonce a été servie à un acheteur : ce n'est pas la preuve qu'il l'a lue.";
 export const PRIVACY_SENTENCE = "Pour protéger les acheteurs, les chiffres sont arrondis à 5 près et les petits nombres ne sont pas détaillés.";
 export const FEW_STATS_YET = "Encore peu d'activité : les petits nombres ne sont pas détaillés.";
 /** Annonce sans boost : aucune ligne « pendant un boost » ni « attribué au boost » ; une seule phrase. */

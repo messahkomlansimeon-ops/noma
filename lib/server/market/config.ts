@@ -59,4 +59,4 @@ export const MARKET_ADMIN_KEY_LIMIT = 20;
 export const MARKET_ADMIN_PERIOD: MarketPeriod = 90;
 
 export const MARKET_CONTRACT_VERSION = "market/v3" as const;
-export const MARKET_ADMIN_CONTRACT_VERSION = "market-admin/v3" as const;
+export const MARKET_ADMIN_CONTRACT_VERSION = "market-admin/v4" as const;

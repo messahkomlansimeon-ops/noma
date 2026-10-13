@@ -11,6 +11,7 @@ import {
   isUtcDay,
   lastPerListing,
   meetsThresholds,
+  publishedRangeBound,
   relativeRound,
   roundPriceXof,
   sellerValues,
@@ -69,7 +70,7 @@ const valuesOf = (rows: readonly MarketObservation[]) => sellerValues(lastPerLis
 /** Arrondi à 500 écrit ici à la main (la moitié vers le haut), pour ne pas réutiliser le code testé. */
 const round500 = (value: number): number => Math.floor((value + 250) / 500) * 500;
 
-describe("arrondis : 500 FCFA pour les prix, relatif (5 % de la médiane) pour la fourchette", () => {
+describe("arrondis : 500 FCFA pour les prix, relatif (5 % de la médiane) puis 500 FCFA pour la fourchette", () => {
   test("le multiple de 500 le plus proche, la moitié vers le haut", () => {
     const cases: Array<[number, number]> = [
       [0, 0], [1, 0], [249, 0], [250, 500], [251, 500], [499, 500], [500, 500], [749, 500], [750, 1000],
@@ -92,6 +93,28 @@ describe("arrondis : 500 FCFA pour les prix, relatif (5 % de la médiane) pour l
     assert.equal(relativeRound(162_500, 170_000), 170_625);
     // médiane nulle : pas de fourchette possible.
     assert.equal(relativeRound(0, 1_000), 0);
+  });
+
+  test("publishedRangeBound : l'arrondi relatif ramené à 500 FCFA, au moins 500 FCFA de la médiane, du bon côté (jamais une borne égale à la médiane)", () => {
+    // médiane 164 500 : un pas de 5 % vaut 8 225 ; Q1 = 148 050 est à 2 pas → 148 050 → 148 000 ; Q3 = 168 000 est à moins d'un demi-pas → 0 pas → la médiane → écartée de 500.
+    assert.equal(publishedRangeBound(164_500, 148_050, "lower"), 148_000);
+    assert.equal(publishedRangeBound(164_500, 168_000, "upper"), 165_000, "Q3 retombe sur la médiane : jamais « entre X et X », au moins 500 de plus");
+    assert.equal(publishedRangeBound(164_500, 164_500, "lower"), 164_000, "Q1 égal à la médiane : au moins 500 de moins");
+    // médiane 160 000 (pas 8 000) : Q1 = 151 250 → 152 000 (déjà un multiple de 500) ; Q3 = 175 000 → 176 000.
+    assert.equal(publishedRangeBound(160_000, 151_250, "lower"), 152_000);
+    assert.equal(publishedRangeBound(160_000, 175_000, "upper"), 176_000);
+    // médiane 162 500 (pas 8 125) : 154 375 reste 154 375 en relatif, puis 154 500 ; 170 625 → 170 500.
+    assert.equal(publishedRangeBound(162_500, 154_375, "lower"), 154_500);
+    assert.equal(publishedRangeBound(162_500, 170_000, "upper"), 170_500);
+    // une borne publiée est toujours un multiple de 500 et strictement de part et d'autre de la médiane
+    for (const median of [500, 1_000, 99_500, 160_000, 162_500, 164_500, 1_000_000]) {
+      for (const quartile of [0, 1, median / 2, median - 250, median, median + 250, median * 2, median * 10]) {
+        const lower = publishedRangeBound(median, quartile, "lower");
+        const upper = publishedRangeBound(median, quartile, "upper");
+        assert.ok(lower % 500 === 0 && upper % 500 === 0, `${median} / ${quartile}`);
+        assert.ok(lower <= median - 500 && upper >= median + 500, `${median} / ${quartile} : ${lower} … ${upper}`);
+      }
+    }
   });
 });
 
@@ -377,20 +400,35 @@ describe("prix atypiques : écartés avant toute publication, et dits", () => {
   });
 });
 
-describe("fourchette : arrondie en relatif, jamais sous 10 VENDEURS, jamais une borne ≤ 0", () => {
-  test("12 vendeurs de 150 000 à 205 000 : médiane 177 500, Q1 = 163 750 → 159 750 (2 pas de 8 875), Q3 = 191 250 → 195 250 ; effectifs « environ 10 »", () => {
+describe("fourchette : arrondie en relatif puis à 500 FCFA, jamais sous 10 VENDEURS, jamais une borne ≤ 0, jamais une borne égale à la médiane", () => {
+  test("12 vendeurs de 150 000 à 205 000 : médiane 177 500, Q1 = 163 750 → 159 750 (2 pas de 8 875) → 160 000, Q3 = 191 250 → 195 250 → 195 500 ; effectifs « environ 10 »", () => {
     const rows = listings(Array.from({ length: 12 }, (_, index) => 150_000 + index * 5_000));
     const listing = published(rows);
     assert.equal(listing.median, 177_500);
-    assert.deepEqual(listing.range, { q1: 159_750, q3: 195_250 });
+    assert.deepEqual(listing.range, { q1: 160_000, q3: 195_500 });
     assert.deepEqual(listing.count, { kind: "approx", value: 10 });
     assert.deepEqual(listing.sellers, { kind: "approx", value: 10 });
     assert.equal(listing.excluded, null);
-    // Les bornes publiées ne sont JAMAIS les quartiles exacts ; ce sont des multiples de 5 % de la médiane (8 875) de part et d'autre d'elle.
+    // Les bornes publiées ne sont JAMAIS les quartiles exacts ; ce sont des multiples de 500 FCFA (comme tous les prix publiés) qui découlent des multiples de 5 % de la médiane (8 875).
     assert.notEqual(listing.range?.q1, 163_750);
     assert.notEqual(listing.range?.q3, 191_250);
-    assert.ok(Math.abs(((listing.range?.q1 ?? 0) - 177_500) % 8_875) === 0);
-    assert.ok(Math.abs(((listing.range?.q3 ?? 0) - 177_500) % 8_875) === 0);
+    assert.equal((listing.range?.q1 ?? 1) % 500, 0);
+    assert.equal((listing.range?.q3 ?? 1) % 500, 0);
+    assert.equal(listing.range?.q1, round500(177_500 - 2 * 8_875), "Q1 : deux pas relatifs sous la médiane, arrondi à 500");
+    assert.equal(listing.range?.q3, round500(177_500 + 2 * 8_875), "Q3 : deux pas relatifs au-dessus de la médiane, arrondi à 500");
+  });
+
+  test("une borne n'est JAMAIS égale à la médiane (même quand l'arrondi relatif la ramène sur elle) : au moins 500 FCFA de part et d'autre ; tous les prix publiés sont des multiples de 500", () => {
+    // Marché serré : tous les vendeurs à 165 000 → Q1 = Q3 = médiane ; la fourchette s'écarte de 500 de chaque côté (jamais « entre 165 000 et 165 000 »).
+    const tight = published(listings(Array.from({ length: 12 }, () => 165_000)));
+    assert.equal(tight.median, 165_000);
+    assert.deepEqual(tight.range, { q1: 164_500, q3: 165_500 });
+    // Marché presque serré : le quartile haut est à 1 % de la médiane (moins d'un demi-pas de 5 %) → il retombe sur la médiane par l'arrondi relatif.
+    const rows = listings([150_000, 152_000, 154_000, 156_000, 158_000, 160_000, 162_000, 164_000, 164_500, 164_500, 165_000, 166_000]);
+    const skewed = published(rows);
+    assert.ok(skewed.range !== null);
+    assert.ok(skewed.range.q1 < skewed.median && skewed.median < skewed.range.q3, JSON.stringify([skewed.range, skewed.median]));
+    for (const price of [skewed.median, skewed.range.q1, skewed.range.q3]) assert.equal(price % 500, 0);
   });
 
   test("9 vendeurs : la médiane seule ; 10 vendeurs : la fourchette apparaît (frontière exacte)", () => {
@@ -424,10 +462,10 @@ describe("fourchette : arrondie en relatif, jamais sous 10 VENDEURS, jamais une 
     assert.equal(listing.range, null, "Q1 arrondi à 0 : pas de fourchette");
     // Avec des petits prix un peu plus grands, la fourchette réapparaît (et toutes ses bornes sont strictement positives).
     const wider = listings([20_000, 20_000, 20_000, 20_000, 100_000, 100_000, 100_000, 100_000, 100_000, 100_000]);
-    assert.deepEqual(published(wider).range, { q1: 20_000, q3: 100_000 });
+    assert.deepEqual(published(wider).range, { q1: 20_000, q3: 100_500 }, "Q3 = médiane : écarté de 500 FCFA");
   });
 
-  test("dans des centaines de marchés tirés au hasard (dont des prix extrêmes), aucune borne publiée n'est ≤ 0 et Q1 ≤ médiane ≤ Q3", () => {
+  test("dans des centaines de marchés tirés au hasard (dont des prix extrêmes), aucune borne publiée n'est ≤ 0 et Q1 < médiane < Q3", () => {
     let state = 12_345;
     const next = () => {
       state = (Math.imul(state, 1_103_515_245) + 12_345) >>> 0;
@@ -446,7 +484,8 @@ describe("fourchette : arrondie en relatif, jamais sous 10 VENDEURS, jamais une 
       if (stats.listings.status !== "published" || stats.listings.range === null) continue;
       ranges += 1;
       assert.ok(stats.listings.range.q1 > 0 && stats.listings.range.q3 > 0, JSON.stringify(stats.listings.range));
-      assert.ok(stats.listings.range.q1 <= stats.listings.median && stats.listings.median <= stats.listings.range.q3);
+      assert.ok(stats.listings.range.q1 < stats.listings.median && stats.listings.median < stats.listings.range.q3, "strictement de part et d'autre de la médiane");
+      assert.ok(stats.listings.range.q1 % 500 === 0 && stats.listings.range.q3 % 500 === 0, "multiples de 500 FCFA");
     }
     assert.ok(ranges >= 30, `${ranges} fourchettes vérifiées`);
   });

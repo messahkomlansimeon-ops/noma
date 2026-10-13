@@ -50,7 +50,8 @@ export function ConversationsList({ space }: { space: "buyer" | "vendor" }) {
   const back = space === "buyer" ? "/compte" : "/vendeur";
   return (
     <main>
-      <TopBar back={back} title={MESSAGES_TITLE} />
+      {/* Lot FIN1 : titre dit une fois (le h1). */}
+      <TopBar back={back} />
       <div className="px-4 pb-6">
         <h1 className="font-display text-[22px] font-extrabold text-ink">{MESSAGES_TITLE}</h1>
         {error ? (

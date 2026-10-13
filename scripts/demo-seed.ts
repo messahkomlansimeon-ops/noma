@@ -499,7 +499,8 @@ async function seedSocial(
     });
     report.orderDeclared = true;
   } catch (error) {
-    if (!(error instanceof SocialError) || error.code !== "order_active_exists") throw error;
+    // Déjà proposée, ou déjà confirmée (rejeu après une répétition de la démonstration) : rien à dupliquer.
+    if (!(error instanceof SocialError) || (error.code !== "order_active_exists" && error.code !== "order_already_confirmed")) throw error;
   }
 }
 

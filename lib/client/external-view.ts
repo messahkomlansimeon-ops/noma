@@ -25,6 +25,22 @@ export function externalMention(sourceName: string): string {
   return `Annonce trouvée sur ${sourceName} : noma ne garantit ni le prix ni la disponibilité ; vous serez redirigé vers le site.`;
 }
 
+export const EXTERNAL_DEMO_SITE_LABEL = "Site de démonstration";
+export const EXTERNAL_DEMO_SITE_HINT = "annonce d'exemple, ce site n'existe pas.";
+
+/**
+ * Lot FIN1 : l'adresse d'une annonce d'une source FICTIVE utilise le domaine réservé `.example` (RFC 2606) : elle ne mène nulle part. Aucun lien n'est alors ouvert : l'écran montre un
+ * bouton désactivé « Voir sur le site » avec la mention « Site de démonstration » (un lien mort devant des investisseurs ferait croire à une panne).
+ */
+export function isDemoSiteUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === "example" || host.endsWith(".example");
+  } catch {
+    return false;
+  }
+}
+
 export interface ExternalLinkProps {
   href: string;
   target: typeof EXTERNAL_LINK_TARGET;
@@ -46,7 +62,10 @@ export interface ExternalCardRow {
   alsoOnText: string | null;
   compatibilityText: string;
   seenText: string;
+  /** Lien sortant ; `null` pour une adresse non sûre OU pour un site de démonstration (`.example`) : aucun lien n'est ouvert. */
   link: ExternalLinkProps | null;
+  /** Vrai pour une annonce d'une source fictive (adresse en `.example`) : le bouton est désactivé et dit « Site de démonstration ». */
+  demoSite: boolean;
 }
 
 function joinNames(names: readonly string[]): string {
@@ -66,7 +85,8 @@ export function externalCardRow(item: ExternalListing): ExternalCardRow {
     alsoOnText: item.alsoOn.length === 0 ? null : `Aussi trouvée sur ${joinNames(item.alsoOn.map((source) => source.name))}`,
     compatibilityText: `Compatibilité ${percent} %`,
     seenText: `Vue le ${formatDateFr(item.seenAt)}`,
-    link: externalLinkProps(item.url),
+    link: isDemoSiteUrl(item.url) ? null : externalLinkProps(item.url),
+    demoSite: isDemoSiteUrl(item.url) && isSafeExternalUrl(item.url),
   };
 }
 

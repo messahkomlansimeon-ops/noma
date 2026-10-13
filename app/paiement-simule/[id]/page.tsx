@@ -11,7 +11,7 @@ import {
   CHECKOUT_MESSAGES,
   SIMULATION_BANNER,
   SIMULATION_SUBTITLE,
-  WALLET_PATH,
+  walletPathFor,
   checkoutView,
   createTopupKeys,
   returnLinkLabel,
@@ -172,8 +172,8 @@ function Paiement({ topupId }: { topupId: string }) {
             <Link data-testid="sim-return" href={target} className={`${linkClass} mt-5 bg-forest text-white`}>
               {returnLinkLabel(target)}
             </Link>
-            {target !== WALLET_PATH ? (
-              <Link href={WALLET_PATH} className={`${linkClass} mt-3 border border-forest/30 bg-white text-forest`}>
+            {target !== walletPathFor(target) ? (
+              <Link href={walletPathFor(target)} className={`${linkClass} mt-3 border border-forest/30 bg-white text-forest`}>
                 Voir mon porte-monnaie
               </Link>
             ) : null}
@@ -212,7 +212,7 @@ function Paiement({ topupId }: { topupId: string }) {
                 Réessayer
               </button>
             ) : null}
-            <Link href={WALLET_PATH} className={`${linkClass} mt-3 border border-forest/30 bg-white text-forest`}>
+            <Link href={walletPathFor(target)} className={`${linkClass} mt-3 border border-forest/30 bg-white text-forest`}>
               Retour à mon porte-monnaie
             </Link>
           </div>

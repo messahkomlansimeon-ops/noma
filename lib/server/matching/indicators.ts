@@ -77,11 +77,16 @@ export function computeAvailabilityIndicator(input: AvailabilityInput): Availabi
 export type PricePosition = "below_market" | "in_market" | "above_market" | "insufficient_data";
 
 export interface MarketReference {
-  /** Échantillon HORS l'offre évaluée. */
+  /** Échantillon HORS l'offre évaluée (marché des offres de la base) ; pour une référence publiée : l'effectif arrondi des annonces de l'encart. */
   sampleSize: number;
   p25: number | null;
   median: number | null;
   p75: number | null;
+  /**
+   * `published` : référence tirée de l'encart « Prix demandés dans les annonces » (médiane et fourchette publiées, `price-reference.ts`) ; absent : marché des offres publiées de la base
+   * (repli quand l'encart n'est pas publié).
+   */
+  source?: "published";
 }
 
 /** Pourquoi le prix est « inconnu » : le vendeur ne l'a pas donné, ou le marché est insuffisant (pas un choix du vendeur). */

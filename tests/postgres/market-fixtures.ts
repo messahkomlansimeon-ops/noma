@@ -4,6 +4,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
+import { createDemand, createOffer } from "../../lib/server/catalog";
 import { makePerson, type Person } from "./metrics-fixtures";
 
 export const MARKET_NOW = new Date(Date.UTC(2030, 5, 15, 12));
@@ -61,4 +62,23 @@ export async function makeActors(pool: Pool, sellers: number, buyers: number): P
 /** Vide les relevés et le journal du relevé quotidien. */
 export function resetObservations(pool: Pool): Promise<unknown> {
   return pool.query("TRUNCATE price_observations, price_observation_runs");
+}
+
+/**
+ * Une vente RÉELLE (lot FIN1) : une annonce, un besoin, une commande déclarée puis confirmée. Le déclencheur de la migration 0023 écrit alors le relevé de vente, dont l'identifiant est
+ * celui de la commande (contrairement aux relevés synthétiques de `insertObservation` ou de `demo:seed`, que ne justifie aucune commande). Renvoie l'identifiant de la commande.
+ */
+export async function confirmRealSale(pool: Pool, input: { sellerId: string; buyerId: string; price: number; model?: string }): Promise<string> {
+  const text = { category: PRODUCT_TEXT.category, brand: PRODUCT_TEXT.brand, model: input.model ?? PRODUCT_TEXT.model };
+  const offer = await createOffer({
+    ownerId: input.sellerId, rawText: "Annonce", ...text, variant: null, condition: null, location: "Cocody", price: { amount: input.price, currency: "XOF" },
+    status: "published", availabilityStatus: "available",
+  }, pool);
+  const demand = await createDemand({ ownerId: input.buyerId, rawText: "Besoin", ...text, location: "Cocody", status: "active" }, pool);
+  const order = await pool.query<{ id: string }>(
+    "INSERT INTO orders (demand_id, offer_id, buyer_id, seller_id, price_amount) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+    [demand.id, offer.id, input.buyerId, input.sellerId, input.price],
+  );
+  await pool.query("UPDATE orders SET status = 'confirmed', decided_at = clock_timestamp(), updated_at = clock_timestamp() WHERE id = $1", [order.rows[0].id]);
+  return order.rows[0].id;
 }

@@ -2,7 +2,7 @@
 
 AUDIT-EVOLUTION-SCOUTR.md §5 (M6) et §7 (lot 7, « statistiques de marché accompagnées d'effectif, période et comparabilité ») : un acheteur doit savoir **où se situe le prix demandé d'une
 annonce**, un vendeur **à quel prix les autres vendeurs publient**. Ce lot garde le prix **affiché** des annonces publiées (une observation par jour) et en publie des statistiques
-**protégées** : **une seule valeur par vendeur**, prix atypiques écartés, seuils portant sur des **vendeurs** distincts (5, 10 et 20), médiane arrondie à 500 FCFA, fourchette arrondie en relatif,
+**protégées** : **une seule valeur par vendeur**, prix atypiques écartés, seuils portant sur des **vendeurs** distincts (5, 10 et 20), médiane arrondie à 500 FCFA, fourchette arrondie en relatif puis à 500 FCFA (jamais une borne égale à la médiane),
 effectifs arrondis à 5 près, comparabilité toujours dite, aucun minimum ni maximum. Aucun paiement, aucun appel externe, aucune dépendance.
 
 > **Les prix de vente ne sont pas publiés** tant qu'un mécanisme robuste (volume élevé, publication différée, comptes anciens) n'est pas en place. Les ventes sont déclarées par l'acheteur et
@@ -38,7 +38,7 @@ l'étape « market » de `lib/server/matching/runner.ts`, la purge `lib/server/m
 | **Groupe de comparaison** | Les annonces dont la clé répond au **niveau** retenu (ci-dessous). |
 | **Vendeurs retenus** | Les vendeurs du groupe après retrait des prix atypiques ; c'est sur eux que portent les seuils, la médiane et la fourchette. Les **annonces retenues** sont leurs annonces (effectif « environ N annonces »). |
 | **Médiane** | Médiane (interpolation linéaire, la formule de `percentile_cont`) des valeurs par vendeur retenues, arrondie à 500 FCFA (le multiple le plus proche, la moitié vers le haut). |
-| **Fourchette (Q1, Q3)** | Publiée seulement à partir de **10 vendeurs retenus**, sinon la médiane seule. Q1 et Q3 sont arrondis **en relatif** : au multiple de **5 % de la médiane** (médiane / 20) le plus proche, de part et d'autre de la médiane (jamais un quartile exact). **Une borne publiée n'est jamais ≤ 0** : si l'arrondi ramène Q1 à 0 (médiane énorme et quartile minuscule), la fourchette entière est omise (la médiane reste publiée). |
+| **Fourchette (Q1, Q3)** | Publiée seulement à partir de **10 vendeurs retenus**, sinon la médiane seule. Q1 et Q3 sont arrondis **en relatif** : au multiple de **5 % de la médiane** (médiane / 20) le plus proche, de part et d'autre de la médiane (jamais un quartile exact) ; **lot FIN1** : cette borne est ensuite ramenée au **multiple de 500 FCFA** le plus proche (comme tout prix publié : la note de l'écran dit « prix à 500 FCFA ») et **écartée d'au moins 500 FCFA de la médiane, du côté du quartile** (Q1 sous la médiane, Q3 au-dessus : une borne qui retombait sur la médiane par l'effet de l'arrondi faisait lire « entre 148 050 et 164 500 » pour une médiane de 164 500). La borne reste une fonction des seuls chiffres relatifs déjà publiés : l'arrondi à 500 n'apprend rien de plus (les essais d'indiscernabilité de `tests/server/market-adversary.test.ts` passent à l'identique). **Une borne publiée n'est jamais ≤ 0** : si l'arrondi ramène Q1 à 0 (médiane énorme et quartile minuscule), la fourchette entière est omise (la médiane reste publiée). |
 | **Tendance** | La période est découpée en blocs de **7 jours consécutifs finissant aujourd'hui** (30 jours : 4 blocs, 90 : 12, 365 : 52 ; les `période mod 7` jours les plus anciens n'y figurent pas) ; un point = la médiane des valeurs par vendeur du bloc (le dernier prix de chaque annonce dans le bloc, une valeur par vendeur ; mêmes prix atypiques écartés), publié seulement si le bloc compte **au moins 20 vendeurs retenus**, sinon `null`. |
 
 **Ce que sont ces chiffres.** Des prix **demandés** par les vendeurs, pas des prix payés : l'écran ne dit jamais « prix du marché » seul et le dit en toutes lettres (« Ce sont des prix demandés par les vendeurs,
@@ -83,8 +83,8 @@ aux deux produits phares (voir « Historique de démonstration »). Le relever �
 
 - **Médiane et points de tendance** : multiples de **500 FCFA**. Chaque valeur est d'abord arrondie à 500 FCFA, puis la médiane est calculée et arrondie à nouveau : toute la publication ne dépend d'un
   prix individuel qu'à 500 FCFA près (indiscernabilité, ci-dessous). L'erreur sur la médiane est d'au plus 500 FCFA (borne testée contre un oracle indépendant).
-- **Fourchette** : multiples de 5 % de la médiane de part et d'autre d'elle (médiane 160 000 : 152 000 et 176 000). Les montants peuvent être « curieux » (153 900 pour une médiane de 162 000) : ils
-  sont exacts par construction, jamais des quartiers exacts.
+- **Fourchette** : multiples de 5 % de la médiane de part et d'autre d'elle (médiane 160 000 : 152 000 et 176 000), **puis ramenés à 500 FCFA** et jamais égaux à la médiane (lot FIN1 : médiane 164 500 → Q1 148 000, Q3 165 000
+  quand le quartile haut retombait sur la médiane). Jamais des quartiles exacts.
 - **Effectifs** (annonces retenues, vendeurs retenus, annonces des vendeurs aux prix atypiques écartés) : la règle de MESURES.md (`roundCount`) : « moins de 5 », « environ 5 » de 5 à 8, « environ 10 » de 9 à 12,
   puis le multiple de 5 le plus proche. L'écran dit « **environ N annonces d'environ M vendeurs** » ; **« N annonces aux prix atypiques écartées »** s'affiche avec N arrondi (« moins de 5 annonces aux prix atypiques
   écartées ») ; rien n'est affiché quand aucune n'a été écartée.
@@ -105,6 +105,16 @@ La **clé exacte d'abord**. Si ses seuils ne sont pas atteints (vendeurs retenus
 
 Une catégorie, une marque ou un modèle absent : pas de marché (comme l'indicateur de prix du matching).
 
+## Une seule référence de prix : l'encart ET l'indicateur « Prix » (lot FIN1)
+
+L'indicateur « Prix » des résultats et de la fiche (`position`, `deltaPercent`, voir `MATCHING-RELEVANCE.md`) ne compare plus le prix à un marché à part : quand l'encart est **publié** pour la clé de l'annonce, il se calcule par
+rapport à **SA médiane** (`lib/server/matching/price-reference.ts` appelle la fonction même de la route, `computeMarketStats` : même clé variante + état, mêmes élargissements, mêmes seuils de vendeurs, mêmes prix atypiques
+écartés, même période de 90 jours, « aujourd'hui » de l'horloge de la base). Écart = (prix − médiane publiée) / médiane publiée ; « sous / dans / au-dessus du marché » selon la fourchette publiée (Q1, Q3) ou, sans fourchette
+(moins de 10 vendeurs), un écart d'au plus 10 % (`publishedBandPercent`). L'effectif servi est celui de l'encart, arrondi. L'annonce évaluée fait partie de son marché, comme dans l'encart. Jamais « Marché insuffisant pour
+comparer le prix » à côté d'un encart rempli ; quand l'encart n'est pas publié, l'indicateur se rabat sur le marché des offres publiées de la base avec une clé qui **inclut la variante et l'état** (une variante ou un état
+absent est confondu). Test de cohérence ENTRE les lots : `tests/postgres/price-consistency.integration.test.ts` (iPhone 12 128 Go 165 000, Galaxy S21 135 000, 130 000 et 140 000, iPhone reconditionné 185 000, iPhone 12 64 Go
+128 000, MacBook Air M1 480 000 : l'encart lu par le client de la fiche et l'indicateur servi par la lecture des résultats donnent la même position et le même écart).
+
 ## Route et écrans
 
 - **`GET /api/market?category&brand&model[&variant][&condition][&period=30|90|365]`** (contrat `market/v3` ; la v1 publiait des ventes, la v2 comptait par annonce) : utilisateurs **connectés** (401 sinon, texte fixe) ; paramètres en
@@ -114,12 +124,13 @@ Une catégorie, une marque ou un modèle absent : pas de marché (comme l'indica
   relit la réponse en **liste blanche stricte** : un champ en trop (un prix de vente, un minimum…) la fait refuser.
 - **Lecture** : la base **réduit** les relevés (`DISTINCT ON`) : pour chaque annonce, son dernier relevé de la période et de chaque bloc de la tendance, soit au plus 1 + 52 lignes par annonce quel que soit
   le nombre de jours observés. Le nombre de lignes lues est borné par le nombre d'annonces : **plus aucun refus (503) au-delà d'un nombre de relevés**, et rien n'est tronqué.
-- **`GET /api/admin/market`** (`market-admin/v3`) : administrateurs seulement (le MÊME 404 pour tout autre, administrateur suspendu compris) ; les 20 clés produit les plus relevées sur 90 jours : prix demandés
+- **`GET /api/admin/market`** (`market-admin/v4` depuis le lot FIN1) : administrateurs seulement (le MÊME 404 pour tout autre, administrateur suspendu compris) ; les 20 clés produit les plus relevées sur 90 jours : prix demandés
   avec les mêmes seuils et arrondis, sur la **clé exacte** (une clé sous les seuils reste listée, « Pas assez de données »), et par produit **un nombre arrondi de ventes confirmées** (« environ 15 ventes
-  confirmées »), sans aucun prix.
-- **Fiche d'une annonce** (acheteur) : l'encart **« Prix demandés dans les annonces »** — médiane, « La moitié des prix demandés est entre X et Y » (à partir de 10 vendeurs, sinon « Fourchette non affichée : il
+  confirmées »), sans aucun prix. **Lot FIN1** : les ventes confirmées sont celles des COMMANDES réelles (comme l'aperçu de l'administration) ; les relevés de vente que ne justifie aucune commande de la base
+  (ceux de `demo:seed`) forment `historicalSales`, un nombre arrondi à part que l'écran étiquette « historique de démonstration, non comptées » : ils ne sont jamais ajoutés aux ventes confirmées.
+- **Fiche d'une annonce** (acheteur) : l'encart **« Prix demandés dans les annonces »** (le bloc se titre « Annonces publiées sur la période » : des annonces publiées sur 30, 90 ou 365 jours, pas « en ligne » à l'instant) — médiane, « La moitié des prix demandés est entre X et Y » (à partir de 10 vendeurs, sinon « Fourchette non affichée : il
   faut au moins 10 vendeurs. »), « environ N annonces d'environ M vendeurs », annonces aux prix atypiques écartées, période (« Sur les 90 derniers jours », boutons 30 jours / 90 jours / 1 an), comparabilité, mini-courbe SVG
-  faite main (quand 20 vendeurs par semaine le permettent), « Ce sont des prix demandés par les vendeurs, pas des prix payés. » et la phrase exacte « Calculé sur au moins 5 vendeurs différents, une seule valeur
+  faite main (quand 20 vendeurs par semaine le permettent ; sa phrase dit sa période : « Tendance en baisse sur les 12 dernières semaines : de X à Y (médiane par semaine) » ; elle ne couvre que des semaines entières, 12 semaines = 84 jours pour 90 jours, et chaque point ne compte que les annonces de sa semaine : sa dernière valeur n'est pas la médiane de la période), « Ce sont des prix demandés par les vendeurs, pas des prix payés. » et la phrase exacte « Calculé sur au moins 5 vendeurs différents, une seule valeur
   par vendeur (la médiane de ses annonces), prix atypiques écartés, chiffres arrondis (prix à 500 FCFA, effectifs à 5 près). » **Aucune ligne de ventes.** Une erreur du serveur ne casse jamais la fiche.
 - **Formulaire d'annonce** (vendeur) : « Prix demandés dans les annonces pour ce produit : médiane X (environ N annonces d'environ M vendeurs, 90 jours). Comparé à : iPhone 12 128 Go, tous états confondus. » sous le prix, dès que la
   catégorie, la marque et le modèle sont saisis (600 ms après la frappe) ; rien sous les seuils.
@@ -186,7 +197,7 @@ les 11 comptes acheteurs fictifs, qui vendent aussi dans l'historique, et 6 comp
 128 Go et Galaxy S21 128 Go d'occasion : 24 vendeurs chaque semaine, donc la tendance de 12 semaines, 20 vendeurs au moins), **12** pour les autres (12 vendeurs : une médiane, et le plus souvent la fourchette,
 jamais de tendance). Une annonce par vendeur et par semaine, et non plusieurs : la valeur d'un vendeur est la médiane de ses annonces, et plusieurs annonces par vendeur resserraient les valeurs au point que l'écart
 interquartile écartait comme « atypiques » jusqu'à un tiers des vendeurs d'une semaine (points de tendance manquants, mesuré avec 40 places). Les ventes fictives, 5 à 15 % sous le prix de base, se font entre les **vendeurs
-fictifs 1 à 7** et les **acheteurs fictifs 1 à 11** (elles ne servent qu'au nombre de ventes confirmées de l'administration). Le prix demandé baisse de 0,08 % par jour. **Lot T3** : les prix des annonces fictives sont étalés de ±20 % autour de la base (±6 % avant) : arrondis en relatif (5 % de la médiane), les quartiles retombaient sur la médiane dans 3 cas sur 4 et l'écran écrivait « entre 162 500 FCFA et 162 500 FCFA » ; à ±20 % les produits phares ont une fourchette de largeur non nulle pour chacun des 60 jours de lancement testés. Si deux bornes arrondies sont tout de même égales, l'écran écrit « La plupart des prix demandés sont autour de X » (jamais « entre X et X »). Tout est une fonction du **jour absolu** et du
+fictifs 1 à 7** et les **acheteurs fictifs 1 à 11** (elles ne servent qu'à l'« historique de démonstration » de l'administration : sans commande derrière elles, elles ne sont pas des ventes confirmées). Le prix demandé baisse de 0,08 % par jour. **Lot T3** : les prix des annonces fictives sont étalés de ±20 % autour de la base (±6 % avant) : arrondis en relatif (5 % de la médiane), les quartiles retombaient sur la médiane dans 3 cas sur 4 et l'écran écrivait « entre 162 500 FCFA et 162 500 FCFA » ; à ±20 % les produits phares ont une fourchette de largeur non nulle pour chacun des 60 jours de lancement testés. Si deux bornes arrondies sont tout de même égales, l'écran écrit « La plupart des prix demandés sont autour de X » (jamais « entre X et X »). Tout est une fonction du **jour absolu** et du
 produit : relancer (ce jour-là ou un autre) réécrit les mêmes lignes ; `ON CONFLICT DO NOTHING` : rejouable à l'identique (0 relevé de plus). Un essai vérifie, pour 60 jours de lancement consécutifs, que chaque
 produit publie sa médiane sur la clé exacte et que les deux produits phares ont leurs 12 points de tendance et leur fourchette. Les identifiants fictifs ne correspondent à aucune annonce ni commande.
 **Ce sont des données de démonstration : ne les montrez jamais comme des prix réels.**

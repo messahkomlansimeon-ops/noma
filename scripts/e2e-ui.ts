@@ -720,7 +720,7 @@ async function main(): Promise<void> {
     await sellerPage.getByRole("button", { name: "Recharger", exact: true }).click();
     await sellerPage.waitForURL(
       (url) =>
-        url.pathname === "/compte/porte-monnaie" && url.searchParams.get("recharger") === "1" && url.searchParams.get("next") === payOfferPath,
+        url.pathname === "/vendeur/porte-monnaie" && url.searchParams.get("recharger") === "1" && url.searchParams.get("next") === payOfferPath,
     );
     await sellerPage.getByTestId("topup-panel").waitFor();
     assert.equal(norm(await sellerPage.getByTestId("wallet-balance").textContent()), "0 FCFA");
@@ -1139,7 +1139,10 @@ async function main(): Promise<void> {
 
     step("« Mon porte-monnaie » : un SEUL débit malgré la réponse perdue et le double clic ; montants signés colorés");
     await sellerPage.getByTestId("boost-balance").getByRole("link", { name: "Mon porte-monnaie" }).click();
-    await sellerPage.waitForURL((url) => url.pathname === "/compte/porte-monnaie" && url.searchParams.get("next") === payOfferPath);
+    // Lot FIN1 : depuis l'espace vendeur, le porte-monnaie s'ouvre DANS l'espace vendeur (barre d'onglets du vendeur).
+    await sellerPage.waitForURL((url) => url.pathname === "/vendeur/porte-monnaie" && url.searchParams.get("next") === payOfferPath);
+    assert.equal(await sellerPage.locator("nav a[href='/vendeur/profil']").count(), 1, "la barre d'onglets du bas est celle du vendeur (lot FIN1)");
+    assert.equal(await sellerPage.locator("nav a[href='/favoris']").count(), 0, "et non celle de l'acheteur");
     await sellerPage.getByTestId("wallet-row").first().waitFor();
     assert.equal(norm(await sellerPage.getByTestId("wallet-balance").textContent()), fmt(2_000 - quoteAmount));
     const rows = sellerPage.getByTestId("wallet-row");
@@ -1247,7 +1250,7 @@ async function main(): Promise<void> {
     assert.equal(await sellerPage.getByTestId("sim-confirm").count(), 0);
     const retry = sellerPage.getByTestId("sim-retry");
     assert.equal(norm(await retry.textContent()), "Réessayer la recharge");
-    assert.equal(await retry.getAttribute("href"), `/compte/porte-monnaie?recharger=1&next=${encodeURIComponent(payOfferPath)}`);
+    assert.equal(await retry.getAttribute("href"), `/vendeur/porte-monnaie?recharger=1&next=${encodeURIComponent(payOfferPath)}`);
     ok("« Faire échouer le paiement » : « Le paiement a échoué. Votre porte-monnaie n'a pas été crédité. », lien « Réessayer la recharge » (panneau ouvert, retour mémorisé)");
     await shot(sellerPage, "24-paiement-simule-echoue");
     // Lot P3-bis (N4) : recharger la page d'une recharge ÉCHOUÉE (déjà terminée avant cette visite) : « terminée sans paiement », jamais d'alarme ni de crédit.
@@ -1319,7 +1322,7 @@ async function main(): Promise<void> {
     ok("« Mon compte » → « Mon porte-monnaie » : le lien d'accès fonctionne");
     await sellerPage.goto(`${BASE}/vendeur/profil`);
     await sellerPage.getByRole("link", { name: "Mon porte-monnaie" }).click();
-    await sellerPage.waitForURL((url) => url.pathname === "/compte/porte-monnaie" && url.searchParams.get("next") === "/vendeur/profil");
+    await sellerPage.waitForURL((url) => url.pathname === "/vendeur/porte-monnaie" && url.searchParams.get("next") === "/vendeur/profil");
     ok("espace vendeur (« Compte ») → « Mon porte-monnaie » : lien d'accès, retour vers le profil vendeur");
 
     step("Historique long : « Voir plus » par curseur (20 lignes par page)");

@@ -8,9 +8,7 @@
 import { API_ABORTED, API_INVALID_RESPONSE, API_NETWORK_ERROR, ApiError, type RequestOptions } from "./api";
 
 export const MARKET_CONTRACT_VERSION = "market/v3";
-export const MARKET_ADMIN_CONTRACT_VERSION = "market-admin/v3";
-/** La fourchette est arrondie en multiples de 5 % de la médiane (médiane / 20). */
-export const MARKET_RANGE_STEPS_PER_MEDIAN = 20;
+export const MARKET_ADMIN_CONTRACT_VERSION = "market-admin/v4";
 
 export const MARKET_PERIOD_DAYS = [30, 90, 365] as const;
 export type MarketPeriodDays = (typeof MARKET_PERIOD_DAYS)[number];
@@ -29,7 +27,7 @@ export interface MarketTrendPoint {
 }
 
 /**
- * Les prix DEMANDÉS dans les annonces : jamais un prix de vente (les ventes ne sont pas publiées). `range` (Q1, Q3 arrondis en relatif, toujours > 0) n'existe qu'à partir de 10 vendeurs
+ * Les prix DEMANDÉS dans les annonces : jamais un prix de vente (les ventes ne sont pas publiées). `range` (Q1 sous la médiane, Q3 au-dessus : arrondis en relatif puis à 500 FCFA, toujours > 0) n'existe qu'à partir de 10 vendeurs
  * retenus ; `sellers` : vendeurs retenus (une valeur chacun) ; `excluded` : annonces des vendeurs aux prix atypiques écartés (`null` : aucun).
  */
 export type MarketListings =
@@ -61,6 +59,8 @@ export interface AdminMarketRow {
   listings: MarketListings;
   /** Ventes confirmées du produit sur 90 jours : un NOMBRE arrondi, jamais un prix. */
   confirmedSales: MarketCount;
+  /** Ventes de l'historique de démonstration (relevés de vente sans commande de la base) : à part, jamais ajoutées aux ventes confirmées. */
+  historicalSales: MarketCount;
 }
 
 export interface AdminMarket {
@@ -141,9 +141,8 @@ function parseListings(status: number, value: unknown): MarketListings {
     need(status, isObject(source.range) && sameKeys(source.range as Json, ["q1", "q3"]) && isAmount((source.range as Json).q1) && isAmount((source.range as Json).q3));
     const q1 = (source.range as Json).q1 as number;
     const q3 = (source.range as Json).q3 as number;
-    // La fourchette est un multiple de 5 % de la médiane de part et d'autre d'elle (jamais un quartile exact).
-    const step = median / MARKET_RANGE_STEPS_PER_MEDIAN;
-    need(status, Number.isInteger(step) && step > 0 && q1 > 0 && q1 <= median && median <= q3 && (median - q1) % step === 0 && (q3 - median) % step === 0);
+    // Les bornes sont des multiples de 500 FCFA comme tous les prix publiés (jamais un quartile exact) et de part et d'autre de la médiane, jamais égales à elle.
+    need(status, q1 > 0 && q1 < median && median < q3 && q1 % MARKET_PRICE_STEP === 0 && q3 % MARKET_PRICE_STEP === 0);
     range = { q1, q3 };
   }
   const trend = (source.trend as unknown[]).map((entry): MarketTrendPoint => {
@@ -248,9 +247,9 @@ export function createMarketClient(options: MarketClientOptions = {}) {
       return {
         period: parsePeriod(status, body.period),
         rows: (body.rows as unknown[]).map((entry): AdminMarketRow => {
-          need(status, isObject(entry) && sameKeys(entry as Json, ["label", "listings", "confirmedSales"]) && typeof entry.label === "string" && entry.label.length >= 1 && entry.label.length <= 200);
+          need(status, isObject(entry) && sameKeys(entry as Json, ["label", "listings", "confirmedSales", "historicalSales"]) && typeof entry.label === "string" && entry.label.length >= 1 && entry.label.length <= 200);
           const row = entry as Json;
-          return { label: row.label as string, listings: parseListings(status, row.listings), confirmedSales: parseCount(status, row.confirmedSales) };
+          return { label: row.label as string, listings: parseListings(status, row.listings), confirmedSales: parseCount(status, row.confirmedSales), historicalSales: parseCount(status, row.historicalSales) };
         }),
       };
     },

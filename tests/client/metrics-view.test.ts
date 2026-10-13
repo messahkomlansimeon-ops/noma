@@ -204,7 +204,9 @@ describe("« Ce que produit votre annonce » (vendeur)", () => {
     assert.ok(view.notes.includes(ATTRIBUTION_SENTENCE));
     assert.match(ATTRIBUTION_SENTENCE, /attribués au boost seulement si l'acheteur avait vu votre annonce sponsorisée dans les 7 jours/);
     assert.ok(view.notes.some((note) => /ne sont comptées que pendant un boost/.test(note)));
-    assert.ok(view.notes.some((note) => /ce n'est pas la preuve qu'il l'a lue\. Aucune vente n'est mesurée/.test(note)));
+    assert.ok(view.notes.some((note) => /ce n'est pas la preuve qu'il l'a lue\.$/.test(note)));
+    // FIN1 : la page de l'annonce montre un bloc « Ventes déclarées et confirmées » : aucune note ne prétend qu'aucune vente n'est mesurée.
+    assert.ok(view.notes.every((note) => !/aucune vente/i.test(note)));
     assert.ok(view.notes.includes(PRIVACY_SENTENCE));
     assert.equal(PRIVACY_SENTENCE, "Pour protéger les acheteurs, les chiffres sont arrondis à 5 près et les petits nombres ne sont pas détaillés.");
     const masked = period({
@@ -264,7 +266,7 @@ describe("fiche d'une annonce (acheteur)", () => {
     assert.equal(view.compatibilityPercent, 87);
     assert.deepEqual(view.indicators.map((indicator) => indicator.key), ["price", "availability", "confidence"]);
     assert.equal(view.dateText, "Annonce du 12 octobre 2031");
-    assert.deepEqual(view.attributes, [{ label: "Etat batterie", value: "89 %" }, { label: "Couleur", value: "noir" }]);
+    assert.deepEqual(view.attributes, [{ label: "État batterie", value: "89 %" }, { label: "Couleur", value: "noir" }]);
     assert.equal(view.sponsored, false);
     assert.equal(view.sponsoredBadge, null);
     assert.equal(view.sponsoredNotice, null);
@@ -299,8 +301,12 @@ describe("fiche d'une annonce (acheteur)", () => {
     assert.equal(frenchDate("2031-01-01T23:59:59.000Z"), "1 janvier 2031");
     assert.equal(frenchDate("2031-12-31T00:00:00.000Z"), "31 décembre 2031");
     assert.equal(frenchDate("n'importe quoi"), null);
-    assert.equal(attributeLabel("etat_batterie"), "Etat batterie");
+    assert.equal(attributeLabel("etat_batterie"), "État batterie");
+    assert.equal(attributeLabel("memoire"), "Mémoire");
     assert.equal(attributeLabel("couleur"), "Couleur");
+    assert.equal(attributeLabel("stockage"), "Stockage");
+    assert.equal(attributeLabel("chargeur_inclus"), "Chargeur inclus");
+    assert.equal(attributeLabel("_"), "_", "clé vide une fois nettoyée : la clé telle quelle");
   });
 
   test("lien vers la fiche : deux UUID exigés, sinon aucun lien", () => {

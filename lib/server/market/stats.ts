@@ -25,8 +25,8 @@ import {
  *  - comparabilité : la clé exacte d'abord ; si ses seuils ne sont pas atteints, la variante est retirée (si elle était demandée), puis l'état (s'il était demandé), et le texte DIT
  *    contre quoi le prix est comparé ;
  *  - prix atypiques : toute valeur par vendeur hors de [Q1 − 1,5 × IQR ; Q3 + 1,5 × IQR] est écartée avant toute publication, et le nombre d'annonces concernées est publié ;
- *  - seuils de confidentialité, sur les VENDEURS retenus après retrait des prix atypiques : médiane à partir de 5 vendeurs distincts, fourchette (Q1, Q3, arrondie en RELATIF : multiples
- *    de 5 % de la médiane, jamais une borne ≤ 0) à partir de 10 vendeurs, un point de tendance (médiane d'une semaine) à partir de 20 vendeurs ; sinon « pas assez de données » ;
+ *  - seuils de confidentialité, sur les VENDEURS retenus après retrait des prix atypiques : médiane à partir de 5 vendeurs distincts, fourchette (Q1, Q3, arrondie en RELATIF puis à
+ *    500 FCFA, jamais une borne ≤ 0, jamais une borne égale à la médiane) à partir de 10 vendeurs, un point de tendance (médiane d'une semaine) à partir de 20 vendeurs ; sinon « pas assez de données » ;
  *  - chaque prix est d'abord arrondi à 500 FCFA, puis la médiane est calculée sur ces prix arrondis et arrondie à 500 FCFA ;
  *  - effectifs (annonces, vendeurs) arrondis comme les autres mesures (`roundCount`) ; jamais de minimum ni de maximum, jamais d'identifiant.
  */
@@ -86,7 +86,10 @@ export interface PublishedListings {
   /** Annonces des vendeurs aux prix atypiques écartés : arrondi ; `null` quand aucun vendeur n'a été écarté. */
   excluded: StatCount | null;
   median: number;
-  /** Fourchette arrondie en relatif (multiples de 5 % de la médiane), seulement à partir de 10 vendeurs retenus, et jamais avec une borne ≤ 0. */
+  /**
+   * Fourchette : bornes arrondies en relatif (multiples de 5 % de la médiane) PUIS à 500 FCFA, comme tous les prix publiés ; Q1 strictement sous la médiane et Q3 strictement au-dessus
+   * (au moins 500 FCFA de part et d'autre : une borne égale à la médiane par l'effet de l'arrondi serait trompeuse) ; seulement à partir de 10 vendeurs retenus, jamais avec une borne ≤ 0.
+   */
   range: { q1: number; q3: number } | null;
   trend: TrendPoint[];
 }
@@ -145,6 +148,17 @@ export function relativeRound(median: number, quartile: number): number {
   const distance = Math.abs(quartile - median);
   const steps = Math.floor((2 * distance + step) / (2 * step));
   return quartile < median ? median - steps * step : median + steps * step;
+}
+
+/**
+ * La borne PUBLIÉE de la fourchette : l'arrondi relatif du quartile (`relativeRound`), ramené au multiple de 500 FCFA le plus proche (« prix à 500 FCFA » : tout prix affiché est un multiple de 500,
+ * la fourchette comme la médiane), puis écarté d'AU MOINS 500 FCFA de la médiane, du côté du quartile (Q1 sous la médiane, Q3 au-dessus) : une borne qui retombe sur la médiane à cause de
+ * l'arrondi (marché serré) ferait lire « la moitié des prix est entre X et X ». La borne ne dépend que de la médiane et de l'arrondi relatif déjà publiés : l'arrondi à 500 n'apprend rien
+ * de plus à qui lit la fourchette (le résultat reste une fonction des chiffres relatifs), et l'écart minimal ne fait qu'élargir la fourchette.
+ */
+export function publishedRangeBound(median: number, quartile: number, side: "lower" | "upper"): number {
+  const rounded = roundPriceXof(relativeRound(median, quartile));
+  return side === "lower" ? Math.min(rounded, median - MARKET_PRICE_ROUNDING_XOF) : Math.max(rounded, median + MARKET_PRICE_ROUNDING_XOF);
 }
 
 // ───────────── comparabilité ─────────────
@@ -244,8 +258,8 @@ interface Summary {
 
 /**
  * Le résumé publiable des annonces d'un groupe (une ligne par annonce) : une valeur par vendeur, prix atypiques écartés, seuils vérifiés sur les vendeurs RETENUS ; `null` sous les seuils.
- * `minSellers` : celui de la période (5) ou celui d'un point de tendance (20). La fourchette n'existe qu'à partir de 10 vendeurs, arrondie en relatif, et n'est jamais publiée avec une
- * borne ≤ 0 (une médiane énorme fait arrondir Q1 à 0 : la fourchette est alors omise).
+ * `minSellers` : celui de la période (5) ou celui d'un point de tendance (20). La fourchette n'existe qu'à partir de 10 vendeurs, arrondie en relatif puis à 500 FCFA, et n'est jamais publiée
+ * avec une borne ≤ 0 (une médiane énorme fait arrondir Q1 à 0 : la fourchette est alors omise).
  */
 function summarize(listings: readonly MarketObservation[], minSellers: number): Summary | null {
   const { kept, excluded } = discardOutliers(sellerValues(listings));
@@ -254,8 +268,8 @@ function summarize(listings: readonly MarketObservation[], minSellers: number): 
   const median = roundPriceXof(quantile(sorted, 0.5));
   let range: Summary["range"] = null;
   if (kept.length >= MARKET_RANGE_MIN_SELLERS) {
-    const q1 = relativeRound(median, quantile(sorted, 0.25));
-    const q3 = relativeRound(median, quantile(sorted, 0.75));
+    const q1 = publishedRangeBound(median, quantile(sorted, 0.25), "lower");
+    const q3 = publishedRangeBound(median, quantile(sorted, 0.75), "upper");
     if (q1 > 0 && q3 > 0) range = { q1, q3 };
   }
   return {

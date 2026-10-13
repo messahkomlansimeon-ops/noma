@@ -89,7 +89,7 @@ export default function Recherche() {
 
         {understanding ? (
           <div className="mt-3 border-l-4 border-forest bg-sage px-4 py-3">
-            <div className="text-[12px] font-semibold text-sage-ink">Noma a compris</div>
+            <div className="text-[12px] font-semibold text-sage-ink">noma a compris</div>
             <div className="text-[15px] font-extrabold text-forest">{understanding.product}</div>
             {understanding.requirements.length > 0 ? (
               <div className="mt-1 text-[12px] text-sage-ink">

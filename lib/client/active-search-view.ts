@@ -214,4 +214,4 @@ export function trackingMaximumText(tracking: { maxUntil: string; readAt: string
 // ───────────── administration ─────────────
 
 export const ADMIN_ACTIVE_SEARCH_TITLE = "Recherche active";
-export const ADMIN_ACTIVE_SEARCH_NOTE = "Prix provisoire : 2 000 FCFA pour 30 jours. Les remboursements se font par la commande d'administration `active-search:refund`.";
+export const ADMIN_ACTIVE_SEARCH_NOTE = "Prix provisoire : 2 000 FCFA pour 30 jours. Les remboursements se font par la commande d'administration « active-search:refund ».";
