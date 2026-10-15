@@ -18,8 +18,12 @@ const SENTINEL_WAVE = "wave_SENTINEL_valeur_secrete_0123456789";
 const SENTINEL_HOOK = "hook_SENTINEL_valeur_secrete_0123456789_abcdef";
 const SENTINEL_BAD_SMS_KEY = "bad key SENTINEL_SMS";
 
+const SENTINEL_TURNSTILE = "turnstile_SENTINEL_valeur_secrete_0123456789";
+
+/** Base de production valide (SMS, et secret anti-bot : constat A1, le secret Turnstile est exigé au démarrage). */
 const SMS_OK = {
   NODE_ENV: "production",
+  NOMA_TURNSTILE_SECRET: SENTINEL_TURNSTILE,
   NOMA_SMS_PROVIDER: "meno",
   NOMA_SMS_API_KEY: "fake_meno_key_for_tests_only_0001",
   NOMA_PUBLIC_URL: "https://noma.example.ci",
@@ -56,7 +60,7 @@ test("SMS1-ter — le code de sortie du refus de démarrer est le code dédié 7
 test("production : configuration SMS et paiement valides : ni journal, ni sortie", () => {
   const result = attempt({ ...SMS_OK, ...PAY_OK });
   assert.deepEqual(result, { logs: [], exits: [], thrown: null });
-  assert.deepEqual(attempt({ NODE_ENV: "production" }), { logs: [], exits: [], thrown: null }, "ni SMS ni paiement configurés : rien à refuser");
+  assert.deepEqual(attempt({ NODE_ENV: "production", NOMA_TURNSTILE_SECRET: SENTINEL_TURNSTILE }), { logs: [], exits: [], thrown: null }, "ni SMS ni paiement configurés : rien à refuser");
 });
 
 test("production : refus du paiement (variables manquantes, prestataire fictif explicite, valeur inconnue) : message fixe journalisé, code 78, aucune valeur dans le journal", () => {
@@ -170,6 +174,38 @@ test("vrai processus : configuration valide (valeurs témoins) : register() rend
   assert.match(dev.stdout, /register-rejected/, "l'exception remonte à l'appelant (next dev l'affiche)");
   assert.ok(!dev.stdout.includes("register-resolved"));
   assert.ok(!/Démarrage refusé/.test(dev.stderr), "hors production, rien n'est journalisé par le garde");
+});
+
+test("A1 — production sans NOMA_TURNSTILE_SECRET (absent ou vide) : démarrage refusé (journal fixe, code 78, le secret n'est jamais journalisé) ; hors production, rien n'est exigé", () => {
+  for (const turnstile of [undefined, ""]) {
+    const result = attempt({ ...SMS_OK, ...PAY_OK, NOMA_TURNSTILE_SECRET: turnstile });
+    assert.deepEqual(result.exits, [REFUSED], `secret ${JSON.stringify(turnstile)}`);
+    assert.equal(result.logs.length, 1);
+    assert.match(result.logs[0], /Démarrage refusé : configuration anti-bot invalide en production : NOMA_TURNSTILE_SECRET requis en production/);
+    assert.ok(result.thrown instanceof Error, "le démarrage n'est jamais réputé réussi après un refus");
+  }
+  const withSecret = attempt({ ...SMS_OK, ...PAY_OK });
+  assert.deepEqual(withSecret, { logs: [], exits: [], thrown: null });
+  for (const nodeEnv of ["development", "test", undefined]) {
+    assert.deepEqual(attempt({ NODE_ENV: nodeEnv }), { logs: [], exits: [], thrown: null }, `NODE_ENV=${String(nodeEnv)} : le secret n'est exigé qu'en production`);
+  }
+  // Les contrôles SMS et paiement passent avant : une seule sortie, la cause la plus précoce.
+  const smsFirst = attempt({ ...SMS_OK, NOMA_SMS_API_KEY: SENTINEL_BAD_SMS_KEY, NOMA_TURNSTILE_SECRET: undefined });
+  assert.deepEqual(smsFirst.exits, [REFUSED]);
+  assert.match(smsFirst.logs[0], /configuration SMS invalide/);
+});
+
+test("A1 — vrai processus : register() en production sans secret Turnstile TERMINE le processus (code 78), message fixe, aucune valeur ; avec le secret, il rend la main", () => {
+  const withoutSecret: Record<string, string> = { ...SMS_OK };
+  delete withoutSecret.NOMA_TURNSTILE_SECRET;
+  const refused = realRegister(withoutSecret);
+  assert.equal(refused.status, REFUSED, `${refused.stdout}${refused.stderr}`);
+  assert.match(refused.stderr, /Démarrage refusé : configuration anti-bot invalide en production : NOMA_TURNSTILE_SECRET requis en production/);
+  assert.ok(!refused.stdout.includes("register-resolved") && !refused.stdout.includes("register-rejected"), "le processus a été terminé par register()");
+  const accepted = realRegister({ ...SMS_OK });
+  assert.equal(accepted.status, 0, `${accepted.stdout}${accepted.stderr}`);
+  assert.match(accepted.stdout, /register-resolved/);
+  assert.ok(!`${accepted.stdout}${accepted.stderr}`.includes(SENTINEL_TURNSTILE));
 });
 
 test("SMS1-ter — vrai processus : budget des notifications nul : avertissement sur la sortie d'erreur hors production, refus (code 78) en production", () => {

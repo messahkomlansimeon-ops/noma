@@ -77,7 +77,7 @@ configuration valide, démarrage normal (`SMS.md`, `PAIEMENT-WAVE.md`).
 | `deploy/backup.sh` | Sauvegarde SQLite cohérente (`VACUUM INTO`) sans arrêt de l'app. **Garde-fous** : source inexistante → exit 1 (aucune base vide créée) ; base illisible/non SQLite → exit 1 ; sauvegarde sans les 4 tables de protection → fichier SUPPRIMÉ + exit 1 | **Exécuté** : nominal ✔ + 3 modes d'échec rejetés (source absente, non-SQLite, SQLite valide sans tables) |
 | `deploy/restore-check.sh` | Restaure la sauvegarde sur une COPIE ; exige intégrité `ok` ET les 4 tables de protection — une sauvegarde incomplète est rejetée (exit 1, copie supprimée) | **Exécuté** : nominal ✔ + 2 modes d'échec rejetés |
 | `deploy/verify-turnstile.ts` | Vérification siteverify ISOLÉE (ni moteur, ni Chromium, ni IA, ni `/api/search`) | Exécuté hors ligne (usage + refus jeton factice) ; appel avec secret réel en préproduction |
-| `deploy/selftest.sh` | **Tests négatifs + nominaux** des scripts deploy/ (hors ligne, base temporaire, **SANS sudo** — le scénario « cible non inscriptible » est racine-compatible via `/proc`) : port 127.0.0.1 forcé, sauvegarde jamais déclarée valide si vide, restauration rejetée sans tables, secrets jamais committés/affichés, garde root sans propriétaire déclenché, **échec de régénération sans destruction de l'original** (contenu/permissions inchangés), **lecture impossible → exit 1 sans remplacement**, **préservation des autres clés**, **temporaire privé dès la création** (umask 077 + mktemp, vérifié sous umask 000). Échec = exit 1. À rejouer après chaque modification de deploy/ ET sur le serveur avant installation | **Exécuté : 39/39 verts** (2 exécutions consécutives, mode non root) |
+| `deploy/selftest.sh` | **Tests négatifs + nominaux** des scripts deploy/ (hors ligne, base temporaire, **SANS sudo** — le scénario « cible non inscriptible » est racine-compatible via `/proc`) : port 127.0.0.1 forcé, sauvegarde jamais déclarée valide si vide, restauration rejetée sans tables, secrets jamais committés/affichés, garde root sans propriétaire déclenché, **échec de régénération sans destruction de l'original** (contenu/permissions inchangés), **lecture impossible → exit 1 sans remplacement**, **préservation des autres clés**, **temporaire privé dès la création** (umask 077 + mktemp, vérifié sous umask 000). Échec = exit 1. À rejouer après chaque modification de deploy/ ET sur le serveur avant installation | **Exécuté : 59/59 verts** (2 exécutions consécutives, mode non root) |
 
 **Séquence d'installation sur le serveur** (fichier unique appartenant à
 l'utilisateur de service, lu par systemd et sourcé au build) :
@@ -261,6 +261,10 @@ Le build doit être exécuté dans un environnement ISOLÉ du serveur de
 développement actif (Next 16 verrouille le répertoire pour `next dev`) :
 copier le projet puis construire dans la copie, ou arrêter `next dev`
 avant. **Comportement vérifié en production** (`next start`, 2 oct. 2026) :
-sans `NOMA_TURNSTILE_SECRET`, le serveur démarre (accueil 200) mais TOUTE
-recherche échoue (500, fail closed à l'appel) — le « démarrage refusé »
-documenté ci-dessus est donc appliqué à la première recherche, pas au boot.
+sans `NOMA_TURNSTILE_SECRET`, le serveur démarrait (accueil 200) mais TOUTE
+recherche échouait (500, fail closed à l'appel). **Corrigé (constat A1)** :
+`register` (instrumentation.ts) refuse désormais de démarrer en production
+sans `NOMA_TURNSTILE_SECRET` (journal fixe, processus terminé, code 78 ;
+`lib/server/startup-guard.ts`). `NOMA_IP_SECRET` et les variables interdites en
+production restent contrôlés à la première recherche. À rejouer sur un vrai
+`next start` lors de la mise en place du serveur.

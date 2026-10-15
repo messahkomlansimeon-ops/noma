@@ -206,15 +206,15 @@ clés réels :
 
 Non exécuté — **blocage : rien n'a été fourni** (voir § 1). Dès réception :
 
-1. **Rejouer `deploy/selftest.sh` sur le serveur, SANS sudo** (27
-   vérifications négatives/nominales ; exit 1 = installation stoppée).
+1. **Rejouer `deploy/selftest.sh` sur le serveur, SANS sudo** (59
+   vérifications négatives/nominales, mesurées le 15 oct. 2026 ; exit 1 = installation stoppée).
 2. Générer les secrets avec sudo en transmettant la propriété à
    l'utilisateur de service (root sans propriétaire → refus par
    construction) : `sudo deploy/gen-secrets.sh /opt/noma/shared/.env.production noma`.
 3. Ajouter `NEXT_PUBLIC_TURNSTILE_SITE_KEY` **par l'utilisateur de
    service** (le fichier lui appartient, 600) : `sudo -u noma sh -c 'echo … >> /opt/noma/shared/.env.production'`.
 4. Construire **en tant qu'utilisateur de service** avec le fichier sourcé
-   (clé publique inline au build) : `sudo -u noma sh -c 'set -a; . /opt/noma/shared/.env.production; set +a; npm run build'`
+   (clé publique inline au build) : `sudo -u noma sh -c 'set -a; . /opt/noma/shared/.env.production; set +a; npm run build:production'`
    — noter le `BUILD_ID` (retour arrière) et vérifier la clé inline dans `.next/static`.
 5. Installer `deploy/noma.service` (écoute forcée 127.0.0.1 — vérifiée) et
    `deploy/nginx-noma.conf` (liste des IP testeurs), certificat TLS.
@@ -243,11 +243,13 @@ explicite panne de source / absence d'offres.
 
 | # | Constat | Impact | Décision |
 |---|---|---|---|
-| A1 | En production sans `NOMA_TURNSTILE_SECRET`, le serveur démarre (accueil 200) mais chaque recherche échoue en 500 : le contrôle se fait à la première recherche, pas au boot (document DEPLOIEMENT : « démarrage refusé ») | Aucun risque de sécurité (fail closed) ; comportement légèrement différent de la doc | Corriger/tester en préproduction ; doc mise à jour |
+| A1 | ~~En production sans `NOMA_TURNSTILE_SECRET`, le serveur démarrait et chaque recherche échouait en 500~~ | Corrigé (15 oct. 2026) : `register` refuse désormais de démarrer (journal fixe, code 78) ; `NOMA_IP_SECRET` et les variables interdites restent contrôlés à la première recherche | **Résolu** ; à rejouer sur un vrai `next start` en préproduction |
 | A2 | Sans secret proxy configuré, tous les clients directs partagent un bucket de quota IP unique (comportement conservateur documenté) | Quotas IP inefficaces derrière aucun proxy | **Proxy de confiance obligatoire** en préproduction |
-| A3 | 9 warnings ESLint préexistants (variables inutilisées dans `poc/`) | Aucun | Hors périmètre de ce lot |
+| A3 | ~~9 warnings ESLint préexistants (variables inutilisées dans `poc/`)~~ | Aucun | **Résolu** : `npx eslint poc` ne signale plus rien (vérifié le 15 oct. 2026) |
 | A4 | Turnstile réel non testé (pas de domaine) | Valide en préproduction seulement | Étape 3 |
-| A5 | Dépôt git sans commit initial (`master`, 0 commit) | Pas d'historique/repli de code | Hors périmètre ; à initier par le porteur |
+| A5 | ~~Dépôt git sans commit initial (`master`, 0 commit)~~ | Obsolète : le dépôt est sur `main` avec son historique complet et un dépôt distant | **Résolu** |
+
+**Lacune de bêta — sauvegarde PostgreSQL (constat du 15 oct. 2026)** : `deploy/backup.sh` et `deploy/restore-check.sh` ne couvrent que la base SQLite des protections anti-bot (`NOMA_DB_PATH`). Les données métier sont dans PostgreSQL et **aucun script ne les sauvegarde** : la sauvegarde se fait à la main (`pg_dump`, voir DEPLOIEMENT.md, section migrations) et la restauration n'est pas vérifiée par script. À traiter avant d'ouvrir à de vrais utilisateurs.
 
 ## 7. Hors périmètre (confirmé)
 

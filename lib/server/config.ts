@@ -110,6 +110,14 @@ export const PRODUCTION_FORBIDDEN_ENV: readonly string[] = Object.freeze([
   "NOMA_TURNSTILE_DISABLED",
 ]);
 
+/** Démarrage du serveur (appelé par `runStartupChecks`) : en production (NODE_ENV exactement « production »), le secret Turnstile est exigé AVANT la première requête, au lieu de
+ *  faire répondre 500 à chaque recherche (constat A1 de la bêta). Seul ce contrôle est avancé : le secret d'adresse IP et les variables interdites restent contrôlés à la création du
+ *  singleton de `guard()` (inchangé). Message fixe : il nomme la variable, jamais sa valeur. */
+export function assertTurnstileStartupConfig(env: Record<string, string | undefined> = process.env): void {
+  if (env.NODE_ENV !== "production") return;
+  if (!(env.NOMA_TURNSTILE_SECRET ?? "")) throw new Error("NOMA_TURNSTILE_SECRET requis en production");
+}
+
 /** Production : la configuration anti-bot doit être complète et aucune variable de développement ne doit être définie,
  *  sinon l'app refuse de démarrer (fail closed). Exécutée à la création du singleton de `guard()` (premier appel de
  *  /api/search dans le processus), seulement quand NODE_ENV vaut exactement « production ». Les messages sont fixes : ils

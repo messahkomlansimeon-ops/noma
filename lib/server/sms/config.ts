@@ -220,3 +220,12 @@ export function assertSmsProductionConfig(env: Environment = process.env): void 
   }
   if (!isValidAuthSecretEncoding(env.NOMA_AUTH_SECRET)) throw new Error("NOMA_AUTH_SECRET requis en production avec NOMA_SMS_PROVIDER=meno");
 }
+
+/**
+ * Rétention du journal `sms_sends` (lot MEN1) : envois créés depuis plus de 62 jours (le mois en cours et le précédent, pour le rapprochement avec le fournisseur), jamais ceux
+ * encore `uncertain` ou `pending` (rapprochement de l'administration). Elle couvre largement la fenêtre de reprise d'un lot de notifications (48 h) : une clé d'idempotence ne
+ * disparaît jamais avant la fin des reprises.
+ */
+export const SMS_SENDS_RETENTION_DAYS = 62;
+/** Variable qui autorise `sms:purge` quand NODE_ENV vaut `production`. */
+export const SMS_PURGE_PRODUCTION_VARIABLE = "NOMA_SMS_PURGE_PRODUCTION";
