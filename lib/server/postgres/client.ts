@@ -31,6 +31,18 @@ export function requireDatabaseUrl(
 }
 
 /**
+ * Démarrage du serveur (appelé par `runStartupChecks`) : en production (NODE_ENV exactement « production »), `DATABASE_URL` est exigée et doit être une URL PostgreSQL
+ * (schéma postgres:// ou postgresql://) AVANT la première requête, au lieu de laisser le serveur démarrer puis répondre 503 à tout. Aucune connexion n'est ouverte ici. Les
+ * messages sont fixes : l'URL contient le mot de passe, elle n'est JAMAIS recopiée.
+ */
+export function assertDatabaseStartupConfig(env: Record<string, string | undefined> = process.env): void {
+  if (env.NODE_ENV !== "production") return;
+  const value = env.DATABASE_URL?.trim();
+  if (!value) throw new Error("DATABASE_URL requis en production");
+  if (!/^postgres(ql)?:\/\//i.test(value)) throw new Error("DATABASE_URL invalide en production (URL PostgreSQL attendue)");
+}
+
+/**
  * Taille MAXIMALE explicite du pool applicatif (par processus) et délai d'ATTENTE d'une connexion (lot P3). Sans délai, `pg` fait attendre sans fin
  * quand toutes les connexions sont prises (constaté : 12 devis simultanés, un GET /api/wallet d'un autre utilisateur attendait 63,9 s) ; avec lui,
  * l'appel échoue en `timeout exceeded when trying to connect` et les routes répondent un 503 propre. Le calcul de la portée d'un boost est

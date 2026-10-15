@@ -67,6 +67,34 @@ describe("câblage à Next (lecture du code source)", () => {
     assert.match(guard, /import \{ notFound \} from "next\/navigation"/);
     assert.match(guard, /candidates\.length === 1/);
     assert.match(guard, /resolve: \(token\) => resolveSession\(token\)/);
-    assert.match(read("app/(admin)/layout.tsx"), /await requireAdminSpace\(\);/);
+    assert.match(read("app/(admin)/layout.tsx"), /await requireAdminSpace\(\)/);
+  });
+});
+
+describe("garde de l'espace d'administration : session illisible (base indisponible)", () => {
+  const failing = (trace: string[]): AdminSpaceDependencies => ({
+    readToken: async () => "t",
+    resolve: async () => {
+      throw new Error("DATABASE_URL est requis pour utiliser la base métier PostgreSQL.");
+    },
+    notFound: () => {
+      trace.push("notFound");
+      throw new NotFound();
+    },
+  });
+
+  test("la décision est « unavailable » (aucune erreur de rendu, aucun 404 : on ne sait pas si le compte est administrateur) et la cause n'est pas relayée", async () => {
+    const trace: string[] = [];
+    assert.equal(await decideAdminSpace(failing(trace)), "unavailable");
+    assert.equal(await requireAdminSpace(failing(trace)), "unavailable");
+    assert.deepEqual(trace, [], "pas de notFound()");
+  });
+
+  test("sans cookie la base n'est pas lue : « show » ; administrateur : « show » ; le gabarit rend le texte d'indisponibilité sans les onglets", async () => {
+    assert.equal(await requireAdminSpace(deps(null, null)), "show");
+    assert.equal(await requireAdminSpace(deps("t", session(true))), "show");
+    const layout = readFileSync(join(import.meta.dirname, "..", "..", "app", "(admin)", "layout.tsx"), "utf8");
+    assert.match(layout, /=== "unavailable"/);
+    assert.match(layout, /Le service est temporairement indisponible\./);
   });
 });

@@ -272,6 +272,19 @@ else
   ok "aucune clé de paiement dans le fichier versionné"
 fi
 
+# ─── 5c. env.production.example — base PostgreSQL : présente, VIDE ──
+section "env.production.example (base : valeur vide, jamais d'URL versionnée)"
+if [[ $(grep -c "^DATABASE_URL=$" deploy/env.production.example) == "1" && $(grep -c "^DATABASE_URL=." deploy/env.production.example) == "0" ]]; then
+  ok "DATABASE_URL présente, valeur vide"
+else
+  ko "DATABASE_URL absente, en double ou renseignée dans l'exemple versionné"
+fi
+if grep -qE '^[A-Z_]+=postgres(ql)?://' deploy/env.production.example; then
+  ko "une URL de base est écrite dans le fichier versionné !"
+else
+  ok "aucune URL de base dans le fichier versionné"
+fi
+
 # ─── bilan ───────────────────────────────────────────────────────────────────
 echo ""
 if [[ $FAIL -eq 0 ]]; then

@@ -1,50 +1,15 @@
 import { create } from "zustand";
-import {
-  alertsSeed,
-  casesSeed,
-  ordersSeed,
-  proposalsSeed,
-  quoteSeed,
-  threadsSeed,
-  vendorOrdersSeed,
-  NEED_DEFAULT,
-  type AlertItem,
-  type CaseItem,
-  type Order,
-  type Proposal,
-  type QuoteLine,
-  type Thread,
-  type VendorOrder,
-} from "./data";
 
-export type Role = "buyer" | "vendor" | "admin";
-
+/**
+ * État d'interface côté navigateur (rien n'est une donnée métier : tout le reste vient du serveur et de PostgreSQL) :
+ *  - le message de confirmation affiché à l'écran (`toast`, `showToast`) ;
+ *  - la sélection de comparaison (`compare`, `toggleCompare`, `clearCompare`), en attendant l'écran de comparaison (lot suivant).
+ * Les anciennes données de maquette (alertes, échanges, commandes, propositions, dossiers, devis, rôle, besoin par défaut) et `lib/data.ts` ont été retirées : aucun écran ne les lisait.
+ */
 interface NomaState {
-  role: Role;
-  setRole: (r: Role) => void;
-  need: string;
-  setNeed: (t: string) => void;
-  favorites: string[];
-  toggleFavorite: (id: string) => void;
   compare: string[];
   toggleCompare: (id: string) => void;
   clearCompare: () => void;
-  alerts: AlertItem[];
-  addAlert: (a: Omit<AlertItem, "id" | "news">) => void;
-  threads: Thread[];
-  sendMessage: (threadId: string, text: string) => void;
-  acceptOffer: (threadId: string) => void;
-  orders: Order[];
-  proposals: Proposal[];
-  cases: CaseItem[];
-  addReport: (r: { motif: string; offer: string; detail: string }) => void;
-  decide: (caseId: string, decision: string, motif: string) => void;
-  vendorOrders: VendorOrder[];
-  advanceVendorOrder: (id: string) => void;
-  declarePayment: (id: string, paid: boolean) => void;
-  quoteLines: QuoteLine[];
-  addQuoteLine: () => void;
-  removeQuoteLine: (index: number) => void;
   toast: string | null;
   showToast: (msg: string) => void;
 }
@@ -52,17 +17,6 @@ interface NomaState {
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useNoma = create<NomaState>((set, get) => ({
-  role: "buyer",
-  setRole: (role) => set({ role }),
-  need: NEED_DEFAULT,
-  setNeed: (need) => set({ need }),
-  favorites: ["o-iphone-145", "o-canape", "o-iphone-140"],
-  toggleFavorite: (id) =>
-    set((s) => ({
-      favorites: s.favorites.includes(id)
-        ? s.favorites.filter((f) => f !== id)
-        : [...s.favorites, id],
-    })),
   compare: ["o-iphone-145", "o-iphone-150"],
   toggleCompare: (id) =>
     set((s) => {
@@ -76,105 +30,6 @@ export const useNoma = create<NomaState>((set, get) => ({
       return { compare: [...s.compare, id] };
     }),
   clearCompare: () => set({ compare: [] }),
-  alerts: alertsSeed,
-  addAlert: (a) =>
-    set((s) => ({
-      alerts: [
-        {
-          ...a,
-          id: `a-${s.alerts.length + 1}`,
-          news: 0,
-        },
-        ...s.alerts,
-      ],
-    })),
-  threads: threadsSeed,
-  sendMessage: (threadId, text) =>
-    set((s) => ({
-      threads: s.threads.map((t) =>
-        t.id === threadId
-          ? {
-              ...t,
-              snippet: text,
-              time: "Maintenant",
-              messages: [
-                ...t.messages,
-                {
-                  id: `m-${t.messages.length + 1}`,
-                  from: "buyer" as const,
-                  text,
-                  time: "14:35",
-                },
-              ],
-            }
-          : t,
-      ),
-    })),
-  acceptOffer: (threadId) =>
-    set((s) => ({
-      threads: s.threads.map((t) =>
-        t.id === threadId
-          ? {
-              ...t,
-              messages: t.messages.map((m) =>
-                m.offer ? { ...m, state: "accepted" as const } : m,
-              ),
-            }
-          : t,
-      ),
-    })),
-  orders: ordersSeed,
-  proposals: proposalsSeed,
-  cases: casesSeed,
-  addReport: ({ motif, offer, detail }) =>
-    set((s) => ({
-      cases: [
-        {
-          id: `S-${s.cases.length + 105}`,
-          motif,
-          offer,
-          meta: `1 signalement · noma${detail ? " · " + detail : ""}`,
-          time: "À l'instant",
-          art: "box" as const,
-          status: "open" as const,
-        },
-        ...s.cases,
-      ],
-    })),
-  decide: (caseId, decision, motif) =>
-    set((s) => ({
-      cases: s.cases.map((c) =>
-        c.id === caseId
-          ? { ...c, status: "closed" as const, decision, motifDecision: motif }
-          : c,
-      ),
-    })),
-  vendorOrders: vendorOrdersSeed,
-  advanceVendorOrder: (id) =>
-    set((s) => ({
-      vendorOrders: s.vendorOrders.map((o) =>
-        o.id === id ? { ...o, step: Math.min((o.step ?? 0) + 1, 2) } : o,
-      ),
-    })),
-  declarePayment: (id, paid) =>
-    set((s) => ({
-      vendorOrders: s.vendorOrders.map((o) =>
-        o.id === id ? { ...o, payment: paid } : o,
-      ),
-    })),
-  quoteLines: quoteSeed.lines,
-  addQuoteLine: () =>
-    set((s) => {
-      get().showToast("Ligne ajoutée au devis");
-      return {
-        quoteLines: [
-          ...s.quoteLines,
-          { label: `Frais supplémentaires ${s.quoteLines.length - 2}`, amount: 1000 },
-        ],
-      };
-    }),
-  removeQuoteLine: (index) =>
-    set((s) => ({ quoteLines: s.quoteLines.filter((_, i) => i !== index) })),
   toast: null,
   showToast: (msg) => {
     set({ toast: msg });

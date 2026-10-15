@@ -193,7 +193,7 @@ second compte (deux numéros différents, par exemple `07 00 00 00 42` et `07 00
     de l'objet ne passe par noma. La mission passe à « Terminée » quand la quantité totale est confirmée, à « Échue » à la fin de sa durée (le worker marque les échéances ; sans lui, rien ne change), à « Annulée » si vous
     l'annulez (les achats pas encore confirmés sont annulés avec elle). Quand de nouvelles annonces font monter la couverture, une notification « Mission : … » prévient l'acheteur, au plus une fois par jour et par mission, dans l'application
     seulement, et seulement si la couverture dépasse le plus haut niveau déjà vu ; **sa propre déclaration d'achat ne notifie jamais** (« 8 sur 8 » n'apparaît pas à l'instant où il déclare un achat que le vendeur n'a pas confirmé). « Voir l'annonce » depuis une ligne ouvre la fiche **dans le contexte de la mission** : la flèche retour ramène à la mission (jamais au besoin interne, qui n'a ni « Prolonger » ni « Reprendre »). Le besoin d'une mission qui se termine n'est retiré que 24 h plus tard (le vendeur ne devine pas la fin) ; « Mes missions » liste les missions
-    ouvertes d'abord, puis les terminées par pages. La migration `0027` est appliquée par `dev:try` comme les autres.
+    ouvertes d'abord, puis les terminées par pages. La migration `0027` doit être appliquée AVANT (`npm run db:migrate` sur la même base) : `dev:try` n'applique aucune migration.
 
 ## La recherche rapide de la page d'accueil
 

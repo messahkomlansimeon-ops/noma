@@ -573,7 +573,7 @@ test("constantes : corps de webhook 64 Kio, test du fondateur plafonné à 500 X
 
 test("/admin/paiements passe par la garde de l'espace d'administration (lot D3) et ses routes par le rôle administrateur vérifié en base ; aucune donnée personnelle dans la vue", () => {
   const layout = source("app/(admin)/layout.tsx");
-  assert.match(layout, /await requireAdminSpace\(\);/);
+  assert.match(layout, /await requireAdminSpace\(\)/);
   assert.ok(layout.indexOf("await requireAdminSpace()") < layout.indexOf("{children}"), "la garde précède la page");
   const home = source("app/(admin)/admin/page.tsx");
   for (const href of ["/admin/vendeurs", "/admin/marche", "/admin/reglages", "/admin/offres", "/admin/sms", "/admin/collecte", "/admin/paiements"]) {

@@ -1,4 +1,5 @@
 import { assertTurnstileStartupConfig } from "./config";
+import { assertDatabaseStartupConfig } from "./postgres/client";
 import { assertSmsProductionConfig, smsStartupWarnings, type Environment } from "./sms/config";
 import { assertPaymentConfiguration } from "./wallet/sublymus/config";
 
@@ -9,7 +10,7 @@ import { assertPaymentConfiguration } from "./wallet/sublymus/config";
 export const STARTUP_REFUSED_EXIT_CODE = 78;
 
 /**
- * Contrôles de configuration au démarrage du serveur (appelés par `register` de instrumentation.ts) : SMS (lot SMS1), paiement (lot PAY1) puis anti-bot (secret Turnstile, constat A1 de la bêta).
+ * Contrôles de configuration au démarrage du serveur (appelés par `register` de instrumentation.ts) : SMS (lot SMS1), paiement (lot PAY1) anti-bot (secret Turnstile, constat A1 de la bêta) puis base de données (DATABASE_URL, jamais recopiée dans un message).
  *
  * Hors production : l'exception du contrôle est relancée telle quelle (affichée par `next dev`).
  * En production : le message FIXE du contrôle (il nomme les variables à corriger, JAMAIS leurs valeurs) est journalisé, puis le processus est TERMINÉ avec le code 78 (`STARTUP_REFUSED_EXIT_CODE`).
@@ -33,6 +34,7 @@ const CHECKS: ReadonlyArray<readonly [label: string, run: (env: Environment) => 
   ["SMS", assertSmsProductionConfig],
   ["paiement", assertPaymentConfiguration],
   ["anti-bot", assertTurnstileStartupConfig],
+  ["base de données", assertDatabaseStartupConfig],
 ];
 
 export function runStartupChecks(env: Environment = process.env, io: StartupIo = defaultIo): void {

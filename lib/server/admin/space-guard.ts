@@ -25,7 +25,7 @@ function defaultDependencies(): AdminSpaceDependencies {
   };
 }
 
-/** Garde du gabarit : 404 pour un compte connecté qui n'est pas administrateur. */
-export async function requireAdminSpace(): Promise<void> {
-  await requireAdminSpaceWith(defaultDependencies());
+/** Garde du gabarit : 404 pour un compte connecté qui n'est pas administrateur ; « unavailable » quand la session ne peut pas être lue (base indisponible). */
+export async function requireAdminSpace(): Promise<"show" | "unavailable"> {
+  return requireAdminSpaceWith(defaultDependencies());
 }

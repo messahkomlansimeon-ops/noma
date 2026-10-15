@@ -270,7 +270,7 @@ test("l'achat de boost reste UN chemin : le code d'attribution et de places est 
 test("/admin/offres passe par la garde de l'espace d'administration (lot D3) : page sous le gabarit gardé, aucune garde propre, 404 standard pour un non-administrateur", () => {
   const layout = source("app/(admin)/layout.tsx");
   // La page est dans le groupe de routes `(admin)` : le gabarit appelle `requireAdminSpace()` AVANT le sélecteur d'espace et les pages (notFound standard, aucun onglet Admin).
-  assert.match(layout, /await requireAdminSpace\(\);/);
+  assert.match(layout, /await requireAdminSpace\(\)/);
   assert.ok(layout.indexOf("await requireAdminSpace()") < layout.indexOf("<RoleSwitcher />"), "la garde précède le sélecteur d'espace");
   assert.ok(layout.indexOf("await requireAdminSpace()") < layout.indexOf("{children}"), "la garde précède la page");
   const page = source("app/(admin)/admin/offres/page.tsx");

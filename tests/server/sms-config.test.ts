@@ -186,7 +186,7 @@ test("assertProductionConfig (protection de recherche) applique aussi la règle 
 test("instrumentation.register : en production, le contrôle SMS journalise le message fixe puis TERMINE le processus (code 78) ; l'edge et le développement ne vérifient rien", async () => {
   // Le processus réel est terminé par `register` (vérifié par un vrai processus dans tests/server/startup-guard.test.ts) : ici, la sortie est injectée.
   // Constat A1 : le contrôle de démarrage exige aussi le secret anti-bot en production.
-  const STARTUP = { ...PRODUCTION, NOMA_TURNSTILE_SECRET: "turnstile_secret_for_tests_only" };
+  const STARTUP = { ...PRODUCTION, NOMA_TURNSTILE_SECRET: "turnstile_secret_for_tests_only", DATABASE_URL: "postgresql://noma:motdepasse@127.0.0.1:5432/noma" };
   const refuse = (env: Record<string, string | undefined>): { logs: string[]; exits: number[]; thrown: unknown } => {
     const logs: string[] = [];
     const exits: number[] = [];
@@ -212,7 +212,7 @@ test("instrumentation.register : en production, le contrôle SMS journalise le m
   assert.equal(valid.thrown, null);
 
   const environment = process.env as Record<string, string | undefined>;
-  const names = ["NEXT_RUNTIME", "NODE_ENV", "NOMA_TURNSTILE_SECRET", "NOMA_SMS_PROVIDER", "NOMA_SMS_API_KEY", "NOMA_PUBLIC_URL", "NOMA_AUTH_SECRET", "NOMA_SMS_BASE_URL", "NOMA_SMS_DAILY_CAP"];
+  const names = ["NEXT_RUNTIME", "NODE_ENV", "NOMA_TURNSTILE_SECRET", "DATABASE_URL", "NOMA_SMS_PROVIDER", "NOMA_SMS_API_KEY", "NOMA_PUBLIC_URL", "NOMA_AUTH_SECRET", "NOMA_SMS_BASE_URL", "NOMA_SMS_DAILY_CAP"];
   const saved = Object.fromEntries(names.map((name) => [name, environment[name]]));
   const apply = (values: Record<string, string | undefined>) => {
     for (const name of names) {

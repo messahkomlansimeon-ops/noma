@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Bell,
   CircleHelp,
@@ -25,8 +25,6 @@ import { Badge, MenuRow } from "@/components/ui";
 import { useNoma } from "@/lib/store";
 
 export default function MonCompte() {
-  const router = useRouter();
-  const setRole = useNoma((s) => s.setRole);
   const showToast = useNoma((s) => s.showToast);
   const { logout, pending: loggingOut } = useLogout();
   const unread = useUnreadCount();
@@ -90,20 +88,17 @@ export default function MonCompte() {
                 Vous vendez ?
               </div>
               <div className="text-[12px] text-sage-ink">
-                Rejoignez les vendeurs noma.
+                Votre compte suffit : publiez une annonce.
               </div>
             </div>
           </div>
-          <button
-            onClick={() => {
-              setRole("vendor");
-              router.push("/vendeur");
-            }}
+          <Link
+            href="/vendeur"
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-forest py-3 text-[14px] font-bold text-white transition active:scale-[0.99]"
           >
-            Devenir vendeur
+            Aller à mon espace vendeur
             <span aria-hidden>›</span>
-          </button>
+          </Link>
         </div>
 
         <button

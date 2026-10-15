@@ -19,11 +19,14 @@ const SENTINEL_HOOK = "hook_SENTINEL_valeur_secrete_0123456789_abcdef";
 const SENTINEL_BAD_SMS_KEY = "bad key SENTINEL_SMS";
 
 const SENTINEL_TURNSTILE = "turnstile_SENTINEL_valeur_secrete_0123456789";
+const SENTINEL_DB_PASSWORD = "dbpass_SENTINEL_valeur_secrete_0123456789";
+const DATABASE_URL_OK = `postgresql://noma:${SENTINEL_DB_PASSWORD}@127.0.0.1:5432/noma`;
 
-/** Base de production valide (SMS, et secret anti-bot : constat A1, le secret Turnstile est exigé au démarrage). */
+/** Base de production valide (SMS, secret anti-bot : constat A1, et base PostgreSQL : DATABASE_URL est exigée au démarrage). */
 const SMS_OK = {
   NODE_ENV: "production",
   NOMA_TURNSTILE_SECRET: SENTINEL_TURNSTILE,
+  DATABASE_URL: DATABASE_URL_OK,
   NOMA_SMS_PROVIDER: "meno",
   NOMA_SMS_API_KEY: "fake_meno_key_for_tests_only_0001",
   NOMA_PUBLIC_URL: "https://noma.example.ci",
@@ -60,7 +63,7 @@ test("SMS1-ter — le code de sortie du refus de démarrer est le code dédié 7
 test("production : configuration SMS et paiement valides : ni journal, ni sortie", () => {
   const result = attempt({ ...SMS_OK, ...PAY_OK });
   assert.deepEqual(result, { logs: [], exits: [], thrown: null });
-  assert.deepEqual(attempt({ NODE_ENV: "production", NOMA_TURNSTILE_SECRET: SENTINEL_TURNSTILE }), { logs: [], exits: [], thrown: null }, "ni SMS ni paiement configurés : rien à refuser");
+  assert.deepEqual(attempt({ NODE_ENV: "production", NOMA_TURNSTILE_SECRET: SENTINEL_TURNSTILE, DATABASE_URL: DATABASE_URL_OK }), { logs: [], exits: [], thrown: null }, "ni SMS ni paiement configurés : rien à refuser");
 });
 
 test("production : refus du paiement (variables manquantes, prestataire fictif explicite, valeur inconnue) : message fixe journalisé, code 78, aucune valeur dans le journal", () => {
@@ -206,6 +209,48 @@ test("A1 — vrai processus : register() en production sans secret Turnstile TER
   assert.equal(accepted.status, 0, `${accepted.stdout}${accepted.stderr}`);
   assert.match(accepted.stdout, /register-resolved/);
   assert.ok(!`${accepted.stdout}${accepted.stderr}`.includes(SENTINEL_TURNSTILE));
+});
+
+test("base de données — production sans DATABASE_URL (absente, vide, espaces) ou qui n'est pas une URL PostgreSQL : démarrage refusé (journal fixe, code 78), l'URL et son mot de passe ne sont JAMAIS journalisés ; hors production, rien n'est exigé", () => {
+  for (const url of [undefined, "", "   "]) {
+    const result = attempt({ ...SMS_OK, ...PAY_OK, DATABASE_URL: url });
+    assert.deepEqual(result.exits, [REFUSED], `DATABASE_URL ${JSON.stringify(url)}`);
+    assert.equal(result.logs.length, 1);
+    assert.match(result.logs[0], /Démarrage refusé : configuration base de données invalide en production : DATABASE_URL requis en production/);
+  }
+  for (const url of [`mysql://noma:${SENTINEL_DB_PASSWORD}@127.0.0.1/noma`, `http://noma:${SENTINEL_DB_PASSWORD}@127.0.0.1/noma`, `noma:${SENTINEL_DB_PASSWORD}@127.0.0.1/noma`]) {
+    const result = attempt({ ...SMS_OK, ...PAY_OK, DATABASE_URL: url });
+    assert.deepEqual(result.exits, [REFUSED]);
+    assert.match(result.logs[0], /DATABASE_URL invalide en production \(URL PostgreSQL attendue\)/);
+    assert.ok(!result.logs.join("\n").includes(SENTINEL_DB_PASSWORD), "le mot de passe n'est jamais recopié");
+    assert.ok(!String(result.thrown).includes(SENTINEL_DB_PASSWORD));
+  }
+  for (const url of ["postgres://u:p@h/db", "postgresql://u:p@h:5432/db", "POSTGRESQL://u:p@h/db"]) {
+    assert.deepEqual(attempt({ ...SMS_OK, ...PAY_OK, DATABASE_URL: url }), { logs: [], exits: [], thrown: null }, url);
+  }
+  for (const nodeEnv of ["development", "test", undefined]) {
+    assert.deepEqual(attempt({ NODE_ENV: nodeEnv }), { logs: [], exits: [], thrown: null }, `NODE_ENV=${String(nodeEnv)}`);
+  }
+  // Les contrôles précédents passent avant : une seule sortie, la cause la plus précoce.
+  const turnstileFirst = attempt({ ...SMS_OK, NOMA_TURNSTILE_SECRET: undefined, DATABASE_URL: undefined });
+  assert.deepEqual(turnstileFirst.exits, [REFUSED]);
+  assert.match(turnstileFirst.logs[0], /configuration anti-bot invalide/);
+});
+
+test("base de données — vrai processus : register() en production sans DATABASE_URL TERMINE le processus (code 78), sans aucune valeur ; avec une URL valide il rend la main", () => {
+  const withoutUrl: Record<string, string> = { ...SMS_OK };
+  delete withoutUrl.DATABASE_URL;
+  const refused = realRegister(withoutUrl);
+  assert.equal(refused.status, REFUSED, `${refused.stdout}${refused.stderr}`);
+  assert.match(refused.stderr, /Démarrage refusé : configuration base de données invalide en production : DATABASE_URL requis en production/);
+  assert.ok(!refused.stdout.includes("register-resolved") && !refused.stdout.includes("register-rejected"));
+  const badScheme = realRegister({ ...SMS_OK, DATABASE_URL: `mysql://noma:${SENTINEL_DB_PASSWORD}@127.0.0.1/noma` });
+  assert.equal(badScheme.status, REFUSED);
+  assert.ok(!`${badScheme.stdout}${badScheme.stderr}`.includes(SENTINEL_DB_PASSWORD));
+  const accepted = realRegister({ ...SMS_OK });
+  assert.equal(accepted.status, 0, `${accepted.stdout}${accepted.stderr}`);
+  assert.match(accepted.stdout, /register-resolved/);
+  assert.ok(!`${accepted.stdout}${accepted.stderr}`.includes(SENTINEL_DB_PASSWORD));
 });
 
 test("SMS1-ter — vrai processus : budget des notifications nul : avertissement sur la sortie d'erreur hors production, refus (code 78) en production", () => {
