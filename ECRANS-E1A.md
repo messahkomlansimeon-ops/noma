@@ -6,7 +6,7 @@
 
 Écrans branchés : connexion et vérification OTP, annonces du vendeur (liste, création, publication, pause, archivage),
 besoins de l'acheteur (création, activation, liste, satisfait, archivage), déconnexion. Les autres écrans restent sur les
-données de démonstration (`lib/data.ts`, `lib/store.ts`) ; le store ne sert plus ici qu'aux messages (toasts). Pas encore :
+données de démonstration (`lib/data.ts`, supprimé au lot FIN3) ; le store (`lib/store.ts`) ne sert plus qu'aux messages (toasts). Pas encore :
 correspondances, indicateurs, « Sponsorisé », devis de boost (lot E1b), messages, commandes, favoris, admin.
 
 ## Couche cliente

@@ -60,7 +60,12 @@ export function SponsoredNotice({ badge, notice }: { badge: string; notice: stri
  * Offre dans les résultats d'un besoin : « Sponsorisé » bien visible et distinct quand l'offre a gagné des places grâce à un boost ;
  * `detailHref` (lot M1) mène à la fiche de l'annonce, dans le contexte de ce besoin.
  */
-export function BuyerMatchCard({ item, detailHref }: { item: StoredMatch; detailHref?: string | null }) {
+export interface CompareControl {
+  selected: boolean;
+  onToggle: () => void;
+}
+
+export function BuyerMatchCard({ item, detailHref, compare }: { item: StoredMatch; detailHref?: string | null; compare?: CompareControl }) {
   const row = buyerMatchRow(item);
   return (
     <li
@@ -85,6 +90,18 @@ export function BuyerMatchCard({ item, detailHref }: { item: StoredMatch; detail
             <IndicatorLine key={indicator.key} indicator={indicator} />
           ))}
         </ul>
+      ) : null}
+      {compare ? (
+        <label className="mt-3 flex items-center gap-2 text-[13px] font-semibold text-ink">
+          <input
+            type="checkbox"
+            data-testid="match-compare"
+            checked={compare.selected}
+            onChange={compare.onToggle}
+            className="size-4 accent-forest"
+          />
+          Comparer
+        </label>
       ) : null}
       {detailHref ? (
         <Link

@@ -12,6 +12,7 @@ import { TopBar } from "@/components/top-bar";
 import { TrackingPanel } from "@/components/tracking-panel";
 import { Badge } from "@/components/ui";
 import { UnreadSync } from "@/components/unread-badge";
+import { useNoma } from "@/lib/store";
 import {
   api,
   describeApiError,
@@ -20,6 +21,7 @@ import {
   type StoredMatch,
 } from "@/lib/client/api";
 import { DEMAND_STATUS_VIEW, demandSummary, recordTitle } from "@/lib/client/catalog-view";
+import { COMPARE_COUNT, COMPARE_LIMIT_MESSAGE, comparePath, pruneSelection, toggleSelection } from "@/lib/client/compare-view";
 import {
   EMPTY_BUYER_HINT,
   EMPTY_BUYER_MESSAGE,
@@ -52,6 +54,9 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
   const [moreError, setMoreError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // Lot FIN3-C1 : deux offres cochées à comparer ; la sélection vit dans cette page, puis dans l'adresse de la page de comparaison.
+  const [selected, setSelected] = useState<string[]>([]);
+  const showToast = useNoma((state) => state.showToast);
   const [refreshing, setRefreshing] = useState(false);
   // Un achat de recherche active change le plafond du suivi (180 jours) : le panneau de suivi est relu.
   const [trackingKey, setTrackingKey] = useState(0);
@@ -159,6 +164,7 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
   const status = DEMAND_STATUS_VIEW[demand.status];
   const summary = demandSummary(demand);
   const notActive = demandNotActiveMessage(demand.status);
+  const chosen = pruneSelection(selected, loaded.items);
   const state = notActive ? "inactive" : resultsState({ loaded: true, itemCount: loaded.items.length, processing: loaded.processing });
   // Un besoin PORTEUR d'une mission n'a pas la carte (`carrier === null` à chaque emplacement) ; actif ou satisfait seulement.
   const activeSearchCard = demand.status === "active" || demand.status === "satisfied" ? <ActiveSearchCard demandId={demandId} onChanged={() => setTrackingKey((key) => key + 1)} /> : null;
@@ -233,9 +239,37 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
           {state === "results" ? (
             <ul className="mt-3 space-y-3" aria-label="Offres correspondant à votre besoin">
               {loaded.items.map((item) => (
-                <BuyerMatchCard key={item.candidateId} item={item} detailHref={offerDetailPath(demandId, item.candidateId)} />
+                <BuyerMatchCard
+                  key={item.candidateId}
+                  item={item}
+                  detailHref={offerDetailPath(demandId, item.candidateId)}
+                  compare={{
+                    selected: chosen.includes(item.candidateId),
+                    onToggle: () => {
+                      const next = toggleSelection(chosen, item.candidateId);
+                      if (next.refused) showToast(COMPARE_LIMIT_MESSAGE);
+                      setSelected(next.selected);
+                    },
+                  }}
+                />
               ))}
             </ul>
+          ) : null}
+
+          {state === "results" && chosen.length > 0 ? (
+            <div data-testid="compare-bar" className="sticky bottom-20 z-10 mt-3 rounded-2xl border border-forest/30 bg-white p-3 shadow-sm">
+              {chosen.length === COMPARE_COUNT && comparePath(demandId, chosen) ? (
+                <Link
+                  href={comparePath(demandId, chosen) ?? "#"}
+                  data-testid="compare-link"
+                  className="flex w-full items-center justify-center rounded-xl bg-forest py-3 text-[14px] font-bold text-white"
+                >
+                  Comparer ces 2 offres
+                </Link>
+              ) : (
+                <p className="text-center text-[13px] font-semibold text-ink-soft">Cochez une deuxième offre pour les comparer.</p>
+              )}
+            </div>
           ) : null}
 
           {loaded.truncated && state === "results" ? (

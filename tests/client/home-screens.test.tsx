@@ -41,8 +41,7 @@ describe("composant « Bientôt disponible »", () => {
   test("toutes les pages qui ne sont pas branchées sur le serveur utilisent ce composant (et rien d'autre)", () => {
     // Lot D2 : favoris, messages, commandes (acheteur et vendeur), administration (tableau de bord, vendeurs, réglages) sont branchés sur le serveur ; il reste « Bientôt disponible » ici.
     const pages = [
-      "app/(buyer)/comparer/page.tsx", "app/(buyer)/partager/page.tsx", "app/(buyer)/propositions/page.tsx", "app/(buyer)/signaler/page.tsx",
-      "app/(buyer)/offre/[id]/page.tsx", "app/(buyer)/offre/[id]/inviter/page.tsx",
+      "app/(buyer)/partager/page.tsx", "app/(buyer)/propositions/page.tsx", "app/(buyer)/signaler/page.tsx",
       "app/(vendor)/vendeur/demandes/page.tsx", "app/(vendor)/vendeur/demandes/[id]/page.tsx", "app/(vendor)/vendeur/devis/nouveau/page.tsx",
       "app/(admin)/admin/dossiers/page.tsx", "app/(admin)/admin/dossiers/[id]/page.tsx",
     ];

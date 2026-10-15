@@ -462,7 +462,7 @@ async function main(): Promise<void> {
 
     step("Pages « Bientôt disponible » restantes (lot D2 : favoris, messages, commandes et administration sont branchés)");
     for (const [path, page, label] of [
-      ["/comparer", buyer, "comparer"], ["/vendeur/demandes", vendor, "demandes vendeur"], ["/vendeur/devis/nouveau", vendor, "devis"],
+      ["/vendeur/demandes", vendor, "demandes vendeur"], ["/vendeur/devis/nouveau", vendor, "devis"],
       // Lot D3 : « /admin/dossiers » est dans l'espace d'administration : un compte ordinaire y obtient la page 404 standard ; « Bientôt disponible » est vérifié plus bas avec l'admin démo.
     ] as const) {
       await page.goto(`${BASE}${path}`);

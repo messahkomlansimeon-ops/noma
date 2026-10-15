@@ -1,14 +1,12 @@
 /**
- * Comparaison et rechargement (essai réel 4A) — le rechargement réintroduisait
- * les 2 ids de démonstration de la seed, bloquant la sélection réelle
- * (compare.length >= 2). Hydrate d'une recherche réelle restaurée → la
- * comparaison repart à zéro. sessionStorage simulé (aucun navigateur).
+ * Rechargement de la recherche rapide (essai réel 4A) : une recherche récente est restaurée, une recherche ancienne ou absente ne l'est pas.
+ * sessionStorage simulé (aucun navigateur). La sélection de comparaison n'est plus dans le navigateur : elle est dans l'adresse de la page
+ * `/besoins/[id]/comparer` (voir tests/client/compare-view.test.ts).
  */
 import { test, describe, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
 
 import { useRealSearch } from "../lib/real-search";
-import { useNoma } from "../lib/store";
 
 // sessionStorage simulé (node : aucune API disponible)
 let storage: Map<string, string>;
@@ -30,72 +28,31 @@ const storedSearch = (offers: { id: string; title: string }[]) => ({
 beforeEach(() => {
   storage = new Map();
   useRealSearch.setState(useRealSearch.getInitialState());
-  useNoma.setState(useNoma.getInitialState());
 });
 
-describe("comparaison — rechargement (régression essai réel 4A)", () => {
-  test("hydrate d'une recherche réelle : la seed de comparaison (ids de démo) est effacée", () => {
+describe("rechargement de la recherche rapide", () => {
+  test("hydrate d'une recherche réelle récente : elle est restaurée", () => {
     storage.set(
       "noma-real-search",
       JSON.stringify(storedSearch([{ id: "o-reel-1", title: "iPhone 12 réel" }])),
     );
-    // au rechargement, le store démo réintroduit 2 ids fictifs
-    assert.deepEqual(useNoma.getState().compare, ["o-iphone-145", "o-iphone-150"]);
     useRealSearch.getState().hydrate();
     assert.equal(useRealSearch.getState().status, "done");
     assert.equal(useRealSearch.getState().offers.length, 1);
-    assert.deepEqual(
-      useNoma.getState().compare,
-      [],
-      "la sélection de démonstration ne doit pas bloquer la sélection réelle",
-    );
   });
 
-  test("sélection réelle après rechargement : acceptée (barre de comparaison atteignable)", () => {
-    storage.set(
-      "noma-real-search",
-      JSON.stringify(storedSearch([{ id: "o-reel-1", title: "iPhone 12" }, { id: "o-reel-2", title: "TV 55" }])),
-    );
-    useRealSearch.getState().hydrate();
-    const compare = useNoma.getState().compare;
-    assert.equal(compare.length, 0);
-    // les deux clics du testeur sont désormais acceptés (compare < 2)
-    useNoma.getState().toggleCompare("o-reel-1");
-    useNoma.getState().toggleCompare("o-reel-2");
-    assert.deepEqual(useNoma.getState().compare, ["o-reel-1", "o-reel-2"]);
-  });
-
-  test("ids de démonstration jamais mélangés aux offres réelles", () => {
-    storage.set(
-      "noma-real-search",
-      JSON.stringify(storedSearch([{ id: "o-reel-1", title: "iPhone 12" }])),
-    );
-    useRealSearch.getState().hydrate();
-    // sans la correction : compare contiendrait encore 2 ids de démo
-    assert.ok(
-      useNoma.getState().compare.every((id) => !id.startsWith("o-iphone-14")),
-      "aucun id de démonstration dans la comparaison",
-    );
-  });
-
-  test("rechargement SANS recherche enregistrée : la seed de démo reste (écrans démo inchangés)", () => {
+  test("rechargement SANS recherche enregistrée : l'état reste au repos", () => {
     useRealSearch.getState().hydrate();
     assert.equal(useRealSearch.getState().status, "idle");
-    assert.deepEqual(
-      useNoma.getState().compare,
-      ["o-iphone-145", "o-iphone-150"],
-      "les écrans de démonstration conservent leur seed",
-    );
   });
 
-  test("recherche enregistrée > 30 min : non restaurée, seed démo inchangée", () => {
+  test("recherche enregistrée > 30 min : non restaurée", () => {
     storage.set(
       "noma-real-search",
       JSON.stringify({ ...storedSearch([{ id: "o-reel-1", title: "iPhone 12" }]), savedAt: Date.now() - 31 * 60_000 }),
     );
     useRealSearch.getState().hydrate();
     assert.equal(useRealSearch.getState().status, "idle");
-    assert.deepEqual(useNoma.getState().compare, ["o-iphone-145", "o-iphone-150"]);
   });
 });
 

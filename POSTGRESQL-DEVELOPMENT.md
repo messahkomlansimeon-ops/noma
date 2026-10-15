@@ -95,7 +95,7 @@ Sans `TEST_DATABASE_URL`, la commande échoue explicitement. Elle ne se replie p
 sur `DATABASE_URL`, ne simule pas un succès et ne nettoie aucune base applicative.
 Le nettoyage supprime uniquement le schéma temporaire dont le nom est généré et
 validé par le harnais ; le schéma `public` est contrôlé mais jamais nettoyé. Les
-données fictives de `lib/data.ts` ne sont jamais importées.
+données fictives de l'ancienne maquette (`lib/data.ts`, supprimé au lot FIN3) n'existent plus.
 
 ## Pool applicatif et mesures de coût (lot P3)
 
