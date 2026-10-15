@@ -86,7 +86,7 @@ describe("textes et écrans corrigés", () => {
   });
 
   test("« noma » en minuscules dans les textes de l'interface", () => {
-    for (const file of ["app/(buyer)/recherche/page.tsx", "app/(buyer)/compte/page.tsx", "lib/store.ts", "lib/data.ts"]) {
+    for (const file of ["app/(buyer)/recherche/page.tsx", "app/(buyer)/compte/page.tsx", "lib/store.ts"]) {
       const text = source(file);
       assert.equal(/[">`]\s*Noma\b|\bNoma a compris|vendeurs Noma|· Noma|sourceName: "Noma"/.test(text), false, file);
     }

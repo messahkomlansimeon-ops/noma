@@ -8,7 +8,14 @@ import { requireAdminSpace } from "@/lib/server/admin/space-guard";
  * est renvoyé vers la connexion par la garde de session de chaque page. L'autorisation réelle reste celle des routes /api/admin/*.
  */
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  await requireAdminSpace();
+  if ((await requireAdminSpace()) === "unavailable") {
+    // Session illisible (base indisponible) : même texte que la garde de session des pages, sans page d'erreur de Next.
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col items-center justify-center gap-3 bg-cream px-6 text-center" role="alert">
+        <p className="text-[14px] font-semibold text-ink">Le service est temporairement indisponible.</p>
+      </main>
+    );
+  }
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-cream sm:border-x sm:border-line">
       <RoleSwitcher />

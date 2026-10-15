@@ -206,7 +206,7 @@ clés réels :
 
 Non exécuté — **blocage : rien n'a été fourni** (voir § 1). Dès réception :
 
-1. **Rejouer `deploy/selftest.sh` sur le serveur, SANS sudo** (59
+1. **Rejouer `deploy/selftest.sh` sur le serveur, SANS sudo** (61
    vérifications négatives/nominales, mesurées le 15 oct. 2026 ; exit 1 = installation stoppée).
 2. Générer les secrets avec sudo en transmettant la propriété à
    l'utilisateur de service (root sans propriétaire → refus par
