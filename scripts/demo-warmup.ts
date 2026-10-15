@@ -35,6 +35,7 @@ export const WARMUP_PAGE_PATTERNS: readonly string[] = Object.freeze([
   "/recherche",
   "/besoins/[id]",
   "/besoins/[id]/offres/[offerId]",
+  "/besoins/[id]/comparer",
   "/favoris",
   "/messages",
   "/messages/[id]",
@@ -75,12 +76,9 @@ export const WARMUP_PAGE_PATTERNS: readonly string[] = Object.freeze([
 
 /** Pages qui existent mais ne servent pas à la démonstration : « Bientôt disponible », anciens écrans, retour de Wave (désactivé par défaut). Le test exige une raison pour chacune. */
 export const WARMUP_EXCLUDED_PAGES: Readonly<Record<string, string>> = Object.freeze({
-  "/comparer": "écran « Bientôt disponible »",
   "/partager": "écran « Bientôt disponible »",
   "/propositions": "écran « Bientôt disponible »",
   "/signaler": "écran « Bientôt disponible »",
-  "/offre/[id]": "ancien écran, hors parcours (la fiche est /besoins/[id]/offres/[offerId])",
-  "/offre/[id]/inviter": "ancien écran, hors parcours",
   "/vendeur/demandes": "ancien écran du vendeur, hors parcours",
   "/vendeur/demandes/[id]": "ancien écran du vendeur, hors parcours",
   "/vendeur/devis/nouveau": "écran « Bientôt disponible »",

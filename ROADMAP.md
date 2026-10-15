@@ -10,10 +10,10 @@ Légende : ☐ à faire · 🚧 en cours · ✅ fait
 ## Étape 1 — Fondations
 - [x] Tokens Tailwind (@theme) : crème #FAF8F1, encre #1A2142, vert #0E5F3B,
       orange #F97316, badge bleu externe, fills doux (sage/carrot/wash), rayons 20-24px
-- [x] lib/data.ts : types (Offer, Thread, Order, CaseItem, QuoteLine…) + seed
+- [x] lib/data.ts : types (Offer, Thread, Order, CaseItem, QuoteLine…) + seed (**supprimé au lot FIN3** : plus aucun écran ne le lisait)
       identique aux maquettes (iPhone 145k/150k/140k, Canapé 185k, devis 25k…)
-- [x] Store Zustand (lib/store.ts) : role, need, favoris, comparaison, alertes,
-      messages, acceptOffer→commande, signalements, décisions admin, devis, toast
+- [x] Store Zustand (lib/store.ts) : à l'origine role, need, favoris, comparaison, alertes,
+      messages, acceptOffer→commande, signalements, décisions admin, devis, toast ; **réduit au toast au lot FIN3** (tout le reste vient du serveur)
 - [x] Composants : ui.tsx (Badge/Chip/Btn/OptionCard/Segmented/Switch/MenuRow…),
       Logo, TopBar, TabBar (acheteur/vendeur/admin), Thumb, OfferCard,
       Timeline + StepBar, Toast
@@ -252,3 +252,4 @@ Légende de cette section : ✅ en service · 🚧 codé et testé mais pas en s
 - 🚧 **Collecte d'annonces d'autres sites** (EXT1, recherche active RA1) : connecteurs **fictifs** seulement, rien en production ; il manque la validation juridique de chaque site, un client réseau sûr et une politique de sortie réseau ; voir COLLECTE-EXTERNE.md, RECHERCHE-ACTIVE.md.
 - ☐ **Bot WhatsApp** (Cloud API) pour les alertes : rien n'est codé (seuls des liens `wa.me` existent).
 - 🚧 **Modération réelle** : la règle automatique des numéros cachés et la suspension de vendeur existent ; la page « Dossiers de modération » est vide (ADMIN.md), pas de badges ni d'historique de modération persistant.
+- ✅ **Comparer deux offres d'un besoin** (lot FIN3-C1) : `/besoins/[id]/comparer`, voir COMPARAISON.md. Les maquettes `/comparer` et `offre/[id]` sont supprimées.

@@ -15,7 +15,6 @@ import {
   type PublicUnderstanding,
   type SourceEventStatus,
 } from "./contracts";
-import { useNoma } from "./store";
 
 const STORAGE_KEY = "noma-real-search";
 const TTL_MS = 30 * 60 * 1000;
@@ -131,12 +130,6 @@ export const useRealSearch = create<RealSearchState>((set, get) => ({
   hydrate: () => {
     if (get().hydrated) return;
     const stored = readStored();
-    if (stored) {
-      // au rechargement, le store réintroduit les 2 ids de démonstration de
-      // sa seed : ils bloqueraient la sélection réelle (compare.length >= 2).
-      // Les offres réelles restaurées ne se mélangent JAMAIS à la démo.
-      useNoma.getState().clearCompare();
-    }
     set({
       hydrated: true,
       ...(stored
@@ -178,9 +171,6 @@ export const useRealSearch = create<RealSearchState>((set, get) => ({
       }
       budgetNumber = parsed.value;
     }
-    // nouvelle recherche : la sélection de comparaison repart à zéro (les ids
-    // de l'écran de démonstration ne doivent jamais se mélanger aux réelles)
-    useNoma.getState().clearCompare();
     // annule la recherche précédente : plus aucun de ses événements ne sera lu
     controller?.abort();
     runToken += 1;

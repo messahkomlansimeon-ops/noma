@@ -36,7 +36,7 @@ export function OfferPhoto({
 
 /**
  * Carte d'une offre de la recherche sur d'autres sites (démonstration). Aucun lien vers une fiche interne (la fiche d'une annonce n'existe que dans le contexte d'un
- * besoin, par les correspondances) et aucune sélection pour comparer (fonction « Bientôt disponible »).
+ * besoin, par les correspondances) et aucune sélection pour comparer (la comparaison n'existe que sur les résultats d'un besoin).
  */
 export function RealOfferCard({
   offer,
