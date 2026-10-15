@@ -261,6 +261,10 @@ Le build doit être exécuté dans un environnement ISOLÉ du serveur de
 développement actif (Next 16 verrouille le répertoire pour `next dev`) :
 copier le projet puis construire dans la copie, ou arrêter `next dev`
 avant. **Comportement vérifié en production** (`next start`, 2 oct. 2026) :
-sans `NOMA_TURNSTILE_SECRET`, le serveur démarre (accueil 200) mais TOUTE
-recherche échoue (500, fail closed à l'appel) — le « démarrage refusé »
-documenté ci-dessus est donc appliqué à la première recherche, pas au boot.
+sans `NOMA_TURNSTILE_SECRET`, le serveur démarrait (accueil 200) mais TOUTE
+recherche échouait (500, fail closed à l'appel). **Corrigé (constat A1)** :
+`register` (instrumentation.ts) refuse désormais de démarrer en production
+sans `NOMA_TURNSTILE_SECRET` (journal fixe, processus terminé, code 78 ;
+`lib/server/startup-guard.ts`). `NOMA_IP_SECRET` et les variables interdites en
+production restent contrôlés à la première recherche. À rejouer sur un vrai
+`next start` lors de la mise en place du serveur.

@@ -185,6 +185,8 @@ test("assertProductionConfig (protection de recherche) applique aussi la règle 
 
 test("instrumentation.register : en production, le contrôle SMS journalise le message fixe puis TERMINE le processus (code 78) ; l'edge et le développement ne vérifient rien", async () => {
   // Le processus réel est terminé par `register` (vérifié par un vrai processus dans tests/server/startup-guard.test.ts) : ici, la sortie est injectée.
+  // Constat A1 : le contrôle de démarrage exige aussi le secret anti-bot en production.
+  const STARTUP = { ...PRODUCTION, NOMA_TURNSTILE_SECRET: "turnstile_secret_for_tests_only" };
   const refuse = (env: Record<string, string | undefined>): { logs: string[]; exits: number[]; thrown: unknown } => {
     const logs: string[] = [];
     const exits: number[] = [];
@@ -196,21 +198,21 @@ test("instrumentation.register : en production, le contrôle SMS journalise le m
     }
     return { logs, exits, thrown };
   };
-  const withoutKey = refuse({ ...PRODUCTION, NOMA_SMS_API_KEY: undefined });
+  const withoutKey = refuse({ ...STARTUP, NOMA_SMS_API_KEY: undefined });
   assert.deepEqual(withoutKey.exits, [78]);
   assert.equal(withoutKey.logs.length, 1);
   assert.match(withoutKey.logs[0], /NOMA_SMS_API_KEY requis en production/);
   assert.match(String(withoutKey.thrown), /NOMA_SMS_API_KEY requis en production/, "le démarrage n'est jamais réputé réussi, même si la sortie revenait");
-  const shortKey = refuse({ ...PRODUCTION, NOMA_SMS_API_KEY: "court" });
+  const shortKey = refuse({ ...STARTUP, NOMA_SMS_API_KEY: "court" });
   assert.deepEqual(shortKey.exits, [78]);
   assert.match(shortKey.logs[0], /invalide \(format\)/);
-  const valid = refuse({ ...PRODUCTION });
+  const valid = refuse({ ...STARTUP });
   assert.deepEqual(valid.exits, []);
   assert.deepEqual(valid.logs, []);
   assert.equal(valid.thrown, null);
 
   const environment = process.env as Record<string, string | undefined>;
-  const names = ["NEXT_RUNTIME", "NODE_ENV", "NOMA_SMS_PROVIDER", "NOMA_SMS_API_KEY", "NOMA_PUBLIC_URL", "NOMA_AUTH_SECRET", "NOMA_SMS_BASE_URL", "NOMA_SMS_DAILY_CAP"];
+  const names = ["NEXT_RUNTIME", "NODE_ENV", "NOMA_TURNSTILE_SECRET", "NOMA_SMS_PROVIDER", "NOMA_SMS_API_KEY", "NOMA_PUBLIC_URL", "NOMA_AUTH_SECRET", "NOMA_SMS_BASE_URL", "NOMA_SMS_DAILY_CAP"];
   const saved = Object.fromEntries(names.map((name) => [name, environment[name]]));
   const apply = (values: Record<string, string | undefined>) => {
     for (const name of names) {
@@ -220,11 +222,11 @@ test("instrumentation.register : en production, le contrôle SMS journalise le m
     }
   };
   try {
-    apply({ ...PRODUCTION, NEXT_RUNTIME: "nodejs" });
+    apply({ ...STARTUP, NEXT_RUNTIME: "nodejs" });
     await register();
-    apply({ ...PRODUCTION, NEXT_RUNTIME: "edge", NOMA_SMS_API_KEY: undefined });
+    apply({ ...STARTUP, NEXT_RUNTIME: "edge", NOMA_SMS_API_KEY: undefined });
     await register();
-    apply({ ...PRODUCTION, NEXT_RUNTIME: "nodejs", NODE_ENV: "development", NOMA_SMS_API_KEY: undefined });
+    apply({ ...STARTUP, NEXT_RUNTIME: "nodejs", NODE_ENV: "development", NOMA_SMS_API_KEY: undefined });
     await register();
   } finally {
     apply(saved);
