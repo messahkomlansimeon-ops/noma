@@ -239,8 +239,16 @@ Légende : ☐ à faire · 🚧 en cours · ✅ fait
              canapé Cocody / plombier Bouaké — requêtes distinctes, limites
              documentées (poc/README.md v3, data/golden/reference.json) |
 
-## Reste pour la suite (hors prototype UI)
-- ☐ Backend réel (auth SMS OTP, Postgres, stockage photos)
-- ☐ PoC recherche IA (OpenRouter + proxies) : accès sources, coût/recherche
-- ☐ Bot WhatsApp (Cloud API) pour les alertes
-- ☐ Modération réelle (règles, badges vendeurs, historique persistant)
+## Reste pour la suite (hors prototype UI) — état au 15 oct. 2026
+Légende de cette section : ✅ en service · 🚧 codé et testé mais pas en service (mise en service par le fondateur) · ☐ à faire
+
+- 🚧 **Backend réel** : le code existe et est testé ; rien n'est encore en service sur un serveur (ni domaine, ni serveur de production fournis).
+  - Connexion par code SMS : `lib/server/auth/`, `lib/server/sms/` (adaptateur Meno, **désactivé par défaut**, `NOMA_SMS_PROVIDER=none`) ; voir SMS.md, AUTH-SERVER.md.
+  - PostgreSQL : migrations jusqu'à la 0029, optionnel sans `DATABASE_URL` ; voir POSTGRESQL-DEVELOPMENT.md. Aucune sauvegarde PostgreSQL scriptée (BETA-CHECKLIST.md, section 6).
+  - Photos : stockage sur **disque local** (`NOMA_MEDIA_DIR`), pas de stockage objet ; voir PHOTOS.md.
+  - Paiement Wave via Sublymus : **prestataire fictif par défaut**, rien n'a contacté Sublymus ni Wave ; voir PAIEMENT-WAVE.md.
+  - Rétention : `metrics:purge`, `notifications:purge`, `sms:purge` ; aucune n'est encore planifiée.
+- 🚧 **PoC recherche IA** : OpenRouter fonctionne (trois recherches réelles, voir ESSAI-LOCAL-REEL.md, « validation partielle » ; coût réel très inférieur à la prévision). La partie « proxies » n'est **pas faite** (aucun proxy payant) ; Scrapling est un NO-GO (SCRAPLING-REAL-TRIAL.md), Cheerio reste en production.
+- 🚧 **Collecte d'annonces d'autres sites** (EXT1, recherche active RA1) : connecteurs **fictifs** seulement, rien en production ; il manque la validation juridique de chaque site, un client réseau sûr et une politique de sortie réseau ; voir COLLECTE-EXTERNE.md, RECHERCHE-ACTIVE.md.
+- ☐ **Bot WhatsApp** (Cloud API) pour les alertes : rien n'est codé (seuls des liens `wa.me` existent).
+- 🚧 **Modération réelle** : la règle automatique des numéros cachés et la suspension de vendeur existent ; la page « Dossiers de modération » est vide (ADMIN.md), pas de badges ni d'historique de modération persistant.
