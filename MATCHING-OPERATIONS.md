@@ -62,6 +62,8 @@ de plus de 400 jours (jour UTC) ; elle ne s'exécute que si `NODE_ENV` est absen
 `notification_deliveries` de plus de 180 jours ; même garde `NODE_ENV` que `metrics:purge`, avec sa propre variable `NOMA_NOTIFICATIONS_PURGE_PRODUCTION=1` pour la production ; à planifier une fois par jour. L'étape « notify » du
 worker n'envoie rien sans transport (`NOMA_DEV_NOTIFY_CONSOLE=1` **et** `NODE_ENV=development`) : voir `NOTIFICATIONS.md`.
 
+**Rétention du journal des SMS (lot MEN1)** : `npm run sms:purge` (simulation par défaut ; `-- --apply` supprime) retire les lignes de `sms_sends` créées depuis plus de 62 jours, jamais les `uncertain` ni les `pending` ; même garde `NODE_ENV`, avec sa propre variable `NOMA_SMS_PURGE_PRODUCTION=1` pour la production ; à planifier une fois par jour. Voir `SMS.md`.
+
 **Rattrapage par bootstrap après un `dead_letter` (lot N1-bis)** : lancer `matching:bootstrap` pour rattraper un job mort **ne crée aucune notification** : les jobs du bootstrap sont silencieux, et les évaluations qu'ils écrivent comptent ensuite comme « ce couple était déjà
 une correspondance » (l'annonce ne notifiera plus). **Une notification peut donc être perdue** quand le job d'une annonce nouvelle est passé en `dead_letter` ; la **correspondance reste visible** dans les résultats du besoin dès que l'évaluation est écrite
 (le matching n'est pas affecté, seule la notification manque). Aucun code de rattrapage n'existe pour les notifications : c'est une limite connue (`NOTIFICATIONS.md`, « Limites »).
