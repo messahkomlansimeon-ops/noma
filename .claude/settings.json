@@ -1,0 +1,17 @@
+{
+  "model": "sonnet",
+  "advisorModel": "opus",
+  "permissions": {
+    "allow": [
+      "Bash(rtk proxy grep *)",
+      "Bash(npx tsc --noEmit --incremental false)",
+      "Bash(npx eslint --max-warnings=0)",
+      "Bash(npm run test:cleanup-schemas)",
+      "Bash(npm run matching:status)",
+      "Bash(npm run matching:status -- --json)",
+      "Bash(rtk proxy npm run matching:status)",
+      "Bash(command cat *)",
+      "mcp__claude-in-chrome__get_page_text"
+    ]
+  }
+}
