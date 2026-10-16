@@ -1,27 +1,172 @@
 @import "tailwindcss";
 
+/*
+ * Système visuel « lagune et soleil » : bleu outremer, jaune safran, fond clair.
+ * Une seule police (Figtree). Tout le site passe par ces jetons : ne pas écrire de
+ * couleur en dur dans un composant.
+ */
 @theme inline {
-  --color-cream: #faf8f1;
-  --color-ink: #1a2142;
-  --color-ink-soft: #5e657f;
-  --color-forest: #0e5f3b;
-  --color-forest-deep: #0b4e31;
-  --color-sage: #e9f1e3;
-  --color-sage-ink: #3e7c55;
-  --color-carrot: #f97316;
-  --color-carrot-soft: #fce9d8;
-  --color-carrot-ink: #c2410c;
-  --color-sky: #dcedfd;
-  --color-sky-ink: #1d4ed8;
-  --color-line: #e9e4d6;
-  --color-wash: #f2efe6;
-  --font-display: var(--font-bricolage);
-  --font-sans: var(--font-manrope);
+  --color-canvas: #f7f7f4;
+  --color-ink: #11142b;
+  --color-ink-soft: #5b6078;
+
+  --color-brand: #2b3fd6;
+  --color-brand-deep: #1d2ba8;
+  --color-brand-soft: #e8ebfd;
+  --color-brand-ink: #1d2ba8;
+
+  --color-accent: #ffb81c;
+  --color-accent-soft: #fff1cf;
+  --color-accent-ink: #7a5200;
+
+  --color-info-soft: #dff3f8;
+  --color-info-ink: #0b5f73;
+
+  --color-success: #12805c;
+  --color-success-soft: #ddf3ea;
+  --color-success-ink: #0c5e43;
+
+  --color-danger: #c73e3e;
+  --color-danger-soft: #fbe4e4;
+  --color-danger-ink: #9a2b2b;
+
+  --color-mist: #f0f1f5;
+  --color-line: #e4e5ec;
+  --color-line-strong: #c9ccda;
+
+  --font-sans: var(--font-figtree);
+
+  --animate-rise: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pop: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-fade: fade 0.3s ease-out both;
+  --animate-float: float 4.5s ease-in-out infinite;
+  --animate-wiggle: wiggle 2.4s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 1.8s ease-out infinite;
+  --animate-shimmer: shimmer 1.4s linear infinite;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--color-cream);
+  background: var(--color-canvas);
   color: var(--color-ink);
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+input,
+textarea,
+button,
+select {
+  font-family: inherit;
+}
+
+/* Le focus reste toujours visible, au clavier comme à l'écran tactile. */
+:focus-visible {
+  outline: 3px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 3px solid var(--color-brand-soft);
+  outline-offset: 0;
+  border-color: var(--color-brand);
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+/* Animations : entrée douce, pression, flottement des illustrations. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes wiggle {
+  0%,
+  70%,
+  100% {
+    transform: rotate(0);
+  }
+  76% {
+    transform: rotate(-12deg);
+  }
+  84% {
+    transform: rotate(10deg);
+  }
+  92% {
+    transform: rotate(-6deg);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgb(43 63 214 / 0.35);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgb(43 63 214 / 0);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes toast-in {
@@ -35,10 +180,6 @@ body {
   }
 }
 
-.animate-toast {
-  animation: toast-in 0.25s ease-out;
-}
-
 @keyframes sheet-in {
   from {
     transform: translateY(100%);
@@ -48,26 +189,53 @@ body {
   }
 }
 
+.animate-toast {
+  animation: toast-in 0.25s ease-out;
+}
+
 .animate-sheet {
   animation: sheet-in 0.34s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+/* Les enfants d'un bloc « stagger » arrivent l'un après l'autre. */
+.stagger > * {
+  animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 60ms; }
+.stagger > *:nth-child(3) { animation-delay: 120ms; }
+.stagger > *:nth-child(4) { animation-delay: 180ms; }
+.stagger > *:nth-child(5) { animation-delay: 240ms; }
+.stagger > *:nth-child(6) { animation-delay: 300ms; }
+.stagger > *:nth-child(n + 7) { animation-delay: 360ms; }
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-mist) 25%,
+    var(--color-line) 50%,
+    var(--color-mist) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
 }
 
-.no-scrollbar {
-  scrollbar-width: none;
+/* Pression tactile sur tout ce qui se touche. */
+.press {
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.press:active {
+  transform: scale(0.97);
 }
 
-input,
-textarea,
-button {
-  font-family: inherit;
-}
-
-input:focus,
-textarea:focus {
-  outline: none;
-  border-color: var(--color-forest);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

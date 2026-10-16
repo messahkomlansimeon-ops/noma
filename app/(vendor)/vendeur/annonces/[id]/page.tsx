@@ -52,13 +52,13 @@ function Annonce({ offerId }: { offerId: string }) {
   if (loadError) {
     return (
       <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-        <p className="text-[14px] font-semibold text-ink">{loadError}</p>
+        <p className="text-[15px] font-semibold text-ink">{loadError}</p>
         <button
           onClick={() => {
             setLoadError(null);
             setReloadKey((key) => key + 1);
           }}
-          className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
+          className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
         >
           Réessayer
         </button>
@@ -67,7 +67,7 @@ function Annonce({ offerId }: { offerId: string }) {
   }
   if (!offer) {
     return (
-      <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
+      <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
         Chargement de l'annonce…
       </p>
     );
@@ -84,16 +84,16 @@ function Annonce({ offerId }: { offerId: string }) {
           <div className="min-w-0 flex-1">
             <div className="text-[15px] font-bold text-ink">{recordTitle(offer)}</div>
             {price ? (
-              <div className="font-display text-[18px] font-extrabold text-ink">{price}</div>
+              <div className="text-[18px] font-extrabold text-ink">{price}</div>
             ) : (
-              <div className="text-[13px] text-ink-soft">Prix à compléter</div>
+              <div className="text-[14px] text-ink-soft">Prix à compléter</div>
             )}
             <div className="mt-1">
               <Badge tone={status.tone}>{status.label}</Badge>
             </div>
           </div>
         </div>
-        {summary ? <div className="mt-1.5 text-[12px] text-ink-soft">{summary}</div> : null}
+        {summary ? <div className="mt-1.5 text-[13px] text-ink-soft">{summary}</div> : null}
       </div>
 
       <PhotoManager offerId={offer.id} readOnly={offer.status === "archived"} onChange={onPhotosChanged} />
@@ -115,7 +115,7 @@ function PageContent() {
         {isUuid(offerId) ? (
           <Annonce offerId={offerId} />
         ) : (
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+          <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
             Annonce introuvable.
           </p>
         )}

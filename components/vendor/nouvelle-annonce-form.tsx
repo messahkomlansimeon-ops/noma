@@ -22,7 +22,7 @@ type Submitting = "publish" | "draft" | null;
 
 function FieldError({ message }: { message?: string }) {
   return message ? (
-    <div role="alert" className="mt-1.5 text-[12px] font-semibold text-carrot-ink">
+    <div role="alert" className="mt-1.5 text-[13px] font-semibold text-accent-ink">
       {message}
     </div>
   ) : null;
@@ -145,7 +145,7 @@ export function NouvelleAnnonceForm({
         <TopBar
           back="/vendeur/annonces"
           right={
-            <span className="pr-2 text-[12px] font-semibold text-ink-soft">
+            <span className="pr-2 text-[13px] font-semibold text-ink-soft">
               Brouillon
             </span>
           }
@@ -154,7 +154,7 @@ export function NouvelleAnnonceForm({
 
       <div className={embedded ? "" : "px-4"}>
         {!embedded && (
-          <h1 className="font-display text-[26px] font-extrabold text-ink">
+          <h1 className="text-[26px] font-extrabold text-ink">
             Nouvelle annonce
           </h1>
         )}
@@ -235,7 +235,7 @@ export function NouvelleAnnonceForm({
                 placeholder="150 000"
                 aria-invalid={errors.price ? true : undefined}
               />
-              <span className="rounded-xl bg-wash px-3 py-3 text-[13px] font-bold text-ink-soft">
+              <span className="rounded-xl bg-mist px-3 py-3 text-[14px] font-bold text-ink-soft">
                 FCFA
               </span>
             </div>
@@ -264,7 +264,7 @@ export function NouvelleAnnonceForm({
           </div>
 
           <div className="flex items-center justify-between rounded-xl border border-line bg-white px-3.5 py-3">
-            <span className="text-[14px] font-semibold text-ink">Disponible</span>
+            <span className="text-[15px] font-semibold text-ink">Disponible</span>
             <Switch checked={available} onChange={setAvailable} />
           </div>
 
@@ -274,18 +274,18 @@ export function NouvelleAnnonceForm({
         <button
           onClick={() => void submit("publish")}
           disabled={submitting !== null}
-          className="mt-5 w-full rounded-xl bg-forest py-3.5 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-5 w-full rounded-xl bg-brand py-3.5 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {submitting === "publish" ? "Publication…" : "Publier l'annonce"}
         </button>
         <button
           onClick={() => void submit("draft")}
           disabled={submitting !== null}
-          className="mt-2.5 w-full rounded-xl border border-forest/30 bg-white py-3.5 text-[15px] font-bold text-forest transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-2.5 w-full rounded-xl border border-brand/30 bg-white py-3.5 text-[15px] font-bold text-brand transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {submitting === "draft" ? "Enregistrement…" : "Enregistrer en brouillon"}
         </button>
-        <div className="py-4 text-center text-[12px] text-ink-soft">
+        <div className="py-4 text-center text-[13px] text-ink-soft">
           Un brouillon n'est visible de personne tant que vous ne le publiez pas.
         </div>
       </div>

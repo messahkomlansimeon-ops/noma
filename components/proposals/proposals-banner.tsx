@@ -19,7 +19,7 @@ export function ProposalsBanner({ demandId }: { demandId: string }) {
   const text = pendingText(count);
   if (text === null) return null;
   return (
-    <Link href="/propositions" data-testid="proposals-banner" className="mt-3 flex items-center justify-between rounded-2xl border border-forest/30 bg-sage px-3.5 py-3 text-[14px] font-bold text-forest">
+    <Link href="/propositions" data-testid="proposals-banner" className="mt-3 flex items-center justify-between rounded-2xl border border-brand/30 bg-brand-soft px-3.5 py-3 text-[15px] font-bold text-brand">
       <span>{text}</span>
       <span aria-hidden>›</span>
     </Link>

@@ -32,19 +32,19 @@ export default function AdminMarche() {
         const rows = adminMarketRows(data.rows);
         return (
           <div data-testid="admin-market">
-            <h1 className="font-display text-[22px] font-extrabold text-ink">{ADMIN_MARKET_TITLE}</h1>
-            <p className="text-[12px] text-ink-soft">
+            <h1 className="text-[22px] font-extrabold text-ink">{ADMIN_MARKET_TITLE}</h1>
+            <p className="text-[13px] text-ink-soft">
               {periodText(data.period.days)}. {ADMIN_MARKET_NOTE}
             </p>
             {rows.length === 0 ? (
-              <p data-testid="admin-market-empty" className="mt-4 text-center text-[14px] text-ink-soft">
+              <p data-testid="admin-market-empty" className="mt-4 text-center text-[15px] text-ink-soft">
                 {ADMIN_MARKET_EMPTY}
               </p>
             ) : (
               <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-white">
-                <table data-testid="admin-market-table" className="w-full text-left text-[12px]">
+                <table data-testid="admin-market-table" className="w-full text-left text-[13px]">
                   <thead>
-                    <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-soft">
+                    <tr className="border-b border-line text-[12px] uppercase tracking-wide text-ink-soft">
                       <th className="px-2 py-2 font-semibold">Produit</th>
                       <th className="px-2 py-2 font-semibold">Prix demandés (médiane)</th>
                       <th className="px-2 py-2 font-semibold">Ventes confirmées</th>
@@ -60,7 +60,7 @@ export default function AdminMarche() {
                         <td data-testid="admin-market-sales" className="px-2 py-2 align-top text-ink">
                           {row.salesText}
                           {row.historicalText ? (
-                            <div data-testid="admin-market-historical" className="text-[11px] text-ink-soft">
+                            <div data-testid="admin-market-historical" className="text-[12px] text-ink-soft">
                               {row.historicalText}
                             </div>
                           ) : null}

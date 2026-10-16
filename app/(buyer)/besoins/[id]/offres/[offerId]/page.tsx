@@ -89,18 +89,18 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
   if (loadError) {
     return (
       <div role="alert" data-testid="offer-load-error" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-        <p className="text-[14px] font-semibold text-ink">{loadError}</p>
+        <p className="text-[15px] font-semibold text-ink">{loadError}</p>
         <div className="mt-3 flex flex-col items-center gap-2">
           <button
             onClick={() => {
               setLoadError(null);
               setReloadKey((key) => key + 1);
             }}
-            className="rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
+            className="rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
           >
             Réessayer
           </button>
-          <Link href={missionId === null ? `/besoins/${demandId}` : `/missions/${missionId}`} className="text-[13px] font-semibold text-forest underline">
+          <Link href={missionId === null ? `/besoins/${demandId}` : `/missions/${missionId}`} className="text-[14px] font-semibold text-brand underline">
             {missionId === null ? "Retour aux résultats de mon besoin" : "Retour à la mission"}
           </Link>
         </div>
@@ -109,7 +109,7 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
   }
   if (!detail) {
     return (
-      <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
+      <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
         Chargement de l'annonce…
       </p>
     );
@@ -126,23 +126,23 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
       <div className="flex items-center gap-3">
         <Thumb art={artForCategory(detail.item.candidate.category)} className="size-20" iconClassName="size-10" photoId={coverPhotoIdOf(detail.details.photos) ?? detail.item.coverPhotoId ?? null} />
         <div className="min-w-0 flex-1">
-          <h1 data-testid="offer-title" className="font-display text-[22px] font-extrabold leading-tight text-ink">
+          <h1 data-testid="offer-title" className="text-[22px] font-extrabold leading-tight text-ink">
             {view.title}
           </h1>
-          <div data-testid="offer-price" className="font-display text-[26px] font-extrabold leading-tight text-ink">
+          <div data-testid="offer-price" className="text-[26px] font-extrabold leading-tight text-ink">
             {view.priceText}
           </div>
-          {view.subtitle ? <div className="text-[13px] text-ink-soft">{view.subtitle}</div> : null}
-          {view.dateText ? <div className="text-[12px] text-ink-soft">{view.dateText}</div> : null}
+          {view.subtitle ? <div className="text-[14px] text-ink-soft">{view.subtitle}</div> : null}
+          {view.dateText ? <div className="text-[13px] text-ink-soft">{view.dateText}</div> : null}
           {view.proBadge ? <div className="mt-1.5"><ProBadge withNotice /></div> : null}
         </div>
         <FavoriteButton demandId={demandId} offerId={offerId} />
       </div>
 
-      <div className="mt-3 text-[13px] font-bold text-ink">{view.compatibility}</div>
+      <div className="mt-3 text-[14px] font-bold text-ink">{view.compatibility}</div>
       {view.compatibilityPercent !== null ? (
-        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-wash" aria-hidden>
-          <div className="h-full rounded-full bg-forest" style={{ width: `${view.compatibilityPercent}%` }} />
+        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-mist" aria-hidden>
+          <div className="h-full rounded-full bg-brand" style={{ width: `${view.compatibilityPercent}%` }} />
         </div>
       ) : null}
 
@@ -157,7 +157,7 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
       {view.attributes.length > 0 ? (
         <dl data-testid="offer-attributes" className="mt-4 divide-y divide-line rounded-2xl border border-line bg-white px-4 py-1">
           {view.attributes.map((attribute) => (
-            <div key={attribute.label} className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
+            <div key={attribute.label} className="flex items-center justify-between gap-4 py-2.5 text-[14px]">
               <dt className="shrink-0 text-ink-soft">{attribute.label}</dt>
               <dd className="text-right font-semibold text-ink">{attribute.value}</dd>
             </div>
@@ -167,21 +167,21 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
 
       {marketQuery ? <MarketCard query={marketQuery} /> : null}
 
-      <section aria-labelledby="contact-title" className="mt-5 rounded-2xl bg-sage p-4">
-        <h2 id="contact-title" className="text-[15px] font-extrabold text-forest">
+      <section aria-labelledby="contact-title" className="mt-5 rounded-2xl bg-brand-soft p-4">
+        <h2 id="contact-title" className="text-[15px] font-extrabold text-brand">
           Cette annonce vous intéresse ?
         </h2>
         {contact.kind === "done" && links ? (
           <div data-testid="contact-result" className="mt-2">
-            <div className="text-[13px] text-sage-ink">Numéro vérifié du vendeur</div>
-            <div data-testid="contact-phone" className="font-display text-[24px] font-extrabold text-ink">
+            <div className="text-[14px] text-brand-ink">Numéro vérifié du vendeur</div>
+            <div data-testid="contact-phone" className="text-[24px] font-extrabold text-ink">
               {formatContactPhone(contact.contact.phone)}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2.5">
               <a
                 href={links.tel}
                 data-testid="contact-tel"
-                className="flex items-center justify-center gap-2 rounded-xl bg-forest px-3 py-3 text-[14px] font-bold text-white"
+                className="flex items-center justify-center gap-2 rounded-xl bg-brand px-3 py-3 text-[15px] font-bold text-white"
               >
                 <Phone className="size-4" aria-hidden />
                 Appeler
@@ -191,7 +191,7 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
                 target="_blank"
                 rel="noopener noreferrer"
                 data-testid="contact-whatsapp"
-                className="flex items-center justify-center gap-2 rounded-xl border border-forest/30 bg-white px-3 py-3 text-[14px] font-bold text-forest"
+                className="flex items-center justify-center gap-2 rounded-xl border border-brand/30 bg-white px-3 py-3 text-[15px] font-bold text-brand"
               >
                 <WhatsAppIcon />
                 WhatsApp
@@ -204,30 +204,30 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
               onClick={() => void reveal()}
               disabled={contact.kind === "pending"}
               data-testid="contact-button"
-              className="mt-2 flex w-full items-center justify-center rounded-xl bg-forest px-4 py-3.5 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:opacity-50"
+              className="mt-2 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3.5 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:opacity-50"
             >
               {contact.kind === "pending" ? CONTACT_ONGOING_LABEL : CONTACT_BUTTON_LABEL}
             </button>
             {contact.kind === "failed" ? (
-              <p role="alert" data-testid="contact-error" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+              <p role="alert" data-testid="contact-error" className="mt-2 text-[14px] font-semibold text-accent-ink">
                 {contact.message}
               </p>
             ) : null}
           </>
         )}
-        <p data-testid="contact-notice" className="mt-3 text-[12px] leading-relaxed text-sage-ink">
+        <p data-testid="contact-notice" className="mt-3 text-[13px] leading-relaxed text-brand-ink">
           {CONTACT_NOTICE} {CONTACT_HINT}
         </p>
       </section>
 
       <OfferActions demandId={demandId} offerId={offerId} />
 
-      <p className="mt-4 text-center text-[12px] leading-relaxed text-ink-soft">
+      <p className="mt-4 text-center text-[13px] leading-relaxed text-ink-soft">
         Informations telles qu'annoncées par le vendeur. Ni l'état, ni la disponibilité ne sont garantis : confirmez-les avec lui.
       </p>
       {reportOfferPath(demandId, offerId) ? (
         <p className="mt-2 text-center">
-          <Link href={reportOfferPath(demandId, offerId) ?? "/signaler"} data-testid="report-offer" className="text-[13px] font-bold text-ink-soft underline">
+          <Link href={reportOfferPath(demandId, offerId) ?? "/signaler"} data-testid="report-offer" className="text-[14px] font-bold text-ink-soft underline">
             Signaler cette annonce
           </Link>
         </p>
@@ -252,7 +252,7 @@ function PageContent() {
         {valid ? (
           <Fiche demandId={demandId} offerId={offerId} missionId={missionId} />
         ) : (
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+          <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
             Annonce introuvable.
           </p>
         )}

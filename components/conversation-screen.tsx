@@ -187,13 +187,13 @@ export function ConversationScreen({ conversationId, space, hint = null }: { con
       <main>
         <TopBar back={back} title="Conversation" />
         <div role="alert" data-testid="conversation-error" className="mx-4 mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-          <p className="text-[14px] font-semibold text-ink">{loadError}</p>
+          <p className="text-[15px] font-semibold text-ink">{loadError}</p>
           <button
             onClick={() => {
               setLoadError(null);
               setReloadKey((key) => key + 1);
             }}
-            className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
+            className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
           >
             Réessayer
           </button>
@@ -205,7 +205,7 @@ export function ConversationScreen({ conversationId, space, hint = null }: { con
     return (
       <main>
         <TopBar back={back} title="Conversation" />
-        <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
+        <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
           Chargement de la conversation…
         </p>
       </main>
@@ -219,26 +219,26 @@ export function ConversationScreen({ conversationId, space, hint = null }: { con
     <main className="flex min-h-[calc(100dvh-8rem)] flex-col">
       <TopBar back={back} title="Conversation" border />
       <div className="px-4 pb-2 pt-2">
-        <h1 data-testid="conversation-title" className="font-display text-[18px] font-extrabold leading-tight text-ink">
+        <h1 data-testid="conversation-title" className="text-[18px] font-extrabold leading-tight text-ink">
           {label}
         </h1>
-        <div className="mt-0.5 flex items-center justify-between gap-2 text-[12px] text-ink-soft">
+        <div className="mt-0.5 flex items-center justify-between gap-2 text-[13px] text-ink-soft">
           <span data-testid="live-status" data-status={status}>
             {STATUS_TEXT[status]}
           </span>
           {offerHref ? (
-            <Link href={offerHref} className="font-bold text-forest">
+            <Link href={offerHref} className="font-bold text-brand">
               {detail.role === "seller" ? "Voir mon annonce" : "Voir l'annonce"}
             </Link>
           ) : null}
         </div>
         {!detail.available ? (
-          <p data-testid="offer-gone" className="mt-2 rounded-xl bg-wash px-3 py-2 text-[12px] font-semibold text-ink-soft">
+          <p data-testid="offer-gone" className="mt-2 rounded-xl bg-mist px-3 py-2 text-[13px] font-semibold text-ink-soft">
             {OFFER_GONE_NOTICE}
           </p>
         ) : null}
         {reminder ? (
-          <div data-testid="safety-reminder" role="note" className="mt-2 flex items-start gap-2 rounded-xl bg-carrot-soft px-3 py-2 text-[12px] text-carrot-ink">
+          <div data-testid="safety-reminder" role="note" className="mt-2 flex items-start gap-2 rounded-xl bg-accent-soft px-3 py-2 text-[13px] text-accent-ink">
             <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
             <span className="flex-1">{SAFETY_REMINDER}</span>
             <button
@@ -256,19 +256,19 @@ export function ConversationScreen({ conversationId, space, hint = null }: { con
           <Link
             href={orderPath(detail.role, detail.order.id)}
             data-testid="conversation-order"
-            className="mt-2 flex items-center justify-between rounded-xl border border-line bg-white px-3 py-2 text-[13px] font-semibold text-ink"
+            className="mt-2 flex items-center justify-between rounded-xl border border-line bg-white px-3 py-2 text-[14px] font-semibold text-ink"
           >
             <span>Commande : {statusLabel(detail.order.status, detail.role)}</span>
-            <span className="text-forest">Voir ›</span>
+            <span className="text-brand">Voir ›</span>
           </Link>
         ) : null}
         {detail.canDeclareOrder ? <DeclareOrder demandId={detail.demandId as string} offerId={detail.offerId} initialPrice={hint?.priceXof} initialQuantity={hint?.quantity} /> : null}
-        {detail.role === "buyer" ? <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">{NO_PAYMENT_THROUGH_NOMA}</p> : null}
+        {detail.role === "buyer" ? <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">{NO_PAYMENT_THROUGH_NOMA}</p> : null}
       </div>
 
       <ul aria-label="Messages" aria-live="polite" data-testid="message-list" className="flex-1 space-y-2 px-4 pb-3 pt-1">
         {loadedMessages && messages.length === 0 ? (
-          <li className="py-6 text-center text-[13px] text-ink-soft">{detail.role === "buyer" ? THREAD_EMPTY_BUYER : THREAD_EMPTY_SELLER}</li>
+          <li className="py-6 text-center text-[14px] text-ink-soft">{detail.role === "buyer" ? THREAD_EMPTY_BUYER : THREAD_EMPTY_SELLER}</li>
         ) : null}
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} />
@@ -281,15 +281,15 @@ export function ConversationScreen({ conversationId, space, hint = null }: { con
           event.preventDefault();
           void send();
         }}
-        className="sticky bottom-[4.25rem] border-t border-line bg-cream/95 px-3 py-2 backdrop-blur"
+        className="sticky bottom-[4.25rem] border-t border-line bg-canvas/95 px-3 py-2 backdrop-blur"
       >
         {sendError ? (
-          <p role="alert" data-testid="send-error" className="mb-1.5 text-[12px] font-semibold text-carrot-ink">
+          <p role="alert" data-testid="send-error" className="mb-1.5 text-[13px] font-semibold text-accent-ink">
             {sendError}
           </p>
         ) : null}
         {composer.problem ? (
-          <p role="alert" className="mb-1.5 text-[12px] font-semibold text-carrot-ink">
+          <p role="alert" className="mb-1.5 text-[13px] font-semibold text-accent-ink">
             {composer.problem}
           </p>
         ) : null}
@@ -314,12 +314,12 @@ export function ConversationScreen({ conversationId, space, hint = null }: { con
             disabled={!composer.canSend}
             data-testid="message-send"
             aria-label={SEND_LABEL}
-            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-forest text-white transition active:scale-95 disabled:opacity-40"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand text-white transition active:scale-95 disabled:opacity-40"
           >
             <Send className="size-5" aria-hidden />
           </button>
         </div>
-        <div className="mt-1 text-right text-[10px] text-ink-soft">{composer.counter}</div>
+        <div className="mt-1 text-right text-[12px] text-ink-soft">{composer.counter}</div>
       </form>
     </main>
   );

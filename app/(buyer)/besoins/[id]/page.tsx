@@ -146,8 +146,8 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
   if (loadError) {
     return (
       <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-        <p className="text-[14px] font-semibold text-ink">{loadError}</p>
-        <button onClick={refresh} className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white">
+        <p className="text-[15px] font-semibold text-ink">{loadError}</p>
+        <button onClick={refresh} className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white">
           Réessayer
         </button>
       </div>
@@ -155,7 +155,7 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
   }
   if (!loaded) {
     return (
-      <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
+      <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
         Chargement des résultats…
       </p>
     );
@@ -174,7 +174,7 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
     <>
       <div className="rounded-2xl border border-line bg-white p-3.5">
         <div className="text-[15px] font-bold text-ink">{recordTitle(demand)}</div>
-        {summary ? <div className="text-[12px] text-ink-soft">{summary}</div> : null}
+        {summary ? <div className="text-[13px] text-ink-soft">{summary}</div> : null}
         <div className="mt-2">
           <Badge tone={status.tone}>{status.label}</Badge>
         </div>
@@ -182,8 +182,8 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
 
       {carrier ? (
         <div data-testid="mission-carrier-note" className="mt-3 rounded-2xl border border-line bg-white p-3.5">
-          <p className="text-[13px] font-semibold text-ink">Ce besoin appartient à votre mission « {carrier.title} » : il se gère depuis la mission.</p>
-          <Link href={missionPath(carrier.id)} className="mt-2 inline-block text-[13px] font-bold text-forest">
+          <p className="text-[14px] font-semibold text-ink">Ce besoin appartient à votre mission « {carrier.title} » : il se gère depuis la mission.</p>
+          <Link href={missionPath(carrier.id)} className="mt-2 inline-block text-[14px] font-bold text-brand">
             Ouvrir la mission ›
           </Link>
         </div>
@@ -196,7 +196,7 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
       {/* Lot FIN1 : la carte vient APRÈS les résultats (le premier écran montre la première annonce, pas une carte de réglages longue de plusieurs écrans). */}
       {notActive ? (
         <>
-          <p role="status" className="mt-4 rounded-2xl bg-wash p-4 text-[14px] font-semibold text-ink-soft">
+          <p role="status" className="mt-4 rounded-2xl bg-mist p-4 text-[15px] font-semibold text-ink-soft">
             {notActive}
           </p>
           {carrier === null ? activeSearchCard : null}
@@ -210,7 +210,7 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
             <button
               onClick={refresh}
               disabled={busy}
-              className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[13px] font-semibold text-ink disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[14px] font-semibold text-ink disabled:opacity-50"
             >
               <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
               Actualiser
@@ -218,29 +218,29 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
           </div>
 
           {loaded.processing && state === "results" ? (
-            <p role="status" className="mt-2 text-[12px] font-semibold text-carrot-ink">
+            <p role="status" className="mt-2 text-[13px] font-semibold text-accent-ink">
               {PROCESSING_MESSAGE} De nouveaux résultats peuvent arriver : appuyez sur Actualiser.
             </p>
           ) : null}
 
           {state === "processing" ? (
-            <div role="status" className="mt-4 rounded-2xl bg-wash p-4 text-center">
-              <p className="text-[14px] font-bold text-ink">{PROCESSING_MESSAGE}</p>
-              <p className="mt-1 text-[13px] text-ink-soft">{PROCESSING_HINT}</p>
+            <div role="status" className="mt-4 rounded-2xl bg-mist p-4 text-center">
+              <p className="text-[15px] font-bold text-ink">{PROCESSING_MESSAGE}</p>
+              <p className="mt-1 text-[14px] text-ink-soft">{PROCESSING_HINT}</p>
             </div>
           ) : null}
 
           {state === "empty" ? (
-            <div role="status" className="mt-4 rounded-2xl bg-wash p-4 text-center">
-              <p className="text-[14px] font-bold text-ink">{EMPTY_BUYER_MESSAGE}</p>
-              <p className="mt-1 text-[13px] text-ink-soft">{EMPTY_BUYER_HINT}</p>
+            <div role="status" className="mt-4 rounded-2xl bg-mist p-4 text-center">
+              <p className="text-[15px] font-bold text-ink">{EMPTY_BUYER_MESSAGE}</p>
+              <p className="mt-1 text-[14px] text-ink-soft">{EMPTY_BUYER_HINT}</p>
             </div>
           ) : null}
 
           <ProposalsBanner demandId={demandId} />
 
           {!notActive ? (
-            <Link href={`/besoins/${demandId}/partager`} data-testid="share-link-entry" className="mt-3 inline-block text-[13px] font-bold text-forest underline">
+            <Link href={`/besoins/${demandId}/partager`} data-testid="share-link-entry" className="mt-3 inline-block text-[14px] font-bold text-brand underline">
               Partager ce besoin
             </Link>
           ) : null}
@@ -266,29 +266,29 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
           ) : null}
 
           {state === "results" && chosen.length > 0 ? (
-            <div data-testid="compare-bar" className="sticky bottom-20 z-10 mt-3 rounded-2xl border border-forest/30 bg-white p-3 shadow-sm">
+            <div data-testid="compare-bar" className="sticky bottom-20 z-10 mt-3 rounded-2xl border border-brand/30 bg-white p-3 shadow-sm">
               {chosen.length === COMPARE_COUNT && comparePath(demandId, chosen) ? (
                 <Link
                   href={comparePath(demandId, chosen) ?? "#"}
                   data-testid="compare-link"
-                  className="flex w-full items-center justify-center rounded-xl bg-forest py-3 text-[14px] font-bold text-white"
+                  className="flex w-full items-center justify-center rounded-xl bg-brand py-3 text-[15px] font-bold text-white"
                 >
                   Comparer ces 2 offres
                 </Link>
               ) : (
-                <p className="text-center text-[13px] font-semibold text-ink-soft">Cochez une deuxième offre pour les comparer.</p>
+                <p className="text-center text-[14px] font-semibold text-ink-soft">Cochez une deuxième offre pour les comparer.</p>
               )}
             </div>
           ) : null}
 
           {loaded.truncated && state === "results" ? (
-            <p role="status" className="mt-3 text-[12px] font-semibold text-ink-soft">
+            <p role="status" className="mt-3 text-[13px] font-semibold text-ink-soft">
               {TRUNCATED_NOTE}
             </p>
           ) : null}
 
           {moreError ? (
-            <p role="alert" className="mt-3 text-center text-[13px] font-semibold text-carrot-ink">
+            <p role="alert" className="mt-3 text-center text-[14px] font-semibold text-accent-ink">
               {moreError}
             </p>
           ) : null}
@@ -297,7 +297,7 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
             <button
               onClick={() => void loadMore()}
               disabled={busy}
-              className="mt-4 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white py-3 text-[14px] font-bold text-forest disabled:opacity-50"
+              className="mt-4 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white py-3 text-[15px] font-bold text-brand disabled:opacity-50"
             >
               {loadingMore ? "Chargement…" : "Voir plus"}
             </button>
@@ -323,7 +323,7 @@ function PageContent() {
         {isUuid(demandId) ? (
           <ResultatsDuBesoin demandId={demandId} />
         ) : (
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+          <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
             Besoin introuvable.
           </p>
         )}

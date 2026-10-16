@@ -95,13 +95,13 @@ function MesBesoins() {
     <main>
       <div className="flex items-center justify-between px-4 py-3">
         <Link href="/" className="flex size-9 items-center">
-          <span className="font-display text-[20px] font-extrabold text-forest">
+          <span className="text-[20px] font-extrabold text-brand">
             noma
           </span>
         </Link>
         <Link
           href="/notifications"
-          className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[13px] font-semibold text-ink"
+          className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[14px] font-semibold text-ink"
         >
           <Bell className="size-4" aria-hidden />
           Notifications
@@ -110,7 +110,7 @@ function MesBesoins() {
       </div>
 
       <div className="px-4">
-        <h1 className="font-display text-[26px] font-extrabold text-ink">
+        <h1 className="text-[26px] font-extrabold text-ink">
           Mes besoins
         </h1>
 
@@ -122,9 +122,9 @@ function MesBesoins() {
                 setFilter(f.id);
                 setArmed(null);
               }}
-              className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition ${
+              className={`rounded-full px-3.5 py-1.5 text-[14px] font-semibold transition ${
                 filter === f.id
-                  ? "bg-forest text-white"
+                  ? "bg-brand text-white"
                   : "border border-line bg-white text-ink"
               }`}
             >
@@ -135,30 +135,30 @@ function MesBesoins() {
         </div>
 
         {truncated && !loadError ? (
-          <p role="status" className="mt-3 text-[13px] font-semibold text-carrot-ink">
+          <p role="status" className="mt-3 text-[14px] font-semibold text-accent-ink">
             {LIST_TRUNCATED_MESSAGE}
           </p>
         ) : null}
 
         {loadError ? (
           <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[14px] font-semibold text-ink">{loadError}</p>
+            <p className="text-[15px] font-semibold text-ink">{loadError}</p>
             <button
               onClick={() => {
                 setLoadError(null);
                 reload();
               }}
-              className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
+              className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
             >
               Réessayer
             </button>
           </div>
         ) : demands === null ? (
-          <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
+          <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
             Chargement de vos besoins…
           </p>
         ) : visible.length === 0 ? (
-          <p className="mt-6 text-center text-[14px] text-ink-soft">
+          <p className="mt-6 text-center text-[15px] text-ink-soft">
             {demands.length === 0
               ? "Vous n'avez pas encore de besoin."
               : "Aucun besoin ne correspond à ce filtre."}
@@ -181,13 +181,13 @@ function MesBesoins() {
                       <div className="truncate text-[15px] font-bold text-ink">
                         {recordTitle(demand)}
                       </div>
-                      {summary && <div className="text-[12px] text-ink-soft">{summary}</div>}
+                      {summary && <div className="text-[13px] text-ink-soft">{summary}</div>}
                     </div>
                     <ChevronRight className="size-4 shrink-0 text-ink-soft" aria-hidden />
                   </Link>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <Badge tone={status.tone}>{status.label}</Badge>
-                    <Link href={`/besoins/${demand.id}`} className="text-[13px] font-bold text-forest">
+                    <Link href={`/besoins/${demand.id}`} className="text-[14px] font-bold text-brand">
                       {demand.status === "active" ? "Voir les offres" : "Détails"}
                     </Link>
                   </div>
@@ -198,9 +198,9 @@ function MesBesoins() {
                           key={a.action}
                           onClick={() => void run(demand, a.action)}
                           disabled={busyId !== null}
-                          className={`flex flex-1 items-center justify-center gap-1.5 text-[13px] font-bold disabled:opacity-40 ${
+                          className={`flex flex-1 items-center justify-center gap-1.5 text-[14px] font-bold disabled:opacity-40 ${
                             a.action === "archive" && armed === `${demand.id}:archive`
-                              ? "text-carrot-ink"
+                              ? "text-accent-ink"
                               : "text-ink"
                           } ${index > 0 ? "border-l border-line" : ""}`}
                         >

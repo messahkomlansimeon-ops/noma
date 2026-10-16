@@ -21,7 +21,7 @@ export function IndicatorLine({ indicator }: { indicator: IndicatorView }) {
   return (
     <li className="flex flex-col items-start gap-0.5" data-indicator={indicator.key}>
       <Badge tone={TONE[indicator.tone]}>{indicator.label}</Badge>
-      {indicator.detail ? <span className="pl-0.5 text-[12px] text-ink-soft">{indicator.detail}</span> : null}
+      {indicator.detail ? <span className="pl-0.5 text-[13px] text-ink-soft">{indicator.detail}</span> : null}
     </li>
   );
 }
@@ -30,10 +30,10 @@ export function IndicatorLine({ indicator }: { indicator: IndicatorView }) {
 function CompatibilityBar({ text, percent }: { text: string; percent: number | null }) {
   return (
     <div className="mt-2">
-      <div className="text-[13px] font-bold text-ink">{text}</div>
+      <div className="text-[14px] font-bold text-ink">{text}</div>
       {percent !== null ? (
-        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-wash" aria-hidden>
-          <div className="h-full rounded-full bg-forest" style={{ width: `${percent}%` }} />
+        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-mist" aria-hidden>
+          <div className="h-full rounded-full bg-brand" style={{ width: `${percent}%` }} />
         </div>
       ) : null}
     </div>
@@ -46,12 +46,12 @@ export function SponsoredNotice({ badge, notice }: { badge: string; notice: stri
     <div className="mb-2 flex flex-wrap items-center gap-2">
       <span
         title={notice ?? undefined}
-        className="inline-flex items-center gap-1 rounded-md bg-carrot px-2 py-[3px] text-[11px] font-extrabold uppercase leading-tight tracking-wide text-white"
+        className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-[3px] text-[12px] font-extrabold uppercase leading-tight tracking-wide text-ink"
       >
         <Megaphone className="size-3" aria-hidden />
         {badge}
       </span>
-      <span className="text-[12px] font-semibold text-carrot-ink">{notice}</span>
+      <span className="text-[13px] font-semibold text-accent-ink">{notice}</span>
     </div>
   );
 }
@@ -71,15 +71,15 @@ export function BuyerMatchCard({ item, detailHref, compare }: { item: StoredMatc
     <li
       data-testid="match-card"
       data-sponsored={row.sponsored ? "true" : "false"}
-      className={`rounded-2xl border bg-white p-3.5 ${row.sponsored ? "border-carrot/60 ring-1 ring-carrot/30" : "border-line"}`}
+      className={`rounded-2xl border bg-white p-3.5 ${row.sponsored ? "border-accent/60 ring-1 ring-accent/30" : "border-line"}`}
     >
       {row.sponsoredBadge ? <SponsoredNotice badge={row.sponsoredBadge} notice={row.sponsoredNotice} /> : null}
       <div className="flex items-center gap-3">
         <Thumb art={artForCategory(item.candidate.category)} className="size-14" iconClassName="size-7" photoId={item.coverPhotoId} />
         <div className="min-w-0 flex-1">
           <div className="text-[15px] font-bold text-ink">{row.title}</div>
-          <div className="font-display text-[18px] font-extrabold text-ink">{row.priceText}</div>
-          {row.subtitle ? <div className="text-[12px] text-ink-soft">{row.subtitle}</div> : null}
+          <div className="text-[18px] font-extrabold text-ink">{row.priceText}</div>
+          {row.subtitle ? <div className="text-[13px] text-ink-soft">{row.subtitle}</div> : null}
           {row.proBadge ? <div className="mt-1"><ProBadge /></div> : null}
         </div>
       </div>
@@ -92,13 +92,13 @@ export function BuyerMatchCard({ item, detailHref, compare }: { item: StoredMatc
         </ul>
       ) : null}
       {compare ? (
-        <label className="mt-3 flex items-center gap-2 text-[13px] font-semibold text-ink">
+        <label className="mt-3 flex items-center gap-2 text-[14px] font-semibold text-ink">
           <input
             type="checkbox"
             data-testid="match-compare"
             checked={compare.selected}
             onChange={compare.onToggle}
-            className="size-4 accent-forest"
+            className="size-4 accent-brand"
           />
           Comparer
         </label>
@@ -107,7 +107,7 @@ export function BuyerMatchCard({ item, detailHref, compare }: { item: StoredMatc
         <Link
           href={detailHref}
           data-testid="match-detail-link"
-          className="mt-3 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white py-2.5 text-[14px] font-bold text-forest"
+          className="mt-3 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white py-2.5 text-[15px] font-bold text-brand"
         >
           Voir l'annonce
         </Link>
@@ -125,8 +125,8 @@ export function InterestedBuyerCard({ item }: { item: StoredMatch }) {
         <Thumb art={artForCategory(item.candidate.category)} className="size-12" iconClassName="size-6" />
         <div className="min-w-0 flex-1">
           <div className="text-[15px] font-bold text-ink">{row.title}</div>
-          <div className="text-[13px] font-semibold text-ink">{row.budgetText}</div>
-          {row.subtitle ? <div className="text-[12px] text-ink-soft">{row.subtitle}</div> : null}
+          <div className="text-[14px] font-semibold text-ink">{row.budgetText}</div>
+          {row.subtitle ? <div className="text-[13px] text-ink-soft">{row.subtitle}</div> : null}
         </div>
       </div>
       <CompatibilityBar text={row.compatibility} percent={row.compatibilityPercent} />

@@ -96,30 +96,30 @@ function LineCard({ line, mission, onChanged }: { line: ProposalLine; mission: M
     <li data-testid="proposal-line" data-offer={line.offerId} className="rounded-2xl border border-line bg-white p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div data-testid="line-vendor" className="text-[12px] font-bold uppercase tracking-wide text-ink-soft">
+          <div data-testid="line-vendor" className="text-[13px] font-bold uppercase tracking-wide text-ink-soft">
             {view.vendor}
           </div>
           <div className="text-[15px] font-bold text-ink">{view.title}</div>
           {view.location ? (
-            <div className="mt-0.5 flex items-center gap-1 text-[12px] text-ink-soft">
+            <div className="mt-0.5 flex items-center gap-1 text-[13px] text-ink-soft">
               <MapPin className="size-3" aria-hidden />
               {view.location}
             </div>
           ) : null}
-          <div className="mt-0.5 text-[11px] text-ink-soft">{view.stockText}</div>
+          <div className="mt-0.5 text-[12px] text-ink-soft">{view.stockText}</div>
         </div>
         <div className="shrink-0 text-right">
-          <div data-testid="line-calcul" className="text-[13px] text-ink-soft">
+          <div data-testid="line-calcul" className="text-[14px] text-ink-soft">
             {view.calculText}
           </div>
-          <div data-testid="line-subtotal" className="font-display text-[17px] font-extrabold text-ink">
+          <div data-testid="line-subtotal" className="text-[17px] font-extrabold text-ink">
             {view.subtotalText}
           </div>
         </div>
       </div>
 
       {demandId !== null ? (
-        <Link href={missionListingPath(mission.id, demandId, line.offerId)} className="mt-2 inline-block text-[12px] font-bold text-forest">
+        <Link href={missionListingPath(mission.id, demandId, line.offerId)} className="mt-2 inline-block text-[13px] font-bold text-brand">
           {SEE_LISTING_LABEL} ›
         </Link>
       ) : null}
@@ -132,7 +132,7 @@ function LineCard({ line, mission, onChanged }: { line: ProposalLine; mission: M
                 onClick={() => void write()}
                 disabled={pending !== null}
                 data-testid="line-write"
-                className="rounded-xl border border-line bg-white px-3 py-2.5 text-[14px] font-bold text-ink disabled:opacity-50"
+                className="rounded-xl border border-line bg-white px-3 py-2.5 text-[15px] font-bold text-ink disabled:opacity-50"
               >
                 {pending === "write" ? "Ouverture…" : WRITE_LABEL}
               </button>
@@ -143,16 +143,16 @@ function LineCard({ line, mission, onChanged }: { line: ProposalLine; mission: M
                 }}
                 disabled={pending !== null}
                 data-testid="line-declare"
-                className="rounded-xl bg-forest px-3 py-2.5 text-[14px] font-bold text-white disabled:opacity-50"
+                className="rounded-xl bg-brand px-3 py-2.5 text-[15px] font-bold text-white disabled:opacity-50"
               >
                 {DECLARE_LABEL}
               </button>
             </div>
           ) : (
-            <div data-testid="line-declare-form" className="rounded-xl border border-line bg-cream p-3">
+            <div data-testid="line-declare-form" className="rounded-xl border border-line bg-canvas p-3">
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label htmlFor={`qty-${line.offerId}`} className="mb-1 block text-[12px] font-bold text-ink">
+                  <label htmlFor={`qty-${line.offerId}`} className="mb-1 block text-[13px] font-bold text-ink">
                     Quantité achetée
                   </label>
                   <input
@@ -166,7 +166,7 @@ function LineCard({ line, mission, onChanged }: { line: ProposalLine; mission: M
                   />
                 </div>
                 <div>
-                  <label htmlFor={`price-${line.offerId}`} className="mb-1 block text-[12px] font-bold text-ink">
+                  <label htmlFor={`price-${line.offerId}`} className="mb-1 block text-[13px] font-bold text-ink">
                     Prix convenu par unité (FCFA)
                   </label>
                   <input
@@ -181,28 +181,28 @@ function LineCard({ line, mission, onChanged }: { line: ProposalLine; mission: M
                 </div>
               </div>
               {overPrice ? (
-                <p role="alert" data-testid="line-problem" className="mt-1.5 text-[12px] font-semibold text-carrot-ink">
+                <p role="alert" data-testid="line-problem" className="mt-1.5 text-[13px] font-semibold text-accent-ink">
                   Ce prix dépasse votre budget par unité ({formatFcfa(mission.unitBudgetXof)}).
                 </p>
               ) : overQuantity ? (
-                <p role="alert" data-testid="line-problem" className="mt-1.5 text-[12px] font-semibold text-carrot-ink">
+                <p role="alert" data-testid="line-problem" className="mt-1.5 text-[13px] font-semibold text-accent-ink">
                   Il ne reste que {remaining} à acheter pour cette mission.
                 </p>
               ) : !valid ? (
-                <p role="alert" data-testid="line-problem" className="mt-1.5 text-[12px] font-semibold text-carrot-ink">
+                <p role="alert" data-testid="line-problem" className="mt-1.5 text-[13px] font-semibold text-accent-ink">
                   Indiquez une quantité de {ORDER_QUANTITY_MIN} à {ORDER_QUANTITY_MAX.toLocaleString("fr-FR")} et un prix en nombres entiers.
                 </p>
               ) : null}
-              <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">{NO_PAYMENT_NOTICE}</p>
+              <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">{NO_PAYMENT_NOTICE}</p>
               <div className="mt-2.5 grid grid-cols-2 gap-2.5">
-                <button onClick={() => setDeclaring(false)} disabled={pending !== null} className="rounded-xl border border-line bg-white px-3 py-2.5 text-[14px] font-bold text-ink disabled:opacity-50">
+                <button onClick={() => setDeclaring(false)} disabled={pending !== null} className="rounded-xl border border-line bg-white px-3 py-2.5 text-[15px] font-bold text-ink disabled:opacity-50">
                   Annuler
                 </button>
                 <button
                   onClick={() => void declare()}
                   disabled={pending !== null || !valid}
                   data-testid="line-declare-submit"
-                  className="rounded-xl bg-forest px-3 py-2.5 text-[14px] font-bold text-white disabled:opacity-50"
+                  className="rounded-xl bg-brand px-3 py-2.5 text-[15px] font-bold text-white disabled:opacity-50"
                 >
                   {pending === "declare" ? "Envoi…" : DECLARE_CONFIRM_LABEL}
                 </button>
@@ -212,7 +212,7 @@ function LineCard({ line, mission, onChanged }: { line: ProposalLine; mission: M
         </div>
       ) : null}
       {error ? (
-        <p role="alert" data-testid="line-error" className="mt-2 text-[12px] font-semibold text-carrot-ink">
+        <p role="alert" data-testid="line-error" className="mt-2 text-[13px] font-semibold text-accent-ink">
           {error}
         </p>
       ) : null}
@@ -225,8 +225,8 @@ function EngagedSection({ engaged }: { engaged: ProposalEngaged[] }) {
   if (engaged.length === 0) return null;
   return (
     <section className="mt-3" data-testid="proposal-engaged">
-      <h3 className="text-[14px] font-extrabold text-ink">{ENGAGED_TITLE}</h3>
-      <p className="mt-0.5 text-[12px] leading-relaxed text-ink-soft">{ENGAGED_NOTE}</p>
+      <h3 className="text-[15px] font-extrabold text-ink">{ENGAGED_TITLE}</h3>
+      <p className="mt-0.5 text-[13px] leading-relaxed text-ink-soft">{ENGAGED_NOTE}</p>
       <ul aria-label="Achats déjà engagés" className="mt-2 space-y-2">
         {engaged.map((order) => {
           const view = engagedLineView(order);
@@ -234,20 +234,20 @@ function EngagedSection({ engaged }: { engaged: ProposalEngaged[] }) {
             <li key={view.orderId} data-testid="engaged-line" data-order-status={order.status} data-offer={view.offerId} className="rounded-2xl border border-line bg-white p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div data-testid="engaged-vendor" className="text-[12px] font-bold uppercase tracking-wide text-ink-soft">
+                  <div data-testid="engaged-vendor" className="text-[13px] font-bold uppercase tracking-wide text-ink-soft">
                     {view.vendor}
                   </div>
-                  <div className="text-[14px] font-bold text-ink">{view.title}</div>
-                  {view.location ? <div className="text-[12px] text-ink-soft">{view.location}</div> : null}
+                  <div className="text-[15px] font-bold text-ink">{view.title}</div>
+                  {view.location ? <div className="text-[13px] text-ink-soft">{view.location}</div> : null}
                 </div>
                 <div className="shrink-0 text-right">
-                  <div className="text-[13px] text-ink-soft">{view.calculText}</div>
-                  <div className="font-display text-[16px] font-extrabold text-ink">{view.subtotalText}</div>
+                  <div className="text-[14px] text-ink-soft">{view.calculText}</div>
+                  <div className="text-[16px] font-extrabold text-ink">{view.subtotalText}</div>
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2" data-testid="engaged-status">
                 <Badge tone={view.confirmed ? "sage" : "carrot"}>{view.statusText}</Badge>
-                <Link href={orderPath("buyer", view.orderId)} className="text-[12px] font-bold text-forest">
+                <Link href={orderPath("buyer", view.orderId)} className="text-[13px] font-bold text-brand">
                   Voir l'achat ›
                 </Link>
               </div>
@@ -265,15 +265,15 @@ export function ProposalSection({ mission, proposal, onChanged }: { mission: Mis
     <section className="mt-5" data-testid="proposal">
       <h2 className="text-[16px] font-extrabold text-ink">{PROPOSAL_TITLE}</h2>
       {proposal === null ? (
-        <p className="mt-2 text-[13px] text-ink-soft" aria-busy="true">
+        <p className="mt-2 text-[14px] text-ink-soft" aria-busy="true">
           Recherche des annonces…
         </p>
       ) : proposal.state === "inactive" ? (
-        <p data-testid="proposal-inactive" className="mt-2 text-[13px] text-ink-soft">
+        <p data-testid="proposal-inactive" className="mt-2 text-[14px] text-ink-soft">
           {PROPOSAL_INACTIVE}
         </p>
       ) : proposal.state === "unavailable" ? (
-        <p role="status" className="mt-2 text-[13px] text-ink-soft">
+        <p role="status" className="mt-2 text-[14px] text-ink-soft">
           {PROPOSAL_UNAVAILABLE}
         </p>
       ) : (
@@ -281,26 +281,26 @@ export function ProposalSection({ mission, proposal, onChanged }: { mission: Mis
           const summary = proposalSummary(proposal);
           return (
             <>
-              <p className="mt-1 text-[12px] leading-relaxed text-ink-soft">{PROPOSAL_NOTE}</p>
+              <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">{PROPOSAL_NOTE}</p>
               <div className="mt-3 rounded-2xl border border-line bg-white p-3.5">
-                <div data-testid="proposal-coverage" className="text-[14px] font-bold text-ink">
+                <div data-testid="proposal-coverage" className="text-[15px] font-bold text-ink">
                   {summary.coverageText} ({summary.coveragePercent} %)
                 </div>
                 <div className="mt-1.5">
                   <ProgressBar percent={summary.coveragePercent} label="Couverture de la proposition" />
                 </div>
                 {summary.committedText ? (
-                  <div data-testid="proposal-committed" className="mt-1.5 text-[13px] font-semibold text-ink">
+                  <div data-testid="proposal-committed" className="mt-1.5 text-[14px] font-semibold text-ink">
                     {summary.committedText}
                   </div>
                 ) : null}
-                <div data-testid="proposal-budget" className="mt-2 text-[13px] text-ink-soft">
+                <div data-testid="proposal-budget" className="mt-2 text-[14px] text-ink-soft">
                   Budget utilisé : {summary.budgetText} · {summary.sellersText}
                 </div>
-                <div className="text-[12px] text-ink-soft">{summary.remainingText}</div>
+                <div className="text-[13px] text-ink-soft">{summary.remainingText}</div>
               </div>
               {proposal.reasons.length > 0 ? (
-                <ul data-testid="proposal-reasons" aria-label="Pourquoi la quantité n'est pas entièrement couverte" className="mt-2 space-y-1 rounded-2xl bg-carrot-soft p-3 text-[12px] text-carrot-ink">
+                <ul data-testid="proposal-reasons" aria-label="Pourquoi la quantité n'est pas entièrement couverte" className="mt-2 space-y-1 rounded-2xl bg-accent-soft p-3 text-[13px] text-accent-ink">
                   {proposal.reasons.map((reason) => (
                     <li key={reason} data-reason={reason}>
                       {shortfallText(reason)}
@@ -310,12 +310,12 @@ export function ProposalSection({ mission, proposal, onChanged }: { mission: Mis
               ) : null}
               <EngagedSection engaged={proposal.engaged} />
               {proposal.lines.length === 0 ? (
-                <p data-testid="proposal-empty" className="mt-3 rounded-2xl bg-wash p-4 text-center text-[13px] text-ink-soft">
+                <p data-testid="proposal-empty" className="mt-3 rounded-2xl bg-mist p-4 text-center text-[14px] text-ink-soft">
                   {proposal.remainingQuantity === 0 ? PROPOSAL_ALL_ENGAGED : PROPOSAL_EMPTY}
                 </p>
               ) : (
                 <>
-                  {proposal.engaged.length > 0 ? <h3 className="mt-4 text-[14px] font-extrabold text-ink">{LINES_TITLE}</h3> : null}
+                  {proposal.engaged.length > 0 ? <h3 className="mt-4 text-[15px] font-extrabold text-ink">{LINES_TITLE}</h3> : null}
                   <ul aria-label="Lignes de la proposition" className="mt-3 space-y-2.5">
                     {orderedProposalLines(proposal.lines).map((line) => (
                       <LineCard key={line.offerId} line={line} mission={mission} onChanged={onChanged} />

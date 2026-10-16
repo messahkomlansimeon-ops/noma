@@ -37,12 +37,12 @@ export function SessionGateView({
   if (state.kind === "unavailable") {
     return (
       <main className="flex min-h-[60dvh] flex-col items-center justify-center gap-3 px-6 text-center" role="alert">
-        <p className="text-[14px] font-semibold text-ink">
+        <p className="text-[15px] font-semibold text-ink">
           Le service est temporairement indisponible.
         </p>
         <button
           onClick={onRetry}
-          className="rounded-xl bg-forest px-5 py-3 text-[14px] font-bold text-white transition active:scale-[0.99]"
+          className="rounded-xl bg-brand px-5 py-3 text-[15px] font-bold text-white transition active:scale-[0.99]"
         >
           Réessayer
         </button>
@@ -52,7 +52,7 @@ export function SessionGateView({
 
   return (
     <main
-      className="flex min-h-[60dvh] items-center justify-center px-6 text-center text-[14px] text-ink-soft"
+      className="flex min-h-[60dvh] items-center justify-center px-6 text-center text-[15px] text-ink-soft"
       aria-busy="true"
     >
       Vérification de votre session…

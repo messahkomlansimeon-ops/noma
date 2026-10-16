@@ -59,7 +59,7 @@ export function DeclareOrder({ demandId, offerId, initialPrice, initialQuantity 
       <button
         onClick={() => setOpen(true)}
         data-testid="declare-order-open"
-        className="mt-2 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white px-4 py-3 text-[14px] font-bold text-forest transition active:scale-[0.99]"
+        className="mt-2 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white px-4 py-3 text-[15px] font-bold text-brand transition active:scale-[0.99]"
       >
         {DECLARE_ORDER_LABEL}
       </button>
@@ -69,7 +69,7 @@ export function DeclareOrder({ demandId, offerId, initialPrice, initialQuantity 
     <div className="mt-2 rounded-xl border border-line bg-white p-3.5" data-testid="declare-order-form">
       {withQuantity ? (
         <>
-          <label htmlFor="order-quantity" className="text-[13px] font-bold text-ink">
+          <label htmlFor="order-quantity" className="text-[14px] font-bold text-ink">
             Quantité achetée
           </label>
           <input
@@ -83,7 +83,7 @@ export function DeclareOrder({ demandId, offerId, initialPrice, initialQuantity 
           />
         </>
       ) : null}
-      <label htmlFor="order-price" className="text-[13px] font-bold text-ink">
+      <label htmlFor="order-price" className="text-[14px] font-bold text-ink">
         {withQuantity ? "Prix convenu par unité (FCFA)" : PRICE_LABEL}
       </label>
       <input
@@ -97,27 +97,27 @@ export function DeclareOrder({ demandId, offerId, initialPrice, initialQuantity 
         className="mt-1.5 w-full rounded-xl border border-line bg-white px-3.5 py-3 text-[15px] text-ink placeholder:text-ink-soft/50"
       />
       {problem ? (
-        <p role="alert" className="mt-1.5 text-[12px] font-semibold text-carrot-ink">
+        <p role="alert" className="mt-1.5 text-[13px] font-semibold text-accent-ink">
           {problem}
         </p>
       ) : null}
-      <p data-testid="no-payment-notice" className="mt-2 text-[12px] leading-relaxed text-ink-soft">
+      <p data-testid="no-payment-notice" className="mt-2 text-[13px] leading-relaxed text-ink-soft">
         {NO_PAYMENT_NOTICE}
       </p>
       {error ? (
-        <p role="alert" data-testid="declare-order-error" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+        <p role="alert" data-testid="declare-order-error" className="mt-2 text-[14px] font-semibold text-accent-ink">
           {error}
         </p>
       ) : null}
       <div className="mt-3 grid grid-cols-2 gap-2.5">
-        <button onClick={() => setOpen(false)} disabled={pending} className="rounded-xl border border-line bg-white px-3 py-2.5 text-[14px] font-bold text-ink disabled:opacity-50">
+        <button onClick={() => setOpen(false)} disabled={pending} className="rounded-xl border border-line bg-white px-3 py-2.5 text-[15px] font-bold text-ink disabled:opacity-50">
           Annuler
         </button>
         <button
           onClick={() => void submit()}
           disabled={pending || parsed === null || !quantityOk}
           data-testid="declare-order-submit"
-          className="rounded-xl bg-forest px-3 py-2.5 text-[14px] font-bold text-white transition active:scale-[0.99] disabled:opacity-50"
+          className="rounded-xl bg-brand px-3 py-2.5 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:opacity-50"
         >
           {pending ? DECLARE_ORDER_ONGOING : DECLARE_ORDER_CONFIRM_LABEL}
         </button>

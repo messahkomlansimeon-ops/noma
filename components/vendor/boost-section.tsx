@@ -368,12 +368,12 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
       </h2>
 
       {!eligibility.eligible ? (
-        <p role="status" data-testid="boost-not-eligible" className="mt-3 rounded-2xl bg-wash p-4 text-[14px] font-semibold text-ink-soft">
+        <p role="status" data-testid="boost-not-eligible" className="mt-3 rounded-2xl bg-mist p-4 text-[15px] font-semibold text-ink-soft">
           {eligibility.message}
         </p>
       ) : (
         <>
-          <p className="mt-1 text-[13px] text-ink-soft">{BOOST_INTRO}</p>
+          <p className="mt-1 text-[14px] text-ink-soft">{BOOST_INTRO}</p>
 
           <WalletLine
             wallet={wallet}
@@ -400,8 +400,8 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
                   }}
                   disabled={pending !== null || buying}
                   aria-pressed={selected}
-                  className={`flex-1 rounded-xl border px-3 py-2.5 text-[14px] font-bold transition disabled:opacity-50 ${
-                    selected ? "border-transparent bg-forest text-white" : "border-line bg-white text-ink"
+                  className={`flex-1 rounded-xl border px-3 py-2.5 text-[15px] font-bold transition disabled:opacity-50 ${
+                    selected ? "border-transparent bg-brand text-white" : "border-line bg-white text-ink"
                   }`}
                 >
                   {pending === duration.code ? "…" : duration.label}
@@ -411,21 +411,21 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
           </div>
 
           {error ? (
-            <p role="alert" className="mt-3 text-[13px] font-semibold text-carrot-ink">
+            <p role="alert" className="mt-3 text-[14px] font-semibold text-accent-ink">
               {error}
             </p>
           ) : null}
 
           {buyError ? (
-            <p role="alert" data-testid="boost-buy-error" className="mt-3 rounded-xl bg-carrot-soft p-3 text-[13px] font-semibold text-carrot-ink">
+            <p role="alert" data-testid="boost-buy-error" className="mt-3 rounded-xl bg-accent-soft p-3 text-[14px] font-semibold text-accent-ink">
               {buyError}
             </p>
           ) : null}
 
           {unresolved ? (
-            <div data-testid="boost-unresolved" role="alert" className="mt-3 rounded-xl border border-carrot/40 bg-carrot-soft/50 p-3.5">
-              <p className="text-[13px] font-semibold text-ink">{unresolved.verified ? PURCHASE_NOT_RECORDED_TEXT : UNRESOLVED_PURCHASE_TEXT}</p>
-              <p className="mt-0.5 text-[12px] text-ink-soft">
+            <div data-testid="boost-unresolved" role="alert" className="mt-3 rounded-xl border border-accent/40 bg-accent-soft/50 p-3.5">
+              <p className="text-[14px] font-semibold text-ink">{unresolved.verified ? PURCHASE_NOT_RECORDED_TEXT : UNRESOLVED_PURCHASE_TEXT}</p>
+              <p className="mt-0.5 text-[13px] text-ink-soft">
                 Achat de {durationLabel(unresolved.quote.durationCode)}
                 {unresolved.quote.amount !== null ? ` · ${formatFcfa(unresolved.quote.amount)}` : ""}
               </p>
@@ -434,7 +434,7 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
                 onClick={() => void confirmPurchase(unresolved.quote)}
                 disabled={buying}
                 aria-disabled={buying}
-                className="mt-2 flex w-full items-center justify-center rounded-xl bg-forest px-4 py-3 text-[14px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-2 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {buying ? BUY_LABELS.confirming : BUY_LABELS.verify}
               </button>
@@ -442,9 +442,9 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
           ) : null}
 
           {success ? (
-            <div data-testid="boost-success" role="status" className="mt-4 rounded-2xl border border-forest/30 bg-sage p-4">
-              <p className="text-[15px] font-extrabold text-forest">{boostActiveText(success.endsAt)}</p>
-              <p data-testid="boost-success-note" className="mt-1 text-[13px] text-sage-ink">
+            <div data-testid="boost-success" role="status" className="mt-4 rounded-2xl border border-brand/30 bg-brand-soft p-4">
+              <p className="text-[15px] font-extrabold text-brand">{boostActiveText(success.endsAt)}</p>
+              <p data-testid="boost-success-note" className="mt-1 text-[14px] text-brand-ink">
                 {BOOST_SUCCESS_NOTE}
               </p>
             </div>
@@ -478,16 +478,16 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
 
           {purchases && purchases.length > 0 ? (
             <div className="mt-5" data-testid="boost-purchase-history">
-              <h3 className="text-[14px] font-extrabold text-ink">Achats de boost de cette annonce</h3>
+              <h3 className="text-[15px] font-extrabold text-ink">Achats de boost de cette annonce</h3>
               <ul className="mt-2 divide-y divide-line rounded-2xl border border-line bg-white">
                 {purchases.map((item) => {
                   const row = purchaseHistoryRow(item);
                   return (
                     <li key={row.key} data-testid="boost-purchase-row" className="px-3.5 py-2.5">
-                      <div className="text-[14px] font-bold text-ink">{row.title}</div>
-                      <div className="text-[12px] text-ink-soft">{row.detail}</div>
+                      <div className="text-[15px] font-bold text-ink">{row.title}</div>
+                      <div className="text-[13px] text-ink-soft">{row.detail}</div>
                       {row.refundedText ? (
-                        <div data-testid="boost-purchase-refunded" className="mt-0.5 text-[12px] font-semibold text-carrot-ink">
+                        <div data-testid="boost-purchase-refunded" className="mt-0.5 text-[13px] font-semibold text-accent-ink">
                           {row.refundedText}
                         </div>
                       ) : null}
@@ -499,21 +499,21 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
           ) : null}
 
           {historyError ? (
-            <p role="alert" className="mt-4 text-[13px] font-semibold text-carrot-ink">
+            <p role="alert" className="mt-4 text-[14px] font-semibold text-accent-ink">
               {historyError}
             </p>
           ) : null}
           {history && history.quotes.length > 0 ? (
             <div className="mt-5" data-testid="boost-history">
-              <h3 className="text-[14px] font-extrabold text-ink">Historique des devis</h3>
+              <h3 className="text-[15px] font-extrabold text-ink">Historique des devis</h3>
               <ul className="mt-2 divide-y divide-line rounded-2xl border border-line bg-white">
                 {history.quotes.map((quote) => {
                   const row = quoteHistoryRow(quote, historyEntryExpired(quote, history.receivedAtMs, now), undefined, purchasedQuoteIds.has(quote.id));
                   return (
                     <li key={row.key} className="flex items-start justify-between gap-3 px-3.5 py-2.5">
                       <div>
-                        <div className="text-[14px] font-bold text-ink">{row.title}</div>
-                        <div className="text-[12px] text-ink-soft">{row.detail}</div>
+                        <div className="text-[15px] font-bold text-ink">{row.title}</div>
+                        <div className="text-[13px] text-ink-soft">{row.detail}</div>
                       </div>
                       <Badge tone={row.tone === "good" ? "sage" : row.tone === "warn" ? "carrot" : "wash"}>{row.status}</Badge>
                     </li>
@@ -542,23 +542,23 @@ function WalletLine({
 }) {
   if (wallet.status === "loading") {
     return (
-      <p className="mt-3 text-[13px] text-ink-soft" aria-busy="true">
+      <p className="mt-3 text-[14px] text-ink-soft" aria-busy="true">
         Lecture de votre solde…
       </p>
     );
   }
   if (wallet.status === "error") {
     return (
-      <div role="alert" className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-wash px-3.5 py-2.5 text-[13px]">
-        <span className="font-semibold text-carrot-ink">{wallet.message}</span>
-        <button onClick={onRetry} className="shrink-0 font-bold text-forest underline">
+      <div role="alert" className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-mist px-3.5 py-2.5 text-[14px]">
+        <span className="font-semibold text-accent-ink">{wallet.message}</span>
+        <button onClick={onRetry} className="shrink-0 font-bold text-brand underline">
           Réessayer
         </button>
       </div>
     );
   }
   return (
-    <div data-testid="boost-balance" className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-wash px-3.5 py-2.5 text-[13px]">
+    <div data-testid="boost-balance" className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-mist px-3.5 py-2.5 text-[14px]">
       <span className="text-ink-soft">
         Votre solde : <strong data-testid="boost-balance-amount" className="text-ink">{formatFcfa(wallet.balanceXof)}</strong>
         {wallet.promoBalanceXof > 0 ? (
@@ -568,10 +568,10 @@ function WalletLine({
         ) : null}
       </span>
       <span className="flex shrink-0 items-center gap-3">
-        <button data-testid="boost-balance-refresh" onClick={onRefresh} className="font-bold text-forest underline">
+        <button data-testid="boost-balance-refresh" onClick={onRefresh} className="font-bold text-brand underline">
           {BUY_LABELS.refreshBalance}
         </button>
-        <Link href={walletLink} className="font-bold text-forest underline">
+        <Link href={walletLink} className="font-bold text-brand underline">
           Mon porte-monnaie
         </Link>
       </span>
@@ -615,37 +615,37 @@ function QuoteCard({
     <div data-testid="boost-quote" data-status={quote.status} className="mt-4 rounded-2xl border border-line bg-white p-4">
       {quote.status === "available" && amount ? (
         <>
-          <div className="text-[13px] font-semibold text-ink-soft">Boost de {durationLabel(quote.durationCode)}</div>
-          <div data-testid="boost-amount" className="font-display text-[30px] font-extrabold leading-tight text-ink">
+          <div className="text-[14px] font-semibold text-ink-soft">Boost de {durationLabel(quote.durationCode)}</div>
+          <div data-testid="boost-amount" className="text-[30px] font-extrabold leading-tight text-ink">
             {amount}
           </div>
           <ul className="mt-3 space-y-2" aria-label="Comment ce prix est calculé">
             {explainFactors(quote).map((line) => (
-              <li key={line.key} className="text-[13px]">
+              <li key={line.key} className="text-[14px]">
                 <span className="font-bold text-ink">{line.title}</span>
                 <span className="text-ink-soft"> : {line.text} </span>
-                <span className="font-semibold text-forest">({line.effect})</span>
+                <span className="font-semibold text-brand">({line.effect})</span>
               </li>
             ))}
           </ul>
         </>
       ) : (
         <>
-          <div className="text-[13px] font-semibold text-ink-soft">Boost de {durationLabel(quote.durationCode)}</div>
-          <p data-testid="boost-unavailable" className="mt-1 rounded-xl bg-carrot-soft p-3 text-[14px] font-semibold text-carrot-ink">
+          <div className="text-[14px] font-semibold text-ink-soft">Boost de {durationLabel(quote.durationCode)}</div>
+          <p data-testid="boost-unavailable" className="mt-1 rounded-xl bg-accent-soft p-3 text-[15px] font-semibold text-accent-ink">
             {unavailableReasonText(quote.unavailableReason)}
           </p>
         </>
       )}
 
-      <p data-testid="boost-validity" className={`mt-3 text-[13px] font-semibold ${validity.expired ? "text-carrot-ink" : "text-ink"}`}>
+      <p data-testid="boost-validity" className={`mt-3 text-[14px] font-semibold ${validity.expired ? "text-accent-ink" : "text-ink"}`}>
         {validity.text}
       </p>
       {validity.expired ? (
         <button
           onClick={onRefresh}
           disabled={busy}
-          className="mt-2 rounded-xl border border-forest/30 bg-white px-4 py-2 text-[13px] font-bold text-forest disabled:opacity-50"
+          className="mt-2 rounded-xl border border-brand/30 bg-white px-4 py-2 text-[14px] font-bold text-brand disabled:opacity-50"
         >
           Demander un nouveau devis
         </button>
@@ -697,8 +697,8 @@ function BuyArea({
   if (confirming && state.kind === "ready") {
     const confirmButton = confirmButtonState(buying, quotePending);
     return (
-      <div data-testid="boost-confirm" role="group" aria-label="Confirmer l'achat" className="mt-4 rounded-xl border border-carrot/40 bg-carrot-soft/50 p-3.5">
-        <p data-testid="boost-confirm-text" className="text-[14px] font-semibold text-ink">
+      <div data-testid="boost-confirm" role="group" aria-label="Confirmer l'achat" className="mt-4 rounded-xl border border-accent/40 bg-accent-soft/50 p-3.5">
+        <p data-testid="boost-confirm-text" className="text-[15px] font-semibold text-ink">
           {purchaseConfirmationText({ amountXof: state.amountXof, durationCode: quote.durationCode, balanceXof: state.balanceXof, promoXof: state.promoXof })}
         </p>
         <div className="mt-3 flex gap-2">
@@ -707,7 +707,7 @@ function BuyArea({
             onClick={onConfirm}
             disabled={confirmButton.disabled}
             aria-disabled={confirmButton.disabled}
-            className="flex-1 rounded-xl bg-forest px-4 py-3 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex-1 rounded-xl bg-brand px-4 py-3 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             {confirmButton.label}
           </button>
@@ -715,7 +715,7 @@ function BuyArea({
             data-testid="boost-cancel-button"
             onClick={onCancel}
             disabled={buying || quotePending}
-            className="rounded-xl border border-line bg-white px-4 py-3 text-[14px] font-bold text-ink disabled:opacity-50"
+            className="rounded-xl border border-line bg-white px-4 py-3 text-[15px] font-bold text-ink disabled:opacity-50"
           >
             {BUY_LABELS.cancel}
           </button>
@@ -732,19 +732,19 @@ function BuyArea({
         onClick={onBuy}
         disabled={!enabled}
         aria-disabled={!enabled}
-        className="flex w-full items-center justify-center rounded-xl bg-forest px-4 py-3.5 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3.5 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
       >
         {BUY_LABELS.buy}
       </button>
 
       {state.kind === "insufficient" ? (
-        <div data-testid="boost-insufficient" role="status" className="mt-3 rounded-xl bg-carrot-soft p-3.5">
-          <p className="text-[14px] font-extrabold text-carrot-ink">{state.text}</p>
-          <p className="mt-0.5 text-[13px] text-ink-soft">{state.detail}</p>
+        <div data-testid="boost-insufficient" role="status" className="mt-3 rounded-xl bg-accent-soft p-3.5">
+          <p className="text-[15px] font-extrabold text-accent-ink">{state.text}</p>
+          <p className="mt-0.5 text-[14px] text-ink-soft">{state.detail}</p>
           <button
             data-testid="boost-recharge"
             onClick={onRecharge}
-            className="mt-3 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white px-4 py-3 text-[14px] font-bold text-forest"
+            className="mt-3 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white px-4 py-3 text-[15px] font-bold text-brand"
           >
             {BUY_LABELS.recharge}
           </button>
@@ -752,9 +752,9 @@ function BuyArea({
       ) : null}
 
       {state.kind === "balance_unknown" ? (
-        <div data-testid="boost-balance-unknown" role="status" className="mt-3 rounded-xl bg-wash p-3.5">
-          <p className="text-[13px] font-semibold text-ink-soft">{BALANCE_UNKNOWN_TEXT}</p>
-          <button onClick={onRetryBalance} className="mt-2 text-[13px] font-bold text-forest underline">
+        <div data-testid="boost-balance-unknown" role="status" className="mt-3 rounded-xl bg-mist p-3.5">
+          <p className="text-[14px] font-semibold text-ink-soft">{BALANCE_UNKNOWN_TEXT}</p>
+          <button onClick={onRetryBalance} className="mt-2 text-[14px] font-bold text-brand underline">
             Réessayer la lecture
           </button>
         </div>

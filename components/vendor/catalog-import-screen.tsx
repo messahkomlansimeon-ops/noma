@@ -74,15 +74,15 @@ export function CatalogImportScreen() {
     <main>
       <TopBar back="/vendeur/annonces" title={IMPORT_PAGE_TITLE} />
       <div className="px-4 pb-8">
-        <p className="mt-3 text-[13px] text-ink-soft">
+        <p className="mt-3 text-[14px] text-ink-soft">
           Colonnes : {IMPORT_COLUMNS_HELP} {IMPORT_MAX_ROWS} lignes au plus par fichier. Votre fichier n&apos;est pas conservé : seules les annonces créées le sont.
         </p>
-        <details className="mt-2 rounded-xl border border-line bg-white p-3 text-[12px] text-ink-soft">
+        <details className="mt-2 rounded-xl border border-line bg-white p-3 text-[13px] text-ink-soft">
           <summary className="cursor-pointer font-bold text-ink">Exemple de fichier</summary>
           <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{IMPORT_EXAMPLE}</pre>
         </details>
 
-        <label className="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-forest/40 bg-white px-4 py-4 text-[14px] font-bold text-forest">
+        <label className="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-brand/40 bg-white px-4 py-4 text-[15px] font-bold text-brand">
           <FileUp className="size-5" aria-hidden />
           {fileName ?? "Choisir un fichier CSV"}
           <input
@@ -93,7 +93,7 @@ export function CatalogImportScreen() {
             onChange={(event) => void readFile(event.target.files?.[0])}
           />
         </label>
-        <label htmlFor="import-text" className="mt-3 block text-[13px] font-bold text-ink">Ou collez le contenu du fichier</label>
+        <label htmlFor="import-text" className="mt-3 block text-[14px] font-bold text-ink">Ou collez le contenu du fichier</label>
         <textarea
           id="import-text"
           data-testid="import-text"
@@ -101,16 +101,16 @@ export function CatalogImportScreen() {
           onChange={(event) => { setText(event.target.value); setFileName(null); setError(null); }}
           rows={6}
           spellCheck={false}
-          className="mt-1.5 w-full rounded-xl border border-line bg-white px-3 py-2.5 font-mono text-[12px] text-ink"
+          className="mt-1.5 w-full rounded-xl border border-line bg-white px-3 py-2.5 font-mono text-[13px] text-ink"
           placeholder={IMPORT_EXAMPLE}
         />
-        {check && !check.ok ? <p role="alert" data-testid="import-check" className="mt-1.5 text-[13px] font-semibold text-carrot-ink">{check.message}</p> : null}
+        {check && !check.ok ? <p role="alert" data-testid="import-check" className="mt-1.5 text-[14px] font-semibold text-accent-ink">{check.message}</p> : null}
 
         <button
           data-testid="import-preview"
           onClick={() => void run(true)}
           disabled={pending !== null || check === null || !check.ok}
-          className="mt-3 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white px-4 py-3 text-[14px] font-bold text-forest disabled:opacity-40"
+          className="mt-3 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white px-4 py-3 text-[15px] font-bold text-brand disabled:opacity-40"
         >
           {pending === "preview" ? "Aperçu en cours…" : "Aperçu (rien n'est créé)"}
         </button>
@@ -118,13 +118,13 @@ export function CatalogImportScreen() {
           data-testid="import-apply"
           onClick={() => void run(false)}
           disabled={!canApply}
-          className="mt-2 flex w-full items-center justify-center rounded-xl bg-forest px-4 py-3 text-[14px] font-bold text-white disabled:opacity-40"
+          className="mt-2 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3 text-[15px] font-bold text-white disabled:opacity-40"
         >
           {pending === "apply" ? "Import en cours…" : "Importer et mettre en ligne"}
         </button>
 
         {error ? (
-          <div role="alert" data-testid="import-error" className="mt-3 rounded-xl bg-carrot-soft p-3 text-[13px] font-semibold text-carrot-ink">
+          <div role="alert" data-testid="import-error" className="mt-3 rounded-xl bg-accent-soft p-3 text-[14px] font-semibold text-accent-ink">
             {error}
             {error.includes("réservé à l'offre Pro") ? (
               <Link href={PRO_PAGE_PATH} className="mt-1 block underline">Voir l&apos;offre Pro</Link>
@@ -135,18 +135,18 @@ export function CatalogImportScreen() {
         {result && summary ? (
           <section data-testid="import-report" data-mode={result.mode} data-replayed={summary.replayed ? "true" : "false"} className="mt-4 rounded-2xl border border-line bg-white p-4">
             <div className="text-[15px] font-extrabold text-ink">{summary.title}</div>
-            <p data-testid="import-summary" className="mt-1 text-[13px] text-ink-soft">{summary.detail}</p>
+            <p data-testid="import-summary" className="mt-1 text-[14px] text-ink-soft">{summary.detail}</p>
             {rejected.length > 0 ? (
               <ul data-testid="import-rejected" className="mt-3 space-y-1.5" aria-label="Lignes refusées">
                 {rejected.map((row) => (
-                  <li key={row.line} data-line={row.line} className="rounded-lg bg-carrot-soft px-3 py-2 text-[12px] text-carrot-ink">
+                  <li key={row.line} data-line={row.line} className="rounded-lg bg-accent-soft px-3 py-2 text-[13px] text-accent-ink">
                     <strong>Ligne {row.line}</strong> : {row.text.replace(/^Ligne refusée : /, "")}
                   </li>
                 ))}
               </ul>
             ) : null}
             {result.mode === "apply" && result.acceptedCount > 0 ? (
-              <Link href="/vendeur/annonces" data-testid="import-listings-link" className="mt-3 block text-[13px] font-bold text-forest underline">Voir mes annonces</Link>
+              <Link href="/vendeur/annonces" data-testid="import-listings-link" className="mt-3 block text-[14px] font-bold text-brand underline">Voir mes annonces</Link>
             ) : null}
           </section>
         ) : null}

@@ -21,14 +21,14 @@ export function OfferPhoto({
         alt={offer.title}
         referrerPolicy="no-referrer"
         loading="lazy"
-        className={`shrink-0 rounded-xl bg-sage object-cover ${className}`}
+        className={`shrink-0 rounded-xl bg-brand-soft object-cover ${className}`}
       />
     );
   }
   return (
     <Thumb
       art="box"
-      className={`${className} bg-wash`}
+      className={`${className} bg-mist`}
       iconClassName={iconClassName}
     />
   );
@@ -55,18 +55,18 @@ export function RealOfferCard({
           <div className="flex items-start justify-between gap-2">
             <span className="truncate text-[15px] font-bold text-ink">{offer.title}</span>
           </div>
-          <div className="font-display text-[18px] font-extrabold text-ink">
+          <div className="text-[18px] font-extrabold text-ink">
             {formatPublicPrice(offer)}
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-            <span className="text-[13px] text-ink-soft">
+            <span className="text-[14px] text-ink-soft">
               {offer.location ?? "Localisation non renseignée"}
             </span>
             <Badge tone="sky">Annonce externe</Badge>
           </div>
         </div>
       </div>
-      <div className="mt-2.5 space-y-0.5 border-t border-line pt-2 text-[12px] leading-snug text-ink-soft">
+      <div className="mt-2.5 space-y-0.5 border-t border-line pt-2 text-[13px] leading-snug text-ink-soft">
         <div>{offer.source}</div>
         {showJustification ? (
           <div className="line-clamp-2">{offer.justification}</div>

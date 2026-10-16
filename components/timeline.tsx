@@ -21,9 +21,9 @@ export function Timeline({
               <div
                 className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
                   done
-                    ? "bg-forest text-white"
+                    ? "bg-brand text-white"
                     : current
-                      ? "border-[3px] border-carrot bg-white"
+                      ? "border-[3px] border-accent bg-white"
                       : "border-2 border-line bg-white"
                 }`}
               >
@@ -32,20 +32,20 @@ export function Timeline({
               {!last && (
                 <div
                   className={`w-0.5 flex-1 py-0.5 ${
-                    done ? "bg-forest" : "bg-line"
+                    done ? "bg-brand" : "bg-line"
                   }`}
                 />
               )}
             </div>
             <div className={last ? "pb-1" : "pb-5"}>
               <div
-                className={`text-[14px] font-bold ${
+                className={`text-[15px] font-bold ${
                   done || current ? "text-ink" : "text-ink-soft"
                 }`}
               >
                 {label}
               </div>
-              <div className="text-[12px] text-ink-soft">{stepTimes[i]}</div>
+              <div className="text-[13px] text-ink-soft">{stepTimes[i]}</div>
             </div>
           </div>
         );
@@ -72,16 +72,16 @@ export function StepBar({
               <div
                 className={`flex size-7 items-center justify-center rounded-full ${
                   done
-                    ? "bg-forest text-white"
+                    ? "bg-brand text-white"
                     : current
-                      ? "bg-forest text-white ring-4 ring-forest/20"
+                      ? "bg-brand text-white ring-4 ring-brand/20"
                       : "border-2 border-line bg-white"
                 }`}
               >
                 {done && <Check className="size-4" strokeWidth={3} />}
               </div>
               <span
-                className={`whitespace-nowrap text-[11px] font-bold ${
+                className={`whitespace-nowrap text-[12px] font-bold ${
                   done || current ? "text-ink" : "text-ink-soft"
                 }`}
               >
@@ -90,7 +90,7 @@ export function StepBar({
             </div>
             {i < steps.length - 1 && (
               <div
-                className={`mx-1 mt-3 h-0.5 flex-1 ${done ? "bg-forest" : "bg-line"}`}
+                className={`mx-1 mt-3 h-0.5 flex-1 ${done ? "bg-brand" : "bg-line"}`}
               />
             )}
           </div>

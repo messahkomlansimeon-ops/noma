@@ -60,10 +60,10 @@ export function FavoriteButton({ demandId, offerId }: { demandId: string; offerI
         data-favorite={favorite ? "true" : "false"}
         className="flex size-11 items-center justify-center rounded-full border border-line bg-white transition active:scale-95 disabled:opacity-50"
       >
-        <Heart className={`size-5 ${favorite ? "fill-carrot text-carrot" : "text-ink"}`} aria-hidden />
+        <Heart className={`size-5 ${favorite ? "fill-accent text-accent" : "text-ink"}`} aria-hidden />
       </button>
       {error ? (
-        <p role="alert" data-testid="favorite-error" className="mt-1 max-w-40 text-[11px] font-semibold text-carrot-ink">
+        <p role="alert" data-testid="favorite-error" className="mt-1 max-w-40 text-[12px] font-semibold text-accent-ink">
           {error}
         </p>
       ) : null}

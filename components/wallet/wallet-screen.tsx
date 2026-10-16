@@ -39,7 +39,7 @@ interface Loaded {
   nextCursor: string | null;
 }
 
-const TONE_CLASS = { credit: "text-forest", debit: "text-carrot-ink", neutral: "text-ink-soft" } as const;
+const TONE_CLASS = { credit: "text-brand", debit: "text-accent-ink", neutral: "text-ink-soft" } as const;
 
 /** Panneau de recharge : montants proposés, montant libre validé, puis page de paiement simulé (prestataire fictif) ou page de paiement Wave (Sublymus). */
 function RechargePanel({ next, provider }: { next: string; provider: PaymentProviderName | "none" }) {
@@ -115,7 +115,7 @@ function RechargePanel({ next, provider }: { next: string; provider: PaymentProv
       <p
         data-testid={provider === "fake" ? "topup-simulation-notice" : "topup-provider-notice"}
         data-provider={provider}
-        className={`mt-1 rounded-lg px-3 py-2 text-[12px] font-semibold ${provider === "sublymus" ? "bg-sage text-forest" : "bg-carrot-soft text-carrot-ink"}`}
+        className={`mt-1 rounded-lg px-3 py-2 text-[13px] font-semibold ${provider === "sublymus" ? "bg-brand-soft text-brand" : "bg-accent-soft text-accent-ink"}`}
       >
         {rechargeNotice(provider)}
       </p>
@@ -134,8 +134,8 @@ function RechargePanel({ next, provider }: { next: string; provider: PaymentProv
               }}
               disabled={pending}
               aria-pressed={selected}
-              className={`rounded-xl border px-3 py-3 text-[14px] font-bold transition disabled:opacity-50 ${
-                selected ? "border-transparent bg-forest text-white" : "border-line bg-white text-ink"
+              className={`rounded-xl border px-3 py-3 text-[15px] font-bold transition disabled:opacity-50 ${
+                selected ? "border-transparent bg-brand text-white" : "border-line bg-white text-ink"
               }`}
             >
               {formatFcfa(preset)}
@@ -144,7 +144,7 @@ function RechargePanel({ next, provider }: { next: string; provider: PaymentProv
         })}
       </div>
 
-      <label htmlFor="topup-amount" className="mt-4 block text-[13px] font-bold text-ink">
+      <label htmlFor="topup-amount" className="mt-4 block text-[14px] font-bold text-ink">
         Ou un autre montant (en FCFA)
       </label>
       <input
@@ -169,13 +169,13 @@ function RechargePanel({ next, provider }: { next: string; provider: PaymentProv
         className="mt-1.5 w-full rounded-xl border border-line bg-white px-3.5 py-3 text-[15px] font-semibold text-ink disabled:opacity-60"
       />
       {touched && !parsed.ok && amountText.trim().length > 0 ? (
-        <p id="topup-amount-error" role="alert" data-testid="topup-amount-error" className="mt-1.5 text-[13px] font-semibold text-carrot-ink">
+        <p id="topup-amount-error" role="alert" data-testid="topup-amount-error" className="mt-1.5 text-[14px] font-semibold text-accent-ink">
           {parsed.message}
         </p>
       ) : null}
 
       {error ? (
-        <p role="alert" data-testid="topup-error" className="mt-3 rounded-xl bg-carrot-soft p-3 text-[13px] font-semibold text-carrot-ink">
+        <p role="alert" data-testid="topup-error" className="mt-3 rounded-xl bg-accent-soft p-3 text-[14px] font-semibold text-accent-ink">
           {error}
         </p>
       ) : null}
@@ -184,7 +184,7 @@ function RechargePanel({ next, provider }: { next: string; provider: PaymentProv
         data-testid="topup-submit"
         onClick={() => void submit()}
         disabled={!parsed.ok || pending || provider === "none"}
-        className="mt-4 flex w-full items-center justify-center rounded-xl bg-forest px-4 py-3.5 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-4 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3.5 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
       >
         {pending ? "Ouverture du paiement…" : parsed.ok ? `Continuer vers le paiement de ${formatFcfa(parsed.amountXof)}` : "Continuer vers le paiement"}
       </button>
@@ -269,50 +269,50 @@ export function PorteMonnaie({ space }: { space: "buyer" | "vendor" }) {
       <div className="px-4 pb-6">
         {loadError ? (
           <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[14px] font-semibold text-ink">{loadError}</p>
+            <p className="text-[15px] font-semibold text-ink">{loadError}</p>
             <button
               onClick={() => {
                 setLoadError(null);
                 setReloadKey((key) => key + 1);
               }}
-              className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
+              className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
             >
               Réessayer
             </button>
           </div>
         ) : !loaded ? (
-          <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
+          <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
             Chargement de votre porte-monnaie…
           </p>
         ) : (
           <>
-            <div className="mt-3 rounded-2xl bg-forest p-5 text-white">
-              <div className="flex items-center gap-2 text-[13px] font-semibold text-white/80">
+            <div className="mt-3 rounded-2xl bg-brand p-5 text-white">
+              <div className="flex items-center gap-2 text-[14px] font-semibold text-white/80">
                 <Wallet className="size-4" aria-hidden />
                 Solde disponible · {PAID_CREDITS_LABEL}
               </div>
-              <div data-testid="wallet-balance" className="mt-1 font-display text-[40px] font-extrabold leading-tight">
+              <div data-testid="wallet-balance" className="mt-1 text-[40px] font-extrabold leading-tight">
                 {formatFcfa(loaded.balanceXof)}
               </div>
               {loaded.promoBalanceXof > 0 || loaded.transactions.some((entry) => entry.promoAmountXof !== 0) ? (
                 <div data-testid="wallet-promo" className="mt-3 rounded-xl bg-white/15 px-3 py-2.5">
-                  <div className="text-[12px] font-semibold text-white/80">{PROMO_CREDITS_LABEL}</div>
-                  <div data-testid="wallet-promo-balance" className="font-display text-[22px] font-extrabold leading-tight">
+                  <div className="text-[13px] font-semibold text-white/80">{PROMO_CREDITS_LABEL}</div>
+                  <div data-testid="wallet-promo-balance" className="text-[22px] font-extrabold leading-tight">
                     {formatFcfa(loaded.promoBalanceXof)}
                   </div>
                   {promoExpiryText(loaded.promoBalanceXof, loaded.promoExpiresAt) ? (
-                    <div data-testid="wallet-promo-expiry" className="text-[12px] text-white/80">
+                    <div data-testid="wallet-promo-expiry" className="text-[13px] text-white/80">
                       {promoExpiryText(loaded.promoBalanceXof, loaded.promoExpiresAt)}
                     </div>
                   ) : null}
-                  <p className="mt-1 text-[11px] leading-snug text-white/70">{PROMO_CREDITS_NOTE}</p>
+                  <p className="mt-1 text-[12px] leading-snug text-white/70">{PROMO_CREDITS_NOTE}</p>
                 </div>
               ) : null}
               <button
                 data-testid="wallet-recharge"
                 onClick={() => setRechargeOpen((open) => !open)}
                 aria-expanded={rechargeOpen}
-                className="mt-3 flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-[15px] font-bold text-forest transition active:scale-[0.99]"
+                className="mt-3 flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-[15px] font-bold text-brand transition active:scale-[0.99]"
               >
                 Recharger
               </button>
@@ -322,7 +322,7 @@ export function PorteMonnaie({ space }: { space: "buyer" | "vendor" }) {
 
             <h2 className="mt-6 text-[16px] font-extrabold text-ink">Historique</h2>
             {loaded.transactions.length === 0 ? (
-              <p data-testid="wallet-empty" className="mt-2 rounded-2xl bg-wash p-4 text-center text-[14px] font-semibold text-ink-soft">
+              <p data-testid="wallet-empty" className="mt-2 rounded-2xl bg-mist p-4 text-center text-[15px] font-semibold text-ink-soft">
                 {EMPTY_WALLET_HISTORY}
               </p>
             ) : (
@@ -332,14 +332,14 @@ export function PorteMonnaie({ space }: { space: "buyer" | "vendor" }) {
                   return (
                     <li key={row.key} data-testid="wallet-row" data-kind={transaction.kind} className="flex items-center justify-between gap-3 px-3.5 py-3">
                       <div className="min-w-0">
-                        <div className="text-[14px] font-bold text-ink">{row.label}</div>
-                        <div className="text-[12px] text-ink-soft">{row.dateText}</div>
+                        <div className="text-[15px] font-bold text-ink">{row.label}</div>
+                        <div className="text-[13px] text-ink-soft">{row.dateText}</div>
                       </div>
                       <div className="shrink-0 text-right">
                         <div data-testid="wallet-row-amount" data-tone={row.tone} className={`text-[15px] font-extrabold ${TONE_CLASS[row.tone]}`}>
                           {row.amountText}
                         </div>
-                        {row.promoText ? <div data-testid="wallet-row-promo" className="text-[11px] font-semibold text-ink-soft">{row.promoText}</div> : null}
+                        {row.promoText ? <div data-testid="wallet-row-promo" className="text-[12px] font-semibold text-ink-soft">{row.promoText}</div> : null}
                       </div>
                     </li>
                   );
@@ -348,7 +348,7 @@ export function PorteMonnaie({ space }: { space: "buyer" | "vendor" }) {
             )}
 
             {moreError ? (
-              <p role="alert" className="mt-3 text-center text-[13px] font-semibold text-carrot-ink">
+              <p role="alert" className="mt-3 text-center text-[14px] font-semibold text-accent-ink">
                 {moreError}
               </p>
             ) : null}
@@ -356,7 +356,7 @@ export function PorteMonnaie({ space }: { space: "buyer" | "vendor" }) {
               <button
                 onClick={() => void loadMore()}
                 disabled={loadingMore}
-                className="mt-4 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white py-3 text-[14px] font-bold text-forest disabled:opacity-50"
+                className="mt-4 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white py-3 text-[15px] font-bold text-brand disabled:opacity-50"
               >
                 {loadingMore ? "Chargement…" : "Voir plus"}
               </button>

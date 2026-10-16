@@ -14,15 +14,15 @@ function ProfilVendeur() {
       <TopBar back="/vendeur" />
 
       <div className="px-4">
-        <h1 className="font-display text-[26px] font-extrabold text-ink">Compte vendeur</h1>
+        <h1 className="text-[26px] font-extrabold text-ink">Compte vendeur</h1>
 
         <div className="mt-3 flex items-center gap-3.5 rounded-2xl border border-line bg-white p-4">
-          <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-sage text-forest">
+          <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
             <Store className="size-7" strokeWidth={1.7} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
             <div className="text-[16px] font-extrabold text-ink">Votre espace vendeur</div>
-            <div className="text-[13px] text-ink-soft">Les acheteurs vous joignent par le numéro de ce compte.</div>
+            <div className="text-[14px] text-ink-soft">Les acheteurs vous joignent par le numéro de ce compte.</div>
             <Badge tone="sage" className="mt-1">
               <Phone className="size-3" />
               Téléphone confirmé
@@ -30,7 +30,7 @@ function ProfilVendeur() {
           </div>
         </div>
 
-        <p className="mt-3 rounded-2xl bg-wash p-3.5 text-[13px] text-ink-soft">
+        <p className="mt-3 rounded-2xl bg-mist p-3.5 text-[14px] text-ink-soft">
           Le profil public (nom de boutique, logo, zones desservies) est bientôt disponible.
         </p>
 
@@ -45,7 +45,7 @@ function ProfilVendeur() {
         <button
           onClick={() => void logout()}
           disabled={loggingOut}
-          className="mt-2 flex w-full items-center justify-center gap-2 py-2 text-[14px] font-bold text-ink-soft transition hover:text-ink disabled:opacity-40"
+          className="mt-2 flex w-full items-center justify-center gap-2 py-2 text-[15px] font-bold text-ink-soft transition hover:text-ink disabled:opacity-40"
         >
           <LogOut className="size-4" />
           {loggingOut ? "Déconnexion…" : "Se déconnecter"}

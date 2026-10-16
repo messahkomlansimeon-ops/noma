@@ -106,7 +106,7 @@ export function InterestedBuyers({ offer }: { offer: OfferRecord }) {
           <button
             onClick={refresh}
             disabled={busy}
-            className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[13px] font-semibold text-ink disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[14px] font-semibold text-ink disabled:opacity-50"
           >
             <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
             Actualiser
@@ -115,18 +115,18 @@ export function InterestedBuyers({ offer }: { offer: OfferRecord }) {
       </div>
 
       {notPublished ? (
-        <p role="status" className="mt-3 rounded-2xl bg-wash p-4 text-[14px] font-semibold text-ink-soft">
+        <p role="status" className="mt-3 rounded-2xl bg-mist p-4 text-[15px] font-semibold text-ink-soft">
           {notPublished}
         </p>
       ) : loadError ? (
         <div role="alert" className="mt-3 rounded-2xl border border-line bg-white p-4 text-center">
-          <p className="text-[14px] font-semibold text-ink">{loadError}</p>
-          <button onClick={refresh} className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white">
+          <p className="text-[15px] font-semibold text-ink">{loadError}</p>
+          <button onClick={refresh} className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white">
             Réessayer
           </button>
         </div>
       ) : !loaded ? (
-        <p className="mt-3 text-[14px] text-ink-soft" aria-busy="true">
+        <p className="mt-3 text-[15px] text-ink-soft" aria-busy="true">
           Chargement des besoins d'acheteurs…
         </p>
       ) : (
@@ -159,21 +159,21 @@ export function InterestedList({
   return (
     <>
       {loaded.items.length > 0 ? (
-        <p className="mt-1 text-[13px] text-ink-soft" data-testid="interested-note">
+        <p className="mt-1 text-[14px] text-ink-soft" data-testid="interested-note">
           {NEEDS_NOTE}
         </p>
       ) : null}
 
       {loaded.processing ? (
-        <p role="status" className="mt-1 text-[12px] font-semibold text-carrot-ink">
+        <p role="status" className="mt-1 text-[13px] font-semibold text-accent-ink">
           {PROCESSING_MESSAGE} La liste peut encore évoluer : appuyez sur Actualiser.
         </p>
       ) : null}
 
       {state === "empty" || state === "processing" ? (
-        <div className="mt-3 rounded-2xl bg-wash p-4 text-center" data-testid="interested-empty">
-          <p className="text-[14px] font-bold text-ink">{state === "processing" ? PROCESSING_MESSAGE : EMPTY_SELLER_MESSAGE}</p>
-          {state === "empty" ? <p className="mt-1 text-[13px] text-ink-soft">{EMPTY_SELLER_HINT}</p> : null}
+        <div className="mt-3 rounded-2xl bg-mist p-4 text-center" data-testid="interested-empty">
+          <p className="text-[15px] font-bold text-ink">{state === "processing" ? PROCESSING_MESSAGE : EMPTY_SELLER_MESSAGE}</p>
+          {state === "empty" ? <p className="mt-1 text-[14px] text-ink-soft">{EMPTY_SELLER_HINT}</p> : null}
         </div>
       ) : (
         <ul className="mt-3 space-y-3" aria-label="Besoins qui correspondent à votre annonce">
@@ -184,13 +184,13 @@ export function InterestedList({
       )}
 
       {loaded.truncated && state === "results" ? (
-        <p role="status" className="mt-3 text-[12px] font-semibold text-ink-soft">
+        <p role="status" className="mt-3 text-[13px] font-semibold text-ink-soft">
           {TRUNCATED_NOTE}
         </p>
       ) : null}
 
       {moreError ? (
-        <p role="alert" className="mt-3 text-center text-[13px] font-semibold text-carrot-ink">
+        <p role="alert" className="mt-3 text-center text-[14px] font-semibold text-accent-ink">
           {moreError}
         </p>
       ) : null}
@@ -199,7 +199,7 @@ export function InterestedList({
         <button
           onClick={onMore}
           disabled={disabled}
-          className="mt-4 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white py-3 text-[14px] font-bold text-forest disabled:opacity-50"
+          className="mt-4 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white py-3 text-[15px] font-bold text-brand disabled:opacity-50"
         >
           {loadingMore ? "Chargement…" : "Voir plus"}
         </button>

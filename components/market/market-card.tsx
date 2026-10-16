@@ -15,39 +15,39 @@ import {
 
 function ListingsBlock({ view }: { view: ListingsView }) {
   return (
-    <div data-testid="market-listings" data-published={view.published ? "true" : "false"} className="rounded-xl bg-wash px-3 py-2.5">
-      <div className="text-[12px] font-semibold uppercase tracking-wide text-ink-soft">{view.title}</div>
+    <div data-testid="market-listings" data-published={view.published ? "true" : "false"} className="rounded-xl bg-mist px-3 py-2.5">
+      <div className="text-[13px] font-semibold uppercase tracking-wide text-ink-soft">{view.title}</div>
       {view.published ? (
         <>
-          <div className="font-display text-[20px] font-extrabold leading-tight text-ink">
-            <span className="text-[12px] font-semibold text-ink-soft">Médiane </span>
+          <div className="text-[20px] font-extrabold leading-tight text-ink">
+            <span className="text-[13px] font-semibold text-ink-soft">Médiane </span>
             <span data-testid="market-listings-median">{view.headline}</span>
           </div>
           {view.range ? (
-            <div data-testid="market-listings-range" className="text-[12px] text-ink">
+            <div data-testid="market-listings-range" className="text-[13px] text-ink">
               {view.range}
             </div>
           ) : (
-            <div data-testid="market-listings-range-note" className="text-[12px] text-ink-soft">
+            <div data-testid="market-listings-range-note" className="text-[13px] text-ink-soft">
               {view.rangeNote}
             </div>
           )}
-          <div data-testid="market-listings-count" className="text-[12px] text-ink-soft">
+          <div data-testid="market-listings-count" className="text-[13px] text-ink-soft">
             {view.countText}
           </div>
           {view.excludedText ? (
-            <div data-testid="market-listings-excluded" className="text-[12px] text-ink-soft">
+            <div data-testid="market-listings-excluded" className="text-[13px] text-ink-soft">
               {view.excludedText}
             </div>
           ) : null}
-          <div data-testid="market-listings-compared" data-widened={view.widened ? "true" : "false"} className={`text-[12px] ${view.widened ? "font-semibold text-carrot-ink" : "text-ink-soft"}`}>
+          <div data-testid="market-listings-compared" data-widened={view.widened ? "true" : "false"} className={`text-[13px] ${view.widened ? "font-semibold text-accent-ink" : "text-ink-soft"}`}>
             {view.comparedTo}
           </div>
           {view.trendSummary ? <Sparkline trend={view.trend} label={view.trendSummary} testId="market-listings-trend" /> : null}
-          {view.trendSummary ? <div className="text-[11px] text-ink-soft">{view.trendSummary}</div> : null}
+          {view.trendSummary ? <div className="text-[12px] text-ink-soft">{view.trendSummary}</div> : null}
         </>
       ) : (
-        <div data-testid="market-listings-insufficient" className="text-[13px] text-ink-soft">
+        <div data-testid="market-listings-insufficient" className="text-[14px] text-ink-soft">
           {MARKET_INSUFFICIENT_TEXT}
         </div>
       )}
@@ -97,28 +97,28 @@ export function MarketCard({ query }: { query: MarketQuery }) {
             onClick={() => setDays(choice.days)}
             aria-pressed={days === choice.days}
             data-testid={`market-period-${choice.days}`}
-            className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${days === choice.days ? "border-transparent bg-forest text-white" : "border-line bg-white text-ink"}`}
+            className={`rounded-full border px-3 py-1 text-[13px] font-semibold ${days === choice.days ? "border-transparent bg-brand text-white" : "border-line bg-white text-ink"}`}
           >
             {choice.label}
           </button>
         ))}
       </div>
       {view === null ? (
-        <p className="mt-3 text-[13px] text-ink-soft" aria-busy="true">
+        <p className="mt-3 text-[14px] text-ink-soft" aria-busy="true">
           {MARKET_LOADING_TEXT}
         </p>
       ) : (
         <>
-          <p data-testid="market-period" className="mt-3 text-[12px] font-semibold text-ink-soft">
+          <p data-testid="market-period" className="mt-3 text-[13px] font-semibold text-ink-soft">
             {view.periodText}
           </p>
           <div className="mt-2 grid gap-2.5">
             <ListingsBlock view={view.listings} />
           </div>
-          <p data-testid="market-asking-note" className="mt-2 text-[12px] font-semibold text-ink">
+          <p data-testid="market-asking-note" className="mt-2 text-[13px] font-semibold text-ink">
             {view.askingNote}
           </p>
-          <p data-testid="market-note" className="mt-1 text-[11px] leading-relaxed text-ink-soft">
+          <p data-testid="market-note" className="mt-1 text-[12px] leading-relaxed text-ink-soft">
             {view.note}
           </p>
         </>

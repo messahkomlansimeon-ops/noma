@@ -19,7 +19,7 @@ type Submitting = "activate" | "draft" | null;
 
 function FieldError({ message }: { message?: string }) {
   return message ? (
-    <div role="alert" className="mt-1.5 text-[12px] font-semibold text-carrot-ink">
+    <div role="alert" className="mt-1.5 text-[13px] font-semibold text-accent-ink">
       {message}
     </div>
   ) : null;
@@ -191,7 +191,7 @@ function NouveauBesoin() {
           </div>
         </div>
 
-        <div className="mt-4 flex items-center gap-2 text-[13px] font-semibold text-forest">
+        <div className="mt-4 flex items-center gap-2 text-[14px] font-semibold text-brand">
           <CheckCheck className="size-4" />
           Vous pouvez archiver ce besoin à tout moment.
         </div>
@@ -199,18 +199,18 @@ function NouveauBesoin() {
         <button
           onClick={() => void submit("activate")}
           disabled={submitting !== null}
-          className="mt-5 w-full rounded-xl bg-forest py-4 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-5 w-full rounded-xl bg-brand py-4 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {submitting === "activate" ? "Activation…" : "Activer le besoin"}
         </button>
         <button
           onClick={() => void submit("draft")}
           disabled={submitting !== null}
-          className="mt-2.5 w-full rounded-xl border border-forest/30 bg-white py-3.5 text-[15px] font-bold text-forest transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-2.5 w-full rounded-xl border border-brand/30 bg-white py-3.5 text-[15px] font-bold text-brand transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {submitting === "draft" ? "Enregistrement…" : "Enregistrer en brouillon"}
         </button>
-        <div className="py-4 text-center text-[12px] text-ink-soft">
+        <div className="py-4 text-center text-[13px] text-ink-soft">
           Un besoin brouillon n'est pas pris en compte tant qu'il n'est pas activé.
         </div>
       </div>

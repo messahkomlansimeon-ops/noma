@@ -11,7 +11,7 @@ export default function NotFound() {
       <title>{APP_TITLE}</title>
       <div className="flex items-center text-ink">
         <h1 className="mr-5 border-r border-ink/30 pr-6 text-[24px] font-medium leading-[49px]">404</h1>
-        <h2 className="text-[14px] font-normal leading-[49px]">This page could not be found.</h2>
+        <h2 className="text-[15px] font-normal leading-[49px]">This page could not be found.</h2>
       </div>
     </main>
   );

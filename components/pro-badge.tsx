@@ -12,13 +12,13 @@ export function ProBadge({ withNotice = false }: { withNotice?: boolean }) {
     <span data-testid="pro-badge" className="inline-flex flex-col items-start gap-0.5">
       <span
         title={PRO_BADGE_NOTICE}
-        className="inline-flex items-center gap-1 rounded-md bg-sage px-2 py-[3px] text-[11px] font-extrabold leading-tight text-forest"
+        className="inline-flex items-center gap-1 rounded-md bg-brand-soft px-2 py-[3px] text-[12px] font-extrabold leading-tight text-brand"
       >
         <BadgeCheck className="size-3" aria-hidden />
         {PRO_BADGE_LABEL}
       </span>
       {withNotice ? (
-        <span data-testid="pro-badge-notice" className="text-[12px] text-ink-soft">
+        <span data-testid="pro-badge-notice" className="text-[13px] text-ink-soft">
           {PRO_BADGE_NOTICE}
         </span>
       ) : null}

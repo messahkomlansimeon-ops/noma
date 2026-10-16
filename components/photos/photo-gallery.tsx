@@ -18,7 +18,7 @@ export function PhotoGallery({ photos, title }: { photos: readonly PhotoRef[]; t
   const drop = (id: string) => setFailed((known) => (known.includes(id) ? known : [...known, id]));
   return (
     <section aria-label="Photos de l'annonce" data-testid="photo-gallery" className="mb-3">
-      <div className="overflow-hidden rounded-2xl bg-wash" style={{ aspectRatio: "4 / 3" }}>
+      <div className="overflow-hidden rounded-2xl bg-mist" style={{ aspectRatio: "4 / 3" }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- fichiers servis par /api/media avec contrôle d'accès */}
         <img
           key={current.id}
@@ -44,7 +44,7 @@ export function PhotoGallery({ photos, title }: { photos: readonly PhotoRef[]; t
                 aria-label={`Voir la photo ${position + 1} sur ${usable.length}`}
                 aria-current={position === index ? "true" : undefined}
                 data-testid="gallery-thumb"
-                className={`block overflow-hidden rounded-xl border-2 ${position === index ? "border-forest" : "border-transparent"}`}
+                className={`block overflow-hidden rounded-xl border-2 ${position === index ? "border-brand" : "border-transparent"}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- fichiers servis par /api/media avec contrôle d'accès */}
                 <img

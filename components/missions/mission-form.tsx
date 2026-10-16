@@ -59,7 +59,7 @@ export function MissionForm({ mode, missionId, initial }: { mode: "create" | "ed
 
   const field = (key: MissionField, formKey: keyof MissionFormValues, label: string, options: { placeholder?: string; numeric?: boolean; hint?: string } = {}) => (
     <div className="mt-3">
-      <label htmlFor={`mission-${key}`} className="mb-1.5 block text-[13px] font-bold text-ink">
+      <label htmlFor={`mission-${key}`} className="mb-1.5 block text-[14px] font-bold text-ink">
         {label}
       </label>
       <Input
@@ -72,9 +72,9 @@ export function MissionForm({ mode, missionId, initial }: { mode: "create" | "ed
         placeholder={options.placeholder}
         aria-invalid={problems[key] ? true : undefined}
       />
-      {options.hint ? <p className="mt-1 text-[11px] text-ink-soft">{options.hint}</p> : null}
+      {options.hint ? <p className="mt-1 text-[12px] text-ink-soft">{options.hint}</p> : null}
       {problems[key] ? (
-        <p role="alert" data-testid={`mission-problem-${key}`} className="mt-1 text-[12px] font-semibold text-carrot-ink">
+        <p role="alert" data-testid={`mission-problem-${key}`} className="mt-1 text-[13px] font-semibold text-accent-ink">
           {problems[key]}
         </p>
       ) : null}
@@ -92,8 +92,8 @@ export function MissionForm({ mode, missionId, initial }: { mode: "create" | "ed
           void submit(true);
         }}
       >
-        <h1 className="font-display text-[22px] font-extrabold text-ink">{mode === "edit" ? "Modifier la mission" : "Nouvelle mission"}</h1>
-        <p className="mt-1 text-[13px] text-ink-soft">
+        <h1 className="text-[22px] font-extrabold text-ink">{mode === "edit" ? "Modifier la mission" : "Nouvelle mission"}</h1>
+        <p className="mt-1 text-[14px] text-ink-soft">
           Achetez plusieurs exemplaires du même objet, chez plusieurs vendeurs. Les vendeurs ne voient jamais votre budget ni le nombre total voulu.
         </p>
 
@@ -103,7 +103,7 @@ export function MissionForm({ mode, missionId, initial }: { mode: "create" | "ed
         {field("model", "model", "Modèle", { placeholder: "Ex. iPhone 12" })}
         {field("variant", "variant", "Variante (facultatif)", { placeholder: "Ex. 128 Go" })}
         <div className="mt-3">
-          <label htmlFor="mission-condition" className="mb-1.5 block text-[13px] font-bold text-ink">
+          <label htmlFor="mission-condition" className="mb-1.5 block text-[14px] font-bold text-ink">
             État voulu
           </label>
           <select id="mission-condition" data-testid="mission-field-condition" value={values.condition} onChange={set("condition")} className={FIELD_CLASS}>
@@ -115,7 +115,7 @@ export function MissionForm({ mode, missionId, initial }: { mode: "create" | "ed
             {MISSION_CONDITIONS.includes(values.condition) ? null : <option value={values.condition}>{values.condition}</option>}
           </select>
           {problems.condition ? (
-            <p role="alert" className="mt-1 text-[12px] font-semibold text-carrot-ink">
+            <p role="alert" className="mt-1 text-[13px] font-semibold text-accent-ink">
               {problems.condition}
             </p>
           ) : null}
@@ -133,16 +133,16 @@ export function MissionForm({ mode, missionId, initial }: { mode: "create" | "ed
         {field("location", "location", "Lieu (facultatif)", { placeholder: "Ex. Abidjan" })}
         {field("deadlineDays", "deadlineDays", "Durée de la mission (jours)", { numeric: true, hint: `De 1 à ${MISSION_DEADLINE_DAYS_MAX} jours.` })}
 
-        <p data-testid="no-payment-notice" className="mt-5 text-[12px] leading-relaxed text-ink-soft">
+        <p data-testid="no-payment-notice" className="mt-5 text-[13px] leading-relaxed text-ink-soft">
           {NO_PAYMENT_NOTICE}
         </p>
         {error ? (
-          <p role="alert" data-testid="mission-form-error" className="mt-3 text-[13px] font-semibold text-carrot-ink">
+          <p role="alert" data-testid="mission-form-error" className="mt-3 text-[14px] font-semibold text-accent-ink">
             {error}
           </p>
         ) : null}
         <div className="mt-4 grid gap-2.5">
-          <button type="submit" disabled={pending} data-testid="mission-submit" className="rounded-xl bg-forest px-4 py-3 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:opacity-50">
+          <button type="submit" disabled={pending} data-testid="mission-submit" className="rounded-xl bg-brand px-4 py-3 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:opacity-50">
             {pending ? "Envoi…" : "Lancer la mission"}
           </button>
           <button
@@ -150,7 +150,7 @@ export function MissionForm({ mode, missionId, initial }: { mode: "create" | "ed
             disabled={pending}
             onClick={() => void submit(false)}
             data-testid="mission-save-draft"
-            className="rounded-xl border border-line bg-white px-4 py-3 text-[14px] font-bold text-ink disabled:opacity-50"
+            className="rounded-xl border border-line bg-white px-4 py-3 text-[15px] font-bold text-ink disabled:opacity-50"
           >
             Enregistrer en brouillon
           </button>

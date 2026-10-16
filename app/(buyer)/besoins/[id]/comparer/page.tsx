@@ -29,9 +29,9 @@ type State =
 
 function Cell({ text, best }: { text: string; best: boolean }) {
   return (
-    <td className={`px-2 py-2 align-top text-[13px] ${best ? "font-bold text-forest" : "text-ink"}`}>
+    <td className={`px-2 py-2 align-top text-[14px] ${best ? "font-bold text-brand" : "text-ink"}`}>
       {text}
-      {best ? <span className="ml-1 text-[11px] font-extrabold uppercase text-forest">Le plus avantageux</span> : null}
+      {best ? <span className="ml-1 text-[12px] font-extrabold uppercase text-brand">Le plus avantageux</span> : null}
     </td>
   );
 }
@@ -46,11 +46,11 @@ function Table({ demandId, pair }: { demandId: string; pair: [StoredMatch, Store
           <caption className="sr-only">Comparaison de deux offres</caption>
           <thead>
             <tr className="border-b border-line">
-              <th scope="col" className="w-[28%] px-2 py-2 text-[12px] font-semibold text-ink-soft">
+              <th scope="col" className="w-[28%] px-2 py-2 text-[13px] font-semibold text-ink-soft">
                 &nbsp;
               </th>
               {titles.map((title, index) => (
-                <th key={pair[index].candidateId} scope="col" className="px-2 py-2 text-[13px] font-extrabold text-ink">
+                <th key={pair[index].candidateId} scope="col" className="px-2 py-2 text-[14px] font-extrabold text-ink">
                   {title}
                 </th>
               ))}
@@ -59,7 +59,7 @@ function Table({ demandId, pair }: { demandId: string; pair: [StoredMatch, Store
           <tbody>
             {rows.map((row) => (
               <tr key={row.key} data-row={row.key} className="border-b border-line last:border-0">
-                <th scope="row" className="px-2 py-2 align-top text-[12px] font-semibold text-ink-soft">
+                <th scope="row" className="px-2 py-2 align-top text-[13px] font-semibold text-ink-soft">
                   {row.label}
                 </th>
                 <Cell text={row.a} best={row.better === "a"} />
@@ -76,14 +76,14 @@ function Table({ demandId, pair }: { demandId: string; pair: [StoredMatch, Store
             <Link
               key={item.candidateId}
               href={href}
-              className="flex items-center justify-center rounded-xl border border-forest/30 bg-white py-2.5 text-[13px] font-bold text-forest"
+              className="flex items-center justify-center rounded-xl border border-brand/30 bg-white py-2.5 text-[14px] font-bold text-brand"
             >
               Voir l'annonce
             </Link>
           ) : null;
         })}
       </div>
-      <p className="mt-3 text-[12px] text-ink-soft">{COMPARE_NOTE}</p>
+      <p className="mt-3 text-[13px] text-ink-soft">{COMPARE_NOTE}</p>
     </div>
   );
 }
@@ -119,21 +119,21 @@ function Compared({ demandId, selection }: { demandId: string; selection: [strin
 
   if (state.kind === "loading") {
     return (
-      <p role="status" aria-busy="true" className="mt-6 text-center text-[14px] text-ink-soft">
+      <p role="status" aria-busy="true" className="mt-6 text-center text-[15px] text-ink-soft">
         Chargement de la comparaison…
       </p>
     );
   }
   if (state.kind === "error") {
     return (
-      <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+      <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
         {state.message}
       </p>
     );
   }
   if (state.kind === "missing") {
     return (
-      <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+      <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
         {COMPARE_MISSING_MESSAGE}
       </p>
     );
@@ -154,7 +154,7 @@ function PageContent() {
         {valid && selection ? (
           <Compared demandId={demandId} selection={selection} />
         ) : (
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+          <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
             {valid ? COMPARE_INVALID_MESSAGE : "Besoin introuvable."}
           </p>
         )}

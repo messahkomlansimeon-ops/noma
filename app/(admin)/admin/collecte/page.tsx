@@ -24,12 +24,12 @@ export default function AdminCollecte() {
         const errors = adminErrorRows(collection.errors);
         return (
           <div data-testid="admin-collection">
-            <h1 className="font-display text-[22px] font-extrabold text-ink">{ADMIN_COLLECTION_TITLE}</h1>
-            <p data-testid="admin-collection-note" className="mt-1 rounded-xl bg-wash px-3 py-2 text-[12px] font-semibold text-ink-soft">
+            <h1 className="text-[22px] font-extrabold text-ink">{ADMIN_COLLECTION_TITLE}</h1>
+            <p data-testid="admin-collection-note" className="mt-1 rounded-xl bg-mist px-3 py-2 text-[13px] font-semibold text-ink-soft">
               {ADMIN_COLLECTION_NOTE}
             </p>
             {!collection.schemaReady ? (
-              <p role="status" className="mt-4 rounded-2xl bg-wash p-4 text-center text-[14px] text-ink-soft">
+              <p role="status" className="mt-4 rounded-2xl bg-mist p-4 text-center text-[15px] text-ink-soft">
                 {ADMIN_COLLECTION_NOT_READY}
               </p>
             ) : (
@@ -47,23 +47,23 @@ export default function AdminCollecte() {
                             <span className="text-[15px] font-bold text-ink">{row.name}</span>
                             <Badge tone={row.state === "closed" ? "sage" : row.state === "disabled" ? "wash" : "carrot"}>{row.stateText}</Badge>
                           </div>
-                          <div className="text-[12px] text-ink-soft">Source {row.typeText.toLowerCase()}</div>
-                          <div data-testid="collection-quota" className="text-[12px] text-ink-soft">
+                          <div className="text-[13px] text-ink-soft">Source {row.typeText.toLowerCase()}</div>
+                          <div data-testid="collection-quota" className="text-[13px] text-ink-soft">
                             {row.quotaText}
                           </div>
-                          <div className="text-[12px] text-ink-soft">{row.failuresText}</div>
-                          {row.pauseText ? <div className="text-[12px] font-semibold text-carrot-ink">{row.pauseText}</div> : null}
-                          {row.lastErrorText ? <div className="text-[12px] text-ink-soft">Dernière erreur : {row.lastErrorText}</div> : null}
+                          <div className="text-[13px] text-ink-soft">{row.failuresText}</div>
+                          {row.pauseText ? <div className="text-[13px] font-semibold text-accent-ink">{row.pauseText}</div> : null}
+                          {row.lastErrorText ? <div className="text-[13px] text-ink-soft">Dernière erreur : {row.lastErrorText}</div> : null}
                         </li>
                       );
                     })}
                   </ul>
                 </section>
                 <section aria-labelledby="watches-title" data-testid="collection-watches" className="mt-4 rounded-2xl border border-line bg-white p-4">
-                  <h2 id="watches-title" className="text-[14px] font-extrabold text-ink">
+                  <h2 id="watches-title" className="text-[15px] font-extrabold text-ink">
                     Surveillances et annonces
                   </h2>
-                  <ul className="mt-1.5 space-y-0.5 text-[12px] text-ink-soft">
+                  <ul className="mt-1.5 space-y-0.5 text-[13px] text-ink-soft">
                     {summary.lines.map((line) => (
                       <li key={line}>{line}</li>
                     ))}
@@ -74,11 +74,11 @@ export default function AdminCollecte() {
                     Dernières erreurs
                   </h2>
                   {errors.length === 0 ? (
-                    <p className="mt-2 text-[13px] text-ink-soft">{ADMIN_COLLECTION_NO_ERRORS}</p>
+                    <p className="mt-2 text-[14px] text-ink-soft">{ADMIN_COLLECTION_NO_ERRORS}</p>
                   ) : (
                     <ul className="mt-2 space-y-1.5">
                       {errors.map((entry) => (
-                        <li key={entry.key} data-testid="collection-error" className="rounded-xl border border-line bg-white px-3 py-2 text-[12px]">
+                        <li key={entry.key} data-testid="collection-error" className="rounded-xl border border-line bg-white px-3 py-2 text-[13px]">
                           <div className="font-semibold text-ink">{entry.text}</div>
                           <div className="text-ink-soft">{entry.dateText}</div>
                         </li>

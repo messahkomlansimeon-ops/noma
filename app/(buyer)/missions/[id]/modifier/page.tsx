@@ -33,7 +33,7 @@ function EditLoader({ id }: { id: string }) {
     return (
       <main>
         <TopBar back={`/missions/${id}`} title="Modifier la mission" />
-        <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+        <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
           {error}
         </p>
       </main>
@@ -43,7 +43,7 @@ function EditLoader({ id }: { id: string }) {
     return (
       <main>
         <TopBar back={`/missions/${id}`} title="Modifier la mission" />
-        <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
+        <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
           Chargement de la mission…
         </p>
       </main>
@@ -62,7 +62,7 @@ export default function ModifierMission() {
       ) : (
         <main>
           <TopBar back="/missions" title="Mission" />
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+          <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
             {MISSION_NOT_FOUND}
           </p>
         </main>

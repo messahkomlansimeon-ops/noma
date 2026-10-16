@@ -74,14 +74,14 @@ function Content() {
 
   if (error && loaded === null) {
     return (
-      <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+      <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
         {error}
       </p>
     );
   }
   if (loaded === null) {
     return (
-      <p aria-busy="true" className="mt-6 text-center text-[14px] text-ink-soft">
+      <p aria-busy="true" className="mt-6 text-center text-[15px] text-ink-soft">
         Chargement…
       </p>
     );
@@ -89,19 +89,19 @@ function Content() {
   const { requests, sent } = loaded;
   return (
     <div data-testid="vendor-requests">
-      <p className="mt-3 text-[13px] text-ink-soft">{REQUESTS_HINT}</p>
+      <p className="mt-3 text-[14px] text-ink-soft">{REQUESTS_HINT}</p>
       {notice ? (
-        <p role="status" className="mt-2 rounded-xl bg-sage px-3 py-2 text-[13px] font-semibold text-forest">
+        <p role="status" className="mt-2 rounded-xl bg-brand-soft px-3 py-2 text-[14px] font-semibold text-brand">
           {notice}
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+        <p role="alert" className="mt-2 text-[14px] font-semibold text-accent-ink">
           {error}
         </p>
       ) : null}
       {requests.requests.length === 0 ? (
-        <p className="mt-4 rounded-2xl bg-wash p-4 text-center text-[14px] text-ink-soft">{REQUESTS_EMPTY}</p>
+        <p className="mt-4 rounded-2xl bg-mist p-4 text-center text-[15px] text-ink-soft">{REQUESTS_EMPTY}</p>
       ) : (
         <ul aria-label={REQUESTS_TITLE} className="mt-3 space-y-3">
           {requests.requests.map((request) => {
@@ -113,10 +113,10 @@ function Content() {
                   <InterestedBuyerCard item={request.need} />
                 </ul>
                 <div className="px-3.5 pb-3">
-                  <p className="text-[12px] text-ink-soft">{row.offersText}</p>
-                  {row.proposedCount > 0 ? <p className="mt-0.5 text-[12px] font-semibold text-forest">{row.allProposed ? "Proposition envoyée" : `${row.proposedCount} proposition(s) envoyée(s)`}</p> : null}
+                  <p className="text-[13px] text-ink-soft">{row.offersText}</p>
+                  {row.proposedCount > 0 ? <p className="mt-0.5 text-[13px] font-semibold text-brand">{row.allProposed ? "Proposition envoyée" : `${row.proposedCount} proposition(s) envoyée(s)`}</p> : null}
                   {href ? (
-                    <Link href={href} data-testid="vendor-request-open" className="mt-2 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white py-2.5 text-[14px] font-bold text-forest">
+                    <Link href={href} data-testid="vendor-request-open" className="mt-2 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white py-2.5 text-[15px] font-bold text-brand">
                       Répondre
                     </Link>
                   ) : null}
@@ -127,14 +127,14 @@ function Content() {
         </ul>
       )}
       {requests.offersTruncated ? (
-        <p role="status" className="mt-3 text-[12px] font-semibold text-ink-soft">
+        <p role="status" className="mt-3 text-[13px] font-semibold text-ink-soft">
           {REQUESTS_TRUNCATED_NOTE}
         </p>
       ) : null}
 
-      <h2 className="mt-6 font-display text-[18px] font-extrabold text-ink">{SENT_TITLE}</h2>
+      <h2 className="mt-6 text-[18px] font-extrabold text-ink">{SENT_TITLE}</h2>
       {sent.length === 0 ? (
-        <p className="mt-2 text-[13px] text-ink-soft">{SENT_EMPTY}</p>
+        <p className="mt-2 text-[14px] text-ink-soft">{SENT_EMPTY}</p>
       ) : (
         <ul className="mt-2 space-y-2.5" aria-label={SENT_TITLE}>
           {sent.map((proposal) => {
@@ -142,17 +142,17 @@ function Content() {
             return (
               <li key={row.id} data-testid="sent-proposal" data-status={row.status} className="rounded-2xl border border-line bg-white p-3.5">
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-[14px] font-bold text-ink">{row.title}</span>
+                  <span className="text-[15px] font-bold text-ink">{row.title}</span>
                   <Badge tone={row.status === "sent" ? "carrot" : row.status === "accepted" ? "sage" : "wash"}>{row.statusText}</Badge>
                 </div>
-                <div className="mt-0.5 text-[14px] font-extrabold text-ink">{row.priceText}</div>
-                <div className="text-[12px] text-ink-soft">{row.validText}</div>
+                <div className="mt-0.5 text-[15px] font-extrabold text-ink">{row.priceText}</div>
+                <div className="text-[13px] text-ink-soft">{row.validText}</div>
                 {canAnswer(proposal) ? (
                   <button
                     onClick={() => void withdraw(proposal.id)}
                     disabled={pendingId === proposal.id}
                     data-testid="proposal-withdraw"
-                    className="mt-2 rounded-xl border border-line bg-white px-3.5 py-2 text-[13px] font-bold text-ink disabled:opacity-50"
+                    className="mt-2 rounded-xl border border-line bg-white px-3.5 py-2 text-[14px] font-bold text-ink disabled:opacity-50"
                   >
                     Retirer
                   </button>

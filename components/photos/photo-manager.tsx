@@ -118,7 +118,7 @@ export function PhotoManager({ offerId, readOnly = false, onChange }: { offerId:
           {PHOTOS_TITLE}
         </h2>
         {photos ? (
-          <span data-testid="photo-count" className="text-[12px] font-semibold text-ink-soft">
+          <span data-testid="photo-count" className="text-[13px] font-semibold text-ink-soft">
             {photoCountText(count)}
           </span>
         ) : null}
@@ -126,25 +126,25 @@ export function PhotoManager({ offerId, readOnly = false, onChange }: { offerId:
 
       {loadError ? (
         <div role="alert" className="mt-2 rounded-2xl border border-line bg-white p-3 text-center">
-          <p className="text-[13px] font-semibold text-ink">{loadError}</p>
+          <p className="text-[14px] font-semibold text-ink">{loadError}</p>
           <button
             type="button"
             onClick={() => {
               setLoadError(null);
               setReloadKey((key) => key + 1);
             }}
-            className="mt-2 rounded-xl bg-forest px-4 py-2 text-[13px] font-bold text-white"
+            className="mt-2 rounded-xl bg-brand px-4 py-2 text-[14px] font-bold text-white"
           >
             Réessayer
           </button>
         </div>
       ) : photos === null ? (
-        <p className="mt-2 text-[13px] text-ink-soft" aria-busy="true">
+        <p className="mt-2 text-[14px] text-ink-soft" aria-busy="true">
           Chargement des photos…
         </p>
       ) : (
         <>
-          {photos.length === 0 && picked.length === 0 ? <p className="mt-2 text-[13px] text-ink-soft">{PHOTOS_EMPTY}</p> : null}
+          {photos.length === 0 && picked.length === 0 ? <p className="mt-2 text-[14px] text-ink-soft">{PHOTOS_EMPTY}</p> : null}
           {photos.length > 0 ? (
             <ul className="mt-2 grid grid-cols-3 gap-2" data-testid="photo-list">
               {photos.map((photo, index) => (
@@ -153,7 +153,7 @@ export function PhotoManager({ offerId, readOnly = false, onChange }: { offerId:
                     {/* eslint-disable-next-line @next/next/no-img-element -- fichiers servis par /api/media avec contrôle d'accès */}
                     <img src={mediaUrl(photo.id) ?? undefined} alt={`Photo ${index + 1}`} loading="lazy" decoding="async" referrerPolicy="no-referrer" className="aspect-square w-full object-cover" />
                     {photo.position === 0 ? (
-                      <span className="absolute left-1 top-1 rounded-md bg-forest px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">Couverture</span>
+                      <span className="absolute left-1 top-1 rounded-md bg-brand px-1.5 py-0.5 text-[12px] font-extrabold uppercase tracking-wide text-white">Couverture</span>
                     ) : null}
                   </div>
                   {readOnly ? null : (
@@ -172,15 +172,15 @@ export function PhotoManager({ offerId, readOnly = false, onChange }: { offerId:
                   <div className="border-t border-line p-1">
                     {confirming === photo.id ? (
                       <div className="flex gap-1">
-                        <button type="button" disabled={busy} onClick={() => void remove(photo.id)} data-testid="photo-delete-confirm" className="flex-1 rounded-lg bg-carrot px-1 py-1.5 text-[11px] font-bold text-white disabled:opacity-40">
+                        <button type="button" disabled={busy} onClick={() => void remove(photo.id)} data-testid="photo-delete-confirm" className="flex-1 rounded-lg bg-accent px-1 py-1.5 text-[12px] font-bold text-ink disabled:opacity-40">
                           Confirmer
                         </button>
-                        <button type="button" onClick={() => setConfirming(null)} className="flex-1 rounded-lg bg-wash px-1 py-1.5 text-[11px] font-bold text-ink">
+                        <button type="button" onClick={() => setConfirming(null)} className="flex-1 rounded-lg bg-mist px-1 py-1.5 text-[12px] font-bold text-ink">
                           Annuler
                         </button>
                       </div>
                     ) : (
-                      <button type="button" disabled={busy} onClick={() => setConfirming(photo.id)} aria-label="Supprimer cette photo" data-testid="photo-delete" className="flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-[11px] font-bold text-carrot-ink disabled:opacity-40">
+                      <button type="button" disabled={busy} onClick={() => setConfirming(photo.id)} aria-label="Supprimer cette photo" data-testid="photo-delete" className="flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-[12px] font-bold text-accent-ink disabled:opacity-40">
                         <Trash2 className="size-3.5" aria-hidden />
                         Supprimer
                       </button>
@@ -199,18 +199,18 @@ export function PhotoManager({ offerId, readOnly = false, onChange }: { offerId:
                     // eslint-disable-next-line @next/next/no-img-element -- aperçu local (adresse blob) d'un fichier choisi
                     <img src={item.previewUrl} alt="" className="size-12 shrink-0 rounded-lg object-cover" />
                   ) : (
-                    <span className="size-12 shrink-0 rounded-lg bg-wash" />
+                    <span className="size-12 shrink-0 rounded-lg bg-mist" />
                   )}
                   <div className="min-w-0 flex-1">
                     {item.status === "failed" ? (
-                      <p role="alert" data-testid="photo-error" className="text-[12px] font-semibold text-carrot-ink">
+                      <p role="alert" data-testid="photo-error" className="text-[13px] font-semibold text-accent-ink">
                         {item.error}
                       </p>
                     ) : (
                       <>
-                        <p className="text-[12px] font-semibold text-ink">{item.status === "done" ? "Photo envoyée" : item.status === "uploading" ? "Envoi en cours…" : "En attente"}</p>
-                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-wash" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent(item.progress)} data-testid="photo-progress">
-                          <div className="h-full rounded-full bg-forest" style={{ width: `${progressPercent(item.progress)}%` }} />
+                        <p className="text-[13px] font-semibold text-ink">{item.status === "done" ? "Photo envoyée" : item.status === "uploading" ? "Envoi en cours…" : "En attente"}</p>
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-mist" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent(item.progress)} data-testid="photo-progress">
+                          <div className="h-full rounded-full bg-brand" style={{ width: `${progressPercent(item.progress)}%` }} />
                         </div>
                       </>
                     )}
@@ -226,26 +226,26 @@ export function PhotoManager({ offerId, readOnly = false, onChange }: { offerId:
           ) : null}
 
           {message ? (
-            <p role="alert" data-testid="photo-message" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+            <p role="alert" data-testid="photo-message" className="mt-2 text-[14px] font-semibold text-accent-ink">
               {message}
             </p>
           ) : null}
 
           {readOnly ? null : room > 0 ? (
             <label
-              className={`mt-2.5 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-forest/30 bg-white py-3 text-[14px] font-bold text-forest ${busy ? "pointer-events-none opacity-40" : ""}`}
+              className={`mt-2.5 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-brand/30 bg-white py-3 text-[15px] font-bold text-brand ${busy ? "pointer-events-none opacity-40" : ""}`}
             >
               <ImagePlus className="size-4" aria-hidden />
               {PHOTOS_ADD_LABEL}
               <input ref={input} type="file" accept={PHOTO_ACCEPT_ATTRIBUTE} multiple disabled={busy} onChange={(event) => void onFiles(event.target.files)} data-testid="photo-add-input" className="sr-only" />
             </label>
           ) : (
-            <p data-testid="photo-limit" className="mt-2 text-[12px] font-semibold text-ink-soft">
+            <p data-testid="photo-limit" className="mt-2 text-[13px] font-semibold text-ink-soft">
               {PHOTOS_LIMIT_REACHED}
             </p>
           )}
-          <p className="mt-1.5 text-[11px] leading-relaxed text-ink-soft">{PHOTOS_HINT}</p>
-          <p data-testid="photo-phone-reminder" className="mt-1 rounded-lg bg-sage px-2.5 py-1.5 text-[12px] font-semibold leading-snug text-sage-ink">
+          <p className="mt-1.5 text-[12px] leading-relaxed text-ink-soft">{PHOTOS_HINT}</p>
+          <p data-testid="photo-phone-reminder" className="mt-1 rounded-lg bg-brand-soft px-2.5 py-1.5 text-[13px] font-semibold leading-snug text-brand-ink">
             {PHONE_REMINDER}
           </p>
           <span className="sr-only">{`Maximum ${PHOTO_MAX_PER_OFFER} photos.`}</span>

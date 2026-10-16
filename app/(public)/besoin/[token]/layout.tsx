@@ -12,5 +12,5 @@ export const metadata: Metadata = {
 };
 
 export default function PublicNeedLayout({ children }: { children: ReactNode }) {
-  return <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-cream sm:border-x sm:border-line">{children}</div>;
+  return <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">{children}</div>;
 }

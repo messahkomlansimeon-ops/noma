@@ -117,9 +117,9 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
                 mode: m === "Un service" ? "service" : "achat",
               })
             }
-            className={`rounded-full px-4 py-2 text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+            className={`rounded-full px-4 py-2 text-[14px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
               mode === m
-                ? "bg-forest text-white"
+                ? "bg-brand text-white"
                 : "border border-line bg-white text-ink"
             }`}
           >
@@ -130,7 +130,7 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
       </div>
 
       <div className="mt-3 rounded-2xl border border-line bg-white p-4">
-        <label htmlFor="need-text" className="block text-[13px] font-bold text-ink">
+        <label htmlFor="need-text" className="block text-[14px] font-bold text-ink">
           Que cherchez-vous ?
         </label>
         <textarea
@@ -143,8 +143,8 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
           placeholder="Un iPhone 12 en bon état, à Abidjan…"
         />
         <div className="mt-2 grid grid-cols-2 gap-2.5">
-          <div className="rounded-xl border border-line bg-cream/60 px-3.5 py-2.5">
-            <label htmlFor="need-location" className="block text-[11px] font-semibold text-ink-soft">
+          <div className="rounded-xl border border-line bg-canvas/60 px-3.5 py-2.5">
+            <label htmlFor="need-location" className="block text-[12px] font-semibold text-ink-soft">
               Localisation
               <span className="ml-1 font-normal">(facultatif)</span>
             </label>
@@ -153,11 +153,11 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
               value={need.location}
               onChange={(e) => setNeed({ location: e.target.value })}
               placeholder="Ex. Cocody"
-              className="mt-0.5 border-0 bg-transparent p-0 text-[14px] font-bold"
+              className="mt-0.5 border-0 bg-transparent p-0 text-[15px] font-bold"
             />
           </div>
-          <div className="rounded-xl border border-line bg-cream/60 px-3.5 py-2.5">
-            <label htmlFor="need-budget" className="block text-[11px] font-semibold text-ink-soft">
+          <div className="rounded-xl border border-line bg-canvas/60 px-3.5 py-2.5">
+            <label htmlFor="need-budget" className="block text-[12px] font-semibold text-ink-soft">
               Budget maximum
               <span className="ml-1 font-normal">(facultatif)</span>
             </label>
@@ -170,12 +170,12 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
               }}
               inputMode="numeric"
               placeholder="FCFA"
-              className="mt-0.5 border-0 bg-transparent p-0 text-[14px] font-bold"
+              className="mt-0.5 border-0 bg-transparent p-0 text-[15px] font-bold"
             />
           </div>
         </div>
         {budgetError ? (
-          <div className="mt-2 text-[12px] font-semibold text-carrot-ink">
+          <div className="mt-2 text-[13px] font-semibold text-accent-ink">
             {budgetError}
           </div>
         ) : null}
@@ -189,11 +189,11 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
       <button
         onClick={search}
         disabled={need.text.trim().length === 0}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-forest py-3.5 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3.5 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
       >
         Trouver des offres
       </button>
-      <div className="mt-2 text-center text-[12px] text-ink-soft">
+      <div className="mt-2 text-center text-[13px] text-ink-soft">
         Première recherche sans compte. Champs vides = extraits de votre texte.
       </div>
     </div>

@@ -19,10 +19,10 @@ function Lines({ lines, testId }: { lines: StatLine[]; testId: string }) {
   return (
     <dl className="mt-2 divide-y divide-line rounded-2xl border border-line bg-white px-3.5 py-0.5" data-testid={testId}>
       {lines.map((line) => (
-        <div key={line.key} className="flex items-start justify-between gap-4 py-2 text-[13px]" data-stat={line.key}>
+        <div key={line.key} className="flex items-start justify-between gap-4 py-2 text-[14px]" data-stat={line.key}>
           <dt className="text-ink-soft">
             {line.label}
-            {line.hint ? <span className="block text-[11px] text-ink-soft/80">{line.hint}</span> : null}
+            {line.hint ? <span className="block text-[12px] text-ink-soft/80">{line.hint}</span> : null}
           </dt>
           <dd className="max-w-[55%] break-words text-right font-semibold text-ink" data-stat-value>
             {line.value}
@@ -82,7 +82,7 @@ export function OfferStatsSection({ offer }: { offer: OfferRecord }) {
         <button
           onClick={refresh}
           disabled={refreshing}
-          className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[13px] font-semibold text-ink disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[14px] font-semibold text-ink disabled:opacity-50"
         >
           <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
           Actualiser
@@ -91,24 +91,24 @@ export function OfferStatsSection({ offer }: { offer: OfferRecord }) {
 
       {loadError ? (
         <div role="alert" className="mt-3 rounded-2xl border border-line bg-white p-4 text-center">
-          <p className="text-[14px] font-semibold text-ink">{loadError}</p>
-          <button onClick={refresh} className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white">
+          <p className="text-[15px] font-semibold text-ink">{loadError}</p>
+          <button onClick={refresh} className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white">
             Réessayer
           </button>
         </div>
       ) : !view || !selected ? (
-        <p className="mt-3 text-[14px] text-ink-soft" aria-busy="true">
+        <p className="mt-3 text-[15px] text-ink-soft" aria-busy="true">
           Chargement des mesures…
         </p>
       ) : (
         <>
           {view.fewActivity ? (
-            <p className="mt-1 text-[12px] font-semibold text-ink-soft" data-testid="stats-few">
+            <p className="mt-1 text-[13px] font-semibold text-ink-soft" data-testid="stats-few">
               {FEW_STATS_YET}
             </p>
           ) : null}
           {view.noBoostText ? (
-            <p className="mt-1 text-[12px] font-semibold text-ink-soft" data-testid="stats-no-boost">
+            <p className="mt-1 text-[13px] font-semibold text-ink-soft" data-testid="stats-no-boost">
               {view.noBoostText}
             </p>
           ) : null}
@@ -121,8 +121,8 @@ export function OfferStatsSection({ offer }: { offer: OfferRecord }) {
                 aria-selected={code === selected.period}
                 data-testid={`stats-period-${code}`}
                 onClick={() => setPeriod(code)}
-                className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition ${
-                  code === selected.period ? "border-transparent bg-forest text-white" : "border-line bg-white text-ink"
+                className={`rounded-full border px-3 py-1.5 text-[13px] font-semibold transition ${
+                  code === selected.period ? "border-transparent bg-brand text-white" : "border-line bg-white text-ink"
                 }`}
               >
                 {PERIOD_LABELS[code]}
@@ -133,14 +133,14 @@ export function OfferStatsSection({ offer }: { offer: OfferRecord }) {
 
           {stats && stats.boosts.length > 0 ? (
             <div className="mt-4" data-testid="stats-boosts">
-              <h3 className="text-[14px] font-extrabold text-ink">Par boost</h3>
+              <h3 className="text-[15px] font-extrabold text-ink">Par boost</h3>
               {stats.boosts.map((boost) => {
                 const boostView = boostStatsView(boost, durationLabel(boost.durationCode));
                 return (
                   <div key={boostView.key} className="mt-2" data-testid="stats-boost">
-                    <div className="text-[13px] font-bold text-ink">{boostView.title}</div>
+                    <div className="text-[14px] font-bold text-ink">{boostView.title}</div>
                     {boostView.note ? (
-                      <p className="mt-2 text-[12px] text-ink-soft" data-testid="stats-boost-note">
+                      <p className="mt-2 text-[13px] text-ink-soft" data-testid="stats-boost-note">
                         {boostView.note}
                       </p>
                     ) : (
@@ -154,7 +154,7 @@ export function OfferStatsSection({ offer }: { offer: OfferRecord }) {
 
           <ul className="mt-4 space-y-1.5" data-testid="stats-notes">
             {view.notes.map((note) => (
-              <li key={note} className="text-[12px] leading-relaxed text-ink-soft">
+              <li key={note} className="text-[13px] leading-relaxed text-ink-soft">
                 {note}
               </li>
             ))}

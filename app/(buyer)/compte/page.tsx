@@ -39,7 +39,7 @@ export default function MonCompte() {
         <LogoMark />
         <button
           onClick={soon}
-          className="flex size-9 items-center justify-center rounded-full text-ink transition hover:bg-wash"
+          className="flex size-9 items-center justify-center rounded-full text-ink transition hover:bg-mist"
           aria-label="Réglages"
         >
           <Settings className="size-5" strokeWidth={1.8} />
@@ -47,17 +47,17 @@ export default function MonCompte() {
       </div>
 
       <div className="px-4">
-        <h1 className="font-display text-[26px] font-extrabold text-ink">
+        <h1 className="text-[26px] font-extrabold text-ink">
           Mon compte
         </h1>
 
         <div className="mt-3 flex items-center gap-3.5 rounded-2xl border border-line bg-white p-4">
-          <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-sage text-forest">
+          <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
             <CircleUser className="size-7" strokeWidth={1.7} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
             <div className="text-[16px] font-extrabold text-ink">Votre compte noma</div>
-            <div className="text-[13px] text-ink-soft">Connecté avec votre numéro de téléphone</div>
+            <div className="text-[14px] text-ink-soft">Connecté avec votre numéro de téléphone</div>
             <Badge tone="sage" className="mt-1">
               <ShieldCheck className="size-3" />
               Téléphone confirmé
@@ -80,23 +80,23 @@ export default function MonCompte() {
 
         <NotificationPreferencesCard />
 
-        <div className="mt-4 rounded-2xl bg-sage p-4">
+        <div className="mt-4 rounded-2xl bg-brand-soft p-4">
           <div className="flex items-center gap-2.5">
-            <span className="flex size-10 items-center justify-center rounded-full bg-white text-forest">
+            <span className="flex size-10 items-center justify-center rounded-full bg-white text-brand">
               <Store className="size-5" strokeWidth={1.9} />
             </span>
             <div>
-              <div className="text-[14px] font-extrabold text-ink">
+              <div className="text-[15px] font-extrabold text-ink">
                 Vous vendez ?
               </div>
-              <div className="text-[12px] text-sage-ink">
+              <div className="text-[13px] text-brand-ink">
                 Votre compte suffit : publiez une annonce.
               </div>
             </div>
           </div>
           <Link
             href="/vendeur"
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-forest py-3 text-[14px] font-bold text-white transition active:scale-[0.99]"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-[15px] font-bold text-white transition active:scale-[0.99]"
           >
             Aller à mon espace vendeur
             <span aria-hidden>›</span>
@@ -106,7 +106,7 @@ export default function MonCompte() {
         <button
           onClick={() => void logout()}
           disabled={loggingOut}
-          className="mt-4 flex w-full items-center justify-center gap-2 py-2 text-[14px] font-bold text-ink-soft transition hover:text-ink disabled:opacity-40"
+          className="mt-4 flex w-full items-center justify-center gap-2 py-2 text-[15px] font-bold text-ink-soft transition hover:text-ink disabled:opacity-40"
         >
           <LogOut className="size-4" />
           {loggingOut ? "Déconnexion…" : "Se déconnecter"}

@@ -36,16 +36,16 @@ export function OfferSalesSection({ offerId }: { offerId: string }) {
         {SALES_TITLE}
       </h2>
       {error ? (
-        <p role="alert" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+        <p role="alert" className="mt-2 text-[14px] font-semibold text-accent-ink">
           {error}
         </p>
       ) : view === null ? (
-        <p className="mt-2 text-[13px] text-ink-soft" aria-busy="true">
+        <p className="mt-2 text-[14px] text-ink-soft" aria-busy="true">
           Chargement…
         </p>
       ) : (
         <dl className="mt-2 divide-y divide-line rounded-2xl border border-line bg-white px-3.5 py-0.5">
-          <div className="flex items-start justify-between gap-4 py-2 text-[13px]" data-stat="sales-confirmed">
+          <div className="flex items-start justify-between gap-4 py-2 text-[14px]" data-stat="sales-confirmed">
             <dt className="text-ink-soft">Ventes confirmées</dt>
             <dd className="text-right font-semibold text-ink" data-stat-value>
               {view.total}
@@ -53,13 +53,13 @@ export function OfferSalesSection({ offerId }: { offerId: string }) {
           </div>
           {view.split ? (
             <>
-              <div className="flex items-start justify-between gap-4 py-2 text-[13px]" data-stat="sales-boost">
+              <div className="flex items-start justify-between gap-4 py-2 text-[14px]" data-stat="sales-boost">
                 <dt className="text-ink-soft">dont attribuées au boost</dt>
                 <dd className="text-right font-semibold text-ink" data-stat-value>
                   {view.split.boost}
                 </dd>
               </div>
-              <div className="flex items-start justify-between gap-4 py-2 text-[13px]" data-stat="sales-organic">
+              <div className="flex items-start justify-between gap-4 py-2 text-[14px]" data-stat="sales-organic">
                 <dt className="text-ink-soft">dont organiques</dt>
                 <dd className="text-right font-semibold text-ink" data-stat-value>
                   {view.split.organic}
@@ -69,7 +69,7 @@ export function OfferSalesSection({ offerId }: { offerId: string }) {
           ) : null}
         </dl>
       )}
-      <p className="mt-1.5 text-[11px] leading-relaxed text-ink-soft">{SALES_NOTE}</p>
+      <p className="mt-1.5 text-[12px] leading-relaxed text-ink-soft">{SALES_NOTE}</p>
     </section>
   );
 }

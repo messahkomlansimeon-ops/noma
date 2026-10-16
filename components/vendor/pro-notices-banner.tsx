@@ -36,14 +36,14 @@ export function ProNoticesBanner() {
       {notices.map((notice) => {
         const view = noticeView(notice);
         return (
-          <div key={notice.id} data-testid="pro-banner-notice" data-code={notice.code} className="rounded-2xl border border-carrot/50 bg-carrot-soft p-3">
-            <div className="text-[13px] font-extrabold text-carrot-ink">{view.title}</div>
-            <p className="mt-0.5 text-[12px] text-carrot-ink">{view.detail}</p>
+          <div key={notice.id} data-testid="pro-banner-notice" data-code={notice.code} className="rounded-2xl border border-accent/50 bg-accent-soft p-3">
+            <div className="text-[14px] font-extrabold text-accent-ink">{view.title}</div>
+            <p className="mt-0.5 text-[13px] text-accent-ink">{view.detail}</p>
           </div>
         );
       })}
-      <div className="flex items-center justify-end gap-3 text-[12px] font-bold">
-        <Link href={PRO_PAGE_PATH} className="text-carrot-ink underline">Voir mon offre</Link>
+      <div className="flex items-center justify-end gap-3 text-[13px] font-bold">
+        <Link href={PRO_PAGE_PATH} className="text-accent-ink underline">Voir mon offre</Link>
         <button data-testid="pro-banner-dismiss" onClick={dismiss} className="rounded-lg bg-white px-3 py-1.5 text-ink">Compris</button>
       </div>
     </section>

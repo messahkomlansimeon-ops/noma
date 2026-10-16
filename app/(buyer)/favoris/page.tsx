@@ -65,34 +65,34 @@ function Favorites() {
       {/* Lot FIN1 : le titre n'est dit qu'une fois (le h1) : plus de « Mes favoris » en double dans la barre du haut. */}
       <TopBar back="/" />
       <div className="px-4 pb-6">
-        <h1 className="font-display text-[22px] font-extrabold text-ink">{FAVORITES_TITLE}</h1>
+        <h1 className="text-[22px] font-extrabold text-ink">{FAVORITES_TITLE}</h1>
         {error ? (
           <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[14px] font-semibold text-ink">{error}</p>
+            <p className="text-[15px] font-semibold text-ink">{error}</p>
             <button
               onClick={() => {
                 setError(null);
                 setReloadKey((key) => key + 1);
               }}
-              className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
+              className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
             >
               Réessayer
             </button>
           </div>
         ) : items === null ? (
-          <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
+          <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
             {FAVORITES_LOADING}
           </p>
         ) : items.length === 0 ? (
-          <div role="status" data-testid="favorites-empty" className="mt-6 rounded-2xl bg-wash p-5 text-center">
+          <div role="status" data-testid="favorites-empty" className="mt-6 rounded-2xl bg-mist p-5 text-center">
             <Heart className="mx-auto size-7 text-ink-soft" aria-hidden />
-            <p className="mt-2 text-[14px] font-bold text-ink">{FAVORITES_EMPTY}</p>
-            <p className="mt-1 text-[13px] text-ink-soft">{FAVORITES_EMPTY_HINT}</p>
+            <p className="mt-2 text-[15px] font-bold text-ink">{FAVORITES_EMPTY}</p>
+            <p className="mt-1 text-[14px] text-ink-soft">{FAVORITES_EMPTY_HINT}</p>
           </div>
         ) : (
           <>
             {actionError ? (
-              <p role="alert" className="mt-3 text-[13px] font-semibold text-carrot-ink">
+              <p role="alert" className="mt-3 text-[14px] font-semibold text-accent-ink">
                 {actionError}
               </p>
             ) : null}
@@ -105,7 +105,7 @@ function Favorites() {
                       {row.coverPhotoId ? <PhotoCover photoId={row.coverPhotoId} className="size-14" fallback={null} /> : null}
                       <div className="min-w-0 flex-1">
                         <div className="text-[15px] font-bold text-ink">{row.title}</div>
-                        {row.priceText ? <div className="font-display text-[18px] font-extrabold text-ink">{row.priceText}</div> : null}
+                        {row.priceText ? <div className="text-[18px] font-extrabold text-ink">{row.priceText}</div> : null}
                         <div className="mt-1">
                           <Badge tone={row.available ? "sage" : "wash"}>{row.statusText}</Badge>
                         </div>
@@ -117,11 +117,11 @@ function Favorites() {
                         data-testid="favorite-remove"
                         className="flex size-10 shrink-0 items-center justify-center rounded-full border border-line bg-white"
                       >
-                        <Heart className="size-5 fill-carrot text-carrot" aria-hidden />
+                        <Heart className="size-5 fill-accent text-accent" aria-hidden />
                       </button>
                     </div>
                     {row.href ? (
-                      <Link href={row.href} className="mt-2 inline-block text-[13px] font-bold text-forest">
+                      <Link href={row.href} className="mt-2 inline-block text-[14px] font-bold text-brand">
                         {OPEN_LISTING_LABEL} ›
                       </Link>
                     ) : null}

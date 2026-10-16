@@ -57,14 +57,14 @@ function Content() {
 
   if (error && items === null) {
     return (
-      <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+      <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
         {error}
       </p>
     );
   }
   if (items === null) {
     return (
-      <p aria-busy="true" className="mt-6 text-center text-[14px] text-ink-soft">
+      <p aria-busy="true" className="mt-6 text-center text-[15px] text-ink-soft">
         Chargement…
       </p>
     );
@@ -72,14 +72,14 @@ function Content() {
   const pendingLine = pendingText(pending);
   return (
     <div data-testid="buyer-proposals">
-      <p className="mt-3 text-[13px] text-ink-soft">{BUYER_HINT}</p>
+      <p className="mt-3 text-[14px] text-ink-soft">{BUYER_HINT}</p>
       {pendingLine ? (
-        <p data-testid="proposals-pending" className="mt-2 text-[13px] font-bold text-forest">
+        <p data-testid="proposals-pending" className="mt-2 text-[14px] font-bold text-brand">
           {pendingLine}
         </p>
       ) : null}
       {notice ? (
-        <p role="status" data-testid="proposal-notice" className="mt-2 rounded-xl bg-sage px-3 py-2 text-[13px] font-semibold text-forest">
+        <p role="status" data-testid="proposal-notice" className="mt-2 rounded-xl bg-brand-soft px-3 py-2 text-[14px] font-semibold text-brand">
           {notice.text}{" "}
           {notice.orderId ? (
             <Link href={`/commandes/${notice.orderId}`} className="underline">
@@ -89,12 +89,12 @@ function Content() {
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+        <p role="alert" className="mt-2 text-[14px] font-semibold text-accent-ink">
           {error}
         </p>
       ) : null}
       {items.length === 0 ? (
-        <p className="mt-4 rounded-2xl bg-wash p-4 text-center text-[14px] text-ink-soft">{BUYER_EMPTY}</p>
+        <p className="mt-4 rounded-2xl bg-mist p-4 text-center text-[15px] text-ink-soft">{BUYER_EMPTY}</p>
       ) : (
         <ul className="mt-3 space-y-3" aria-label={BUYER_TITLE}>
           {items.map((proposal) => {
@@ -102,14 +102,14 @@ function Content() {
             return (
               <li key={row.id} data-testid="buyer-proposal" data-status={row.status} className="rounded-2xl border border-line bg-white p-3.5">
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-[14px] font-bold text-ink">{row.title}</span>
+                  <span className="text-[15px] font-bold text-ink">{row.title}</span>
                   <Badge tone={row.status === "sent" ? "carrot" : row.status === "accepted" ? "sage" : "wash"}>{row.statusText}</Badge>
                 </div>
-                <div data-testid="proposal-price" className="mt-0.5 font-display text-[18px] font-extrabold text-ink">
+                <div data-testid="proposal-price" className="mt-0.5 text-[18px] font-extrabold text-ink">
                   {row.priceText}
                 </div>
                 {row.lines.length > 0 ? (
-                  <ul className="mt-1.5 space-y-0.5 text-[13px] text-ink" aria-label="Lignes du devis">
+                  <ul className="mt-1.5 space-y-0.5 text-[14px] text-ink" aria-label="Lignes du devis">
                     {row.lines.map((line, index) => (
                       <li key={index} className="flex justify-between gap-3">
                         <span>{line.label}</span>
@@ -119,22 +119,22 @@ function Content() {
                   </ul>
                 ) : null}
                 {row.details.map((detail) => (
-                  <div key={detail} className="mt-0.5 text-[13px] text-ink-soft">
+                  <div key={detail} className="mt-0.5 text-[14px] text-ink-soft">
                     {detail}
                   </div>
                 ))}
-                <div className="mt-1 text-[12px] text-ink-soft">{row.validText}</div>
+                <div className="mt-1 text-[13px] text-ink-soft">{row.validText}</div>
                 {canAnswer(proposal) ? (
                   <div className="mt-3 grid grid-cols-2 gap-2.5">
-                    <button onClick={() => void answer(proposal.id, "decline")} disabled={busyId === proposal.id} data-testid="proposal-decline" className="rounded-xl border border-line bg-white px-3 py-2.5 text-[14px] font-bold text-ink disabled:opacity-50">
+                    <button onClick={() => void answer(proposal.id, "decline")} disabled={busyId === proposal.id} data-testid="proposal-decline" className="rounded-xl border border-line bg-white px-3 py-2.5 text-[15px] font-bold text-ink disabled:opacity-50">
                       Refuser
                     </button>
-                    <button onClick={() => void answer(proposal.id, "accept")} disabled={busyId === proposal.id} data-testid="proposal-accept" className="rounded-xl bg-forest px-3 py-2.5 text-[14px] font-bold text-white disabled:opacity-50">
+                    <button onClick={() => void answer(proposal.id, "accept")} disabled={busyId === proposal.id} data-testid="proposal-accept" className="rounded-xl bg-brand px-3 py-2.5 text-[15px] font-bold text-white disabled:opacity-50">
                       Accepter
                     </button>
                   </div>
                 ) : proposal.orderId ? (
-                  <Link href={`/commandes/${proposal.orderId}`} className="mt-2 inline-block text-[13px] font-bold text-forest">
+                  <Link href={`/commandes/${proposal.orderId}`} className="mt-2 inline-block text-[14px] font-bold text-brand">
                     Voir la commande ›
                   </Link>
                 ) : null}

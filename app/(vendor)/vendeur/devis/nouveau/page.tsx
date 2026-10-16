@@ -27,14 +27,14 @@ function QuoteScreen({ demandId, offerId }: { demandId: string; offerId: string 
 
   if (error) {
     return (
-      <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+      <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
         {error}
       </p>
     );
   }
   if (request === null) {
     return (
-      <p aria-busy="true" className="mt-6 text-center text-[14px] text-ink-soft">
+      <p aria-busy="true" className="mt-6 text-center text-[15px] text-ink-soft">
         Chargement…
       </p>
     );
@@ -42,16 +42,16 @@ function QuoteScreen({ demandId, offerId }: { demandId: string; offerId: string 
   const offer = request.offers.find((entry) => entry.offerId === offerId);
   if (!offer) {
     return (
-      <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+      <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
         Cette annonce ne correspond plus à ce besoin.
       </p>
     );
   }
   if (sent) {
     return (
-      <div role="status" data-testid="proposal-sent" className="mt-4 rounded-2xl bg-sage p-4 text-center">
-        <p className="text-[14px] font-bold text-forest">{SENT_MESSAGE}</p>
-        <Link href="/vendeur/demandes" className="mt-3 inline-flex rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white">
+      <div role="status" data-testid="proposal-sent" className="mt-4 rounded-2xl bg-brand-soft p-4 text-center">
+        <p className="text-[15px] font-bold text-brand">{SENT_MESSAGE}</p>
+        <Link href="/vendeur/demandes" className="mt-3 inline-flex rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white">
           Retour aux demandes
         </Link>
       </div>
@@ -62,11 +62,11 @@ function QuoteScreen({ demandId, offerId }: { demandId: string; offerId: string 
       <ul className="mt-3">
         <InterestedBuyerCard item={request.need} />
       </ul>
-      <p className="mt-3 text-[13px] font-semibold text-ink">Annonce : {offer.title}</p>
+      <p className="mt-3 text-[14px] font-semibold text-ink">Annonce : {offer.title}</p>
       {canPropose(offer) ? (
         <ProposalForm demandId={demandId} offerId={offerId} withLines onSent={() => setSent(true)} />
       ) : (
-        <p role="status" className="mt-3 rounded-xl bg-wash px-3 py-2 text-[13px] text-ink-soft">
+        <p role="status" className="mt-3 rounded-xl bg-mist px-3 py-2 text-[14px] text-ink-soft">
           Un devis ne peut pas être envoyé pour cette annonce : une proposition est déjà en attente, ou l'acheteur en a refusé une.
         </p>
       )}
@@ -84,7 +84,7 @@ function PageContent() {
         {target ? (
           <QuoteScreen demandId={target.demandId} offerId={target.offerId} />
         ) : (
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+          <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
             Choisissez une demande, puis « Faire un devis ».
           </p>
         )}

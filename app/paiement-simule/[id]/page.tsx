@@ -115,18 +115,18 @@ function Paiement({ topupId }: { topupId: string }) {
       <div
         data-testid="sim-banner"
         role="note"
-        className="sticky top-0 z-20 flex items-center justify-center gap-2 bg-carrot px-4 py-3.5 text-center text-[15px] font-extrabold uppercase tracking-wide text-white"
+        className="sticky top-0 z-20 flex items-center justify-center gap-2 bg-accent px-4 py-3.5 text-center text-[15px] font-extrabold uppercase tracking-wide text-ink"
       >
         <TriangleAlert className="size-5 shrink-0" aria-hidden />
         {SIMULATION_BANNER}
       </div>
 
       <div className="px-4 pb-10 pt-5">
-        <h1 className="font-display text-[26px] font-extrabold text-ink">Paiement simulé</h1>
-        <p className="mt-1 text-[13px] text-ink-soft">{SIMULATION_SUBTITLE}</p>
+        <h1 className="text-[26px] font-extrabold text-ink">Paiement simulé</h1>
+        <p className="mt-1 text-[14px] text-ink-soft">{SIMULATION_SUBTITLE}</p>
 
         {view.kind === "loading" ? (
-          <p className="mt-8 text-center text-[14px] text-ink-soft" aria-busy="true">
+          <p className="mt-8 text-center text-[15px] text-ink-soft" aria-busy="true">
             Chargement de la recharge…
           </p>
         ) : null}
@@ -134,13 +134,13 @@ function Paiement({ topupId }: { topupId: string }) {
         {view.kind === "pending" ? (
           <>
             <div className="mt-5 rounded-2xl border border-line bg-white p-5 text-center">
-              <div className="text-[13px] font-semibold text-ink-soft">Montant de la recharge</div>
-              <div data-testid="sim-amount" className="font-display text-[38px] font-extrabold leading-tight text-ink">
+              <div className="text-[14px] font-semibold text-ink-soft">Montant de la recharge</div>
+              <div data-testid="sim-amount" className="text-[38px] font-extrabold leading-tight text-ink">
                 {view.amountText}
               </div>
             </div>
             {actionError ? (
-              <p role="alert" data-testid="sim-action-error" className="mt-3 rounded-xl bg-carrot-soft p-3 text-[13px] font-semibold text-carrot-ink">
+              <p role="alert" data-testid="sim-action-error" className="mt-3 rounded-xl bg-accent-soft p-3 text-[14px] font-semibold text-accent-ink">
                 {actionError}
               </p>
             ) : null}
@@ -148,7 +148,7 @@ function Paiement({ topupId }: { topupId: string }) {
               data-testid="sim-confirm"
               onClick={() => void act("confirm")}
               disabled={busy !== null}
-              className="mt-5 flex w-full items-center justify-center rounded-xl bg-forest px-4 py-3.5 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-5 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3.5 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy === "confirm" ? "Paiement en cours…" : "Confirmer le paiement"}
             </button>
@@ -156,7 +156,7 @@ function Paiement({ topupId }: { topupId: string }) {
               data-testid="sim-fail"
               onClick={() => void act("fail")}
               disabled={busy !== null}
-              className="mt-3 flex w-full items-center justify-center rounded-xl border border-carrot/50 bg-white px-4 py-3.5 text-[15px] font-bold text-carrot-ink transition disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-3 flex w-full items-center justify-center rounded-xl border border-accent/50 bg-white px-4 py-3.5 text-[15px] font-bold text-accent-ink transition disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy === "fail" ? "Échec en cours…" : "Faire échouer le paiement"}
             </button>
@@ -165,15 +165,15 @@ function Paiement({ topupId }: { topupId: string }) {
 
         {view.kind === "succeeded" ? (
           <div className="mt-5">
-            <div data-testid="sim-result" data-kind="succeeded" role="status" className="rounded-2xl border border-forest/30 bg-sage p-5 text-center">
-              <CircleCheck className="mx-auto size-9 text-forest" aria-hidden />
-              <p className="mt-2 text-[16px] font-extrabold text-forest">{view.message}</p>
+            <div data-testid="sim-result" data-kind="succeeded" role="status" className="rounded-2xl border border-brand/30 bg-brand-soft p-5 text-center">
+              <CircleCheck className="mx-auto size-9 text-brand" aria-hidden />
+              <p className="mt-2 text-[16px] font-extrabold text-brand">{view.message}</p>
             </div>
-            <Link data-testid="sim-return" href={target} className={`${linkClass} mt-5 bg-forest text-white`}>
+            <Link data-testid="sim-return" href={target} className={`${linkClass} mt-5 bg-brand text-white`}>
               {returnLinkLabel(target)}
             </Link>
             {target !== walletPathFor(target) ? (
-              <Link href={walletPathFor(target)} className={`${linkClass} mt-3 border border-forest/30 bg-white text-forest`}>
+              <Link href={walletPathFor(target)} className={`${linkClass} mt-3 border border-brand/30 bg-white text-brand`}>
                 Voir mon porte-monnaie
               </Link>
             ) : null}
@@ -182,15 +182,15 @@ function Paiement({ topupId }: { topupId: string }) {
 
         {view.kind === "failed" || view.kind === "expired" ? (
           <div className="mt-5">
-            <div data-testid="sim-result" data-kind={view.kind} role="status" className="rounded-2xl border border-carrot/40 bg-carrot-soft p-5 text-center">
-              <CircleX className="mx-auto size-9 text-carrot-ink" aria-hidden />
-              <p className="mt-2 text-[15px] font-extrabold text-carrot-ink">{view.message}</p>
-              <p className="mt-1 text-[13px] text-ink-soft">Montant de la recharge : {view.amountText}.</p>
+            <div data-testid="sim-result" data-kind={view.kind} role="status" className="rounded-2xl border border-accent/40 bg-accent-soft p-5 text-center">
+              <CircleX className="mx-auto size-9 text-accent-ink" aria-hidden />
+              <p className="mt-2 text-[15px] font-extrabold text-accent-ink">{view.message}</p>
+              <p className="mt-1 text-[14px] text-ink-soft">Montant de la recharge : {view.amountText}.</p>
             </div>
-            <Link data-testid="sim-retry" href={retryHref} className={`${linkClass} mt-5 bg-forest text-white`}>
+            <Link data-testid="sim-retry" href={retryHref} className={`${linkClass} mt-5 bg-brand text-white`}>
               Réessayer la recharge
             </Link>
-            <Link href={target} className={`${linkClass} mt-3 border border-forest/30 bg-white text-forest`}>
+            <Link href={target} className={`${linkClass} mt-3 border border-brand/30 bg-white text-brand`}>
               {returnLinkLabel(target) === "Continuer" ? "Retour" : returnLinkLabel(target)}
             </Link>
           </div>
@@ -207,12 +207,12 @@ function Paiement({ topupId }: { topupId: string }) {
                   setFailure(null);
                   setReloadKey((key) => key + 1);
                 }}
-                className={`${linkClass} mt-5 bg-forest text-white`}
+                className={`${linkClass} mt-5 bg-brand text-white`}
               >
                 Réessayer
               </button>
             ) : null}
-            <Link href={walletPathFor(target)} className={`${linkClass} mt-3 border border-forest/30 bg-white text-forest`}>
+            <Link href={walletPathFor(target)} className={`${linkClass} mt-3 border border-brand/30 bg-white text-brand`}>
               Retour à mon porte-monnaie
             </Link>
           </div>
@@ -229,10 +229,10 @@ function PageContent() {
     <Paiement topupId={topupId} />
   ) : (
     <main className="flex flex-1 flex-col">
-      <div className="bg-carrot px-4 py-3.5 text-center text-[15px] font-extrabold uppercase tracking-wide text-white">
+      <div className="bg-accent px-4 py-3.5 text-center text-[15px] font-extrabold uppercase tracking-wide text-ink">
         {SIMULATION_BANNER}
       </div>
-      <p role="alert" className="mt-6 px-4 text-center text-[14px] font-semibold text-ink">
+      <p role="alert" className="mt-6 px-4 text-center text-[15px] font-semibold text-ink">
         {CHECKOUT_MESSAGES.notFound}
       </p>
     </main>
@@ -243,7 +243,7 @@ export default function PaiementSimulePage() {
   // Plein écran mobile, sans barre d'onglets (on ne « quitte » pas un paiement par un onglet). Pas de layout propre à cette route.
   // useSearchParams exige une frontière Suspense pour que le reste de la page reste pré-rendu.
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-cream sm:border-x sm:border-line">
+    <div className="mx-auto flex min-h-dvh w-full max-w-xl flex-col">
       <SessionGate>
         <Suspense fallback={null}>
           <PageContent />

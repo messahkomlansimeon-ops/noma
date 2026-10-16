@@ -16,6 +16,7 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react";
+import { LogoMark } from "@/components/logo";
 import { MessagesBadge, messagesRefresher } from "@/components/messages-badge";
 import { UnreadBadge, unreadRefresher } from "@/components/unread-badge";
 
@@ -31,34 +32,90 @@ interface TabItem {
 }
 
 /** Les adresses « / », « /vendeur » et « /admin » ne rendent l'onglet actif QUE sur elles-mêmes (sinon il le serait sur toutes les pages de leur espace). */
+function isActive(pathname: string | null, item: TabItem): boolean {
+  return item.match.some((m) =>
+    m === "/" || m === "/vendeur" || m === "/admin" ? pathname === m : (pathname ?? "").startsWith(m),
+  );
+}
+
+function Pastilles({ item }: { item: TabItem }) {
+  return (
+    <>
+      {item.unread ? <UnreadBadge className="absolute -right-3 -top-2" /> : null}
+      {item.messages ? <MessagesBadge className="absolute -right-3 -top-2" /> : null}
+    </>
+  );
+}
+
+/**
+ * Une seule liste d'entrées, deux présentations : barre en bas sur téléphone (moins de 768 px), menu latéral fixe à partir de la tablette.
+ * Le menu latéral est le premier élément de la grille du gabarit ; la barre du bas est fixe et sort du flot.
+ */
 function TabBar({ items }: { items: TabItem[] }) {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[480px] border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-      <div className="grid grid-cols-4">
-        {items.map((it) => {
-          const active = it.match.some((m) =>
-            m === "/" || m === "/vendeur" || m === "/admin" ? pathname === m : pathname.startsWith(m),
-          );
-          return (
-            <Link
-              key={it.href}
-              href={it.href}
-              className={`flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition ${
-                active ? "text-forest" : "text-ink-soft"
-              }`}
-            >
-              <span className="relative">
-                <it.icon className="size-5" strokeWidth={active ? 2.3 : 1.8} />
-                {it.unread ? <UnreadBadge className="absolute -right-2.5 -top-1.5" /> : null}
-                {it.messages ? <MessagesBadge className="absolute -right-2.5 -top-1.5" /> : null}
-              </span>
-              {it.label}
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
+    <>
+      <aside className="sticky top-0 hidden h-dvh flex-col gap-8 border-r border-line bg-white px-4 py-6 md:flex">
+        <div className="px-2">
+          <LogoMark size="lg" />
+        </div>
+        <nav aria-label="Navigation principale" className="stagger flex flex-col gap-1.5">
+          {items.map((it) => {
+            const active = isActive(pathname, it);
+            return (
+              <Link
+                key={it.href}
+                href={it.href}
+                aria-current={active ? "page" : undefined}
+                className={`press relative flex min-h-12 items-center gap-3 rounded-2xl px-3.5 text-[16px] font-bold ${
+                  active ? "bg-brand-soft text-brand" : "text-ink-soft hover:bg-mist hover:text-ink"
+                }`}
+              >
+                <span className="relative">
+                  <it.icon className="size-6" strokeWidth={active ? 2.4 : 2} aria-hidden />
+                  <Pastilles item={it} />
+                </span>
+                {it.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
+      <nav
+        aria-label="Navigation principale"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      >
+        <div className="mx-auto grid max-w-xl grid-cols-4">
+          {items.map((it) => {
+            const active = isActive(pathname, it);
+            return (
+              <Link
+                key={it.href}
+                href={it.href}
+                aria-current={active ? "page" : undefined}
+                className={`press flex min-h-16 flex-col items-center justify-center gap-1 text-[12px] font-bold ${
+                  active ? "text-brand" : "text-ink-soft"
+                }`}
+              >
+                <span
+                  className={`relative flex h-8 w-14 items-center justify-center rounded-full transition-all duration-300 ${
+                    active ? "bg-brand-soft" : "bg-transparent"
+                  }`}
+                >
+                  <it.icon
+                    className={`size-6 transition-transform duration-300 ${active ? "scale-110" : ""}`}
+                    strokeWidth={active ? 2.4 : 2}
+                    aria-hidden
+                  />
+                  <Pastilles item={it} />
+                </span>
+                {it.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    </>
   );
 }
 

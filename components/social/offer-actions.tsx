@@ -60,30 +60,30 @@ export function OfferActions({ demandId, offerId }: { demandId: string; offerId:
         onClick={() => void write()}
         disabled={pending}
         data-testid="write-to-seller"
-        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-forest px-4 py-3 text-[14px] font-bold text-white transition active:scale-[0.99] disabled:opacity-50"
+        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:opacity-50"
       >
         <MessageCircle className="size-4" aria-hidden />
         {pending ? WRITE_TO_SELLER_ONGOING : WRITE_TO_SELLER_LABEL}
       </button>
       {error ? (
-        <p role="alert" data-testid="write-error" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+        <p role="alert" data-testid="write-error" className="mt-2 text-[14px] font-semibold text-accent-ink">
           {error}
         </p>
       ) : null}
       {banner ? (
-        <div data-testid="offer-order-banner" data-kind={banner.kind} className="mt-2 rounded-xl border border-forest/30 bg-sage px-3.5 py-3">
-          <div data-testid="offer-order-label" className="text-[14px] font-bold text-forest">
+        <div data-testid="offer-order-banner" data-kind={banner.kind} className="mt-2 rounded-xl border border-brand/30 bg-brand-soft px-3.5 py-3">
+          <div data-testid="offer-order-label" className="text-[15px] font-bold text-brand">
             {banner.label}
           </div>
-          <div className="text-[12px] text-sage-ink">{banner.hint}</div>
-          <Link href={banner.href} className="mt-1 inline-block text-[12px] font-bold text-forest underline">
+          <div className="text-[13px] text-brand-ink">{banner.hint}</div>
+          <Link href={banner.href} className="mt-1 inline-block text-[13px] font-bold text-brand underline">
             Voir la commande
           </Link>
         </div>
       ) : (
         <DeclareOrder demandId={demandId} offerId={offerId} />
       )}
-      <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">{NO_PAYMENT_NOTICE}</p>
+      <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">{NO_PAYMENT_NOTICE}</p>
     </section>
   );
 }

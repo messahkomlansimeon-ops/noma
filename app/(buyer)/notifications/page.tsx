@@ -127,38 +127,38 @@ function Notifications() {
       <div className="px-4 pb-6">
         {loadError ? (
           <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[14px] font-semibold text-ink">{loadError}</p>
+            <p className="text-[15px] font-semibold text-ink">{loadError}</p>
             <button
               onClick={() => {
                 setLoadError(null);
                 setReloadKey((key) => key + 1);
               }}
-              className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
+              className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
             >
               Réessayer
             </button>
           </div>
         ) : state === "loading" ? (
-          <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
+          <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
             {NOTIFICATIONS_LOADING}
           </p>
         ) : state === "empty" ? (
-          <div role="status" className="mt-6 rounded-2xl bg-wash p-5 text-center">
+          <div role="status" className="mt-6 rounded-2xl bg-mist p-5 text-center">
             <BellRing className="mx-auto size-7 text-ink-soft" aria-hidden />
-            <p className="mt-2 text-[14px] font-bold text-ink">{EMPTY_NOTIFICATIONS_MESSAGE}</p>
-            <p className="mt-1 text-[13px] text-ink-soft">{EMPTY_NOTIFICATIONS_HINT}</p>
+            <p className="mt-2 text-[15px] font-bold text-ink">{EMPTY_NOTIFICATIONS_MESSAGE}</p>
+            <p className="mt-1 text-[14px] text-ink-soft">{EMPTY_NOTIFICATIONS_HINT}</p>
           </div>
         ) : (
           <>
             <div className="mt-3">
-              <h1 className="font-display text-[22px] font-extrabold text-ink" data-testid="notifications-heading">
+              <h1 className="text-[22px] font-extrabold text-ink" data-testid="notifications-heading">
                 {unreadTotal > 0 ? `${unreadTotal} non lue${unreadTotal > 1 ? "s" : ""}` : "Tout est lu"}
               </h1>
               {/* Sous le titre : le bouton a toute la largeur utile à 390 px. */}
               <button
                 onClick={() => void markAll()}
                 disabled={marking || unreadTotal === 0}
-                className="mt-2 flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[13px] font-semibold text-ink disabled:opacity-50"
+                className="mt-2 flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[14px] font-semibold text-ink disabled:opacity-50"
               >
                 <CheckCheck className="size-3.5" aria-hidden />
                 {MARK_ALL_READ_LABEL}
@@ -171,19 +171,19 @@ function Notifications() {
                   <>
                     <span
                       aria-hidden
-                      className={`mt-1.5 size-2.5 shrink-0 rounded-full ${row.unread ? "bg-carrot" : "bg-transparent"}`}
+                      className={`mt-1.5 size-2.5 shrink-0 rounded-full ${row.unread ? "bg-accent" : "bg-transparent"}`}
                     />
                     <span className="min-w-0 flex-1">
                       <span className={`block text-[15px] text-ink ${row.unread ? "font-extrabold" : "font-medium"}`}>
                         {row.unread ? <span className="sr-only">{UNREAD_SR_LABEL} : </span> : null}
                         {row.badge ? (
-                          <span data-testid="notification-badge" className="mr-1.5 rounded-full bg-wash px-2 py-0.5 align-middle text-[11px] font-bold text-ink-soft">{row.badge}</span>
+                          <span data-testid="notification-badge" className="mr-1.5 rounded-full bg-mist px-2 py-0.5 align-middle text-[12px] font-bold text-ink-soft">{row.badge}</span>
                         ) : null}
                         {row.title}
                       </span>
-                      {row.subtitle ? <span className="block text-[13px] text-ink-soft">{row.subtitle}</span> : null}
-                      <span className="mt-0.5 block text-[12px] text-ink-soft">{row.dateText}</span>
-                      {row.href ? <span className="mt-1 block text-[13px] font-bold text-forest">{row.linkLabel}</span> : null}
+                      {row.subtitle ? <span className="block text-[14px] text-ink-soft">{row.subtitle}</span> : null}
+                      <span className="mt-0.5 block text-[13px] text-ink-soft">{row.dateText}</span>
+                      {row.href ? <span className="mt-1 block text-[14px] font-bold text-brand">{row.linkLabel}</span> : null}
                     </span>
                     {row.href ? <ChevronRight className="mt-1 size-4 shrink-0 text-ink-soft" aria-hidden /> : null}
                   </>
@@ -203,7 +203,7 @@ function Notifications() {
               })}
             </ul>
             {moreError ? (
-              <p role="alert" className="mt-3 text-center text-[13px] font-semibold text-carrot-ink">
+              <p role="alert" className="mt-3 text-center text-[14px] font-semibold text-accent-ink">
                 {moreError}
               </p>
             ) : null}
@@ -211,7 +211,7 @@ function Notifications() {
               <button
                 onClick={() => void loadMore()}
                 disabled={loadingMore}
-                className="mt-4 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white py-3 text-[14px] font-bold text-forest disabled:opacity-50"
+                className="mt-4 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white py-3 text-[15px] font-bold text-brand disabled:opacity-50"
               >
                 {loadingMore ? "Chargement…" : LOAD_MORE_LABEL}
               </button>

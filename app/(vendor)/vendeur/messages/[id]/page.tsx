@@ -16,7 +16,7 @@ export default function ConversationVendeur() {
       ) : (
         <main>
           <TopBar back="/vendeur/messages" title="Conversation" />
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+          <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
             Conversation introuvable.
           </p>
         </main>

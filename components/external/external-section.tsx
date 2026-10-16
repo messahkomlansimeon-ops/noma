@@ -30,25 +30,25 @@ export function ExternalCard({ item }: { item: ExternalListing }) {
   return (
     <li data-testid="external-card" data-source={item.source.code} className="rounded-2xl border border-line bg-white p-3.5">
       <div className="text-[15px] font-bold text-ink">{row.title}</div>
-      <div className="font-display text-[18px] font-extrabold text-ink">{row.priceText}</div>
-      {row.locationText ? <div className="text-[12px] text-ink-soft">{row.locationText}</div> : null}
-      <div className="mt-1 text-[12px] font-semibold text-forest">{row.compatibilityText}</div>
+      <div className="text-[18px] font-extrabold text-ink">{row.priceText}</div>
+      {row.locationText ? <div className="text-[13px] text-ink-soft">{row.locationText}</div> : null}
+      <div className="mt-1 text-[13px] font-semibold text-brand">{row.compatibilityText}</div>
       {row.alsoOnText ? (
-        <div data-testid="external-also-on" className="text-[12px] text-ink-soft">
+        <div data-testid="external-also-on" className="text-[13px] text-ink-soft">
           {row.alsoOnText}
         </div>
       ) : null}
-      <p data-testid="external-mention" className="mt-2 rounded-xl bg-wash px-3 py-2 text-[12px] font-semibold leading-snug text-ink-soft">
+      <p data-testid="external-mention" className="mt-2 rounded-xl bg-mist px-3 py-2 text-[13px] font-semibold leading-snug text-ink-soft">
         {row.mention}
       </p>
-      <div className="mt-1 text-[11px] text-ink-soft">{row.seenText}</div>
+      <div className="mt-1 text-[12px] text-ink-soft">{row.seenText}</div>
       {row.link ? (
         <a
           href={row.link.href}
           target={row.link.target}
           rel={row.link.rel}
           data-testid="external-link"
-          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-forest/30 bg-white py-2.5 text-[14px] font-bold text-forest"
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-brand/30 bg-white py-2.5 text-[15px] font-bold text-brand"
         >
           {EXTERNAL_LINK_LABEL}
           <ExternalLink className="size-4" aria-hidden />
@@ -59,12 +59,12 @@ export function ExternalCard({ item }: { item: ExternalListing }) {
             type="button"
             disabled
             aria-disabled="true"
-            className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-line bg-wash py-2.5 text-[14px] font-bold text-ink-soft opacity-70"
+            className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-line bg-mist py-2.5 text-[15px] font-bold text-ink-soft opacity-70"
           >
             {EXTERNAL_LINK_LABEL}
             <ExternalLink className="size-4" aria-hidden />
           </button>
-          <p className="mt-1 text-center text-[11px] font-semibold text-ink-soft">
+          <p className="mt-1 text-center text-[12px] font-semibold text-ink-soft">
             {EXTERNAL_DEMO_SITE_LABEL} : {EXTERNAL_DEMO_SITE_HINT}
           </p>
         </div>
@@ -82,14 +82,14 @@ export type ExternalSectionState =
 export function ExternalSectionView({ state, loadingMore, moreError, onMore }: { state: ExternalSectionState; loadingMore: boolean; moreError: boolean; onMore: () => void }) {
   if (state.kind === "loading") {
     return (
-      <p data-testid="external-loading" aria-busy="true" className="mt-6 text-center text-[12px] text-ink-soft">
+      <p data-testid="external-loading" aria-busy="true" className="mt-6 text-center text-[13px] text-ink-soft">
         {EXTERNAL_LOADING}
       </p>
     );
   }
   if (state.kind === "error") {
     return (
-      <p data-testid="external-unavailable" role="status" className="mt-6 text-center text-[12px] font-semibold text-ink-soft">
+      <p data-testid="external-unavailable" role="status" className="mt-6 text-center text-[13px] font-semibold text-ink-soft">
         {EXTERNAL_UNAVAILABLE}
       </p>
     );
@@ -100,14 +100,14 @@ export function ExternalSectionView({ state, loadingMore, moreError, onMore }: {
       <h2 id="external-section-title" className="text-[16px] font-extrabold text-ink">
         {EXTERNAL_SECTION_TITLE}
       </h2>
-      <p className="mt-0.5 text-[12px] text-ink-soft">{EXTERNAL_SECTION_INTRO}</p>
+      <p className="mt-0.5 text-[13px] text-ink-soft">{EXTERNAL_SECTION_INTRO}</p>
       <ul className="mt-3 space-y-3" aria-label={EXTERNAL_SECTION_TITLE}>
         {state.items.map((item) => (
           <ExternalCard key={item.id} item={item} />
         ))}
       </ul>
       {moreError ? (
-        <p role="alert" className="mt-3 text-center text-[13px] font-semibold text-carrot-ink">
+        <p role="alert" className="mt-3 text-center text-[14px] font-semibold text-accent-ink">
           {EXTERNAL_UNAVAILABLE}
         </p>
       ) : null}
@@ -116,7 +116,7 @@ export function ExternalSectionView({ state, loadingMore, moreError, onMore }: {
           onClick={onMore}
           disabled={loadingMore}
           data-testid="external-more"
-          className="mt-4 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white py-3 text-[14px] font-bold text-forest disabled:opacity-50"
+          className="mt-4 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white py-3 text-[15px] font-bold text-brand disabled:opacity-50"
         >
           {loadingMore ? "Chargement…" : EXTERNAL_MORE_LABEL}
         </button>

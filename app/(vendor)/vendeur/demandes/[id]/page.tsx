@@ -37,14 +37,14 @@ function Detail({ demandId }: { demandId: string }) {
 
   if (error) {
     return (
-      <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+      <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
         {error}
       </p>
     );
   }
   if (request === null) {
     return (
-      <p aria-busy="true" className="mt-6 text-center text-[14px] text-ink-soft">
+      <p aria-busy="true" className="mt-6 text-center text-[15px] text-ink-soft">
         Chargement…
       </p>
     );
@@ -55,7 +55,7 @@ function Detail({ demandId }: { demandId: string }) {
         <InterestedBuyerCard item={request.need} />
       </ul>
       {sent ? (
-        <p role="status" data-testid="proposal-sent" className="mt-3 rounded-xl bg-sage px-3 py-2 text-[13px] font-semibold text-forest">
+        <p role="status" data-testid="proposal-sent" className="mt-3 rounded-xl bg-brand-soft px-3 py-2 text-[14px] font-semibold text-brand">
           {SENT_MESSAGE}
         </p>
       ) : null}
@@ -67,7 +67,7 @@ function Detail({ demandId }: { demandId: string }) {
           return (
             <li key={offer.offerId} data-testid="request-offer" className="rounded-2xl border border-line bg-white p-3.5">
               <div className="flex items-start justify-between gap-2">
-                <span className="text-[14px] font-bold text-ink">{offer.title}</span>
+                <span className="text-[15px] font-bold text-ink">{offer.title}</span>
                 {state ? <Badge tone={offer.proposal?.status === "sent" || offer.proposal?.status === "accepted" ? "sage" : "wash"}>{state}</Badge> : null}
               </div>
               {canPropose(offer) ? (
@@ -84,11 +84,11 @@ function Detail({ demandId }: { demandId: string }) {
                   />
                 ) : (
                   <div className="mt-2 grid grid-cols-2 gap-2">
-                    <button onClick={() => { setSent(false); setOpen(offer.offerId); }} data-testid="proposal-open" className="rounded-xl bg-forest px-3 py-2.5 text-[14px] font-bold text-white">
+                    <button onClick={() => { setSent(false); setOpen(offer.offerId); }} data-testid="proposal-open" className="rounded-xl bg-brand px-3 py-2.5 text-[15px] font-bold text-white">
                       Faire une proposition
                     </button>
                     {quote ? (
-                      <Link href={quote} data-testid="quote-open" className="flex items-center justify-center rounded-xl border border-forest/30 bg-white px-3 py-2.5 text-[14px] font-bold text-forest">
+                      <Link href={quote} data-testid="quote-open" className="flex items-center justify-center rounded-xl border border-brand/30 bg-white px-3 py-2.5 text-[15px] font-bold text-brand">
                         Faire un devis
                       </Link>
                     ) : null}
@@ -114,7 +114,7 @@ export default function DemandeDetail() {
           {isUuid(id) ? (
             <Detail demandId={id} />
           ) : (
-            <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+            <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
               Demande introuvable.
             </p>
           )}

@@ -15,7 +15,7 @@ import { createGenerationGuard } from "@/lib/client/match-view";
 import { browserSessionStorage, createIdempotencyKeys, newIdempotencyKey, walletHref } from "@/lib/client/wallet-view";
 
 const KEY_PREFIX = "noma:active-search-key:";
-const TONE_CLASS = { active: "border-forest/30 bg-sage", off: "border-line bg-white", paused: "border-carrot/40 bg-carrot-soft", closed: "border-line bg-wash", unavailable: "border-line bg-wash" } as const;
+const TONE_CLASS = { active: "border-brand/30 bg-brand-soft", off: "border-line bg-white", paused: "border-accent/40 bg-accent-soft", closed: "border-line bg-mist", unavailable: "border-line bg-mist" } as const;
 
 /**
  * Carte « Recherche active » de la page d'un besoin actif (lot RA1) : état de l'option, ce qu'elle apporte, ses règles (dites AVANT l'achat), prix PROVISOIRE, achat avec confirmation et clé
@@ -131,15 +131,15 @@ export function ActiveSearchCardView(props: ActiveSearchCardViewProps) {
   if (loadError) {
     return (
       <div role="alert" data-testid="active-search-error" className="mt-3 rounded-2xl border border-line bg-white p-3.5 text-center">
-        <p className="text-[13px] font-semibold text-ink">{loadError}</p>
-        <button onClick={props.onRetry} className="mt-2 rounded-xl bg-forest px-4 py-2 text-[13px] font-bold text-white">
+        <p className="text-[14px] font-semibold text-ink">{loadError}</p>
+        <button onClick={props.onRetry} className="mt-2 rounded-xl bg-brand px-4 py-2 text-[14px] font-bold text-white">
           Réessayer
         </button>
       </div>
     );
   }
   if (!state) {
-    return <p className="mt-3 text-center text-[13px] text-ink-soft" aria-busy="true">{ACTIVE_SEARCH_LOADING}</p>;
+    return <p className="mt-3 text-center text-[14px] text-ink-soft" aria-busy="true">{ACTIVE_SEARCH_LOADING}</p>;
   }
 
   const view = activeSearchView(state);
@@ -158,35 +158,35 @@ export function ActiveSearchCardView(props: ActiveSearchCardViewProps) {
       data-acceleration={state.accelerationPending ? "pending" : state.active ? "running" : "none"}
     >
       <div className="flex items-start gap-2.5">
-        <Radar className={`mt-0.5 size-5 shrink-0 ${view.tone === "active" ? "text-forest" : "text-ink-soft"}`} aria-hidden />
+        <Radar className={`mt-0.5 size-5 shrink-0 ${view.tone === "active" ? "text-brand" : "text-ink-soft"}`} aria-hidden />
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-extrabold text-ink">{ACTIVE_SEARCH_TITLE}</div>
-          <div className="mt-0.5 text-[13px] font-bold text-ink" data-testid="active-search-headline">{view.headline}</div>
-          <p className="mt-0.5 text-[12px] text-ink-soft" data-testid="active-search-detail">{view.detail}</p>
+          <div className="text-[15px] font-extrabold text-ink">{ACTIVE_SEARCH_TITLE}</div>
+          <div className="mt-0.5 text-[14px] font-bold text-ink" data-testid="active-search-headline">{view.headline}</div>
+          <p className="mt-0.5 text-[13px] text-ink-soft" data-testid="active-search-detail">{view.detail}</p>
         </div>
       </div>
 
       {compact ? null : (
         <>
-          <ul className="mt-2.5 list-disc space-y-1 pl-5 text-[12px] text-ink-soft" data-testid="active-search-benefits">
+          <ul className="mt-2.5 list-disc space-y-1 pl-5 text-[13px] text-ink-soft" data-testid="active-search-benefits">
             {ACTIVE_SEARCH_BENEFITS.map((line) => <li key={line}>{line}</li>)}
           </ul>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-[12px] text-ink-soft" data-testid="active-search-rules">
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-[13px] text-ink-soft" data-testid="active-search-rules">
             {ACTIVE_SEARCH_RULES.map((line) => <li key={line}>{line}</li>)}
           </ul>
-          <p className="mt-2 text-[11px] text-ink-soft">{EXTERNAL_NOTIFICATION_NOTE}</p>
-          <p data-testid="active-search-price-notice" className="mt-2 rounded-lg bg-carrot-soft px-3 py-2 text-[12px] font-semibold text-carrot-ink">{ACTIVE_SEARCH_PRICE_NOTICE}</p>
+          <p className="mt-2 text-[12px] text-ink-soft">{EXTERNAL_NOTIFICATION_NOTE}</p>
+          <p data-testid="active-search-price-notice" className="mt-2 rounded-lg bg-accent-soft px-3 py-2 text-[13px] font-semibold text-accent-ink">{ACTIVE_SEARCH_PRICE_NOTICE}</p>
         </>
       )}
 
       {!compact && purchase.kind === "blocked" ? (
-        <p data-testid="active-search-blocked" className="mt-3 rounded-xl bg-wash p-3 text-[13px] font-semibold text-ink-soft">{purchase.text}</p>
+        <p data-testid="active-search-blocked" className="mt-3 rounded-xl bg-mist p-3 text-[14px] font-semibold text-ink-soft">{purchase.text}</p>
       ) : null}
       {!compact && purchase.kind === "none" ? (
-        <p role="alert" className="mt-3 rounded-xl bg-carrot-soft p-3 text-[13px] font-semibold text-carrot-ink">Votre solde n&apos;a pas pu être lu : l&apos;achat est impossible pour le moment.</p>
+        <p role="alert" className="mt-3 rounded-xl bg-accent-soft p-3 text-[14px] font-semibold text-accent-ink">Votre solde n&apos;a pas pu être lu : l&apos;achat est impossible pour le moment.</p>
       ) : null}
       {!compact && purchase.kind === "insufficient" ? (
-        <div data-testid="active-search-insufficient" className="mt-3 rounded-xl bg-carrot-soft p-3 text-[13px] text-carrot-ink">
+        <div data-testid="active-search-insufficient" className="mt-3 rounded-xl bg-accent-soft p-3 text-[14px] text-accent-ink">
           <div className="font-extrabold">{purchase.text}</div>
           <p className="mt-0.5">{purchase.detail}</p>
           <Link href={walletHref({ next: `/besoins/${demandId}`, recharge: true })} data-testid="active-search-recharge" className="mt-2 inline-flex items-center gap-1.5 font-bold underline">
@@ -201,32 +201,32 @@ export function ActiveSearchCardView(props: ActiveSearchCardViewProps) {
           data-testid="active-search-buy"
           onClick={props.onBuy}
           disabled={!canPurchase(purchase, pending)}
-          className="mt-3 flex w-full items-center justify-center rounded-xl bg-forest px-4 py-3 text-[14px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-3 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
         >
           {view.buttonLabel}
         </button>
       ) : null}
       {!compact && purchase.kind === "ready" && confirming ? (
-        <div data-testid="active-search-confirmation" className="mt-3 rounded-2xl border border-forest/30 bg-white p-3.5">
-          <p className="text-[13px] font-semibold text-ink">{purchaseConfirmationText(purchase, view.isExtension)}</p>
+        <div data-testid="active-search-confirmation" className="mt-3 rounded-2xl border border-brand/30 bg-white p-3.5">
+          <p className="text-[14px] font-semibold text-ink">{purchaseConfirmationText(purchase, view.isExtension)}</p>
           <div className="mt-3 flex gap-2">
             <button
               data-testid="active-search-confirm"
               onClick={props.onConfirm}
               disabled={pending}
-              className="flex-1 rounded-xl bg-forest px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50"
+              className="flex-1 rounded-xl bg-brand px-4 py-2.5 text-[14px] font-bold text-white disabled:opacity-50"
             >
               {pending ? ACTIVE_SEARCH_LABELS.confirming : ACTIVE_SEARCH_LABELS.confirm}
             </button>
-            <button onClick={props.onCancel} disabled={pending} className="rounded-xl border border-line bg-white px-4 py-2.5 text-[13px] font-bold text-ink disabled:opacity-50">
+            <button onClick={props.onCancel} disabled={pending} className="rounded-xl border border-line bg-white px-4 py-2.5 text-[14px] font-bold text-ink disabled:opacity-50">
               {ACTIVE_SEARCH_LABELS.cancel}
             </button>
           </div>
         </div>
       ) : null}
 
-      {actionError ? <p role="alert" data-testid="active-search-action-error" className="mt-3 rounded-xl bg-carrot-soft p-3 text-[13px] font-semibold text-carrot-ink">{actionError}</p> : null}
-      {done ? <p role="status" data-testid="active-search-done" className="mt-3 rounded-xl bg-white p-3 text-[13px] font-semibold text-forest">{done}</p> : null}
+      {actionError ? <p role="alert" data-testid="active-search-action-error" className="mt-3 rounded-xl bg-accent-soft p-3 text-[14px] font-semibold text-accent-ink">{actionError}</p> : null}
+      {done ? <p role="status" data-testid="active-search-done" className="mt-3 rounded-xl bg-white p-3 text-[14px] font-semibold text-brand">{done}</p> : null}
     </section>
   );
 }

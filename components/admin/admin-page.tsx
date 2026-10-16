@@ -46,20 +46,20 @@ function Content<T>({ title, back, load, children }: { title: string; back: stri
       <TopBar back={back} title={title} />
       <div className="px-4 pb-6">
         {state.kind === "loading" ? (
-          <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
+          <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
             {ADMIN_LOADING}
           </p>
         ) : state.kind === "not-found" ? (
           <AdminNotFound />
         ) : state.kind === "error" ? (
           <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[14px] font-semibold text-ink">{state.message}</p>
+            <p className="text-[15px] font-semibold text-ink">{state.message}</p>
             <button
               onClick={() => {
                 setState({ kind: "loading" });
                 reload();
               }}
-              className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
+              className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
             >
               Réessayer
             </button>

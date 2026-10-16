@@ -47,14 +47,14 @@ export default function Recherche() {
           loading ? (
             <button
               onClick={cancelSearch}
-              className="rounded-full px-2 py-1.5 text-[13px] font-bold text-carrot-ink transition hover:bg-wash"
+              className="rounded-full px-2 py-1.5 text-[14px] font-bold text-accent-ink transition hover:bg-mist"
             >
               Arrêter
             </button>
           ) : status === "clarification" ? null : (
             <button
               onClick={() => void startSearch()}
-              className="rounded-full px-2 py-1.5 text-[13px] font-bold text-forest transition hover:bg-wash"
+              className="rounded-full px-2 py-1.5 text-[14px] font-bold text-brand transition hover:bg-mist"
             >
               Relancer
             </button>
@@ -63,10 +63,10 @@ export default function Recherche() {
       />
 
       <div className="px-4">
-        <div className="text-[12px] font-extrabold uppercase tracking-wider text-sage-ink">
+        <div className="text-[13px] font-extrabold uppercase tracking-wider text-brand-ink">
           Recherche sur d&apos;autres sites (démonstration)
         </div>
-        <h1 className="font-display text-[24px] font-extrabold text-ink">
+        <h1 className="text-[24px] font-extrabold text-ink">
           {status === "loading"
             ? "Recherche en cours…"
             : status === "clarification"
@@ -78,7 +78,7 @@ export default function Recherche() {
           <div className="text-[16px] font-bold text-ink">
             {need.text.trim() || "Votre besoin"}
           </div>
-          <div className="text-[13px] text-ink-soft">
+          <div className="text-[14px] text-ink-soft">
             {[
               locationChip ?? "Localisation : celle de votre texte",
               budgetChip ?? "Budget : celui de votre texte",
@@ -88,11 +88,11 @@ export default function Recherche() {
         </div>
 
         {understanding ? (
-          <div className="mt-3 border-l-4 border-forest bg-sage px-4 py-3">
-            <div className="text-[12px] font-semibold text-sage-ink">noma a compris</div>
-            <div className="text-[15px] font-extrabold text-forest">{understanding.product}</div>
+          <div className="mt-3 border-l-4 border-brand bg-brand-soft px-4 py-3">
+            <div className="text-[13px] font-semibold text-brand-ink">noma a compris</div>
+            <div className="text-[15px] font-extrabold text-brand">{understanding.product}</div>
             {understanding.requirements.length > 0 ? (
-              <div className="mt-1 text-[12px] text-sage-ink">
+              <div className="mt-1 text-[13px] text-brand-ink">
                 Obligatoire : {understanding.requirements.join(" · ")}
               </div>
             ) : null}
@@ -107,7 +107,7 @@ export default function Recherche() {
                 <button
                   key={option}
                   onClick={() => void answerClarification(option)}
-                  className="w-full rounded-xl border border-line bg-white px-4 py-3 text-left text-[14px] font-bold text-ink transition hover:border-forest hover:bg-sage"
+                  className="w-full rounded-xl border border-line bg-white px-4 py-3 text-left text-[15px] font-bold text-ink transition hover:border-brand hover:bg-brand-soft"
                 >
                   {option}
                 </button>
@@ -117,21 +117,21 @@ export default function Recherche() {
         ) : null}
 
         {error ? (
-          <div className="mt-3 flex items-start gap-2 rounded-2xl bg-carrot-soft p-3.5 text-[13px] font-semibold text-carrot-ink">
+          <div className="mt-3 flex items-start gap-2 rounded-2xl bg-accent-soft p-3.5 text-[14px] font-semibold text-accent-ink">
             <OctagonAlert className="mt-0.5 size-4 shrink-0" />
             <span>{error}</span>
           </div>
         ) : null}
 
         {!error && loading ? (
-          <div className="mt-3 rounded-2xl bg-sage p-3.5">
-            <div className="flex items-center gap-2 text-[13px] font-extrabold text-forest">
+          <div className="mt-3 rounded-2xl bg-brand-soft p-3.5">
+            <div className="flex items-center gap-2 text-[14px] font-extrabold text-brand">
               <LoaderCircle className="size-4 animate-spin" />
               {offers.length > 0
                 ? `${offers.length} offre${offers.length > 1 ? "s" : ""} déjà trouvée${offers.length > 1 ? "s" : ""}`
                 : "Premières pistes en cours…"}
             </div>
-            <p className="mt-0.5 text-[12px] leading-snug text-sage-ink">
+            <p className="mt-0.5 text-[13px] leading-snug text-brand-ink">
               Les résultats se complètent au fur et à mesure. Vous pouvez
               arrêter quand vous voulez : les offres déjà trouvées restent.
             </p>
@@ -139,7 +139,7 @@ export default function Recherche() {
         ) : null}
 
         {status === "done" && sourcesAllUnavailable(sources) ? (
-          <div className="mt-3 rounded-2xl bg-carrot-soft p-3.5 text-[13px] font-semibold text-carrot-ink">
+          <div className="mt-3 rounded-2xl bg-accent-soft p-3.5 text-[14px] font-semibold text-accent-ink">
             Les sources sont indisponibles pour le moment. Réessayez dans un
             instant.
           </div>
@@ -147,7 +147,7 @@ export default function Recherche() {
 
         {hydrated && status === "done" && !error && offers.length === 0 && !sourcesAllUnavailable(sources) ? (
           offersRetired > 0 ? (
-            <div className="mt-3 rounded-2xl bg-wash p-3.5 text-[13px] font-semibold text-ink-soft">
+            <div className="mt-3 rounded-2xl bg-mist p-3.5 text-[14px] font-semibold text-ink-soft">
               {offersRetired} annonce{offersRetired > 1 ? "s" : ""} affichée
               {offersRetired > 1 ? "s" : ""} {offersRetired > 1 ? "ont été retirées" : "a été retirée"} après
               vérification d&apos;accessibilité (inaccessible — 404 confirmé).
@@ -155,7 +155,7 @@ export default function Recherche() {
               besoin.
             </div>
           ) : (
-            <div className="mt-3 rounded-2xl bg-wash p-3.5 text-[13px] font-semibold text-ink-soft">
+            <div className="mt-3 rounded-2xl bg-mist p-3.5 text-[14px] font-semibold text-ink-soft">
               Aucune offre trouvée pour ce besoin. Précisez le produit, la
               localisation ou le budget, puis relancez.
             </div>
@@ -173,7 +173,7 @@ export default function Recherche() {
         </div>
 
         {loading && offers.length > 0 ? (
-          <p className="mt-3 text-center text-[12px] text-ink-soft">
+          <p className="mt-3 text-center text-[13px] text-ink-soft">
             La recherche continue — la liste se met à jour automatiquement.
           </p>
         ) : null}

@@ -47,7 +47,7 @@ export function NotificationPreferencesCard() {
   if (state === "hidden") return null;
   if (state === "loading") {
     return (
-      <p className="mt-4 text-center text-[13px] text-ink-soft" aria-busy="true">
+      <p className="mt-4 text-center text-[14px] text-ink-soft" aria-busy="true">
         {PREFERENCES_LOADING}
       </p>
     );
@@ -55,13 +55,13 @@ export function NotificationPreferencesCard() {
   if (state === "error" || !preferences) {
     return (
       <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-3.5 text-center">
-        <p className="text-[13px] font-semibold text-ink">Vos préférences de notification sont indisponibles pour le moment.</p>
+        <p className="text-[14px] font-semibold text-ink">Vos préférences de notification sont indisponibles pour le moment.</p>
         <button
           onClick={() => {
             setState("loading");
             setReloadKey((key) => key + 1);
           }}
-          className="mt-2 rounded-xl bg-forest px-4 py-2 text-[13px] font-bold text-white"
+          className="mt-2 rounded-xl bg-brand px-4 py-2 text-[14px] font-bold text-white"
         >
           Réessayer
         </button>
@@ -87,24 +87,24 @@ export function NotificationPreferencesCard() {
   return (
     <section className="mt-4 rounded-2xl border border-line bg-white p-4" aria-label={PREFERENCES_TITLE} data-testid="notification-preferences">
       <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sage text-forest">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
           <MessageSquareText className="size-[18px]" strokeWidth={1.9} aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-extrabold text-ink">{PREFERENCES_TITLE}</div>
+          <div className="text-[15px] font-extrabold text-ink">{PREFERENCES_TITLE}</div>
           <div className="mt-1 flex items-center justify-between gap-3">
-            <span id="external-label" className="text-[13px] font-semibold text-ink">
+            <span id="external-label" className="text-[14px] font-semibold text-ink">
               {preferencesLabel(preferences)}
             </span>
             <span className={saving ? "opacity-50" : ""}>
               <Switch checked={view.enabled} onChange={(next) => void toggle(next)} label={preferencesLabel(preferences)} />
             </span>
           </div>
-          <p className="mt-2 text-[12px] text-ink-soft">{PREFERENCES_HINT}</p>
-          <p className="mt-1.5 text-[12px] font-semibold text-carrot-ink" data-testid="external-notice">
+          <p className="mt-2 text-[13px] text-ink-soft">{PREFERENCES_HINT}</p>
+          <p className="mt-1.5 text-[13px] font-semibold text-accent-ink" data-testid="external-notice">
             {view.notice}
           </p>
-          {view.extra ? <p className="mt-1 text-[12px] text-ink-soft">{view.extra}</p> : null}
+          {view.extra ? <p className="mt-1 text-[13px] text-ink-soft">{view.extra}</p> : null}
         </div>
       </div>
     </section>

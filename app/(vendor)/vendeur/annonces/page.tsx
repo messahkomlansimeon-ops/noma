@@ -118,7 +118,7 @@ function MesAnnonces() {
         right={
           <button
             onClick={() => setSheet(true)}
-            className="flex size-9 items-center justify-center rounded-full bg-forest text-white"
+            className="flex size-9 items-center justify-center rounded-full bg-brand text-white"
             aria-label="Nouvelle annonce"
           >
             <Plus className="size-5" />
@@ -134,7 +134,7 @@ function MesAnnonces() {
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Rechercher une annonce"
             aria-label="Rechercher une annonce"
-            className="w-full bg-transparent text-[14px] text-ink placeholder:text-ink-soft/60"
+            className="w-full bg-transparent text-[15px] text-ink placeholder:text-ink-soft/60"
           />
         </div>
 
@@ -146,9 +146,9 @@ function MesAnnonces() {
                 setFilter(f.id);
                 setArmed(null);
               }}
-              className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition ${
+              className={`rounded-full px-3.5 py-1.5 text-[14px] font-semibold transition ${
                 filter === f.id
-                  ? "bg-forest text-white"
+                  ? "bg-brand text-white"
                   : "border border-line bg-white text-ink"
               }`}
             >
@@ -159,30 +159,30 @@ function MesAnnonces() {
         </div>
 
         {truncated && !loadError ? (
-          <p role="status" className="mt-3 text-[13px] font-semibold text-carrot-ink">
+          <p role="status" className="mt-3 text-[14px] font-semibold text-accent-ink">
             {LIST_TRUNCATED_MESSAGE}
           </p>
         ) : null}
 
         {loadError ? (
           <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[14px] font-semibold text-ink">{loadError}</p>
+            <p className="text-[15px] font-semibold text-ink">{loadError}</p>
             <button
               onClick={() => {
                 setLoadError(null);
                 reload();
               }}
-              className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
+              className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
             >
               Réessayer
             </button>
           </div>
         ) : offers === null ? (
-          <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
+          <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
             Chargement de vos annonces…
           </p>
         ) : visible.length === 0 ? (
-          <p className="mt-6 text-center text-[14px] text-ink-soft">
+          <p className="mt-6 text-center text-[15px] text-ink-soft">
             {offers.length === 0
               ? "Vous n'avez pas encore d'annonce."
               : "Aucune annonce ne correspond à ce filtre."}
@@ -203,9 +203,9 @@ function MesAnnonces() {
                         {recordTitle(offer)}
                       </div>
                       {price ? (
-                        <div className="font-display text-[18px] font-extrabold text-ink">{price}</div>
+                        <div className="text-[18px] font-extrabold text-ink">{price}</div>
                       ) : (
-                        <div className="text-[13px] text-ink-soft">Prix à compléter</div>
+                        <div className="text-[14px] text-ink-soft">Prix à compléter</div>
                       )}
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         <Badge tone={status.tone}>{status.label}</Badge>
@@ -216,11 +216,11 @@ function MesAnnonces() {
                       </div>
                     </div>
                   </div>
-                  {summary && <div className="mt-1.5 text-[12px] text-ink-soft">{summary}</div>}
+                  {summary && <div className="mt-1.5 text-[13px] text-ink-soft">{summary}</div>}
                   <Link
                     href={`/vendeur/annonces/${offer.id}`}
                     aria-label={`Acheteurs intéressés et boost : ${recordTitle(offer)}`}
-                    className="mt-2 flex items-center justify-between border-t border-line pt-2.5 text-[13px] font-bold text-forest"
+                    className="mt-2 flex items-center justify-between border-t border-line pt-2.5 text-[14px] font-bold text-brand"
                   >
                     Acheteurs intéressés et boost
                     <ChevronRight className="size-4" aria-hidden />
@@ -232,9 +232,9 @@ function MesAnnonces() {
                           key={a.action}
                           onClick={() => void run(offer, a.action)}
                           disabled={busyId !== null}
-                          className={`flex flex-1 items-center justify-center gap-1.5 text-[13px] font-bold disabled:opacity-40 ${
+                          className={`flex flex-1 items-center justify-center gap-1.5 text-[14px] font-bold disabled:opacity-40 ${
                             a.action === "archive" && armed === `${offer.id}:archive`
-                              ? "text-carrot-ink"
+                              ? "text-accent-ink"
                               : "text-ink"
                           } ${index > 0 ? "border-l border-line" : ""}`}
                         >
@@ -255,7 +255,7 @@ function MesAnnonces() {
 
         <button
           onClick={() => setSheet(true)}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-forest py-3.5 text-[15px] font-bold text-white transition active:scale-[0.99]"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3.5 text-[15px] font-bold text-white transition active:scale-[0.99]"
         >
           <Plus className="size-4" />
           Nouvelle annonce

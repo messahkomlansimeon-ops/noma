@@ -55,14 +55,14 @@ function Vendors({ data, offset, reload, setOffset }: { data: Data; offset: numb
   const pageInfo = pageWindow(data.page.total, data.page.offset, data.page.limit);
   return (
     <div data-testid="admin-vendors">
-      <h1 className="font-display text-[22px] font-extrabold text-ink">{VENDORS_TITLE}</h1>
+      <h1 className="text-[22px] font-extrabold text-ink">{VENDORS_TITLE}</h1>
       {notice ? (
-        <p role="status" data-testid="admin-notice" className="mt-2 rounded-xl bg-sage px-3 py-2 text-[13px] font-semibold text-forest">
+        <p role="status" data-testid="admin-notice" className="mt-2 rounded-xl bg-brand-soft px-3 py-2 text-[14px] font-semibold text-brand">
           {notice}
         </p>
       ) : null}
       {data.page.vendors.length === 0 ? (
-        <p className="mt-4 rounded-2xl bg-wash p-4 text-center text-[14px] text-ink-soft">{VENDORS_EMPTY}</p>
+        <p className="mt-4 rounded-2xl bg-mist p-4 text-center text-[15px] text-ink-soft">{VENDORS_EMPTY}</p>
       ) : (
         <ul aria-label="Vendeurs" className="mt-3 space-y-2.5">
           {data.page.vendors.map((vendor) => {
@@ -74,14 +74,14 @@ function Vendors({ data, offset, reload, setOffset }: { data: Data; offset: numb
                     <span data-testid="vendor-phone" className="font-mono text-[15px] font-bold tracking-wide text-ink">
                       {row.maskedPhone}
                     </span>
-                    <span data-testid="vendor-ref" className="ml-2 font-mono text-[11px] text-ink-soft">
+                    <span data-testid="vendor-ref" className="ml-2 font-mono text-[12px] text-ink-soft">
                       {row.refText}
                     </span>
                   </span>
                   <Badge tone={row.suspended ? "carrot" : "sage"}>{row.statusText}</Badge>
                 </div>
-                <div className="mt-0.5 text-[12px] text-ink-soft">{row.offersText}</div>
-                <div className="text-[12px] text-ink-soft">{row.joinedText}</div>
+                <div className="mt-0.5 text-[13px] text-ink-soft">{row.offersText}</div>
+                <div className="text-[13px] text-ink-soft">{row.joinedText}</div>
                 {row.canSuspend || row.canReactivate ? (
                   <button
                     onClick={() => {
@@ -90,7 +90,7 @@ function Vendors({ data, offset, reload, setOffset }: { data: Data; offset: numb
                       setConfirming({ id: row.id, action: row.canSuspend ? "suspend" : "reactivate", phone: row.maskedPhone, ref: row.refText });
                     }}
                     data-testid={row.canSuspend ? "vendor-suspend" : "vendor-reactivate"}
-                    className="mt-2 rounded-xl border border-line bg-white px-3.5 py-2 text-[13px] font-bold text-ink"
+                    className="mt-2 rounded-xl border border-line bg-white px-3.5 py-2 text-[14px] font-bold text-ink"
                   >
                     {row.canSuspend ? SUSPEND_LABEL : REACTIVATE_LABEL}
                   </button>
@@ -100,7 +100,7 @@ function Vendors({ data, offset, reload, setOffset }: { data: Data; offset: numb
           })}
         </ul>
       )}
-      <div className="mt-3 flex items-center justify-between text-[12px] text-ink-soft">
+      <div className="mt-3 flex items-center justify-between text-[13px] text-ink-soft">
         <span>
           {pageInfo.from === 0 ? "" : `${pageInfo.from} à ${pageInfo.to} sur ${data.page.total}`}
         </span>
@@ -115,21 +115,21 @@ function Vendors({ data, offset, reload, setOffset }: { data: Data; offset: numb
       </div>
 
       {confirming ? (
-        <div role="alertdialog" aria-modal="false" aria-labelledby="confirm-title" data-testid="admin-confirm" className="mt-4 rounded-2xl border-2 border-carrot bg-white p-4">
-          <h2 id="confirm-title" className="text-[14px] font-extrabold text-ink">
+        <div role="alertdialog" aria-modal="false" aria-labelledby="confirm-title" data-testid="admin-confirm" className="mt-4 rounded-2xl border-2 border-accent bg-white p-4">
+          <h2 id="confirm-title" className="text-[15px] font-extrabold text-ink">
             Confirmer
           </h2>
-          <p className="mt-1 text-[13px] text-ink-soft">{confirmText(confirming.action, confirming.phone, confirming.ref)}</p>
+          <p className="mt-1 text-[14px] text-ink-soft">{confirmText(confirming.action, confirming.phone, confirming.ref)}</p>
           {error ? (
-            <p role="alert" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+            <p role="alert" className="mt-2 text-[14px] font-semibold text-accent-ink">
               {error}
             </p>
           ) : null}
           <div className="mt-3 grid grid-cols-2 gap-2.5">
-            <button onClick={() => setConfirming(null)} disabled={pending} className="rounded-xl border border-line bg-white px-3 py-2.5 text-[14px] font-bold text-ink disabled:opacity-50">
+            <button onClick={() => setConfirming(null)} disabled={pending} className="rounded-xl border border-line bg-white px-3 py-2.5 text-[15px] font-bold text-ink disabled:opacity-50">
               Annuler
             </button>
-            <button onClick={() => void apply()} disabled={pending} data-testid="admin-confirm-yes" className="rounded-xl bg-forest px-3 py-2.5 text-[14px] font-bold text-white disabled:opacity-50">
+            <button onClick={() => void apply()} disabled={pending} data-testid="admin-confirm-yes" className="rounded-xl bg-brand px-3 py-2.5 text-[15px] font-bold text-white disabled:opacity-50">
               {confirming.action === "suspend" ? SUSPEND_LABEL : REACTIVATE_LABEL}
             </button>
           </div>
@@ -141,13 +141,13 @@ function Vendors({ data, offset, reload, setOffset }: { data: Data; offset: numb
           {JOURNAL_TITLE}
         </h2>
         {data.journal.length === 0 ? (
-          <p className="mt-2 text-[13px] text-ink-soft">{JOURNAL_EMPTY}</p>
+          <p className="mt-2 text-[14px] text-ink-soft">{JOURNAL_EMPTY}</p>
         ) : (
           <ul className="mt-2 space-y-1.5">
             {data.journal.map((entry) => {
               const line = journalRow(entry);
               return (
-                <li key={line.id} data-testid="journal-row" className="rounded-xl border border-line bg-white px-3 py-2 text-[12px]">
+                <li key={line.id} data-testid="journal-row" className="rounded-xl border border-line bg-white px-3 py-2 text-[13px]">
                   <div className="font-semibold text-ink">{line.text}</div>
                   <div className="text-ink-soft">{line.dateText}</div>
                 </li>

@@ -26,15 +26,15 @@ export function ComingSoon({
       </div>
       <div className="px-4">
         <div className="mt-6 rounded-2xl border border-line bg-white p-6 text-center" data-coming-soon>
-          <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-sage text-forest">
+          <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand-soft text-brand">
             <Hourglass className="size-7" strokeWidth={1.6} aria-hidden />
           </span>
-          <div className="mt-3 text-[12px] font-extrabold uppercase tracking-wider text-sage-ink">{COMING_SOON_LABEL}</div>
-          <h1 className="mt-1 font-display text-[22px] font-extrabold text-ink">{title}</h1>
-          <p className="mt-1.5 text-[14px] leading-relaxed text-ink-soft">{sentence}</p>
+          <div className="mt-3 text-[13px] font-extrabold uppercase tracking-wider text-brand-ink">{COMING_SOON_LABEL}</div>
+          <h1 className="mt-1 text-[22px] font-extrabold text-ink">{title}</h1>
+          <p className="mt-1.5 text-[15px] leading-relaxed text-ink-soft">{sentence}</p>
           <Link
             href={backHref}
-            className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-forest px-5 py-3 text-[14px] font-bold text-white transition active:scale-[0.99]"
+            className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-[15px] font-bold text-white transition active:scale-[0.99]"
           >
             <ArrowLeft className="size-4" aria-hidden />
             {backLabel}

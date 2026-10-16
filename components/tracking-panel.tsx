@@ -66,13 +66,13 @@ export function TrackingPanel({ demandId }: { demandId: string }) {
   if (error) {
     return (
       <div role="alert" className="mt-3 rounded-2xl border border-line bg-white p-3.5 text-center">
-        <p className="text-[13px] font-semibold text-ink">{error}</p>
+        <p className="text-[14px] font-semibold text-ink">{error}</p>
         <button
           onClick={() => {
             setError(null);
             setReloadKey((key) => key + 1);
           }}
-          className="mt-2 rounded-xl bg-forest px-4 py-2 text-[13px] font-bold text-white"
+          className="mt-2 rounded-xl bg-brand px-4 py-2 text-[14px] font-bold text-white"
         >
           Réessayer
         </button>
@@ -81,7 +81,7 @@ export function TrackingPanel({ demandId }: { demandId: string }) {
   }
   if (!tracking) {
     return (
-      <p className="mt-3 text-center text-[13px] text-ink-soft" aria-busy="true">
+      <p className="mt-3 text-center text-[14px] text-ink-soft" aria-busy="true">
         {TRACKING_LOADING}
       </p>
     );
@@ -92,12 +92,12 @@ export function TrackingPanel({ demandId }: { demandId: string }) {
   return (
     <section className="mt-3 rounded-2xl border border-line bg-white p-3.5" aria-label={TRACKING_TITLE} data-testid="tracking-panel" data-tone={view.tone}>
       <div className="flex items-start gap-2.5">
-        <Icon className={`mt-0.5 size-5 shrink-0 ${view.tone === "active" ? "text-forest" : "text-ink-soft"}`} aria-hidden />
+        <Icon className={`mt-0.5 size-5 shrink-0 ${view.tone === "active" ? "text-brand" : "text-ink-soft"}`} aria-hidden />
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-extrabold text-ink" data-testid="tracking-headline">
+          <div className="text-[15px] font-extrabold text-ink" data-testid="tracking-headline">
             {view.headline}
           </div>
-          <p className="mt-0.5 text-[12px] text-ink-soft">{view.detail}</p>
+          <p className="mt-0.5 text-[13px] text-ink-soft">{view.detail}</p>
         </div>
       </div>
       {view.applicable ? (
@@ -106,7 +106,7 @@ export function TrackingPanel({ demandId }: { demandId: string }) {
             <button
               onClick={() => void run("extend")}
               disabled={busy !== null}
-              className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[13px] font-semibold text-ink disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[14px] font-semibold text-ink disabled:opacity-50"
             >
               <CalendarPlus className="size-3.5" aria-hidden />
               {busy === "extend" ? "…" : TRACKING_EXTEND_LABEL}
@@ -116,7 +116,7 @@ export function TrackingPanel({ demandId }: { demandId: string }) {
             <button
               onClick={() => void run("pause")}
               disabled={busy !== null}
-              className="rounded-full border border-line bg-white px-3 py-1.5 text-[13px] font-semibold text-ink disabled:opacity-50"
+              className="rounded-full border border-line bg-white px-3 py-1.5 text-[14px] font-semibold text-ink disabled:opacity-50"
             >
               {busy === "pause" ? "…" : TRACKING_PAUSE_LABEL}
             </button>
@@ -125,15 +125,15 @@ export function TrackingPanel({ demandId }: { demandId: string }) {
             <button
               onClick={() => void run("resume")}
               disabled={busy !== null}
-              className="rounded-full bg-forest px-3 py-1.5 text-[13px] font-bold text-white disabled:opacity-50"
+              className="rounded-full bg-brand px-3 py-1.5 text-[14px] font-bold text-white disabled:opacity-50"
             >
               {busy === "resume" ? "…" : TRACKING_RESUME_LABEL}
             </button>
           ) : null}
-          {view.atMaximum ? <span className="self-center text-[12px] text-ink-soft">{trackingMaximumText(tracking)}</span> : null}
+          {view.atMaximum ? <span className="self-center text-[13px] text-ink-soft">{trackingMaximumText(tracking)}</span> : null}
         </div>
       ) : null}
-      <p className="mt-2.5 text-[11px] text-ink-soft">{TRACKING_NOTE}</p>
+      <p className="mt-2.5 text-[12px] text-ink-soft">{TRACKING_NOTE}</p>
     </section>
   );
 }

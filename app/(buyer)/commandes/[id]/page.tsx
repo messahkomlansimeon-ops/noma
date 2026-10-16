@@ -16,7 +16,7 @@ export default function CommandeDetail() {
       ) : (
         <main>
           <TopBar back="/commandes" title="Commande" />
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
+          <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
             Commande introuvable.
           </p>
         </main>

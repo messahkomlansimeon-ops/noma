@@ -39,7 +39,7 @@ export function MarketHint({ category, brand, model, variant, condition }: { cat
   const text = key !== null && result !== null && result.key === key ? result.text : null;
   if (text === null) return null;
   return (
-    <p data-testid="market-hint" className="mt-1.5 text-[12px] font-semibold leading-snug text-forest">
+    <p data-testid="market-hint" className="mt-1.5 text-[13px] font-semibold leading-snug text-brand">
       {text}
     </p>
   );

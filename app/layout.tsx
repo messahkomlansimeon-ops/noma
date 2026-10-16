@@ -1,17 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Manrope } from "next/font/google";
+import { Figtree } from "next/font/google";
 import "./globals.css";
 import { Toast } from "@/components/toast";
 import { APP_TITLE } from "@/lib/site";
 
-const bricolage = Bricolage_Grotesque({
+const figtree = Figtree({
   subsets: ["latin"],
-  variable: "--font-bricolage",
-});
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-manrope",
+  variable: "--font-figtree",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -24,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#faf8f1",
+  themeColor: "#f7f7f4",
   width: "device-width",
   initialScale: 1,
 };
@@ -33,9 +29,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="fr"
-      className={`${bricolage.variable} ${manrope.variable} h-full antialiased`}
+      className={`${figtree.variable} h-full antialiased`}
     >
-      <body className="min-h-dvh bg-cream font-sans text-ink">
+      <body className="min-h-dvh bg-canvas font-sans text-ink">
         {children}
         <Toast />
       </body>

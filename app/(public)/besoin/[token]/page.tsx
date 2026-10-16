@@ -37,7 +37,7 @@ export default function BesoinPartage() {
         <LogoMark />
       </div>
       {state.kind === "loading" ? (
-        <p aria-busy="true" className="mt-8 text-center text-[14px] text-ink-soft">
+        <p aria-busy="true" className="mt-8 text-center text-[15px] text-ink-soft">
           {PUBLIC_LOADING}
         </p>
       ) : state.kind === "ready" ? (
@@ -55,13 +55,13 @@ function Need({ need }: { need: PublicNeed }) {
   const view = publicNeedLines(need);
   return (
     <div>
-      <p className="mt-4 text-[12px] font-extrabold uppercase tracking-wider text-sage-ink">{PUBLIC_TITLE}</p>
-      <h1 className="mt-1 font-display text-[24px] font-extrabold text-ink">{view.title}</h1>
-      <ul className="mt-3 space-y-1.5 rounded-2xl border border-line bg-white p-4 text-[14px] text-ink" aria-label="Le besoin">
+      <p className="mt-4 text-[13px] font-extrabold uppercase tracking-wider text-brand-ink">{PUBLIC_TITLE}</p>
+      <h1 className="mt-1 text-[24px] font-extrabold text-ink">{view.title}</h1>
+      <ul className="mt-3 space-y-1.5 rounded-2xl border border-line bg-white p-4 text-[15px] text-ink" aria-label="Le besoin">
         {view.lines.length === 0 ? <li className="text-ink-soft">Aucun autre détail.</li> : view.lines.map((line) => <li key={line}>{line}</li>)}
       </ul>
-      <p className="mt-3 text-[13px] text-ink-soft">{PUBLIC_NOTE}</p>
-      <Link href="/vendeur/annonces/nouvelle" data-testid="shared-cta" className="mt-5 flex w-full items-center justify-center rounded-xl bg-forest py-3.5 text-[15px] font-bold text-white">
+      <p className="mt-3 text-[14px] text-ink-soft">{PUBLIC_NOTE}</p>
+      <Link href="/vendeur/annonces/nouvelle" data-testid="shared-cta" className="mt-5 flex w-full items-center justify-center rounded-xl bg-brand py-3.5 text-[15px] font-bold text-white">
         {PUBLIC_CTA}
       </Link>
     </div>

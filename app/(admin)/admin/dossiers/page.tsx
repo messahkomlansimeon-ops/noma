@@ -13,7 +13,7 @@ function Dossiers({ page, status, setStatus, offset, setOffset }: { page: AdminR
   const window = pageWindow(page.total, page.offset, page.limit);
   return (
     <div data-testid="admin-dossiers">
-      <h1 className="font-display text-[22px] font-extrabold text-ink">{DOSSIERS_TITLE}</h1>
+      <h1 className="text-[22px] font-extrabold text-ink">{DOSSIERS_TITLE}</h1>
       <div role="tablist" aria-label="Dossiers" className="mt-3 grid grid-cols-2 gap-2">
         {(["open", "closed"] as const).map((entry) => (
           <button
@@ -25,14 +25,14 @@ function Dossiers({ page, status, setStatus, offset, setOffset }: { page: AdminR
               setOffset(0);
               setStatus(entry);
             }}
-            className={`rounded-xl border px-3 py-2 text-[14px] font-bold ${status === entry ? "border-forest bg-forest text-white" : "border-line bg-white text-ink"}`}
+            className={`rounded-xl border px-3 py-2 text-[15px] font-bold ${status === entry ? "border-brand bg-brand text-white" : "border-line bg-white text-ink"}`}
           >
             {entry === "open" ? "À traiter" : "Clos"}
           </button>
         ))}
       </div>
       {page.reports.length === 0 ? (
-        <p className="mt-4 rounded-2xl bg-wash p-4 text-center text-[14px] text-ink-soft">{status === "open" ? DOSSIERS_EMPTY_OPEN : DOSSIERS_EMPTY_CLOSED}</p>
+        <p className="mt-4 rounded-2xl bg-mist p-4 text-center text-[15px] text-ink-soft">{status === "open" ? DOSSIERS_EMPTY_OPEN : DOSSIERS_EMPTY_CLOSED}</p>
       ) : (
         <ul aria-label="Dossiers" className="mt-3 space-y-2.5">
           {page.reports.map((report) => {
@@ -41,21 +41,21 @@ function Dossiers({ page, status, setStatus, offset, setOffset }: { page: AdminR
               <li key={row.id} data-testid="dossier-row" data-status={report.status}>
                 <Link href={`/admin/dossiers/${row.id}`} className="block rounded-2xl border border-line bg-white p-3.5">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="text-[14px] font-bold text-ink">{row.title}</span>
+                    <span className="text-[15px] font-bold text-ink">{row.title}</span>
                     <Badge tone={row.open ? "carrot" : "sage"}>{row.decisionText ?? "À traiter"}</Badge>
                   </div>
-                  <div className="mt-0.5 text-[12px] text-ink-soft">{row.reasonText}</div>
-                  <div className="font-mono text-[12px] text-ink-soft">{row.reportedText}</div>
-                  <div className="font-mono text-[12px] text-ink-soft">{row.reporterText}</div>
-                  {row.alertText ? <div className="mt-1 text-[12px] font-semibold text-carrot-ink">{row.alertText}</div> : null}
-                  <div className="text-[12px] text-ink-soft">{row.dateText}</div>
+                  <div className="mt-0.5 text-[13px] text-ink-soft">{row.reasonText}</div>
+                  <div className="font-mono text-[13px] text-ink-soft">{row.reportedText}</div>
+                  <div className="font-mono text-[13px] text-ink-soft">{row.reporterText}</div>
+                  {row.alertText ? <div className="mt-1 text-[13px] font-semibold text-accent-ink">{row.alertText}</div> : null}
+                  <div className="text-[13px] text-ink-soft">{row.dateText}</div>
                 </Link>
               </li>
             );
           })}
         </ul>
       )}
-      <div className="mt-3 flex items-center justify-between text-[12px] text-ink-soft">
+      <div className="mt-3 flex items-center justify-between text-[13px] text-ink-soft">
         <span>{window.from === 0 ? "" : `${window.from} à ${window.to} sur ${page.total}`}</span>
         <span className="flex gap-2">
           <button disabled={!window.hasPrevious} onClick={() => setOffset(Math.max(0, offset - DOSSIERS_PAGE_SIZE))} className="rounded-lg border border-line bg-white px-3 py-1.5 font-bold text-ink disabled:opacity-40">

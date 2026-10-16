@@ -30,22 +30,22 @@ export function Sheet({
       <button
         aria-label="Fermer"
         onClick={onClose}
-        className="absolute inset-0 cursor-default bg-ink/45 backdrop-blur-sm"
+        className="absolute inset-0 cursor-default bg-ink/50 backdrop-blur-sm"
       />
-      <div className="animate-sheet absolute inset-x-0 bottom-0 mx-auto flex max-h-[88dvh] w-full max-w-[480px] flex-col rounded-t-3xl bg-cream shadow-2xl sm:border-x sm:border-line">
+      <div className="animate-sheet absolute inset-x-0 bottom-0 mx-auto flex max-h-[88dvh] w-full max-w-lg flex-col rounded-t-[28px] bg-canvas shadow-2xl md:bottom-auto md:top-1/2 md:-translate-y-1/2 md:rounded-[28px]">
         <div className="flex items-center gap-3 px-4 pb-1 pt-3">
-          <span className="mx-auto h-1.5 w-10 shrink-0 rounded-full bg-line" />
+          <span className="mx-auto h-1.5 w-10 shrink-0 rounded-full bg-line-strong" />
         </div>
         <div className="flex items-center justify-between px-4 pb-2">
-          <span className="font-display text-[19px] font-extrabold text-ink">
+          <span className="text-[19px] font-extrabold text-ink">
             {title}
           </span>
           <button
             onClick={onClose}
             aria-label="Fermer"
-            className="flex size-9 items-center justify-center rounded-full bg-white text-ink-soft transition hover:bg-wash"
+            className="press flex size-11 items-center justify-center rounded-full bg-white text-ink-soft hover:bg-mist"
           >
-            <X className="size-5" />
+            <X className="size-6" aria-hidden />
           </button>
         </div>
         <div className="overflow-y-auto px-4 pb-7">{children}</div>
