@@ -101,7 +101,7 @@ test("migration 0028 : le compte système, les tables, les déclencheurs et les 
   const { runMigrations } = await import("../../lib/server/postgres/migrations");
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.at(-1), "0030_reports_moderation");
+  assert.equal(rerun.skipped.at(-1), "0031_seller_proposals");
   assert.ok(rerun.skipped.includes("0028_active_search"));
   assert.equal(await scalar(pool, "SELECT count(*)::int AS n FROM wallet_accounts WHERE kind = 'active_search_revenue'"), 1);
   for (const table of ["active_search_purchases", "active_search_state", "active_search_seen", "active_search_places"]) {

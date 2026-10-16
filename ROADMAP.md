@@ -254,3 +254,4 @@ Légende de cette section : ✅ en service · 🚧 codé et testé mais pas en s
 - 🚧 **Modération réelle** : la règle automatique des numéros cachés, la suspension de vendeur et, depuis le lot FIN3-C2, les signalements d'annonces et de commandes avec leurs dossiers de modération (SIGNALEMENTS.md) existent ; pas de badges de vendeurs, pas de synthèse automatique ni de notification de clôture.
 - ✅ **Comparer deux offres d'un besoin** (lot FIN3-C1) : `/besoins/[id]/comparer`, voir COMPARAISON.md. Les maquettes `/comparer` et `offre/[id]` sont supprimées.
 - ✅ **Signalements et dossiers de modération** (lot FIN3-C2, migration 0030) : `/signaler`, `/admin/dossiers`, voir SIGNALEMENTS.md.
+- ✅ **Propositions de vendeur et devis** (lot FIN3-C3, migration 0031) : `/vendeur/demandes`, `/vendeur/devis/nouveau`, `/propositions`, voir PROPOSITIONS.md. L'acceptation crée une commande par le circuit existant ; pas de notification.

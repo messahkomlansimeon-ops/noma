@@ -460,18 +460,18 @@ async function main(): Promise<void> {
     assert.equal(await buyer.getByTestId("match-card").filter({ hasText: "Sponsorisé" }).count(), 1, "l'annonce boostée remonte « Sponsorisé »");
     ok("côté acheteur : 8 annonces Galaxy S21 dont une « Sponsorisé »");
 
-    step("Pages « Bientôt disponible » restantes (lot D2 : favoris, messages, commandes et administration sont branchés)");
-    for (const [path, page, label] of [
-      ["/vendeur/demandes", vendor, "demandes vendeur"], ["/vendeur/devis/nouveau", vendor, "devis"],
-      // Lot D3 : « /admin/dossiers » est dans l'espace d'administration : un compte ordinaire y obtient la page 404 standard ; la file des dossiers est vérifiée plus bas avec l'admin démo.
-    ] as const) {
-      await page.goto(`${BASE}${path}`);
-      await page.getByText("Bientôt disponible").first().waitFor();
-      await page.getByRole("link", { name: /Retour/ }).first().waitFor();
-      assert.equal(/Alex O\.|Marcory Mobile|iPhone 14|NM-0|D-10/.test(await page.evaluate(() => document.body.innerText)), false, `${label} : aucune donnée factice`);
-      await checkClean(page, `« Bientôt disponible » (${label})`);
-    }
-    await shot(buyer, "12-bientot-disponible");
+    step("Pages « Demandes » et « Devis » du vendeur, « Propositions reçues » de l'acheteur (lot FIN3-C3 : branchées sur le serveur)");
+    await vendor.goto(`${BASE}/vendeur/demandes`);
+    await vendor.getByTestId("vendor-requests").waitFor();
+    assert.equal(/Alex O\.|Marcory Mobile|iPhone 14|NM-0|D-10/.test(await vendor.evaluate(() => document.body.innerText)), false, "demandes vendeur : aucune donnée factice");
+    await checkClean(vendor, "demandes vendeur");
+    await vendor.goto(`${BASE}/vendeur/devis/nouveau`);
+    await vendor.getByText("Choisissez une demande").first().waitFor();
+    await checkClean(vendor, "devis sans besoin choisi");
+    await buyer.goto(`${BASE}/propositions`);
+    await buyer.getByTestId("buyer-proposals").waitFor();
+    await checkClean(buyer, "propositions reçues");
+    await shot(buyer, "12-propositions");
 
     // ── LOT D2 : favoris, messagerie en direct, commande, administration ───────────────────────────────
     step("D2 · Favoris : le cœur de la fiche, la page /favoris, retrait");

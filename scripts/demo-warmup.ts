@@ -37,6 +37,7 @@ export const WARMUP_PAGE_PATTERNS: readonly string[] = Object.freeze([
   "/besoins/[id]/offres/[offerId]",
   "/besoins/[id]/comparer",
   "/signaler",
+  "/propositions",
   "/favoris",
   "/messages",
   "/messages/[id]",
@@ -60,6 +61,9 @@ export const WARMUP_PAGE_PATTERNS: readonly string[] = Object.freeze([
   "/vendeur/messages",
   "/vendeur/messages/[id]",
   "/vendeur/offre-pro",
+  "/vendeur/demandes",
+  "/vendeur/demandes/[id]",
+  "/vendeur/devis/nouveau",
   "/vendeur/porte-monnaie",
   "/vendeur/profil",
   // administration
@@ -78,10 +82,6 @@ export const WARMUP_PAGE_PATTERNS: readonly string[] = Object.freeze([
 /** Pages qui existent mais ne servent pas à la démonstration : « Bientôt disponible », anciens écrans, retour de Wave (désactivé par défaut). Le test exige une raison pour chacune. */
 export const WARMUP_EXCLUDED_PAGES: Readonly<Record<string, string>> = Object.freeze({
   "/partager": "écran « Bientôt disponible »",
-  "/propositions": "écran « Bientôt disponible »",
-  "/vendeur/demandes": "ancien écran du vendeur, hors parcours",
-  "/vendeur/demandes/[id]": "ancien écran du vendeur, hors parcours",
-  "/vendeur/devis/nouveau": "écran « Bientôt disponible »",
   "/admin/dossiers/[id]": "dossier de modération : demande un identifiant de dossier réel (la file « /admin/dossiers » est préchauffée)",
   "/paiement-retour/[id]": "retour du paiement Wave : désactivé par défaut, hors démonstration",
 });
@@ -167,7 +167,12 @@ export const WARMUP_API_PATTERNS: readonly string[] = Object.freeze([
   "/api/orders",
   "/api/orders/[id]",
   "/api/orders/[id]/[action]",
+  "/api/proposals",
+  "/api/proposals/[id]/[action]",
   "/api/reports",
+  "/api/requests",
+  "/api/requests/[id]",
+  "/api/requests/[id]/proposals",
   "/api/payments/fake/webhook",
   "/api/search",
   "/api/subscription",

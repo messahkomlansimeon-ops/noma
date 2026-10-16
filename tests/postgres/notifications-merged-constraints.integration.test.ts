@@ -182,10 +182,11 @@ describe("contraintes fusionnées de notifications : base vierge, migrations 000
     env = await openTestSchema(6);
     const pool = env.pool;
     const names = readdirSync(join(import.meta.dirname, "../../database/migrations")).filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort();
-    assert.equal(names.at(-4), "0027_missions.sql");
-    assert.equal(names.at(-3), "0028_active_search.sql");
-    assert.equal(names.at(-2), "0029_active_search_places.sql");
-    assert.equal(names.at(-1), "0030_reports_moderation.sql");
+    assert.equal(names.at(-5), "0027_missions.sql");
+    assert.equal(names.at(-4), "0028_active_search.sql");
+    assert.equal(names.at(-3), "0029_active_search_places.sql");
+    assert.equal(names.at(-2), "0030_reports_moderation.sql");
+    assert.equal(names.at(-1), "0031_seller_proposals.sql");
     assert.equal((await pool.query("SELECT count(*)::int AS n FROM noma_schema_migrations")).rows[0].n, names.length);
     const world = await baseWorld(pool);
     const purchaseId = await buyOption(pool, world.market);
@@ -202,8 +203,8 @@ describe("contraintes fusionnées de notifications : base DÉJÀ migrée jusqu'�
     try {
       const directory = join(import.meta.dirname, "../../database/migrations");
       const names = readdirSync(directory).filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort();
-      assert.equal(names.at(-3), "0028_active_search.sql");
-      assert.equal(names.at(-1), "0030_reports_moderation.sql");
+      assert.equal(names.at(-4), "0028_active_search.sql");
+      assert.equal(names.at(-1), "0031_seller_proposals.sql");
       await pool.query("CREATE TABLE noma_schema_migrations (version TEXT PRIMARY KEY, checksum TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)");
       // 0001 → 0027 avec leurs EMPREINTES réelles (le lanceur de migrations les contrôle ensuite).
       for (const name of names.filter((file) => file < "0028")) {
@@ -223,8 +224,8 @@ describe("contraintes fusionnées de notifications : base DÉJÀ migrée jusqu'�
       const rowBefore = (await pool.query("SELECT * FROM notifications WHERE id = $1", [coverageId])).rows[0];
 
       const applied = await runMigrations(pool);
-      assert.deepEqual(applied.applied, ["0028_active_search", "0029_active_search_places", "0030_reports_moderation"], "seules la 0028, la 0029 et la 0030 s'appliquent, sans erreur");
-      assert.equal(applied.skipped.length, names.length - 3);
+      assert.deepEqual(applied.applied, ["0028_active_search", "0029_active_search_places", "0030_reports_moderation", "0031_seller_proposals"], "seules la 0028, la 0029, la 0030 et la 0031 s'appliquent, sans erreur");
+      assert.equal(applied.skipped.length, names.length - 4);
 
       // Conservée à l'identique (les colonnes ajoutées par la 0028 sont NULL).
       const rowAfter = (await pool.query("SELECT * FROM notifications WHERE id = $1", [coverageId])).rows[0];
