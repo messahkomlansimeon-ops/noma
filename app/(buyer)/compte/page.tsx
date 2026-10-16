@@ -73,7 +73,7 @@ export default function MonCompte() {
           <MenuRow icon={Heart} label="Mes favoris" href="/favoris" />
           <MenuRow icon={CircleUser} label="Informations personnelles" onClick={soon} />
           <MenuRow icon={Bell} label="Notifications" badge={unread !== null && unread > 0 ? unread : undefined} href="/notifications" />
-          <MenuRow icon={CircleHelp} label="Aide et signalements" onClick={soon} />
+          <MenuRow icon={CircleHelp} label="Mes signalements" href="/signaler" />
         </div>
 
         <NotificationPreferencesCard />

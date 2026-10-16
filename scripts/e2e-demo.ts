@@ -463,7 +463,7 @@ async function main(): Promise<void> {
     step("Pages « Bientôt disponible » restantes (lot D2 : favoris, messages, commandes et administration sont branchés)");
     for (const [path, page, label] of [
       ["/vendeur/demandes", vendor, "demandes vendeur"], ["/vendeur/devis/nouveau", vendor, "devis"],
-      // Lot D3 : « /admin/dossiers » est dans l'espace d'administration : un compte ordinaire y obtient la page 404 standard ; « Bientôt disponible » est vérifié plus bas avec l'admin démo.
+      // Lot D3 : « /admin/dossiers » est dans l'espace d'administration : un compte ordinaire y obtient la page 404 standard ; la file des dossiers est vérifiée plus bas avec l'admin démo.
     ] as const) {
       await page.goto(`${BASE}${path}`);
       await page.getByText("Bientôt disponible").first().waitFor();
@@ -715,8 +715,8 @@ async function main(): Promise<void> {
     assert.equal(await adminPage.getByTestId("admin-settings").locator("input, button, textarea").count(), 0, "lecture seule : aucun champ ni bouton");
     await shot(adminPage, "28-admin-reglages");
     await adminPage.goto(`${BASE}/admin/dossiers`);
-    await adminPage.getByText("Bientôt disponible").first().waitFor();
-    ok("réglages du boost en lecture seule ; « Dossiers » reste « Bientôt disponible »");
+    await adminPage.getByTestId("admin-dossiers").waitFor();
+    ok("réglages du boost en lecture seule ; la file des dossiers de modération s'ouvre (lot FIN3-C2)");
     step("H1 · Administration : le tableau « Marché » (prix demandés, NOMBRE arrondi de ventes confirmées, aucun prix de vente)");
     await adminPage.goto(`${BASE}/admin`);
     await adminPage.getByTestId("admin-market-link").click();
