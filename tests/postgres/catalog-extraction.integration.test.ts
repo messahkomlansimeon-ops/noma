@@ -105,6 +105,7 @@ if (!configuredUrl?.trim()) {
         "0028_active_search",
         "0029_active_search_places",
         "0030_reports_moderation",
+        "0031_seller_proposals",
       ]);
     });
 

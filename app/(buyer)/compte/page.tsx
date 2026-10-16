@@ -5,6 +5,7 @@ import {
   Bell,
   CircleHelp,
   CircleUser,
+  Handshake,
   Heart,
   Layers,
   LogOut,
@@ -73,6 +74,7 @@ export default function MonCompte() {
           <MenuRow icon={Heart} label="Mes favoris" href="/favoris" />
           <MenuRow icon={CircleUser} label="Informations personnelles" onClick={soon} />
           <MenuRow icon={Bell} label="Notifications" badge={unread !== null && unread > 0 ? unread : undefined} href="/notifications" />
+          <MenuRow icon={Handshake} label="Propositions reçues" href="/propositions" />
           <MenuRow icon={CircleHelp} label="Mes signalements" href="/signaler" />
         </div>
 

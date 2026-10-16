@@ -862,7 +862,7 @@ function coverField(value: unknown): { coverPhotoId?: string } {
   return cover === null ? {} : { coverPhotoId: cover };
 }
 
-function parseStoredMatch(status: number, value: unknown): StoredMatch {
+export function parseStoredMatch(status: number, value: unknown): StoredMatch {
   if (
     !isObject(value) ||
     typeof value.candidateId !== "string" ||

@@ -61,8 +61,8 @@ before(async () => {
   txPool = await openNamed("tx");
   dirtyPool = await openNamed("dirty", dirtySchema);
   holderPool = await openNamed("holder");
-  assert.equal((await runMigrations(pool)).applied.length, 30);
-  assert.equal((await runMigrations(dirtyPool)).applied.length, 30);
+  assert.equal((await runMigrations(pool)).applied.length, 31);
+  assert.equal((await runMigrations(dirtyPool)).applied.length, 31);
 });
 
 after(async () => {
@@ -259,8 +259,8 @@ const insertEntry = (client: PoolClient, transactionId: string, accountId: strin
 test("migration 0014 : 14 appliquées, la relance n'en applique aucune, comptes système créés, tables et index présents", async () => {
   const rerun = await runMigrations(pool);
   assert.deepEqual(rerun.applied, []);
-  assert.equal(rerun.skipped.length, 30);
-  assert.equal(rerun.skipped.at(-1), "0030_reports_moderation");
+  assert.equal(rerun.skipped.length, 31);
+  assert.equal(rerun.skipped.at(-1), "0031_seller_proposals");
   const accounts = (await pool.query("SELECT kind, owner_id, balance::text AS balance FROM wallet_accounts ORDER BY kind")).rows;
   // Lot PRO1 (migration 0021) : quatre comptes système de plus (revenus d'abonnement et crédits promotionnels : émis, dépensés, expirés). Lot RA1 (migration 0028) : les revenus de la recherche active.
   assert.deepEqual(accounts, [

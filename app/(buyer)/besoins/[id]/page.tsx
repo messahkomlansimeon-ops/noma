@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { ActiveSearchCard } from "@/components/active-search-card";
 import { ExternalSection } from "@/components/external/external-section";
+import { ProposalsBanner } from "@/components/proposals/proposals-banner";
 import { BuyerMatchCard } from "@/components/matches/match-parts";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
@@ -235,6 +236,8 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
               <p className="mt-1 text-[13px] text-ink-soft">{EMPTY_BUYER_HINT}</p>
             </div>
           ) : null}
+
+          <ProposalsBanner demandId={demandId} />
 
           {state === "results" ? (
             <ul className="mt-3 space-y-3" aria-label="Offres correspondant à votre besoin">

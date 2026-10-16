@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { requireTransactionPool, requireUuid } from "../catalog/validation";
 import { readOfferAccess } from "../metrics/contacts";
 import { readAttributedBoostId } from "../metrics/attribution";
@@ -111,6 +111,40 @@ function toView(row: OrderRow, userId: string): OrderView {
 
 // ───────────── déclaration ─────────────
 
+/**
+ * La déclaration DANS une transaction déjà ouverte (verrou du couple, accès à l'annonce, refus d'une commande active, attribution au boost, rattachement à une mission, insertion) :
+ * partagée par `declareOrder` et par l'acceptation d'une proposition de vendeur (lot FIN3-C3), qui doit créer la commande dans LA MÊME transaction que le changement d'état de la
+ * proposition. Rend l'identifiant de la commande ; lève `SocialError` (mêmes codes qu'avant : `order_active_exists`, `order_already_confirmed`, `offer_not_available`…).
+ */
+export async function declareOrderInTransaction(
+  client: PoolClient,
+  input: { buyerId: string; demandId: string; offerId: string; price: number; quantity: number },
+): Promise<string> {
+  const { buyerId, demandId, offerId, price, quantity } = input;
+  await client.query(`SET LOCAL statement_timeout = '${SOCIAL_TRANSACTION_TIMEOUT}'`);
+  // Un verrou par couple (besoin, annonce) : deux déclarations simultanées s'attendent (l'index unique partiel reste le dernier garde-fou).
+  await client.query("SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext($2::text))", [`order:${demandId}`, offerId]);
+  const access = await readOfferAccess(client, { viewerId: buyerId, demandId, offerId });
+  if (!access.ok) throw new SocialError(access.reason === "offer_not_available" ? "offer_not_available" : "resource_not_found");
+  const active = await client.query<{ status: string }>("SELECT status FROM orders WHERE demand_id = $1::uuid AND offer_id = $2::uuid AND status IN ('proposed', 'confirmed')", [demandId, offerId]);
+  // Lot FIN1 : le refus dit EXACTEMENT ce qui existe (« en attente de confirmation » pour une commande proposée, « déjà confirmé » pour une vente confirmée), jamais « en cours » pour une vente conclue.
+  if (active.rowCount) throw new SocialError(active.rows.some((row) => row.status === "confirmed") ? "order_already_confirmed" : "order_active_exists");
+  const boostId = await readAttributedBoostId(client, { offerId, demandId });
+  // Lot MV1 : sur le besoin porteur d'une mission, la commande lui est rattachée (mission active, budgets et quantité respectés ; ligne de la mission verrouillée).
+  const mission = await linkOrderToMission(client, { buyerId, demandId, quantity, priceXof: price });
+  try {
+    const created = await client.query<{ id: string }>(
+      `INSERT INTO orders (demand_id, offer_id, buyer_id, seller_id, price_amount, boost_id, quantity, mission_id)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::bigint, $6::uuid, $7::int, $8::uuid) RETURNING id`,
+      [demandId, offerId, buyerId, access.sellerId, price, boostId, quantity, mission.missionId],
+    );
+    return created.rows[0].id;
+  } catch (error) {
+    if ((error as { code?: unknown } | null)?.code === "23505") throw new SocialError("order_active_exists");
+    throw error;
+  }
+}
+
 export async function declareOrder(input: { pool: Pool; buyerId: string; demandId: string; offerId: string; price: unknown; quantity?: unknown }): Promise<OrderView> {
   const pool = requireTransactionPool(input.pool);
   const buyerId = requireUuid(input.buyerId, "buyerId").toLowerCase();
@@ -118,30 +152,7 @@ export async function declareOrder(input: { pool: Pool; buyerId: string; demandI
   const offerId = requireUuid(input.offerId, "offerId").toLowerCase();
   const price = requireOrderPrice(input.price);
   const quantity = requireOrderQuantity(input.quantity);
-  const orderId = await withPostgresTransaction(async (client) => {
-    await client.query(`SET LOCAL statement_timeout = '${SOCIAL_TRANSACTION_TIMEOUT}'`);
-    // Un verrou par couple (besoin, annonce) : deux déclarations simultanées s'attendent (l'index unique partiel reste le dernier garde-fou).
-    await client.query("SELECT pg_advisory_xact_lock(hashtext($1::text), hashtext($2::text))", [`order:${demandId}`, offerId]);
-    const access = await readOfferAccess(client, { viewerId: buyerId, demandId, offerId });
-    if (!access.ok) throw new SocialError(access.reason === "offer_not_available" ? "offer_not_available" : "resource_not_found");
-    const active = await client.query<{ status: string }>("SELECT status FROM orders WHERE demand_id = $1::uuid AND offer_id = $2::uuid AND status IN ('proposed', 'confirmed')", [demandId, offerId]);
-    // Lot FIN1 : le refus dit EXACTEMENT ce qui existe (« en attente de confirmation » pour une commande proposée, « déjà confirmé » pour une vente confirmée), jamais « en cours » pour une vente conclue.
-    if (active.rowCount) throw new SocialError(active.rows.some((row) => row.status === "confirmed") ? "order_already_confirmed" : "order_active_exists");
-    const boostId = await readAttributedBoostId(client, { offerId, demandId });
-    // Lot MV1 : sur le besoin porteur d'une mission, la commande lui est rattachée (mission active, budgets et quantité respectés ; ligne de la mission verrouillée).
-    const mission = await linkOrderToMission(client, { buyerId, demandId, quantity, priceXof: price });
-    try {
-      const created = await client.query<{ id: string }>(
-        `INSERT INTO orders (demand_id, offer_id, buyer_id, seller_id, price_amount, boost_id, quantity, mission_id)
-         VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::bigint, $6::uuid, $7::int, $8::uuid) RETURNING id`,
-        [demandId, offerId, buyerId, access.sellerId, price, boostId, quantity, mission.missionId],
-      );
-      return created.rows[0].id;
-    } catch (error) {
-      if ((error as { code?: unknown } | null)?.code === "23505") throw new SocialError("order_active_exists");
-      throw error;
-    }
-  }, pool);
+  const orderId = await withPostgresTransaction((client) => declareOrderInTransaction(client, { buyerId, demandId, offerId, price, quantity }), pool);
   return readOrder({ pool, userId: buyerId, orderId });
 }
 

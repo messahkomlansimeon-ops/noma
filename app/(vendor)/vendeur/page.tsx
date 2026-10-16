@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ChevronRight, MessageCircle, Package, Plus, Wallet, Zap } from "lucide-react";
+import { ChevronRight, Inbox, MessageCircle, Package, Plus, Wallet, Zap } from "lucide-react";
 import { LogoMark } from "@/components/logo";
 import { MessagesBadge, MessagesUnreadSync } from "@/components/messages-badge";
 import { Sheet } from "@/components/modal";
@@ -136,6 +136,10 @@ function Dashboard() {
           <Link href="/vendeur/commandes" data-testid="vendor-orders-link" className="flex items-center gap-2 rounded-2xl border border-line bg-white p-3.5 text-[14px] font-bold text-ink transition hover:bg-wash/40">
             <Package className="size-4" aria-hidden />
             Commandes
+          </Link>
+          <Link href="/vendeur/demandes" data-testid="vendor-requests-link" className="col-span-2 flex items-center gap-2 rounded-2xl border border-line bg-white p-3.5 text-[14px] font-bold text-ink transition hover:bg-wash/40">
+            <Inbox className="size-4" aria-hidden />
+            Demandes d'acheteurs et propositions
           </Link>
         </div>
 
