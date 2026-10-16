@@ -81,7 +81,7 @@ export const WARMUP_PAGE_PATTERNS: readonly string[] = Object.freeze([
   "/admin/dossiers",
 ]);
 
-/** Pages qui existent mais ne servent pas à la démonstration : « Bientôt disponible », anciens écrans, retour de Wave (désactivé par défaut). Le test exige une raison pour chacune. */
+/** Pages qui existent mais ne servent pas à la démonstration : anciens écrans, retour de Wave (désactivé par défaut). Le test exige une raison pour chacune. */
 export const WARMUP_EXCLUDED_PAGES: Readonly<Record<string, string>> = Object.freeze({
   "/admin/dossiers/[id]": "dossier de modération : demande un identifiant de dossier réel (la file « /admin/dossiers » est préchauffée)",
   "/paiement-retour/[id]": "retour du paiement Wave : désactivé par défaut, hors démonstration",
