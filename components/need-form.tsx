@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { Briefcase, Key, MapPin, Search, ShoppingBag, TriangleAlert, Wallet, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui";
 import { parseBudgetFcfa } from "@/lib/contracts";
 import { useRealSearch } from "@/lib/real-search";
@@ -9,6 +10,7 @@ import { useRealSearch } from "@/lib/real-search";
 const modes = ["Acheter", "Louer", "Un service"];
 // Location temporairement désactivée : achat et service seuls.
 const DISABLED_MODES = new Set<string>(["Louer"]);
+const MODE_ICONS: Record<string, LucideIcon> = { Acheter: ShoppingBag, Louer: Key, "Un service": Briefcase };
 
 /** Clé publique Turnstile — absente = widget non rendu (dev local) ;
  *  présente = jeton requis avant chaque recherche. */
@@ -106,31 +108,36 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
   };
 
   return (
-    <div>
-      <div className="flex gap-2">
-        {modes.map((m) => (
-          <button
-            key={m}
-            disabled={DISABLED_MODES.has(m)}
-            onClick={() =>
-              setNeed({
-                mode: m === "Un service" ? "service" : "achat",
-              })
-            }
-            className={`rounded-full px-4 py-2 text-[14px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-              mode === m
-                ? "bg-brand text-white"
-                : "border border-line bg-white text-ink"
-            }`}
-          >
-            {m}
-            {m === "Louer" ? " (bientôt)" : ""}
-          </button>
-        ))}
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap gap-2">
+        {modes.map((m) => {
+          const ModeIcon = MODE_ICONS[m] ?? ShoppingBag;
+          return (
+            <button
+              key={m}
+              disabled={DISABLED_MODES.has(m)}
+              onClick={() =>
+                setNeed({
+                  mode: m === "Un service" ? "service" : "achat",
+                })
+              }
+              className={`press inline-flex min-h-11 items-center gap-2 rounded-full border-2 px-4 text-[14px] font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
+                mode === m
+                  ? "border-transparent bg-brand text-white"
+                  : "border-line-strong bg-white text-ink hover:border-brand"
+              }`}
+            >
+              <ModeIcon className="size-4" aria-hidden />
+              {m}
+              {m === "Louer" ? " (bientôt)" : ""}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="mt-3 rounded-2xl border border-line bg-white p-4">
-        <label htmlFor="need-text" className="block text-[14px] font-bold text-ink">
+      <div className="flex flex-col gap-3 rounded-3xl border border-line bg-white p-4">
+        <label htmlFor="need-text" className="flex items-center gap-2 text-[15px] font-bold text-ink">
+          <Search className="size-5 text-brand" aria-hidden />
           Que cherchez-vous ?
         </label>
         <textarea
@@ -139,27 +146,26 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
           onChange={(e) => setNeed({ text: e.target.value })}
           rows={2}
           maxLength={1000}
-          className="mt-2 w-full resize-none bg-transparent text-[15px] font-medium leading-relaxed text-ink placeholder:text-ink-soft/50"
+          className="w-full resize-none rounded-2xl border-2 border-line bg-white px-4 py-3 text-[16px] font-medium leading-relaxed text-ink placeholder:text-ink-soft/60 hover:border-line-strong"
           placeholder="Un iPhone 12 en bon état, à Abidjan…"
         />
-        <div className="mt-2 grid grid-cols-2 gap-2.5">
-          <div className="rounded-xl border border-line bg-canvas/60 px-3.5 py-2.5">
-            <label htmlFor="need-location" className="block text-[12px] font-semibold text-ink-soft">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label htmlFor="need-location" className="mb-1.5 flex items-center gap-1.5 text-[14px] font-bold text-ink">
+              <MapPin className="size-4 text-ink-soft" aria-hidden />
               Localisation
-              <span className="ml-1 font-normal">(facultatif)</span>
             </label>
             <Input
               id="need-location"
               value={need.location}
               onChange={(e) => setNeed({ location: e.target.value })}
               placeholder="Ex. Cocody"
-              className="mt-0.5 border-0 bg-transparent p-0 text-[15px] font-bold"
             />
           </div>
-          <div className="rounded-xl border border-line bg-canvas/60 px-3.5 py-2.5">
-            <label htmlFor="need-budget" className="block text-[12px] font-semibold text-ink-soft">
+          <div>
+            <label htmlFor="need-budget" className="mb-1.5 flex items-center gap-1.5 text-[14px] font-bold text-ink">
+              <Wallet className="size-4 text-ink-soft" aria-hidden />
               Budget maximum
-              <span className="ml-1 font-normal">(facultatif)</span>
             </label>
             <Input
               id="need-budget"
@@ -170,17 +176,17 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
               }}
               inputMode="numeric"
               placeholder="FCFA"
-              className="mt-0.5 border-0 bg-transparent p-0 text-[15px] font-bold"
             />
           </div>
         </div>
         {budgetError ? (
-          <div className="mt-2 text-[13px] font-semibold text-accent-ink">
+          <div role="alert" className="flex items-start gap-2 rounded-2xl bg-accent-soft px-3.5 py-2.5 text-[14px] font-semibold text-accent-ink">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
             {budgetError}
           </div>
         ) : null}
         {TURNSTILE_SITE_KEY ? (
-          <div className="mt-3 flex justify-center">
+          <div className="flex justify-center">
             <div ref={widgetRef} />
           </div>
         ) : null}
@@ -189,13 +195,11 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
       <button
         onClick={search}
         disabled={need.text.trim().length === 0}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3.5 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+        className="press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-[16px] font-bold text-white shadow-md shadow-brand/30 hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-40"
       >
+        <Search className="size-5" aria-hidden />
         Trouver des offres
       </button>
-      <div className="mt-2 text-center text-[13px] text-ink-soft">
-        Première recherche sans compte. Champs vides = extraits de votre texte.
-      </div>
     </div>
   );
 }

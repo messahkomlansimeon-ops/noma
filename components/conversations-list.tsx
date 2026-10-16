@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ChevronRight, MessageCircle } from "lucide-react";
+import { ChevronRight, MessageCircle, RotateCw } from "lucide-react";
 import { messagesRefresher } from "@/components/messages-badge";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
+import { ArtAlert, ArtChat } from "@/components/illustrations";
 import { TopBar } from "@/components/top-bar";
+import { Badge, Btn, EmptyState, IconTile, Skeleton } from "@/components/ui";
 import {
   MESSAGES_EMPTY,
-  MESSAGES_EMPTY_BUYER_HINT,
-  MESSAGES_EMPTY_SELLER_HINT,
   MESSAGES_LOADING,
   MESSAGES_TITLE,
   conversationRow,
@@ -53,54 +53,61 @@ export function ConversationsList({ space }: { space: "buyer" | "vendor" }) {
       {/* Lot FIN1 : titre dit une fois (le h1). */}
       <TopBar back={back} />
       <div className="px-4 pb-6">
-        <h1 className="text-[22px] font-extrabold text-ink">{MESSAGES_TITLE}</h1>
+        <h1 className="flex items-center gap-2.5 text-[24px] font-extrabold tracking-tight text-ink">
+          <MessageCircle className="size-6 text-brand" aria-hidden />
+          {MESSAGES_TITLE}
+        </h1>
         {error ? (
-          <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[15px] font-semibold text-ink">{error}</p>
-            <button
-              onClick={() => {
-                setError(null);
-                setReloadKey((key) => key + 1);
-              }}
-              className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
-            >
-              Réessayer
-            </button>
+          <div role="alert" className="animate-rise mt-4 flex flex-col items-center gap-4 rounded-3xl border border-line bg-white p-6 text-center">
+            <ArtAlert className="size-24" />
+            <p className="text-[16px] font-bold text-ink">{error}</p>
+            <div className="w-full max-w-xs">
+              <Btn
+                onClick={() => {
+                  setError(null);
+                  setReloadKey((key) => key + 1);
+                }}
+              >
+                <RotateCw className="size-5" aria-hidden />
+                Réessayer
+              </Btn>
+            </div>
           </div>
         ) : items === null ? (
-          <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
-            {MESSAGES_LOADING}
-          </p>
+          <div className="mt-4 flex flex-col gap-3 md:grid md:grid-cols-2" aria-busy="true">
+            <span className="sr-only">{MESSAGES_LOADING}</span>
+            <Skeleton className="h-20 w-full rounded-3xl" />
+            <Skeleton className="h-20 w-full rounded-3xl" />
+            <Skeleton className="h-20 w-full rounded-3xl" />
+          </div>
         ) : items.length === 0 ? (
-          <div role="status" data-testid="messages-empty" className="mt-6 rounded-2xl bg-mist p-5 text-center">
-            <MessageCircle className="mx-auto size-7 text-ink-soft" aria-hidden />
-            <p className="mt-2 text-[15px] font-bold text-ink">{MESSAGES_EMPTY}</p>
-            <p className="mt-1 text-[14px] text-ink-soft">{space === "buyer" ? MESSAGES_EMPTY_BUYER_HINT : MESSAGES_EMPTY_SELLER_HINT}</p>
+          <div role="status" data-testid="messages-empty">
+            <EmptyState art={<ArtChat className="size-36" />} title={MESSAGES_EMPTY} />
           </div>
         ) : (
-          <ul aria-label="Vos conversations" className="mt-3 space-y-2.5" data-testid="conversation-list">
+          <ul aria-label="Vos conversations" className="stagger mt-4 flex flex-col gap-3 md:grid md:grid-cols-2" data-testid="conversation-list">
             {items.map((item) => {
               const row = conversationRow(item);
               return (
                 <li key={row.id} data-testid="conversation-row" data-unread={row.unread ? "true" : "false"}>
-                  <Link href={row.href} className="flex items-start gap-3 rounded-2xl border border-line bg-white p-3.5">
-                    <span aria-hidden className={`mt-1.5 size-2.5 shrink-0 rounded-full ${row.unread ? "bg-accent" : "bg-transparent"}`} />
+                  <Link href={row.href} className="press flex min-h-20 items-center gap-3 rounded-3xl border border-line bg-white p-3.5 hover:border-brand">
+                    <IconTile icon={MessageCircle} tone={row.unread ? "accent" : "brand"} className="size-12" />
                     <span className="min-w-0 flex-1">
-                      <span className={`block text-[15px] text-ink ${row.unread ? "font-extrabold" : "font-semibold"}`}>
+                      <span className={`block truncate text-[16px] text-ink ${row.unread ? "font-extrabold" : "font-bold"}`}>
                         {row.unread ? <span className="sr-only">non lu : </span> : null}
                         {row.label}
                       </span>
                       {row.subtitle ? <span className="block truncate text-[13px] text-ink-soft">{row.subtitle}</span> : null}
-                      <span className={`mt-0.5 block truncate text-[14px] ${row.unread ? "font-bold text-ink" : "text-ink-soft"}`}>{row.preview}</span>
-                      <span className="mt-0.5 block text-[12px] text-ink-soft">
+                      <span className={`block truncate text-[14px] ${row.unread ? "font-bold text-ink" : "text-ink-soft"}`}>{row.preview}</span>
+                      <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-soft">
                         {row.dateText}
-                        {row.available ? "" : " · annonce plus disponible"}
+                        {row.available ? null : <Badge tone="wash">annonce plus disponible</Badge>}
                       </span>
                     </span>
                     {row.unread ? (
-                      <span className="mt-1 flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[12px] font-extrabold leading-5 text-ink">{row.unreadCount}</span>
+                      <span className="flex min-w-6 items-center justify-center rounded-full bg-accent px-1.5 text-[12px] font-extrabold leading-6 text-ink">{row.unreadCount}</span>
                     ) : null}
-                    <ChevronRight className="mt-1 size-4 shrink-0 text-ink-soft" aria-hidden />
+                    <ChevronRight className="size-5 shrink-0 text-ink-soft" aria-hidden />
                   </Link>
                 </li>
               );

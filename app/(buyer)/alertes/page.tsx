@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Bell, ChevronRight, Plus } from "lucide-react";
+import { ArrowRight, Archive, Bell, ChevronRight, CircleCheck, Play, Plus, RotateCw, TriangleAlert, type LucideIcon } from "lucide-react";
+import { ArtAlert, ArtSearch } from "@/components/illustrations";
+import { LogoMark } from "@/components/logo";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { Thumb } from "@/components/thumb";
-import { Badge, BtnOutline } from "@/components/ui";
+import { HeaderBtn } from "@/components/top-bar";
+import { Badge, Btn, BtnOutline, Chip, EmptyState, Skeleton } from "@/components/ui";
 import { UnreadBadge, UnreadSync } from "@/components/unread-badge";
 import { ApiError, api, describeApiError, type DemandRecord } from "@/lib/client/api";
 import {
@@ -30,6 +33,8 @@ const ACTION_DONE: Record<DemandAction, string> = {
   satisfy: "Besoin marqué satisfait",
   archive: "Besoin archivé",
 };
+
+const ACTION_ICONS: Record<DemandAction, LucideIcon> = { activate: Play, satisfy: CircleCheck, archive: Archive };
 
 function MesBesoins() {
   const showToast = useNoma((s) => s.showToast);
@@ -92,138 +97,140 @@ function MesBesoins() {
   const visible = filterDemands(demands ?? [], filter);
 
   return (
-    <main>
-      <div className="flex items-center justify-between px-4 py-3">
-        <Link href="/" className="flex size-9 items-center">
-          <span className="text-[20px] font-extrabold text-brand">
-            noma
-          </span>
-        </Link>
-        <Link
-          href="/notifications"
-          className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[14px] font-semibold text-ink"
-        >
-          <Bell className="size-4" aria-hidden />
-          Notifications
-          <UnreadBadge />
-        </Link>
+    <main className="flex flex-col gap-5 px-4 pb-6 pt-3">
+      <div className="flex items-center justify-between">
+        <span className="md:hidden">
+          <LogoMark />
+        </span>
+        <h1 className="hidden text-[26px] font-extrabold tracking-tight text-ink md:block">Mes besoins</h1>
+        <span className="relative">
+          <HeaderBtn icon={Bell} href="/notifications" label="Notifications" />
+          <UnreadBadge className="pointer-events-none absolute -right-0.5 -top-0.5" />
+        </span>
+      </div>
+      <h1 className="-mt-2 text-[24px] font-extrabold tracking-tight text-ink md:hidden">Mes besoins</h1>
+
+      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+        {DEMAND_FILTERS.map((f) => (
+          <Chip
+            key={f.id}
+            active={filter === f.id}
+            className="min-h-11 shrink-0"
+            onClick={() => {
+              setFilter(f.id);
+              setArmed(null);
+            }}
+          >
+            {f.label}
+            {demands ? countSuffix(filterDemands(demands, f.id).length, truncated) : ""}
+          </Chip>
+        ))}
       </div>
 
-      <div className="px-4">
-        <h1 className="text-[26px] font-extrabold text-ink">
-          Mes besoins
-        </h1>
+      {truncated && !loadError ? (
+        <p role="status" className="flex items-start gap-2 rounded-2xl bg-accent-soft px-3.5 py-3 text-[14px] font-semibold text-accent-ink">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+          {LIST_TRUNCATED_MESSAGE}
+        </p>
+      ) : null}
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          {DEMAND_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => {
-                setFilter(f.id);
-                setArmed(null);
-              }}
-              className={`rounded-full px-3.5 py-1.5 text-[14px] font-semibold transition ${
-                filter === f.id
-                  ? "bg-brand text-white"
-                  : "border border-line bg-white text-ink"
-              }`}
-            >
-              {f.label}
-              {demands ? countSuffix(filterDemands(demands, f.id).length, truncated) : ""}
-            </button>
-          ))}
-        </div>
-
-        {truncated && !loadError ? (
-          <p role="status" className="mt-3 text-[14px] font-semibold text-accent-ink">
-            {LIST_TRUNCATED_MESSAGE}
-          </p>
-        ) : null}
-
-        {loadError ? (
-          <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[15px] font-semibold text-ink">{loadError}</p>
-            <button
+      {loadError ? (
+        <div role="alert" className="animate-rise flex flex-col items-center gap-4 px-6 py-8 text-center">
+          <ArtAlert className="size-28" />
+          <p className="text-[16px] font-bold text-ink">{loadError}</p>
+          <div className="w-full max-w-xs">
+            <Btn
               onClick={() => {
                 setLoadError(null);
                 reload();
               }}
-              className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
             >
+              <RotateCw className="size-5" aria-hidden />
               Réessayer
-            </button>
+            </Btn>
           </div>
-        ) : demands === null ? (
-          <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
-            Chargement de vos besoins…
-          </p>
-        ) : visible.length === 0 ? (
-          <p className="mt-6 text-center text-[15px] text-ink-soft">
-            {demands.length === 0
-              ? "Vous n'avez pas encore de besoin."
-              : "Aucun besoin ne correspond à ce filtre."}
-          </p>
-        ) : (
-          <div className="mt-4 space-y-3">
-            {visible.map((demand) => {
-              const status = DEMAND_STATUS_VIEW[demand.status];
-              const summary = demandSummary(demand);
-              const busy = busyId === demand.id;
-              return (
-                <div key={demand.id} className="rounded-2xl border border-line bg-white p-3.5">
-                  <Link
-                    href={`/besoins/${demand.id}`}
-                    aria-label={`Voir les offres pour : ${recordTitle(demand)}`}
-                    className="flex items-center gap-3"
-                  >
-                    <Thumb art={artForCategory(demand.category)} className="size-12" iconClassName="size-6" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[15px] font-bold text-ink">
-                        {recordTitle(demand)}
-                      </div>
-                      {summary && <div className="text-[13px] text-ink-soft">{summary}</div>}
-                    </div>
-                    <ChevronRight className="size-4 shrink-0 text-ink-soft" aria-hidden />
-                  </Link>
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <Badge tone={status.tone}>{status.label}</Badge>
-                    <Link href={`/besoins/${demand.id}`} className="text-[14px] font-bold text-brand">
-                      {demand.status === "active" ? "Voir les offres" : "Détails"}
-                    </Link>
+        </div>
+      ) : demands === null ? (
+        <div className="flex flex-col gap-3" aria-busy="true">
+          <span className="sr-only">Chargement de vos besoins…</span>
+          <Skeleton className="h-28 w-full rounded-3xl" />
+          <Skeleton className="h-28 w-full rounded-3xl" />
+          <Skeleton className="h-28 w-full rounded-3xl" />
+        </div>
+      ) : visible.length === 0 ? (
+        <EmptyState
+          art={<ArtSearch className="size-36" />}
+          title={demands.length === 0 ? "Vous n'avez pas encore de besoin." : "Aucun besoin ne correspond à ce filtre."}
+          action={
+            demands.length === 0 ? (
+              <Btn href="/alerte/nouvelle">
+                <Plus className="size-5" aria-hidden />
+                Nouveau besoin
+              </Btn>
+            ) : undefined
+          }
+        />
+      ) : (
+        <div className="stagger flex flex-col gap-3 md:grid md:grid-cols-2">
+          {visible.map((demand) => {
+            const status = DEMAND_STATUS_VIEW[demand.status];
+            const summary = demandSummary(demand);
+            const busy = busyId === demand.id;
+            const actions = demandActions(demand.status);
+            return (
+              <div key={demand.id} className="flex flex-col gap-2.5 rounded-3xl border border-line bg-white p-3.5">
+                <Link
+                  href={`/besoins/${demand.id}`}
+                  aria-label={`Voir les offres pour : ${recordTitle(demand)}`}
+                  className="press flex items-center gap-3"
+                >
+                  <Thumb art={artForCategory(demand.category)} className="size-14" iconClassName="size-7" />
+                  <div className="min-w-0 flex-1">
+                    <div className="line-clamp-2 text-[16px] font-bold leading-snug text-ink">{recordTitle(demand)}</div>
+                    {summary && <div className="text-[14px] text-ink-soft">{summary}</div>}
                   </div>
-                  {demandActions(demand.status).length > 0 && (
-                    <div className="mt-2.5 flex border-t border-line pt-2.5">
-                      {demandActions(demand.status).map((a, index) => (
+                  <ChevronRight className="size-5 shrink-0 text-ink-soft" aria-hidden />
+                </Link>
+                <div className="flex items-center justify-between gap-2">
+                  <Badge tone={status.tone}>{status.label}</Badge>
+                  <Link href={`/besoins/${demand.id}`} className="press flex min-h-11 items-center gap-1 text-[14px] font-bold text-brand">
+                    {demand.status === "active" ? "Voir les offres" : "Détails"}
+                    <ArrowRight className="size-4" aria-hidden />
+                  </Link>
+                </div>
+                {actions.length > 0 && (
+                  <div className="flex gap-2 border-t border-line pt-2.5">
+                    {actions.map((a) => {
+                      const confirmArchive = a.action === "archive" && armed === `${demand.id}:archive`;
+                      const ActionIcon = ACTION_ICONS[a.action];
+                      return (
                         <button
                           key={a.action}
                           onClick={() => void run(demand, a.action)}
                           disabled={busyId !== null}
-                          className={`flex flex-1 items-center justify-center gap-1.5 text-[14px] font-bold disabled:opacity-40 ${
-                            a.action === "archive" && armed === `${demand.id}:archive`
-                              ? "text-accent-ink"
-                              : "text-ink"
-                          } ${index > 0 ? "border-l border-line" : ""}`}
+                          className={`press flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl px-2 text-[14px] font-bold disabled:opacity-40 ${
+                            confirmArchive ? "bg-accent-soft text-accent-ink" : "bg-mist text-ink hover:bg-line"
+                          }`}
                         >
-                          {busy
-                            ? "…"
-                            : a.action === "archive" && armed === `${demand.id}:archive`
-                              ? "Confirmer l'archivage"
-                              : a.label}
+                          <ActionIcon className="size-4 shrink-0" aria-hidden />
+                          {busy ? "…" : confirmArchive ? "Confirmer l'archivage" : a.label}
                         </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-        <BtnOutline href="/alerte/nouvelle" className="mt-4">
-          <Plus className="size-4" />
+      {demands !== null && demands.length === 0 && !loadError ? null : (
+        <BtnOutline href="/alerte/nouvelle">
+          <Plus className="size-5" aria-hidden />
           Nouveau besoin
         </BtnOutline>
-      </div>
+      )}
     </main>
   );
 }

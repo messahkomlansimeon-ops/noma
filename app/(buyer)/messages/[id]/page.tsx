@@ -4,7 +4,9 @@ import { Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { ConversationScreen } from "@/components/conversation-screen";
 import { SessionGate } from "@/components/session-gate";
+import { ArtAlert } from "@/components/illustrations";
 import { TopBar } from "@/components/top-bar";
+import { EmptyState } from "@/components/ui";
 import { isUuid } from "@/lib/client/api";
 import { parseMissionHint } from "@/lib/client/missions-view";
 
@@ -28,9 +30,9 @@ export default function Conversation() {
       ) : (
         <main>
           <TopBar back="/messages" title="Conversation" />
-          <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
-            Conversation introuvable.
-          </p>
+          <div role="alert">
+            <EmptyState art={<ArtAlert className="size-32" />} title="Conversation introuvable." />
+          </div>
         </main>
       )}
     </SessionGate>

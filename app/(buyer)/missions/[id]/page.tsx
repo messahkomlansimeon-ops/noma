@@ -3,7 +3,9 @@
 import { useParams } from "next/navigation";
 import { MissionDetail } from "@/components/missions/mission-detail";
 import { SessionGate } from "@/components/session-gate";
+import { ArtAlert } from "@/components/illustrations";
 import { TopBar } from "@/components/top-bar";
+import { EmptyState } from "@/components/ui";
 import { isUuid } from "@/lib/client/api";
 import { MISSION_NOT_FOUND } from "@/lib/client/missions-view";
 
@@ -17,9 +19,9 @@ export default function MissionPage() {
       ) : (
         <main>
           <TopBar back="/missions" title="Mission" />
-          <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
-            {MISSION_NOT_FOUND}
-          </p>
+          <div role="alert">
+            <EmptyState art={<ArtAlert className="size-32" />} title={MISSION_NOT_FOUND} />
+          </div>
         </main>
       )}
     </SessionGate>

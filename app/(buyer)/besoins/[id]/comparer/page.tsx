@@ -1,10 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { Info, Trophy } from "lucide-react";
+import { ArtAlert, ArtEmpty } from "@/components/illustrations";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
+import { BtnOutline, EmptyState, Skeleton } from "@/components/ui";
 import { api, describeApiError, isUuid, type StoredMatch } from "@/lib/client/api";
 import {
   COMPARE_INVALID_MESSAGE,
@@ -29,9 +31,14 @@ type State =
 
 function Cell({ text, best }: { text: string; best: boolean }) {
   return (
-    <td className={`px-2 py-2 align-top text-[14px] ${best ? "font-bold text-brand" : "text-ink"}`}>
+    <td className={`px-2.5 py-2.5 align-top text-[14px] ${best ? "bg-success-soft font-bold text-success-ink" : "text-ink"}`}>
       {text}
-      {best ? <span className="ml-1 text-[12px] font-extrabold uppercase text-brand">Le plus avantageux</span> : null}
+      {best ? (
+        <span className="mt-1 flex items-center gap-1 text-[12px] font-extrabold uppercase text-success-ink">
+          <Trophy className="size-3.5" aria-hidden />
+          Le plus avantageux
+        </span>
+      ) : null}
     </td>
   );
 }
@@ -40,17 +47,17 @@ function Table({ demandId, pair }: { demandId: string; pair: [StoredMatch, Store
   const rows: CompareRow[] = compareRows(pair[0], pair[1]);
   const titles = pair.map((item) => productTitle(item.candidate, "Offre"));
   return (
-    <div>
-      <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+    <div className="animate-rise flex flex-col gap-3">
+      <div className="overflow-x-auto rounded-3xl border border-line bg-white">
         <table data-testid="compare-table" className="w-full table-fixed border-collapse text-left">
           <caption className="sr-only">Comparaison de deux offres</caption>
           <thead>
             <tr className="border-b border-line">
-              <th scope="col" className="w-[28%] px-2 py-2 text-[13px] font-semibold text-ink-soft">
+              <th scope="col" className="w-[28%] px-2.5 py-3 text-[13px] font-semibold text-ink-soft">
                 &nbsp;
               </th>
               {titles.map((title, index) => (
-                <th key={pair[index].candidateId} scope="col" className="px-2 py-2 text-[14px] font-extrabold text-ink">
+                <th key={pair[index].candidateId} scope="col" className="px-2.5 py-3 text-[15px] font-extrabold leading-snug text-ink">
                   {title}
                 </th>
               ))}
@@ -59,7 +66,7 @@ function Table({ demandId, pair }: { demandId: string; pair: [StoredMatch, Store
           <tbody>
             {rows.map((row) => (
               <tr key={row.key} data-row={row.key} className="border-b border-line last:border-0">
-                <th scope="row" className="px-2 py-2 align-top text-[13px] font-semibold text-ink-soft">
+                <th scope="row" className="px-2.5 py-2.5 align-top text-[13px] font-semibold text-ink-soft">
                   {row.label}
                 </th>
                 <Cell text={row.a} best={row.better === "a"} />
@@ -69,21 +76,20 @@ function Table({ demandId, pair }: { demandId: string; pair: [StoredMatch, Store
           </tbody>
         </table>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2.5">
         {pair.map((item) => {
           const href = offerDetailPath(demandId, item.candidateId);
           return href ? (
-            <Link
-              key={item.candidateId}
-              href={href}
-              className="flex items-center justify-center rounded-xl border border-brand/30 bg-white py-2.5 text-[14px] font-bold text-brand"
-            >
+            <BtnOutline key={item.candidateId} href={href}>
               Voir l'annonce
-            </Link>
+            </BtnOutline>
           ) : null;
         })}
       </div>
-      <p className="mt-3 text-[13px] text-ink-soft">{COMPARE_NOTE}</p>
+      <p className="flex items-start gap-2 text-[13px] text-ink-soft">
+        <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+        {COMPARE_NOTE}
+      </p>
     </div>
   );
 }
@@ -119,23 +125,24 @@ function Compared({ demandId, selection }: { demandId: string; selection: [strin
 
   if (state.kind === "loading") {
     return (
-      <p role="status" aria-busy="true" className="mt-6 text-center text-[15px] text-ink-soft">
-        Chargement de la comparaison…
-      </p>
+      <div role="status" aria-busy="true" className="flex flex-col gap-3">
+        <span className="sr-only">Chargement de la comparaison…</span>
+        <Skeleton className="h-64 w-full rounded-3xl" />
+      </div>
     );
   }
   if (state.kind === "error") {
     return (
-      <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
-        {state.message}
-      </p>
+      <div role="alert">
+        <EmptyState art={<ArtAlert className="size-32" />} title={state.message} />
+      </div>
     );
   }
   if (state.kind === "missing") {
     return (
-      <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
-        {COMPARE_MISSING_MESSAGE}
-      </p>
+      <div role="alert">
+        <EmptyState art={<ArtEmpty className="size-36" />} title={COMPARE_MISSING_MESSAGE} />
+      </div>
     );
   }
   return <Table demandId={demandId} pair={state.pair} />;
@@ -150,13 +157,13 @@ function PageContent() {
   return (
     <main>
       <TopBar back={valid ? `/besoins/${demandId}` : "/alertes"} title="Comparer" />
-      <div className="px-4 pb-6">
+      <div className="px-4 pb-6 pt-2">
         {valid && selection ? (
           <Compared demandId={demandId} selection={selection} />
         ) : (
-          <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
-            {valid ? COMPARE_INVALID_MESSAGE : "Besoin introuvable."}
-          </p>
+          <div role="alert">
+            <EmptyState art={<ArtEmpty className="size-36" />} title={valid ? COMPARE_INVALID_MESSAGE : "Besoin introuvable."} />
+          </div>
         )}
       </div>
     </main>

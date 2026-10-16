@@ -2,9 +2,11 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleAlert, History, Info, Plus, RotateCw, TriangleAlert, Wallet } from "lucide-react";
+import { ArtAlert, ArtWallet } from "@/components/illustrations";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
+import { Btn, EmptyState, IconTile, Input, Skeleton } from "@/components/ui";
 import { api, describeApiError, type PaymentProviderName, type WalletTransaction } from "@/lib/client/api";
 import { createGenerationGuard } from "@/lib/client/match-view";
 import { safeNextPath } from "@/lib/client/session";
@@ -39,7 +41,9 @@ interface Loaded {
   nextCursor: string | null;
 }
 
-const TONE_CLASS = { credit: "text-brand", debit: "text-accent-ink", neutral: "text-ink-soft" } as const;
+const TONE_CLASS = { credit: "text-success-ink", debit: "text-accent-ink", neutral: "text-ink-soft" } as const;
+const TONE_ICON = { credit: ArrowDownLeft, debit: ArrowUpRight, neutral: ArrowLeftRight } as const;
+const TONE_TILE = { credit: "success", debit: "accent", neutral: "mist" } as const;
 
 /** Panneau de recharge : montants proposés, montant libre validé, puis page de paiement simulé (prestataire fictif) ou page de paiement Wave (Sublymus). */
 function RechargePanel({ next, provider }: { next: string; provider: PaymentProviderName | "none" }) {
@@ -108,19 +112,21 @@ function RechargePanel({ next, provider }: { next: string; provider: PaymentProv
   };
 
   return (
-    <section data-testid="topup-panel" aria-labelledby="topup-title" className="mt-4 rounded-2xl border border-line bg-white p-4">
-      <h2 id="topup-title" className="text-[16px] font-extrabold text-ink">
+    <section data-testid="topup-panel" aria-labelledby="topup-title" className="animate-rise rounded-3xl border border-line bg-white p-4">
+      <h2 id="topup-title" className="flex items-center gap-2.5 text-[18px] font-extrabold tracking-tight text-ink">
+        <IconTile icon={Plus} tone="brand" className="size-9" />
         Recharger mon porte-monnaie
       </h2>
       <p
         data-testid={provider === "fake" ? "topup-simulation-notice" : "topup-provider-notice"}
         data-provider={provider}
-        className={`mt-1 rounded-lg px-3 py-2 text-[13px] font-semibold ${provider === "sublymus" ? "bg-brand-soft text-brand" : "bg-accent-soft text-accent-ink"}`}
+        className={`mt-3 flex items-start gap-2.5 rounded-2xl px-3.5 py-3 text-[14px] font-bold ${provider === "sublymus" ? "bg-brand-soft text-brand-ink" : "bg-accent-soft text-accent-ink"}`}
       >
+        {provider === "sublymus" ? <Info className="mt-0.5 size-5 shrink-0" aria-hidden /> : <TriangleAlert className="mt-0.5 size-5 shrink-0" aria-hidden />}
         {rechargeNotice(provider)}
       </p>
 
-      <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Montants proposés">
+      <div className="mt-4 grid grid-cols-2 gap-2.5 md:grid-cols-4" role="group" aria-label="Montants proposés">
         {TOPUP_PRESETS.map((preset) => {
           const selected = parsed.ok && parsed.amountXof === preset;
           return (
@@ -134,8 +140,8 @@ function RechargePanel({ next, provider }: { next: string; provider: PaymentProv
               }}
               disabled={pending}
               aria-pressed={selected}
-              className={`rounded-xl border px-3 py-3 text-[15px] font-bold transition disabled:opacity-50 ${
-                selected ? "border-transparent bg-brand text-white" : "border-line bg-white text-ink"
+              className={`press min-h-12 rounded-2xl border-2 px-3 py-3 text-[15px] font-bold disabled:cursor-not-allowed disabled:opacity-40 ${
+                selected ? "border-transparent bg-brand text-white" : "border-line bg-white text-ink hover:border-line-strong"
               }`}
             >
               {formatFcfa(preset)}
@@ -144,10 +150,10 @@ function RechargePanel({ next, provider }: { next: string; provider: PaymentProv
         })}
       </div>
 
-      <label htmlFor="topup-amount" className="mt-4 block text-[14px] font-bold text-ink">
+      <label htmlFor="topup-amount" className="mb-1.5 mt-4 block text-[14px] font-bold text-ink">
         Ou un autre montant (en FCFA)
       </label>
-      <input
+      <Input
         id="topup-amount"
         data-testid="topup-amount-input"
         value={amountText}
@@ -166,16 +172,18 @@ function RechargePanel({ next, provider }: { next: string; provider: PaymentProv
         disabled={pending}
         aria-invalid={touched && !parsed.ok ? true : undefined}
         aria-describedby={touched && !parsed.ok ? "topup-amount-error" : undefined}
-        className="mt-1.5 w-full rounded-xl border border-line bg-white px-3.5 py-3 text-[15px] font-semibold text-ink disabled:opacity-60"
+        className="font-semibold disabled:opacity-60"
       />
       {touched && !parsed.ok && amountText.trim().length > 0 ? (
-        <p id="topup-amount-error" role="alert" data-testid="topup-amount-error" className="mt-1.5 text-[14px] font-semibold text-accent-ink">
+        <p id="topup-amount-error" role="alert" data-testid="topup-amount-error" className="mt-2 flex items-center gap-2 text-[14px] font-semibold text-danger-ink">
+          <CircleAlert className="size-4 shrink-0" aria-hidden />
           {parsed.message}
         </p>
       ) : null}
 
       {error ? (
-        <p role="alert" data-testid="topup-error" className="mt-3 rounded-xl bg-accent-soft p-3 text-[14px] font-semibold text-accent-ink">
+        <p role="alert" data-testid="topup-error" className="mt-3 flex items-center gap-2.5 rounded-2xl bg-danger-soft px-4 py-3 text-[14px] font-semibold text-danger-ink">
+          <CircleAlert className="size-5 shrink-0" aria-hidden />
           {error}
         </p>
       ) : null}
@@ -184,7 +192,7 @@ function RechargePanel({ next, provider }: { next: string; provider: PaymentProv
         data-testid="topup-submit"
         onClick={() => void submit()}
         disabled={!parsed.ok || pending || provider === "none"}
-        className="mt-4 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3.5 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+        className="press mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3.5 text-[16px] font-bold text-white hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-40"
       >
         {pending ? "Ouverture du paiement…" : parsed.ok ? `Continuer vers le paiement de ${formatFcfa(parsed.amountXof)}` : "Continuer vers le paiement"}
       </button>
@@ -268,100 +276,117 @@ export function PorteMonnaie({ space }: { space: "buyer" | "vendor" }) {
       <TopBar back={backPath} title="Mon porte-monnaie" />
       <div className="px-4 pb-6">
         {loadError ? (
-          <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[15px] font-semibold text-ink">{loadError}</p>
-            <button
-              onClick={() => {
-                setLoadError(null);
-                setReloadKey((key) => key + 1);
-              }}
-              className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
-            >
-              Réessayer
-            </button>
+          <div role="alert" className="animate-rise mt-4 flex flex-col items-center gap-4 rounded-3xl border border-line bg-white p-6 text-center">
+            <ArtAlert className="size-24" />
+            <p className="text-[16px] font-bold text-ink">{loadError}</p>
+            <div className="w-full max-w-xs">
+              <Btn
+                onClick={() => {
+                  setLoadError(null);
+                  setReloadKey((key) => key + 1);
+                }}
+              >
+                <RotateCw className="size-5" aria-hidden />
+                Réessayer
+              </Btn>
+            </div>
           </div>
         ) : !loaded ? (
-          <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
-            Chargement de votre porte-monnaie…
-          </p>
+          <div className="mt-4 flex flex-col gap-3" aria-busy="true">
+            <span className="sr-only">Chargement de votre porte-monnaie…</span>
+            <Skeleton className="h-44 w-full rounded-[2rem]" />
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-16 w-full rounded-3xl" />
+            <Skeleton className="h-16 w-full rounded-3xl" />
+          </div>
         ) : (
-          <>
-            <div className="mt-3 rounded-2xl bg-brand p-5 text-white">
-              <div className="flex items-center gap-2 text-[14px] font-semibold text-white/80">
-                <Wallet className="size-4" aria-hidden />
+          <div className="mt-3 flex flex-col gap-5">
+            <div className="animate-rise relative overflow-hidden rounded-[2rem] bg-brand p-5 text-white">
+              <span aria-hidden className="absolute -right-6 -top-6 size-28 rounded-full bg-white/10" />
+              <span aria-hidden className="absolute -bottom-8 right-10 size-20 rounded-full bg-white/10" />
+              <div className="relative flex items-center gap-2 text-[14px] font-semibold text-white/90">
+                <Wallet className="size-5" aria-hidden />
                 Solde disponible · {PAID_CREDITS_LABEL}
               </div>
-              <div data-testid="wallet-balance" className="mt-1 text-[40px] font-extrabold leading-tight">
+              <div data-testid="wallet-balance" className="relative mt-1 text-[40px] font-extrabold leading-tight">
                 {formatFcfa(loaded.balanceXof)}
               </div>
               {loaded.promoBalanceXof > 0 || loaded.transactions.some((entry) => entry.promoAmountXof !== 0) ? (
-                <div data-testid="wallet-promo" className="mt-3 rounded-xl bg-white/15 px-3 py-2.5">
-                  <div className="text-[13px] font-semibold text-white/80">{PROMO_CREDITS_LABEL}</div>
+                <div data-testid="wallet-promo" className="relative mt-3 rounded-2xl bg-white/15 px-4 py-3">
+                  <div className="text-[13px] font-semibold text-white/90">{PROMO_CREDITS_LABEL}</div>
                   <div data-testid="wallet-promo-balance" className="text-[22px] font-extrabold leading-tight">
                     {formatFcfa(loaded.promoBalanceXof)}
                   </div>
                   {promoExpiryText(loaded.promoBalanceXof, loaded.promoExpiresAt) ? (
-                    <div data-testid="wallet-promo-expiry" className="text-[13px] text-white/80">
+                    <div data-testid="wallet-promo-expiry" className="text-[13px] text-white/90">
                       {promoExpiryText(loaded.promoBalanceXof, loaded.promoExpiresAt)}
                     </div>
                   ) : null}
-                  <p className="mt-1 text-[12px] leading-snug text-white/70">{PROMO_CREDITS_NOTE}</p>
+                  <p className="mt-1 text-[12px] leading-snug text-white/80">{PROMO_CREDITS_NOTE}</p>
                 </div>
               ) : null}
               <button
                 data-testid="wallet-recharge"
                 onClick={() => setRechargeOpen((open) => !open)}
                 aria-expanded={rechargeOpen}
-                className="mt-3 flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-[15px] font-bold text-brand transition active:scale-[0.99]"
+                className="press relative mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-[16px] font-bold text-brand hover:bg-brand-soft"
               >
+                <Plus className="size-5" aria-hidden />
                 Recharger
               </button>
             </div>
 
             {rechargeOpen ? <RechargePanel next={next} provider={loaded.paymentMode} /> : null}
 
-            <h2 className="mt-6 text-[16px] font-extrabold text-ink">Historique</h2>
-            {loaded.transactions.length === 0 ? (
-              <p data-testid="wallet-empty" className="mt-2 rounded-2xl bg-mist p-4 text-center text-[15px] font-semibold text-ink-soft">
-                {EMPTY_WALLET_HISTORY}
-              </p>
-            ) : (
-              <ul data-testid="wallet-history" className="mt-2 divide-y divide-line rounded-2xl border border-line bg-white" aria-label="Opérations du porte-monnaie">
-                {loaded.transactions.map((transaction) => {
-                  const row = walletRow(transaction);
-                  return (
-                    <li key={row.key} data-testid="wallet-row" data-kind={transaction.kind} className="flex items-center justify-between gap-3 px-3.5 py-3">
-                      <div className="min-w-0">
-                        <div className="text-[15px] font-bold text-ink">{row.label}</div>
-                        <div className="text-[13px] text-ink-soft">{row.dateText}</div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <div data-testid="wallet-row-amount" data-tone={row.tone} className={`text-[15px] font-extrabold ${TONE_CLASS[row.tone]}`}>
-                          {row.amountText}
+            <section className="flex flex-col gap-3">
+              <h2 className="flex items-center gap-2 text-[18px] font-extrabold tracking-tight text-ink">
+                <History className="size-5 text-brand" aria-hidden />
+                Historique
+              </h2>
+              {loaded.transactions.length === 0 ? (
+                <div data-testid="wallet-empty">
+                  <EmptyState art={<ArtWallet className="size-32" />} title={EMPTY_WALLET_HISTORY} />
+                </div>
+              ) : (
+                <ul data-testid="wallet-history" className="divide-y divide-line overflow-hidden rounded-3xl border border-line bg-white" aria-label="Opérations du porte-monnaie">
+                  {loaded.transactions.map((transaction) => {
+                    const row = walletRow(transaction);
+                    return (
+                      <li key={row.key} data-testid="wallet-row" data-kind={transaction.kind} className="flex items-center gap-3 px-4 py-3">
+                        <IconTile icon={TONE_ICON[row.tone]} tone={TONE_TILE[row.tone]} className="size-10" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[15px] font-bold text-ink">{row.label}</div>
+                          <div className="text-[13px] text-ink-soft">{row.dateText}</div>
                         </div>
-                        {row.promoText ? <div data-testid="wallet-row-promo" className="text-[12px] font-semibold text-ink-soft">{row.promoText}</div> : null}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+                        <div className="shrink-0 text-right">
+                          <div data-testid="wallet-row-amount" data-tone={row.tone} className={`text-[16px] font-extrabold ${TONE_CLASS[row.tone]}`}>
+                            {row.amountText}
+                          </div>
+                          {row.promoText ? <div data-testid="wallet-row-promo" className="text-[12px] font-semibold text-ink-soft">{row.promoText}</div> : null}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
 
-            {moreError ? (
-              <p role="alert" className="mt-3 text-center text-[14px] font-semibold text-accent-ink">
-                {moreError}
-              </p>
-            ) : null}
-            {loaded.nextCursor ? (
-              <button
-                onClick={() => void loadMore()}
-                disabled={loadingMore}
-                className="mt-4 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white py-3 text-[15px] font-bold text-brand disabled:opacity-50"
-              >
-                {loadingMore ? "Chargement…" : "Voir plus"}
-              </button>
-            ) : null}
-          </>
+              {moreError ? (
+                <p role="alert" className="flex items-center justify-center gap-2 text-center text-[14px] font-semibold text-danger-ink">
+                  <CircleAlert className="size-4 shrink-0" aria-hidden />
+                  {moreError}
+                </p>
+              ) : null}
+              {loaded.nextCursor ? (
+                <button
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className="press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-line-strong bg-white px-5 py-3 text-[16px] font-bold text-ink hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {loadingMore ? "Chargement…" : "Voir plus"}
+                </button>
+              ) : null}
+            </section>
+          </div>
         )}
       </div>
     </main>

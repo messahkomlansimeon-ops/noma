@@ -19,15 +19,15 @@ export function Timeline({
           <div key={label} className="flex gap-3">
             <div className="flex flex-col items-center">
               <div
-                className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
+                className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
                   done
-                    ? "bg-brand text-white"
+                    ? "animate-pop bg-brand text-white"
                     : current
                       ? "border-[3px] border-accent bg-white"
                       : "border-2 border-line bg-white"
                 }`}
               >
-                {done && <Check className="size-4" strokeWidth={3} />}
+                {done && <Check className="size-4" strokeWidth={3} aria-hidden />}
               </div>
               {!last && (
                 <div
@@ -70,15 +70,15 @@ export function StepBar({
           <div key={label} className="flex flex-1 items-start last:flex-none">
             <div className="flex flex-col items-center gap-1">
               <div
-                className={`flex size-7 items-center justify-center rounded-full ${
+                className={`flex size-8 items-center justify-center rounded-full ${
                   done
-                    ? "bg-brand text-white"
+                    ? "animate-pop bg-brand text-white"
                     : current
-                      ? "bg-brand text-white ring-4 ring-brand/20"
+                      ? "bg-brand text-white ring-4 ring-brand-soft"
                       : "border-2 border-line bg-white"
                 }`}
               >
-                {done && <Check className="size-4" strokeWidth={3} />}
+                {done && <Check className="size-4" strokeWidth={3} aria-hidden />}
               </div>
               <span
                 className={`whitespace-nowrap text-[12px] font-bold ${
@@ -90,7 +90,7 @@ export function StepBar({
             </div>
             {i < steps.length - 1 && (
               <div
-                className={`mx-1 mt-3 h-0.5 flex-1 ${done ? "bg-brand" : "bg-line"}`}
+                className={`mx-1 mt-4 h-0.5 flex-1 ${done ? "bg-brand" : "bg-line"}`}
               />
             )}
           </div>

@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BellOff, BellRing, CalendarPlus } from "lucide-react";
+import { BellOff, BellRing, CalendarPlus, Pause, Play, RotateCw } from "lucide-react";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
+import { ArtAlert } from "@/components/illustrations";
+import { Btn, IconTile, Skeleton } from "@/components/ui";
 import { api, describeApiError, type DemandTracking, type TrackingAction } from "@/lib/client/api";
 import {
   TRACKING_EXTEND_LABEL,
@@ -17,9 +19,12 @@ import {
 import { trackingMaximumText } from "@/lib/client/active-search-view";
 import { useNoma } from "@/lib/store";
 
+const PILL =
+  "press inline-flex min-h-11 items-center gap-1.5 rounded-full border-2 border-line-strong bg-white px-4 text-[14px] font-bold text-ink hover:border-brand disabled:cursor-not-allowed disabled:opacity-50";
+
 /**
  * Suivi d'un besoin actif (lot N1) : « Suivi actif jusqu'au … », Prolonger, Pause / Reprendre. Le matching continue pendant une pause ou après la fin du suivi :
- * seules les notifications s'arrêtent (la note le dit). Les textes viennent de `notifications-view.ts` (testé).
+ * seules les notifications s'arrêtent. Les textes viennent de `notifications-view.ts` (testé).
  */
 export function TrackingPanel({ demandId }: { demandId: string }) {
   const showToast = useNoma((s) => s.showToast);
@@ -65,59 +70,56 @@ export function TrackingPanel({ demandId }: { demandId: string }) {
 
   if (error) {
     return (
-      <div role="alert" className="mt-3 rounded-2xl border border-line bg-white p-3.5 text-center">
-        <p className="text-[14px] font-semibold text-ink">{error}</p>
-        <button
-          onClick={() => {
-            setError(null);
-            setReloadKey((key) => key + 1);
-          }}
-          className="mt-2 rounded-xl bg-brand px-4 py-2 text-[14px] font-bold text-white"
-        >
-          Réessayer
-        </button>
+      <div role="alert" className="animate-rise mt-3 flex flex-col items-center gap-3 rounded-3xl border border-line bg-white p-4 text-center">
+        <ArtAlert className="size-20" />
+        <p className="text-[15px] font-bold text-ink">{error}</p>
+        <div className="w-full max-w-xs">
+          <Btn
+            onClick={() => {
+              setError(null);
+              setReloadKey((key) => key + 1);
+            }}
+          >
+            <RotateCw className="size-5" aria-hidden />
+            Réessayer
+          </Btn>
+        </div>
       </div>
     );
   }
   if (!tracking) {
     return (
-      <p className="mt-3 text-center text-[14px] text-ink-soft" aria-busy="true">
-        {TRACKING_LOADING}
-      </p>
+      <div className="mt-3" aria-busy="true">
+        <span className="sr-only">{TRACKING_LOADING}</span>
+        <Skeleton className="h-20 w-full rounded-3xl" />
+      </div>
     );
   }
 
   const view = trackingView(tracking);
   const Icon = view.tone === "active" ? BellRing : BellOff;
   return (
-    <section className="mt-3 rounded-2xl border border-line bg-white p-3.5" aria-label={TRACKING_TITLE} data-testid="tracking-panel" data-tone={view.tone}>
-      <div className="flex items-start gap-2.5">
-        <Icon className={`mt-0.5 size-5 shrink-0 ${view.tone === "active" ? "text-brand" : "text-ink-soft"}`} aria-hidden />
+    <section className="animate-rise mt-3 rounded-3xl border border-line bg-white p-4" aria-label={TRACKING_TITLE} data-testid="tracking-panel" data-tone={view.tone}>
+      <div className="flex items-center gap-3">
+        <IconTile icon={Icon} tone={view.tone === "active" ? "brand" : "mist"} />
         <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-extrabold text-ink" data-testid="tracking-headline">
+          <div className="text-[16px] font-extrabold leading-snug text-ink" data-testid="tracking-headline">
             {view.headline}
           </div>
-          <p className="mt-0.5 text-[13px] text-ink-soft">{view.detail}</p>
+          {view.tone !== "active" ? <p className="mt-0.5 text-[14px] text-ink-soft">{view.detail}</p> : null}
         </div>
       </div>
       {view.applicable ? (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           {view.canExtend ? (
-            <button
-              onClick={() => void run("extend")}
-              disabled={busy !== null}
-              className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[14px] font-semibold text-ink disabled:opacity-50"
-            >
-              <CalendarPlus className="size-3.5" aria-hidden />
+            <button onClick={() => void run("extend")} disabled={busy !== null} className={PILL}>
+              <CalendarPlus className="size-4" aria-hidden />
               {busy === "extend" ? "…" : TRACKING_EXTEND_LABEL}
             </button>
           ) : null}
           {view.canPause ? (
-            <button
-              onClick={() => void run("pause")}
-              disabled={busy !== null}
-              className="rounded-full border border-line bg-white px-3 py-1.5 text-[14px] font-semibold text-ink disabled:opacity-50"
-            >
+            <button onClick={() => void run("pause")} disabled={busy !== null} className={PILL}>
+              <Pause className="size-4" aria-hidden />
               {busy === "pause" ? "…" : TRACKING_PAUSE_LABEL}
             </button>
           ) : null}
@@ -125,15 +127,16 @@ export function TrackingPanel({ demandId }: { demandId: string }) {
             <button
               onClick={() => void run("resume")}
               disabled={busy !== null}
-              className="rounded-full bg-brand px-3 py-1.5 text-[14px] font-bold text-white disabled:opacity-50"
+              className="press inline-flex min-h-11 items-center gap-1.5 rounded-full bg-brand px-4 text-[14px] font-bold text-white hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
             >
+              <Play className="size-4" aria-hidden />
               {busy === "resume" ? "…" : TRACKING_RESUME_LABEL}
             </button>
           ) : null}
-          {view.atMaximum ? <span className="self-center text-[13px] text-ink-soft">{trackingMaximumText(tracking)}</span> : null}
+          {view.atMaximum ? <span className="text-[13px] text-ink-soft">{trackingMaximumText(tracking)}</span> : null}
         </div>
       ) : null}
-      <p className="mt-2.5 text-[12px] text-ink-soft">{TRACKING_NOTE}</p>
+      <p className="mt-3 text-[13px] text-ink-soft">{TRACKING_NOTE}</p>
     </section>
   );
 }

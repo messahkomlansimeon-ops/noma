@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { House } from "lucide-react";
+import { ArtAlert } from "@/components/illustrations";
 import { APP_TITLE } from "@/lib/site";
 
 /**
@@ -7,12 +10,20 @@ import { APP_TITLE } from "@/lib/site";
  */
 export default function NotFound() {
   return (
-    <main className="flex min-h-dvh items-center justify-center px-6" data-testid="not-found">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-6 text-center" data-testid="not-found">
       <title>{APP_TITLE}</title>
-      <div className="flex items-center text-ink">
-        <h1 className="mr-5 border-r border-ink/30 pr-6 text-[24px] font-medium leading-[49px]">404</h1>
-        <h2 className="text-[15px] font-normal leading-[49px]">This page could not be found.</h2>
+      <ArtAlert className="size-40" />
+      <div className="animate-rise flex flex-col items-center gap-1">
+        <h1 className="text-[56px] font-extrabold leading-none tracking-tight text-brand">404</h1>
+        <h2 className="text-[17px] font-bold text-ink">This page could not be found.</h2>
       </div>
+      <Link
+        href="/"
+        aria-label="Accueil"
+        className="press flex size-14 items-center justify-center rounded-full bg-brand text-white hover:bg-brand-deep"
+      >
+        <House className="size-6" aria-hidden />
+      </Link>
     </main>
   );
 }

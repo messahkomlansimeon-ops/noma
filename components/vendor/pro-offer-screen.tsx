@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BadgeCheck, Gift, Upload, Wallet } from "lucide-react";
+import { BadgeCheck, BellRing, ChevronRight, CircleCheck, Crown, Gift, Loader2, Scale, Upload, Wallet } from "lucide-react";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
+import { IconTile } from "@/components/ui";
+import { BTN_OUTLINE, BTN_PRIMARY, ErrorState, LoadingBlock, Notice, SectionHeading } from "@/components/vendor/vendor-parts";
 import { ApiError, api, describeApiError } from "@/lib/client/api";
 import { createGenerationGuard } from "@/lib/client/match-view";
 import type { SubscriptionState } from "@/lib/client/pro-api";
@@ -17,6 +19,7 @@ import { browserSessionStorage, createIdempotencyKeys, formatFcfa, newIdempotenc
 
 const SUBSCRIBE_KEY_PREFIX = "noma:subscribe-key:";
 const TONE_CLASS = { good: "border-brand/30 bg-brand-soft", neutral: "border-line bg-white", warn: "border-accent/50 bg-accent-soft" } as const;
+const TONE_ICON = { good: "success", neutral: "mist", warn: "accent" } as const;
 
 /** Écran « Offre Pro » du vendeur : comparaison aux prix provisoires, souscription avec les crédits, état, renouvellement, annulation, crédits promotionnels, avis. */
 export function ProOfferScreen() {
@@ -109,25 +112,23 @@ export function ProOfferScreen() {
   return (
     <main>
       <TopBar back="/vendeur/profil" title={PRO_PAGE_TITLE} />
-      <div className="px-4 pb-8">
+      <div className="px-4 pb-8 pt-2">
         {loadError ? (
-          <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[15px] font-semibold text-ink">{loadError}</p>
-            <button onClick={() => { setLoadError(null); setReloadKey((key) => key + 1); }} className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white">
-              Réessayer
-            </button>
-          </div>
+          <ErrorState message={loadError} onRetry={() => { setLoadError(null); setReloadKey((key) => key + 1); }} />
         ) : state === null ? (
-          <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">Chargement de votre offre…</p>
+          <LoadingBlock label="Chargement de votre offre…" />
         ) : (
-          <>
+          <div className="stagger flex flex-col gap-4">
             {state.notices.slice(0, 5).map((notice) => {
               const view = noticeView(notice, undefined, state.current.maxOnlineOffers);
               return (
-                <section key={notice.id} data-testid="pro-notice" data-code={notice.code} className="mt-4 rounded-2xl border border-accent/50 bg-accent-soft p-4">
-                  <div className="text-[15px] font-extrabold text-accent-ink">{view.title}</div>
-                  <p className="mt-1 text-[14px] text-accent-ink">{view.detail}</p>
-                  <div className="mt-1 text-[13px] text-accent-ink/80">{view.dateText}</div>
+                <section key={notice.id} data-testid="pro-notice" data-code={notice.code} className="flex items-start gap-3 rounded-3xl border border-accent/50 bg-accent-soft p-4">
+                  <BellRing className="mt-0.5 size-5 shrink-0 text-accent-ink" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-extrabold text-accent-ink">{view.title}</div>
+                    <p className="mt-1 text-[14px] text-accent-ink">{view.detail}</p>
+                    <div className="mt-1 text-[13px] text-accent-ink/80">{view.dateText}</div>
+                  </div>
                 </section>
               );
             })}
@@ -135,12 +136,12 @@ export function ProOfferScreen() {
             {(() => {
               const status = statusView(state);
               return (
-                <section data-testid="pro-status" data-tone={status.tone} data-source={state.current.source} className={`mt-4 rounded-2xl border p-4 ${TONE_CLASS[status.tone]}`}>
-                  <div className="flex items-center gap-2 text-[16px] font-extrabold text-ink">
-                    {state.current.source === "subscription" ? <BadgeCheck className="size-5 text-brand" aria-hidden /> : null}
+                <section data-testid="pro-status" data-tone={status.tone} data-source={state.current.source} className={`rounded-3xl border p-4 ${TONE_CLASS[status.tone]}`}>
+                  <div className="flex items-center gap-3 text-[17px] font-extrabold text-ink">
+                    <IconTile icon={state.current.source === "subscription" ? BadgeCheck : Crown} tone={TONE_ICON[status.tone]} />
                     {status.title}
                   </div>
-                  <ul className="mt-1.5 space-y-1 text-[14px] text-ink-soft">
+                  <ul className="mt-3 space-y-1 text-[14px] text-ink-soft">
                     {status.lines.map((line) => <li key={line}>{line}</li>)}
                   </ul>
                   {state.subscription ? (
@@ -148,7 +149,7 @@ export function ProOfferScreen() {
                       data-testid="pro-toggle-renewal"
                       onClick={() => toggleRenewal(!state.subscription!.autoRenew)}
                       disabled={pending}
-                      className="mt-3 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white px-4 py-3 text-[15px] font-bold text-brand disabled:opacity-50"
+                      className={`${BTN_OUTLINE} mt-3`}
                     >
                       {pending ? SUBSCRIBE_LABELS.working : state.subscription.autoRenew ? SUBSCRIBE_LABELS.disableRenewal : SUBSCRIBE_LABELS.enableRenewal}
                     </button>
@@ -161,13 +162,15 @@ export function ProOfferScreen() {
             {(() => {
               const promo = promoView(state.promo);
               return (
-                <section data-testid="pro-promo" className="mt-3 rounded-2xl border border-line bg-white p-4">
-                  <div className="flex items-center gap-2 text-[15px] font-extrabold text-ink">
-                    <Gift className="size-4 text-brand" aria-hidden />
-                    Crédits promotionnels
+                <section data-testid="pro-promo" className="rounded-3xl border border-line bg-white p-4">
+                  <div className="flex items-center gap-3">
+                    <IconTile icon={Gift} tone="accent" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[14px] font-bold text-ink-soft">Crédits promotionnels</div>
+                      <div data-testid="pro-promo-amount" className="text-[26px] font-extrabold leading-tight text-ink">{promo.amountText}</div>
+                    </div>
                   </div>
-                  <div data-testid="pro-promo-amount" className="mt-1 text-[26px] font-extrabold text-ink">{promo.amountText}</div>
-                  {promo.expiryText ? <div data-testid="pro-promo-expiry" className="text-[14px] text-ink-soft">{promo.expiryText}</div> : null}
+                  {promo.expiryText ? <div data-testid="pro-promo-expiry" className="mt-1 text-[14px] text-ink-soft">{promo.expiryText}</div> : null}
                   <p className="mt-2 text-[13px] text-ink-soft">{PROMO_CREDITS_RULES}</p>
                 </section>
               );
@@ -177,43 +180,46 @@ export function ProOfferScreen() {
               <Link
                 href={IMPORT_PAGE_PATH}
                 data-testid="pro-import-link"
-                className="mt-3 flex items-center gap-3 rounded-2xl border border-line bg-white p-4 text-[15px] font-bold text-ink"
+                className="press flex min-h-16 items-center gap-3 rounded-3xl border border-line bg-white p-4 text-[15px] font-bold text-ink hover:border-brand"
               >
-                <Upload className="size-5 text-brand" aria-hidden />
-                Importer un catalogue (fichier CSV)
+                <IconTile icon={Upload} tone="info" />
+                <span className="flex-1">Importer un catalogue (fichier CSV)</span>
+                <ChevronRight className="size-5 text-ink-soft" aria-hidden />
               </Link>
             ) : null}
 
-            <h2 className="mt-6 text-[16px] font-extrabold text-ink">Gratuit ou Pro</h2>
-            <p data-testid="pro-prices-notice" className="mt-1 rounded-lg bg-accent-soft px-3 py-2 text-[13px] font-semibold text-accent-ink">{PRICES_PROVISIONAL_NOTICE}</p>
-            <table data-testid="pro-plan-table" className="mt-3 w-full overflow-hidden rounded-2xl border border-line bg-white text-left text-[14px]">
-              <thead>
-                <tr className="bg-mist text-ink-soft">
-                  <th className="px-3 py-2 font-bold" scope="col"><span className="sr-only">Critère</span></th>
-                  {state.plans.map((entry) => <th key={entry.code} scope="col" className="px-3 py-2 font-extrabold text-ink">{entry.name}</th>)}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {comparisonRows(state.plans).map((row) => (
-                  <tr key={row.key} data-testid={`pro-row-${row.key}`}>
-                    <th scope="row" className="px-3 py-2 font-semibold text-ink">{row.label}</th>
-                    {row.values.map((value, index) => <td key={`${row.key}-${state.plans[index].code}`} className="px-3 py-2 text-ink">{value}</td>)}
+            <div className="mt-2 flex flex-col gap-3">
+              <SectionHeading icon={Scale}>Gratuit ou Pro</SectionHeading>
+              <Notice tone="accent" data-testid="pro-prices-notice" small>{PRICES_PROVISIONAL_NOTICE}</Notice>
+              <table data-testid="pro-plan-table" className="w-full overflow-hidden rounded-3xl border border-line bg-white text-left text-[14px]">
+                <thead>
+                  <tr className="bg-mist text-ink-soft">
+                    <th className="px-3 py-3 font-bold" scope="col"><span className="sr-only">Critère</span></th>
+                    {state.plans.map((entry) => <th key={entry.code} scope="col" className="px-3 py-3 font-extrabold text-ink">{entry.name}</th>)}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {comparisonRows(state.plans).map((row) => (
+                    <tr key={row.key} data-testid={`pro-row-${row.key}`}>
+                      <th scope="row" className="px-3 py-3 font-semibold text-ink">{row.label}</th>
+                      {row.values.map((value, index) => <td key={`${row.key}-${state.plans[index].code}`} className="px-3 py-3 font-semibold text-ink">{value}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {!state.subscription && plan ? (
-              <section className="mt-4">
+              <section className="flex flex-col gap-3">
                 {subscribe.kind === "balance_unknown" ? (
-                  <p role="alert" className="rounded-xl bg-accent-soft p-3 text-[14px] font-semibold text-accent-ink">Votre solde n&apos;a pas pu être lu : l&apos;abonnement est impossible pour le moment.</p>
+                  <Notice tone="danger" role="alert">Votre solde n&apos;a pas pu être lu : l&apos;abonnement est impossible pour le moment.</Notice>
                 ) : null}
                 {subscribe.kind === "insufficient" ? (
-                  <div data-testid="pro-insufficient" className="rounded-xl bg-accent-soft p-3 text-[14px] text-accent-ink">
+                  <div data-testid="pro-insufficient" className="rounded-3xl bg-accent-soft p-4 text-[14px] text-accent-ink">
                     <div className="font-extrabold">{subscribe.text}</div>
                     <p className="mt-0.5">{subscribe.detail}</p>
-                    <Link href={walletHref({ next: "/vendeur/offre-pro", recharge: true })} data-testid="pro-recharge" className="mt-2 inline-flex items-center gap-1.5 font-bold underline">
-                      <Wallet className="size-4" aria-hidden />
+                    <Link href={walletHref({ next: "/vendeur/offre-pro", recharge: true })} data-testid="pro-recharge" className={`${BTN_OUTLINE} mt-3`}>
+                      <Wallet className="size-5" aria-hidden />
                       {SUBSCRIBE_LABELS.recharge}
                     </Link>
                   </div>
@@ -223,24 +229,26 @@ export function ProOfferScreen() {
                     data-testid="pro-subscribe"
                     onClick={() => { setActionError(null); setDone(null); setConfirming(true); }}
                     disabled={!canSubscribe(subscribe, pending)}
-                    className="mt-3 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3.5 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+                    className={BTN_PRIMARY}
                   >
+                    <Crown className="size-5" aria-hidden />
                     {subscribableLabelFor(plan)}
                   </button>
                 ) : subscribe.kind === "ready" ? (
-                  <div data-testid="pro-confirmation" className="mt-3 rounded-2xl border border-brand/30 bg-brand-soft p-4">
+                  <div data-testid="pro-confirmation" className="animate-pop rounded-3xl border border-brand/30 bg-brand-soft p-4">
                     <p className="text-[15px] font-semibold text-ink">{subscribeConfirmationText(subscribe)}</p>
                     <p className="mt-1 text-[13px] text-ink-soft">{planPriceText(plan)}. {PRICES_PROVISIONAL_NOTICE}</p>
-                    <div className="mt-3 flex gap-2">
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                       <button
                         data-testid="pro-confirm"
                         onClick={() => void confirmSubscribe()}
                         disabled={pending}
-                        className="flex-1 rounded-xl bg-brand px-4 py-3 text-[15px] font-bold text-white disabled:opacity-50"
+                        className={`${BTN_PRIMARY} sm:flex-1`}
                       >
+                        {pending ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <CircleCheck className="size-5" aria-hidden />}
                         {pending ? SUBSCRIBE_LABELS.confirming : SUBSCRIBE_LABELS.confirm}
                       </button>
-                      <button onClick={() => setConfirming(false)} disabled={pending} className="rounded-xl border border-line bg-white px-4 py-3 text-[15px] font-bold text-ink disabled:opacity-50">
+                      <button onClick={() => setConfirming(false)} disabled={pending} className={`${BTN_OUTLINE} sm:w-auto`}>
                         {SUBSCRIBE_LABELS.cancel}
                       </button>
                     </div>
@@ -249,10 +257,13 @@ export function ProOfferScreen() {
               </section>
             ) : null}
 
-            {actionError ? <p role="alert" data-testid="pro-error" className="mt-3 rounded-xl bg-accent-soft p-3 text-[14px] font-semibold text-accent-ink">{actionError}</p> : null}
-            {done ? <p role="status" data-testid="pro-done" className="mt-3 rounded-xl bg-brand-soft p-3 text-[14px] font-semibold text-brand">{done}</p> : null}
-            <p className="mt-4 text-[13px] text-ink-soft">Solde en crédits : {balance === null ? "inconnu" : <span data-testid="pro-balance">{formatFcfa(balance)}</span>}</p>
-          </>
+            {actionError ? <Notice tone="danger" role="alert" data-testid="pro-error">{actionError}</Notice> : null}
+            {done ? <Notice tone="brand" icon={CircleCheck} role="status" data-testid="pro-done">{done}</Notice> : null}
+            <p className="flex items-center gap-2 text-[14px] font-semibold text-ink-soft">
+              <Wallet className="size-5 text-brand" aria-hidden />
+              <span>Solde en crédits : {balance === null ? "inconnu" : <span data-testid="pro-balance" className="font-extrabold text-ink">{formatFcfa(balance)}</span>}</span>
+            </p>
+          </div>
         )}
       </div>
     </main>

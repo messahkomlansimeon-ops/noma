@@ -272,7 +272,7 @@ async function main(): Promise<void> {
     await buyer.getByPlaceholder("200 000").fill("200 000");
     await buyer.getByRole("button", { name: "Activer le besoin" }).click();
     await buyer.waitForURL("**/alertes");
-    await buyer.locator("div.rounded-2xl", { hasText: "Je cherche un iPhone 12" }).first().getByRole("link", { name: "Voir les offres", exact: true }).click();
+    await buyer.locator("div.rounded-3xl", { hasText: "Je cherche un iPhone 12" }).first().getByRole("link", { name: "Voir les offres", exact: true }).click();
     await buyer.waitForURL(/\/besoins\/[0-9a-f-]{36}$/);
     // L'acheteur ne voit pas le texte libre de l'annonce, seulement sa fiche épurée (« Apple iPhone 12 ») : la base d'essai ne contient que cette annonce.
     await refreshUntil(buyer, "l'annonce du vendeur dans les résultats", async () => (await buyer.getByTestId("match-card").count()) > 0);
@@ -331,7 +331,7 @@ async function main(): Promise<void> {
 
     step("Annonce en pause : plus servie à l'acheteur, toujours au vendeur");
     await vendor.goto(`${BASE}/vendeur/annonces`);
-    const mine = vendor.locator("div.rounded-2xl", { hasText: title }).first();
+    const mine = vendor.locator("div.rounded-3xl", { hasText: title }).first();
     await mine.getByRole("button", { name: "Mettre en pause" }).click();
     await mine.getByText("En pause", { exact: true }).waitFor();
     assert.equal((await fetchPhoto(buyerContext, firstId)).status, 404);

@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { CircleCheck, CircleX, TriangleAlert } from "lucide-react";
+import { CircleCheck, CircleX, RotateCw, ShieldCheck, TriangleAlert, Wallet } from "lucide-react";
+import { ArtAlert, ArtCheck, ArtWallet } from "@/components/illustrations";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
+import { Skeleton } from "@/components/ui";
 import { ApiError, api, describeApiError, isUuid, type WalletTopup } from "@/lib/client/api";
 import { safeNextPath } from "@/lib/client/session";
 import {
@@ -37,7 +39,9 @@ function failureOf(error: unknown): CheckoutFailure {
   return error instanceof ApiError ? { status: error.status, code: error.code } : { status: 0, code: "unexpected" };
 }
 
-const linkClass = "flex w-full items-center justify-center rounded-xl px-4 py-3.5 text-[15px] font-bold transition active:scale-[0.99]";
+const linkClass = "press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-[16px] font-bold";
+const PRIMARY = "bg-brand text-white hover:bg-brand-deep";
+const OUTLINE = "border-2 border-line-strong bg-white text-ink hover:border-brand hover:text-brand";
 
 /** Page du prestataire de paiement SIMULÉ : l'utilisateur choisit l'issue ; l'état affiché est celui LU sur le serveur. */
 function Paiement({ topupId }: { topupId: string }) {
@@ -115,65 +119,79 @@ function Paiement({ topupId }: { topupId: string }) {
       <div
         data-testid="sim-banner"
         role="note"
-        className="sticky top-0 z-20 flex items-center justify-center gap-2 bg-accent px-4 py-3.5 text-center text-[15px] font-extrabold uppercase tracking-wide text-ink"
+        className="sticky top-0 z-20 flex items-center justify-center gap-2 rounded-b-3xl bg-accent px-4 py-3.5 text-center text-[15px] font-extrabold uppercase tracking-wide text-ink"
       >
         <TriangleAlert className="size-5 shrink-0" aria-hidden />
         {SIMULATION_BANNER}
       </div>
 
-      <div className="px-4 pb-10 pt-5">
-        <h1 className="text-[26px] font-extrabold text-ink">Paiement simulé</h1>
-        <p className="mt-1 text-[14px] text-ink-soft">{SIMULATION_SUBTITLE}</p>
+      <div className="flex flex-col gap-4 px-4 pb-10 pt-5">
+        <h1 className="flex items-center gap-2.5 text-[26px] font-extrabold tracking-tight text-ink">
+          <Wallet className="size-7 text-brand" aria-hidden />
+          Paiement simulé
+        </h1>
+        <p className="flex items-start gap-2.5 rounded-2xl bg-accent-soft p-3.5 text-[14px] font-semibold text-accent-ink">
+          <ShieldCheck className="mt-0.5 size-5 shrink-0" aria-hidden />
+          {SIMULATION_SUBTITLE}
+        </p>
 
         {view.kind === "loading" ? (
-          <p className="mt-8 text-center text-[15px] text-ink-soft" aria-busy="true">
-            Chargement de la recharge…
-          </p>
+          <div className="flex flex-col gap-3" aria-busy="true">
+            <span className="sr-only">Chargement de la recharge…</span>
+            <Skeleton className="h-40 w-full rounded-3xl" />
+            <Skeleton className="h-12 w-full rounded-2xl" />
+          </div>
         ) : null}
 
         {view.kind === "pending" ? (
           <>
-            <div className="mt-5 rounded-2xl border border-line bg-white p-5 text-center">
+            <div className="animate-rise flex flex-col items-center gap-2 rounded-3xl border border-line bg-white p-5 text-center">
+              <ArtWallet className="size-28" />
               <div className="text-[14px] font-semibold text-ink-soft">Montant de la recharge</div>
-              <div data-testid="sim-amount" className="text-[38px] font-extrabold leading-tight text-ink">
+              <div data-testid="sim-amount" className="text-[40px] font-extrabold leading-tight text-ink">
                 {view.amountText}
               </div>
             </div>
             {actionError ? (
-              <p role="alert" data-testid="sim-action-error" className="mt-3 rounded-xl bg-accent-soft p-3 text-[14px] font-semibold text-accent-ink">
+              <p role="alert" data-testid="sim-action-error" className="flex items-center gap-2.5 rounded-2xl bg-danger-soft px-4 py-3 text-[14px] font-semibold text-danger-ink">
+                <TriangleAlert className="size-5 shrink-0" aria-hidden />
                 {actionError}
               </p>
             ) : null}
-            <button
-              data-testid="sim-confirm"
-              onClick={() => void act("confirm")}
-              disabled={busy !== null}
-              className="mt-5 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3.5 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {busy === "confirm" ? "Paiement en cours…" : "Confirmer le paiement"}
-            </button>
-            <button
-              data-testid="sim-fail"
-              onClick={() => void act("fail")}
-              disabled={busy !== null}
-              className="mt-3 flex w-full items-center justify-center rounded-xl border border-accent/50 bg-white px-4 py-3.5 text-[15px] font-bold text-accent-ink transition disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {busy === "fail" ? "Échec en cours…" : "Faire échouer le paiement"}
-            </button>
+            <div className="grid gap-3 md:grid-cols-2">
+              <button
+                data-testid="sim-confirm"
+                onClick={() => void act("confirm")}
+                disabled={busy !== null}
+                className={`${linkClass} ${PRIMARY} disabled:cursor-not-allowed disabled:opacity-40`}
+              >
+                <CircleCheck className="size-5" aria-hidden />
+                {busy === "confirm" ? "Paiement en cours…" : "Confirmer le paiement"}
+              </button>
+              <button
+                data-testid="sim-fail"
+                onClick={() => void act("fail")}
+                disabled={busy !== null}
+                className={`${linkClass} border-2 border-danger bg-white text-danger-ink hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-40`}
+              >
+                <CircleX className="size-5" aria-hidden />
+                {busy === "fail" ? "Échec en cours…" : "Faire échouer le paiement"}
+              </button>
+            </div>
           </>
         ) : null}
 
         {view.kind === "succeeded" ? (
-          <div className="mt-5">
-            <div data-testid="sim-result" data-kind="succeeded" role="status" className="rounded-2xl border border-brand/30 bg-brand-soft p-5 text-center">
-              <CircleCheck className="mx-auto size-9 text-brand" aria-hidden />
-              <p className="mt-2 text-[16px] font-extrabold text-brand">{view.message}</p>
+          <div className="flex flex-col gap-3">
+            <div data-testid="sim-result" data-kind="succeeded" role="status" className="animate-rise flex flex-col items-center gap-2 rounded-3xl bg-success-soft p-5 text-center">
+              <ArtCheck className="size-28" />
+              <p className="text-[18px] font-extrabold text-success-ink">{view.message}</p>
             </div>
-            <Link data-testid="sim-return" href={target} className={`${linkClass} mt-5 bg-brand text-white`}>
+            <Link data-testid="sim-return" href={target} className={`${linkClass} ${PRIMARY}`}>
               {returnLinkLabel(target)}
             </Link>
             {target !== walletPathFor(target) ? (
-              <Link href={walletPathFor(target)} className={`${linkClass} mt-3 border border-brand/30 bg-white text-brand`}>
+              <Link href={walletPathFor(target)} className={`${linkClass} ${OUTLINE}`}>
                 Voir mon porte-monnaie
               </Link>
             ) : null}
@@ -181,25 +199,27 @@ function Paiement({ topupId }: { topupId: string }) {
         ) : null}
 
         {view.kind === "failed" || view.kind === "expired" ? (
-          <div className="mt-5">
-            <div data-testid="sim-result" data-kind={view.kind} role="status" className="rounded-2xl border border-accent/40 bg-accent-soft p-5 text-center">
-              <CircleX className="mx-auto size-9 text-accent-ink" aria-hidden />
-              <p className="mt-2 text-[15px] font-extrabold text-accent-ink">{view.message}</p>
-              <p className="mt-1 text-[14px] text-ink-soft">Montant de la recharge : {view.amountText}.</p>
+          <div className="flex flex-col gap-3">
+            <div data-testid="sim-result" data-kind={view.kind} role="status" className="animate-rise flex flex-col items-center gap-2 rounded-3xl bg-accent-soft p-5 text-center">
+              <ArtAlert className="size-28" />
+              <p className="text-[17px] font-extrabold text-accent-ink">{view.message}</p>
+              <p className="text-[14px] text-ink-soft">Montant de la recharge : {view.amountText}.</p>
             </div>
-            <Link data-testid="sim-retry" href={retryHref} className={`${linkClass} mt-5 bg-brand text-white`}>
+            <Link data-testid="sim-retry" href={retryHref} className={`${linkClass} ${PRIMARY}`}>
+              <RotateCw className="size-5" aria-hidden />
               Réessayer la recharge
             </Link>
-            <Link href={target} className={`${linkClass} mt-3 border border-brand/30 bg-white text-brand`}>
+            <Link href={target} className={`${linkClass} ${OUTLINE}`}>
               {returnLinkLabel(target) === "Continuer" ? "Retour" : returnLinkLabel(target)}
             </Link>
           </div>
         ) : null}
 
         {view.kind === "unavailable" || view.kind === "not_found" || view.kind === "error" ? (
-          <div className="mt-5">
-            <div data-testid="sim-result" data-kind={view.kind} role="alert" className="rounded-2xl border border-line bg-white p-5 text-center">
-              <p className="text-[15px] font-bold text-ink">{view.message}</p>
+          <div className="flex flex-col gap-3">
+            <div data-testid="sim-result" data-kind={view.kind} role="alert" className="animate-rise flex flex-col items-center gap-3 rounded-3xl border border-line bg-white p-5 text-center">
+              <ArtAlert className="size-24" />
+              <p className="text-[16px] font-bold text-ink">{view.message}</p>
             </div>
             {view.kind === "error" ? (
               <button
@@ -207,12 +227,13 @@ function Paiement({ topupId }: { topupId: string }) {
                   setFailure(null);
                   setReloadKey((key) => key + 1);
                 }}
-                className={`${linkClass} mt-5 bg-brand text-white`}
+                className={`${linkClass} ${PRIMARY}`}
               >
+                <RotateCw className="size-5" aria-hidden />
                 Réessayer
               </button>
             ) : null}
-            <Link href={walletPathFor(target)} className={`${linkClass} mt-3 border border-brand/30 bg-white text-brand`}>
+            <Link href={walletPathFor(target)} className={`${linkClass} ${OUTLINE}`}>
               Retour à mon porte-monnaie
             </Link>
           </div>
@@ -229,12 +250,14 @@ function PageContent() {
     <Paiement topupId={topupId} />
   ) : (
     <main className="flex flex-1 flex-col">
-      <div className="bg-accent px-4 py-3.5 text-center text-[15px] font-extrabold uppercase tracking-wide text-ink">
+      <div className="flex items-center justify-center gap-2 rounded-b-3xl bg-accent px-4 py-3.5 text-center text-[15px] font-extrabold uppercase tracking-wide text-ink">
+        <TriangleAlert className="size-5 shrink-0" aria-hidden />
         {SIMULATION_BANNER}
       </div>
-      <p role="alert" className="mt-6 px-4 text-center text-[15px] font-semibold text-ink">
-        {CHECKOUT_MESSAGES.notFound}
-      </p>
+      <div role="alert" className="flex flex-col items-center gap-3 px-4 pt-8 text-center">
+        <ArtAlert className="size-28" />
+        <p className="text-[16px] font-bold text-ink">{CHECKOUT_MESSAGES.notFound}</p>
+      </div>
     </main>
   );
 }

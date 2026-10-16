@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { ConversationScreen } from "@/components/conversation-screen";
 import { SessionGate } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
+import { ErrorState } from "@/components/vendor/vendor-parts";
 import { isUuid } from "@/lib/client/api";
 
 export default function ConversationVendeur() {
@@ -16,9 +17,7 @@ export default function ConversationVendeur() {
       ) : (
         <main>
           <TopBar back="/vendeur/messages" title="Conversation" />
-          <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
-            Conversation introuvable.
-          </p>
+          <ErrorState message="Conversation introuvable." />
         </main>
       )}
     </SessionGate>

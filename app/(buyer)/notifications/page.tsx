@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BellRing, ChevronRight, CheckCheck } from "lucide-react";
+import { Bell, Briefcase, CheckCheck, ChevronRight, Clock, Globe, Layers, MessageCircle, RotateCw, Sparkles, type LucideIcon } from "lucide-react";
+import { ArtAlert, ArtBell } from "@/components/illustrations";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
+import { Btn, EmptyState, IconTile, Skeleton } from "@/components/ui";
 import { UnreadSync, unreadRefresher } from "@/components/unread-badge";
 import { api, describeApiError, type NotificationItem } from "@/lib/client/api";
 import {
-  EMPTY_NOTIFICATIONS_HINT,
   EMPTY_NOTIFICATIONS_MESSAGE,
   LOAD_MORE_LABEL,
   MARK_ALL_READ_DONE,
@@ -25,6 +26,15 @@ import {
   unreadInList,
 } from "@/lib/client/notifications-view";
 import { useNoma } from "@/lib/store";
+
+const KIND_ICONS: Record<NotificationItem["kind"], LucideIcon> = {
+  new_match: Sparkles,
+  new_matches_digest: Layers,
+  new_message: MessageCircle,
+  mission_coverage: Briefcase,
+  new_external_match: Globe,
+  active_search_expiring: Clock,
+};
 
 /**
  * Page « Notifications » (lot N1) : les nouvelles annonces qui correspondent à vos besoins, les non-lues en gras, « Tout marquer comme lu », et pour chacune le lien
@@ -124,75 +134,77 @@ function Notifications() {
   return (
     <main>
       <TopBar back="/alertes" title={NOTIFICATIONS_PAGE_TITLE} />
-      <div className="px-4 pb-6">
+      <div className="flex flex-col gap-4 px-4 pb-6 pt-1">
         {loadError ? (
-          <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[15px] font-semibold text-ink">{loadError}</p>
-            <button
-              onClick={() => {
-                setLoadError(null);
-                setReloadKey((key) => key + 1);
-              }}
-              className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
-            >
-              Réessayer
-            </button>
+          <div role="alert" className="animate-rise flex flex-col items-center gap-4 px-6 py-8 text-center">
+            <ArtAlert className="size-28" />
+            <p className="text-[16px] font-bold text-ink">{loadError}</p>
+            <div className="w-full max-w-xs">
+              <Btn
+                onClick={() => {
+                  setLoadError(null);
+                  setReloadKey((key) => key + 1);
+                }}
+              >
+                <RotateCw className="size-5" aria-hidden />
+                Réessayer
+              </Btn>
+            </div>
           </div>
         ) : state === "loading" ? (
-          <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
-            {NOTIFICATIONS_LOADING}
-          </p>
+          <div className="flex flex-col gap-3" aria-busy="true">
+            <span className="sr-only">{NOTIFICATIONS_LOADING}</span>
+            <Skeleton className="h-20 w-full rounded-3xl" />
+            <Skeleton className="h-20 w-full rounded-3xl" />
+            <Skeleton className="h-20 w-full rounded-3xl" />
+          </div>
         ) : state === "empty" ? (
-          <div role="status" className="mt-6 rounded-2xl bg-mist p-5 text-center">
-            <BellRing className="mx-auto size-7 text-ink-soft" aria-hidden />
-            <p className="mt-2 text-[15px] font-bold text-ink">{EMPTY_NOTIFICATIONS_MESSAGE}</p>
-            <p className="mt-1 text-[14px] text-ink-soft">{EMPTY_NOTIFICATIONS_HINT}</p>
+          <div role="status">
+            <EmptyState art={<ArtBell className="size-36" />} title={EMPTY_NOTIFICATIONS_MESSAGE} />
           </div>
         ) : (
           <>
-            <div className="mt-3">
-              <h1 className="text-[22px] font-extrabold text-ink" data-testid="notifications-heading">
+            <div className="flex items-center justify-between gap-3">
+              <h1 className="text-[22px] font-extrabold tracking-tight text-ink" data-testid="notifications-heading">
                 {unreadTotal > 0 ? `${unreadTotal} non lue${unreadTotal > 1 ? "s" : ""}` : "Tout est lu"}
               </h1>
-              {/* Sous le titre : le bouton a toute la largeur utile à 390 px. */}
               <button
                 onClick={() => void markAll()}
                 disabled={marking || unreadTotal === 0}
-                className="mt-2 flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[14px] font-semibold text-ink disabled:opacity-50"
+                className="press inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border-2 border-line-strong bg-white px-4 text-[14px] font-bold text-ink hover:border-brand disabled:opacity-50"
               >
-                <CheckCheck className="size-3.5" aria-hidden />
+                <CheckCheck className="size-4" aria-hidden />
                 {MARK_ALL_READ_LABEL}
               </button>
             </div>
-            <ul className="mt-3 space-y-2.5" aria-label="Vos notifications" data-unread-shown={unreadShown}>
+            <ul className="stagger flex flex-col gap-2.5 md:grid md:grid-cols-2" aria-label="Vos notifications" data-unread-shown={unreadShown}>
               {(items ?? []).map((item) => {
                 const row = notificationRow(item);
+                const KindIcon = KIND_ICONS[row.kind] ?? Bell;
                 const inner = (
                   <>
-                    <span
-                      aria-hidden
-                      className={`mt-1.5 size-2.5 shrink-0 rounded-full ${row.unread ? "bg-accent" : "bg-transparent"}`}
-                    />
+                    <IconTile icon={KindIcon} tone={row.unread ? "accent" : "mist"} />
                     <span className="min-w-0 flex-1">
-                      <span className={`block text-[15px] text-ink ${row.unread ? "font-extrabold" : "font-medium"}`}>
+                      <span className={`block text-[15px] leading-snug text-ink ${row.unread ? "font-extrabold" : "font-medium"}`}>
                         {row.unread ? <span className="sr-only">{UNREAD_SR_LABEL} : </span> : null}
                         {row.badge ? (
-                          <span data-testid="notification-badge" className="mr-1.5 rounded-full bg-mist px-2 py-0.5 align-middle text-[12px] font-bold text-ink-soft">{row.badge}</span>
+                          <span data-testid="notification-badge" className="mr-1.5 inline-flex rounded-full bg-mist px-2.5 py-0.5 align-middle text-[12px] font-bold text-ink-soft">{row.badge}</span>
                         ) : null}
                         {row.title}
                       </span>
-                      {row.subtitle ? <span className="block text-[14px] text-ink-soft">{row.subtitle}</span> : null}
+                      {row.subtitle && row.kind !== "new_matches_digest" ? <span className="block text-[14px] text-ink-soft">{row.subtitle}</span> : null}
                       <span className="mt-0.5 block text-[13px] text-ink-soft">{row.dateText}</span>
                       {row.href ? <span className="mt-1 block text-[14px] font-bold text-brand">{row.linkLabel}</span> : null}
                     </span>
-                    {row.href ? <ChevronRight className="mt-1 size-4 shrink-0 text-ink-soft" aria-hidden /> : null}
+                    {row.unread ? <span aria-hidden className="size-2.5 shrink-0 rounded-full bg-accent" /> : null}
+                    {row.href ? <ChevronRight className="size-5 shrink-0 text-ink-soft" aria-hidden /> : null}
                   </>
                 );
-                const className = "flex items-start gap-3 rounded-2xl border border-line bg-white p-3.5";
+                const className = `press flex min-h-14 items-center gap-3 rounded-3xl border p-3.5 ${row.unread ? "border-accent/40 bg-white" : "border-line bg-white"}`;
                 return (
                   <li key={row.id} data-testid="notification-row" data-unread={row.unread ? "true" : "false"} data-kind={row.kind}>
                     {row.href ? (
-                      <Link href={row.href} onClick={() => markOne(item)} className={className}>
+                      <Link href={row.href} onClick={() => markOne(item)} className={`${className} hover:border-brand`}>
                         {inner}
                       </Link>
                     ) : (
@@ -203,7 +215,7 @@ function Notifications() {
               })}
             </ul>
             {moreError ? (
-              <p role="alert" className="mt-3 text-center text-[14px] font-semibold text-accent-ink">
+              <p role="alert" className="text-center text-[14px] font-semibold text-accent-ink">
                 {moreError}
               </p>
             ) : null}
@@ -211,7 +223,7 @@ function Notifications() {
               <button
                 onClick={() => void loadMore()}
                 disabled={loadingMore}
-                className="mt-4 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white py-3 text-[15px] font-bold text-brand disabled:opacity-50"
+                className="press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-line-strong bg-white px-5 py-3 text-[16px] font-bold text-ink hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loadingMore ? "Chargement…" : LOAD_MORE_LABEL}
               </button>

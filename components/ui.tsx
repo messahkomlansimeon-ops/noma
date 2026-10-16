@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, type LucideIcon } from "lucide-react";
+import { ChevronRight, RotateCw, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { ArtAlert } from "@/components/illustrations";
 
 /** Les noms de tons (carrot, sage…) sont des valeurs métier déjà utilisées partout : seule leur apparence change. */
 const badgeTones = {
@@ -72,7 +73,7 @@ export function Chip({
   className?: string;
 }) {
   const base =
-    "press inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[14px] font-semibold";
+    "press inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 py-2 text-[14px] font-semibold";
   const look = active
     ? "border border-transparent bg-brand text-white"
     : soft
@@ -91,57 +92,46 @@ export function Chip({
 const btnBase =
   "press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-[16px] font-bold disabled:cursor-not-allowed disabled:opacity-40";
 
-export function Btn({
-  children,
-  href,
-  onClick,
-  className = "",
-  disabled,
-}: {
+/** Attributs transmis tels quels au bouton ou au lien : `type`, `data-*`, `aria-*`, `id`, `title`… */
+type PassThrough = Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  "onClick" | "className" | "disabled" | "children"
+>;
+
+interface BtnProps extends PassThrough {
   children: ReactNode;
   href?: string;
   onClick?: () => void;
   className?: string;
   disabled?: boolean;
-}) {
-  const cls = `${btnBase} bg-brand text-white shadow-[0_6px_16px_-8px_rgb(43_63_214/0.8)] hover:bg-brand-deep ${className}`;
+}
+
+function renderBtn(cls: string, { children, href, onClick, disabled, ...rest }: BtnProps) {
   if (href && !disabled) {
     return (
-      <Link href={href} className={cls}>
+      <Link href={href} className={cls} {...(rest as Record<string, unknown>)}>
         {children}
       </Link>
     );
   }
   return (
-    <button onClick={onClick} disabled={disabled} className={cls}>
+    <button onClick={onClick} disabled={disabled} className={cls} {...rest}>
       {children}
     </button>
   );
 }
 
-export function BtnOutline({
-  children,
-  href,
-  onClick,
-  className = "",
-}: {
-  children: ReactNode;
-  href?: string;
-  onClick?: () => void;
-  className?: string;
-}) {
-  const cls = `${btnBase} border-2 border-line-strong bg-white text-ink hover:border-brand hover:text-brand ${className}`;
-  if (href) {
-    return (
-      <Link href={href} className={cls}>
-        {children}
-      </Link>
-    );
-  }
-  return (
-    <button onClick={onClick} className={cls}>
-      {children}
-    </button>
+export function Btn({ className = "", ...props }: BtnProps) {
+  return renderBtn(
+    `${btnBase} bg-brand text-white shadow-[0_6px_16px_-8px_rgb(43_63_214/0.8)] hover:bg-brand-deep ${className}`,
+    props,
+  );
+}
+
+export function BtnOutline({ className = "", ...props }: BtnProps) {
+  return renderBtn(
+    `${btnBase} border-2 border-line-strong bg-white text-ink hover:border-brand hover:text-brand ${className}`,
+    props,
   );
 }
 
@@ -197,19 +187,24 @@ export function Switch({
 }) {
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange?.(!checked)}
-      className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${
-        checked ? "bg-brand" : "bg-line-strong"
-      }`}
+      className="press flex h-11 w-16 shrink-0 items-center justify-center"
     >
       <span
-        className={`absolute top-1 size-6 rounded-full bg-white shadow-md transition-all duration-200 ${
-          checked ? "left-7" : "left-1"
+        className={`relative h-8 w-14 rounded-full transition-colors ${
+          checked ? "bg-brand" : "bg-line-strong"
         }`}
-      />
+      >
+        <span
+          className={`absolute top-1 size-6 rounded-full bg-white shadow-md transition-all duration-200 ${
+            checked ? "left-7" : "left-1"
+          }`}
+        />
+      </span>
     </button>
   );
 }
@@ -239,7 +234,7 @@ export function Segmented({
           <button
             key={o}
             onClick={() => onChange(o)}
-            className={`press rounded-full border-2 font-semibold ${size === "sm" ? "px-3.5 py-2 text-[13px]" : "px-5 py-2.5 text-[14px]"} ${
+            className={`press min-h-11 rounded-full border-2 font-semibold ${size === "sm" ? "px-3.5 py-2 text-[13px]" : "px-5 py-2.5 text-[14px]"} ${
               selected ? sel : "border-line bg-white text-ink hover:border-line-strong"
             }`}
           >
@@ -335,16 +330,45 @@ export function EmptyState({
   art,
   title,
   action,
+  ...rest
 }: {
   art: ReactNode;
   title: string;
   action?: ReactNode;
+  role?: string;
+  "data-testid"?: string;
 }) {
   return (
-    <div className="animate-rise flex flex-col items-center gap-5 px-6 py-10 text-center">
+    <div {...rest} className="animate-rise flex flex-col items-center gap-5 px-6 py-10 text-center">
       {art}
       <p className="max-w-[28ch] text-[17px] font-bold leading-snug text-ink">{title}</p>
       {action ? <div className="w-full max-w-xs">{action}</div> : null}
+    </div>
+  );
+}
+
+/** Erreur de chargement : illustration, phrase, bouton « Réessayer ». */
+export function ErrorState({
+  message,
+  onRetry,
+  retryLabel = "Réessayer",
+}: {
+  message: string;
+  onRetry?: () => void;
+  retryLabel?: string;
+}) {
+  return (
+    <div role="alert" className="animate-rise flex flex-col items-center gap-4 px-6 py-10 text-center">
+      <ArtAlert />
+      <p className="max-w-[30ch] text-[17px] font-bold leading-snug text-ink">{message}</p>
+      {onRetry ? (
+        <div className="w-full max-w-xs">
+          <Btn onClick={onRetry}>
+            <RotateCw className="size-5" aria-hidden />
+            {retryLabel}
+          </Btn>
+        </div>
+      ) : null}
     </div>
   );
 }

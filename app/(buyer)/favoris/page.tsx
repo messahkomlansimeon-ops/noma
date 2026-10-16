@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Heart } from "lucide-react";
+import { ArrowRight, Heart, RotateCw, TriangleAlert } from "lucide-react";
+import { ArtAlert, ArtHeart } from "@/components/illustrations";
 import { PhotoCover } from "@/components/photos/photo-cover";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
-import { Badge } from "@/components/ui";
+import { Badge, Btn, EmptyState, IconTile, Skeleton } from "@/components/ui";
 import {
   FAVORITES_EMPTY,
-  FAVORITES_EMPTY_HINT,
   FAVORITES_LOADING,
   FAVORITES_TITLE,
   OPEN_LISTING_LABEL,
@@ -64,65 +64,71 @@ function Favorites() {
     <main>
       {/* Lot FIN1 : le titre n'est dit qu'une fois (le h1) : plus de « Mes favoris » en double dans la barre du haut. */}
       <TopBar back="/" />
-      <div className="px-4 pb-6">
-        <h1 className="text-[22px] font-extrabold text-ink">{FAVORITES_TITLE}</h1>
+      <div className="flex flex-col gap-4 px-4 pb-6 pt-1">
+        <h1 className="text-[24px] font-extrabold tracking-tight text-ink">{FAVORITES_TITLE}</h1>
         {error ? (
-          <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[15px] font-semibold text-ink">{error}</p>
-            <button
-              onClick={() => {
-                setError(null);
-                setReloadKey((key) => key + 1);
-              }}
-              className="mt-3 rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white"
-            >
-              Réessayer
-            </button>
+          <div role="alert" className="animate-rise flex flex-col items-center gap-4 px-6 py-8 text-center">
+            <ArtAlert className="size-28" />
+            <p className="text-[16px] font-bold text-ink">{error}</p>
+            <div className="w-full max-w-xs">
+              <Btn
+                onClick={() => {
+                  setError(null);
+                  setReloadKey((key) => key + 1);
+                }}
+              >
+                <RotateCw className="size-5" aria-hidden />
+                Réessayer
+              </Btn>
+            </div>
           </div>
         ) : items === null ? (
-          <p className="mt-6 text-center text-[15px] text-ink-soft" aria-busy="true">
-            {FAVORITES_LOADING}
-          </p>
+          <div className="flex flex-col gap-3" aria-busy="true">
+            <span className="sr-only">{FAVORITES_LOADING}</span>
+            <Skeleton className="h-28 w-full rounded-3xl" />
+            <Skeleton className="h-28 w-full rounded-3xl" />
+          </div>
         ) : items.length === 0 ? (
-          <div role="status" data-testid="favorites-empty" className="mt-6 rounded-2xl bg-mist p-5 text-center">
-            <Heart className="mx-auto size-7 text-ink-soft" aria-hidden />
-            <p className="mt-2 text-[15px] font-bold text-ink">{FAVORITES_EMPTY}</p>
-            <p className="mt-1 text-[14px] text-ink-soft">{FAVORITES_EMPTY_HINT}</p>
+          <div role="status" data-testid="favorites-empty">
+            <EmptyState art={<ArtHeart className="size-36" />} title={FAVORITES_EMPTY} />
           </div>
         ) : (
           <>
             {actionError ? (
-              <p role="alert" className="mt-3 text-[14px] font-semibold text-accent-ink">
+              <p role="alert" className="flex items-start gap-2 rounded-2xl bg-accent-soft px-3.5 py-3 text-[14px] font-semibold text-accent-ink">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
                 {actionError}
               </p>
             ) : null}
-            <ul aria-label="Vos annonces gardées" className="mt-3 space-y-2.5" data-testid="favorites-list">
+            <ul aria-label="Vos annonces gardées" className="stagger flex flex-col gap-3 md:grid md:grid-cols-2" data-testid="favorites-list">
               {items.map((item) => {
                 const row = favoriteRow(item);
+                const iconFallback = <IconTile icon={Heart} tone="accent" className="size-16" />;
                 return (
-                  <li key={row.offerId} data-testid="favorite-row" data-available={row.available ? "true" : "false"} className="rounded-2xl border border-line bg-white p-3.5">
-                    <div className="flex items-start gap-3">
-                      {row.coverPhotoId ? <PhotoCover photoId={row.coverPhotoId} className="size-14" fallback={null} /> : null}
+                  <li key={row.offerId} data-testid="favorite-row" data-available={row.available ? "true" : "false"} className="flex flex-col gap-2 rounded-3xl border border-line bg-white p-3.5">
+                    <div className="flex items-center gap-3">
+                      {row.coverPhotoId ? <PhotoCover photoId={row.coverPhotoId} className="size-16" fallback={iconFallback} /> : iconFallback}
                       <div className="min-w-0 flex-1">
-                        <div className="text-[15px] font-bold text-ink">{row.title}</div>
-                        {row.priceText ? <div className="text-[18px] font-extrabold text-ink">{row.priceText}</div> : null}
-                        <div className="mt-1">
-                          <Badge tone={row.available ? "sage" : "wash"}>{row.statusText}</Badge>
-                        </div>
+                        <div className="line-clamp-2 text-[16px] font-bold leading-snug text-ink">{row.title}</div>
+                        {row.priceText ? <div className="text-[20px] font-extrabold leading-tight text-ink">{row.priceText}</div> : null}
+                        <Badge tone={row.available ? "sage" : "wash"} className="mt-1">
+                          {row.statusText}
+                        </Badge>
                       </div>
                       <button
                         onClick={() => void remove(row.offerId)}
                         aria-label={`${REMOVE_FAVORITE_LABEL} : ${row.title}`}
                         title={REMOVE_FAVORITE_LABEL}
                         data-testid="favorite-remove"
-                        className="flex size-10 shrink-0 items-center justify-center rounded-full border border-line bg-white"
+                        className="press flex size-12 shrink-0 items-center justify-center rounded-full border-2 border-line bg-white hover:border-line-strong"
                       >
-                        <Heart className="size-5 fill-accent text-accent" aria-hidden />
+                        <Heart className="size-6 fill-accent text-accent" aria-hidden />
                       </button>
                     </div>
                     {row.href ? (
-                      <Link href={row.href} className="mt-2 inline-block text-[14px] font-bold text-brand">
-                        {OPEN_LISTING_LABEL} ›
+                      <Link href={row.href} className="press flex min-h-11 items-center justify-end gap-1 text-[14px] font-bold text-brand">
+                        {OPEN_LISTING_LABEL}
+                        <ArrowRight className="size-4" aria-hidden />
                       </Link>
                     ) : null}
                   </li>

@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Badge } from "@/components/ui";
+import { Check, ChevronRight, Hourglass, Info, RefreshCw, Rocket, ShieldCheck, Wallet, Zap } from "lucide-react";
+import { Badge, IconTile } from "@/components/ui";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
+import { BTN_OUTLINE, BTN_PRIMARY, BTN_SMALL, LINK_ACTION, LoadingBlock, Notice, SectionHeading } from "@/components/vendor/vendor-parts";
 import {
   ApiError,
   api,
@@ -362,18 +364,20 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
   };
 
   return (
-    <section aria-labelledby="boost-title" className="mt-6">
-      <h2 id="boost-title" className="text-[16px] font-extrabold text-ink">
+    <section aria-labelledby="boost-title">
+      <SectionHeading icon={Zap} id="boost-title">
         Booster cette annonce
-      </h2>
+      </SectionHeading>
 
       {!eligibility.eligible ? (
-        <p role="status" data-testid="boost-not-eligible" className="mt-3 rounded-2xl bg-mist p-4 text-[15px] font-semibold text-ink-soft">
+        <Notice tone="mist" icon={Info} role="status" data-testid="boost-not-eligible" className="mt-3">
           {eligibility.message}
-        </p>
+        </Notice>
       ) : (
         <>
-          <p className="mt-1 text-[14px] text-ink-soft">{BOOST_INTRO}</p>
+          <Notice tone="info" icon={ShieldCheck} className="mt-3" small>
+            {BOOST_INTRO}
+          </Notice>
 
           <WalletLine
             wallet={wallet}
@@ -388,7 +392,7 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
             }}
           />
 
-          <div className="mt-3 flex gap-2" role="group" aria-label="Durée du boost">
+          <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Durée du boost">
             {BOOST_DURATIONS.map((duration) => {
               const selected = entry?.quote.durationCode === duration.code;
               return (
@@ -400,8 +404,8 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
                   }}
                   disabled={pending !== null || buying}
                   aria-pressed={selected}
-                  className={`flex-1 rounded-xl border px-3 py-2.5 text-[15px] font-bold transition disabled:opacity-50 ${
-                    selected ? "border-transparent bg-brand text-white" : "border-line bg-white text-ink"
+                  className={`press flex min-h-14 items-center justify-center gap-1.5 rounded-2xl border-2 px-2 text-[16px] font-bold disabled:opacity-50 ${
+                    selected ? "border-transparent bg-brand text-white" : "border-line bg-white text-ink hover:border-brand"
                   }`}
                 >
                   {pending === duration.code ? "…" : duration.label}
@@ -411,21 +415,21 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
           </div>
 
           {error ? (
-            <p role="alert" className="mt-3 text-[14px] font-semibold text-accent-ink">
+            <Notice tone="danger" role="alert" className="mt-3">
               {error}
-            </p>
+            </Notice>
           ) : null}
 
           {buyError ? (
-            <p role="alert" data-testid="boost-buy-error" className="mt-3 rounded-xl bg-accent-soft p-3 text-[14px] font-semibold text-accent-ink">
+            <Notice tone="danger" role="alert" data-testid="boost-buy-error" className="mt-3">
               {buyError}
-            </p>
+            </Notice>
           ) : null}
 
           {unresolved ? (
-            <div data-testid="boost-unresolved" role="alert" className="mt-3 rounded-xl border border-accent/40 bg-accent-soft/50 p-3.5">
-              <p className="text-[14px] font-semibold text-ink">{unresolved.verified ? PURCHASE_NOT_RECORDED_TEXT : UNRESOLVED_PURCHASE_TEXT}</p>
-              <p className="mt-0.5 text-[13px] text-ink-soft">
+            <div data-testid="boost-unresolved" role="alert" className="mt-3 rounded-3xl border border-accent/40 bg-accent-soft p-4">
+              <p className="text-[15px] font-bold text-accent-ink">{unresolved.verified ? PURCHASE_NOT_RECORDED_TEXT : UNRESOLVED_PURCHASE_TEXT}</p>
+              <p className="mt-1 text-[13px] font-semibold text-accent-ink">
                 Achat de {durationLabel(unresolved.quote.durationCode)}
                 {unresolved.quote.amount !== null ? ` · ${formatFcfa(unresolved.quote.amount)}` : ""}
               </p>
@@ -434,19 +438,25 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
                 onClick={() => void confirmPurchase(unresolved.quote)}
                 disabled={buying}
                 aria-disabled={buying}
-                className="mt-2 flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+                className={`${BTN_PRIMARY} mt-3`}
               >
+                <RefreshCw className={`size-5 ${buying ? "animate-spin" : ""}`} aria-hidden />
                 {buying ? BUY_LABELS.confirming : BUY_LABELS.verify}
               </button>
             </div>
           ) : null}
 
           {success ? (
-            <div data-testid="boost-success" role="status" className="mt-4 rounded-2xl border border-brand/30 bg-brand-soft p-4">
-              <p className="text-[15px] font-extrabold text-brand">{boostActiveText(success.endsAt)}</p>
-              <p data-testid="boost-success-note" className="mt-1 text-[14px] text-brand-ink">
-                {BOOST_SUCCESS_NOTE}
-              </p>
+            <div data-testid="boost-success" role="status" className="animate-pop mt-4 flex items-start gap-3 rounded-3xl border border-brand/30 bg-brand-soft p-4">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-white text-brand">
+                <Rocket className="size-6" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[16px] font-extrabold text-brand-ink">{boostActiveText(success.endsAt)}</p>
+                <p data-testid="boost-success-note" className="mt-1 text-[13px] leading-snug text-brand-ink">
+                  {BOOST_SUCCESS_NOTE}
+                </p>
+              </div>
             </div>
           ) : null}
 
@@ -478,19 +488,24 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
 
           {purchases && purchases.length > 0 ? (
             <div className="mt-5" data-testid="boost-purchase-history">
-              <h3 className="text-[15px] font-extrabold text-ink">Achats de boost de cette annonce</h3>
-              <ul className="mt-2 divide-y divide-line rounded-2xl border border-line bg-white">
+              <SectionHeading icon={Check} level={3}>
+                Achats de boost de cette annonce
+              </SectionHeading>
+              <ul className="mt-3 divide-y divide-line overflow-hidden rounded-3xl border border-line bg-white">
                 {purchases.map((item) => {
                   const row = purchaseHistoryRow(item);
                   return (
-                    <li key={row.key} data-testid="boost-purchase-row" className="px-3.5 py-2.5">
-                      <div className="text-[15px] font-bold text-ink">{row.title}</div>
-                      <div className="text-[13px] text-ink-soft">{row.detail}</div>
-                      {row.refundedText ? (
-                        <div data-testid="boost-purchase-refunded" className="mt-0.5 text-[13px] font-semibold text-accent-ink">
-                          {row.refundedText}
-                        </div>
-                      ) : null}
+                    <li key={row.key} data-testid="boost-purchase-row" className="flex items-start gap-3 px-4 py-3">
+                      <IconTile icon={Rocket} tone="accent" className="size-10" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[15px] font-bold text-ink">{row.title}</div>
+                        <div className="text-[13px] text-ink-soft">{row.detail}</div>
+                        {row.refundedText ? (
+                          <div data-testid="boost-purchase-refunded" className="mt-0.5 text-[13px] font-semibold text-accent-ink">
+                            {row.refundedText}
+                          </div>
+                        ) : null}
+                      </div>
                     </li>
                   );
                 })}
@@ -499,19 +514,22 @@ export function BoostSection({ offer, onOfferChanged }: { offer: OfferRecord; on
           ) : null}
 
           {historyError ? (
-            <p role="alert" className="mt-4 text-[14px] font-semibold text-accent-ink">
+            <Notice tone="danger" role="alert" className="mt-4">
               {historyError}
-            </p>
+            </Notice>
           ) : null}
           {history && history.quotes.length > 0 ? (
             <div className="mt-5" data-testid="boost-history">
-              <h3 className="text-[15px] font-extrabold text-ink">Historique des devis</h3>
-              <ul className="mt-2 divide-y divide-line rounded-2xl border border-line bg-white">
+              <SectionHeading icon={Hourglass} level={3}>
+                Historique des devis
+              </SectionHeading>
+              <ul className="mt-3 divide-y divide-line overflow-hidden rounded-3xl border border-line bg-white">
                 {history.quotes.map((quote) => {
                   const row = quoteHistoryRow(quote, historyEntryExpired(quote, history.receivedAtMs, now), undefined, purchasedQuoteIds.has(quote.id));
                   return (
-                    <li key={row.key} className="flex items-start justify-between gap-3 px-3.5 py-2.5">
-                      <div>
+                    <li key={row.key} className="flex items-start gap-3 px-4 py-3">
+                      <IconTile icon={Hourglass} tone="mist" className="size-10" />
+                      <div className="min-w-0 flex-1">
                         <div className="text-[15px] font-bold text-ink">{row.title}</div>
                         <div className="text-[13px] text-ink-soft">{row.detail}</div>
                       </div>
@@ -541,40 +559,41 @@ function WalletLine({
   onRefresh: () => void;
 }) {
   if (wallet.status === "loading") {
-    return (
-      <p className="mt-3 text-[14px] text-ink-soft" aria-busy="true">
-        Lecture de votre solde…
-      </p>
-    );
+    return <LoadingBlock label="Lecture de votre solde…" rows={1} rowClassName="h-16 w-full rounded-3xl" className="mt-3" />;
   }
   if (wallet.status === "error") {
     return (
-      <div role="alert" className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-mist px-3.5 py-2.5 text-[14px]">
-        <span className="font-semibold text-accent-ink">{wallet.message}</span>
-        <button onClick={onRetry} className="shrink-0 font-bold text-brand underline">
+      <div role="alert" className="mt-3 flex items-center justify-between gap-3 rounded-3xl bg-danger-soft px-4 py-3 text-[14px]">
+        <span className="font-semibold text-danger-ink">{wallet.message}</span>
+        <button onClick={onRetry} className={`${LINK_ACTION} shrink-0`}>
           Réessayer
         </button>
       </div>
     );
   }
   return (
-    <div data-testid="boost-balance" className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-mist px-3.5 py-2.5 text-[14px]">
-      <span className="text-ink-soft">
-        Votre solde : <strong data-testid="boost-balance-amount" className="text-ink">{formatFcfa(wallet.balanceXof)}</strong>
-        {wallet.promoBalanceXof > 0 ? (
-          <span data-testid="boost-promo-balance" className="block">
-            et <strong className="text-ink">{formatFcfa(wallet.promoBalanceXof)}</strong> de crédits promotionnels (dépensés en premier)
-          </span>
-        ) : null}
-      </span>
-      <span className="flex shrink-0 items-center gap-3">
-        <button data-testid="boost-balance-refresh" onClick={onRefresh} className="font-bold text-brand underline">
+    <div data-testid="boost-balance" className="mt-3 rounded-3xl border border-line bg-white p-4">
+      <div className="flex items-center gap-3">
+        <IconTile icon={Wallet} tone="success" className="size-12" />
+        <div className="min-w-0 flex-1 text-[14px] text-ink-soft">
+          Votre solde : <strong data-testid="boost-balance-amount" className="text-[18px] font-extrabold text-ink">{formatFcfa(wallet.balanceXof)}</strong>
+          {wallet.promoBalanceXof > 0 ? (
+            <span data-testid="boost-promo-balance" className="block">
+              et <strong className="text-ink">{formatFcfa(wallet.promoBalanceXof)}</strong> de crédits promotionnels (dépensés en premier)
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-1">
+        <button data-testid="boost-balance-refresh" onClick={onRefresh} className={LINK_ACTION}>
+          <RefreshCw className="size-4" aria-hidden />
           {BUY_LABELS.refreshBalance}
         </button>
-        <Link href={walletLink} className="font-bold text-brand underline">
+        <Link href={walletLink} className={LINK_ACTION}>
           Mon porte-monnaie
+          <ChevronRight className="size-4" aria-hidden />
         </Link>
-      </span>
+      </div>
     </div>
   );
 }
@@ -612,41 +631,48 @@ function QuoteCard({
   const validity = anchoredQuoteValidity(quote, entry.clock, now);
   const amount = quoteAmountText(quote);
   return (
-    <div data-testid="boost-quote" data-status={quote.status} className="mt-4 rounded-2xl border border-line bg-white p-4">
+    <div data-testid="boost-quote" data-status={quote.status} className="animate-rise mt-4 rounded-3xl border border-line bg-white p-5">
       {quote.status === "available" && amount ? (
         <>
-          <div className="text-[14px] font-semibold text-ink-soft">Boost de {durationLabel(quote.durationCode)}</div>
-          <div data-testid="boost-amount" className="text-[30px] font-extrabold leading-tight text-ink">
+          <div className="flex items-center gap-2 text-[14px] font-semibold text-ink-soft">
+            <Zap className="size-5 text-brand" aria-hidden />
+            Boost de {durationLabel(quote.durationCode)}
+          </div>
+          <div data-testid="boost-amount" className="text-[32px] font-extrabold leading-tight text-ink">
             {amount}
           </div>
           <ul className="mt-3 space-y-2" aria-label="Comment ce prix est calculé">
             {explainFactors(quote).map((line) => (
-              <li key={line.key} className="text-[14px]">
-                <span className="font-bold text-ink">{line.title}</span>
-                <span className="text-ink-soft"> : {line.text} </span>
-                <span className="font-semibold text-brand">({line.effect})</span>
+              <li key={line.key} className="flex items-start gap-2.5 text-[14px] leading-snug">
+                <span aria-hidden className="mt-1.5 size-2 shrink-0 rounded-full bg-brand" />
+                <span>
+                  <span className="font-bold text-ink">{line.title}</span>
+                  <span className="text-ink-soft"> : {line.text} </span>
+                  <span className="font-semibold text-brand">({line.effect})</span>
+                </span>
               </li>
             ))}
           </ul>
         </>
       ) : (
         <>
-          <div className="text-[14px] font-semibold text-ink-soft">Boost de {durationLabel(quote.durationCode)}</div>
-          <p data-testid="boost-unavailable" className="mt-1 rounded-xl bg-accent-soft p-3 text-[15px] font-semibold text-accent-ink">
+          <div className="flex items-center gap-2 text-[14px] font-semibold text-ink-soft">
+            <Zap className="size-5 text-brand" aria-hidden />
+            Boost de {durationLabel(quote.durationCode)}
+          </div>
+          <p data-testid="boost-unavailable" className="mt-2 rounded-2xl bg-accent-soft p-3 text-[15px] font-semibold text-accent-ink">
             {unavailableReasonText(quote.unavailableReason)}
           </p>
         </>
       )}
 
-      <p data-testid="boost-validity" className={`mt-3 text-[14px] font-semibold ${validity.expired ? "text-accent-ink" : "text-ink"}`}>
+      <p data-testid="boost-validity" className={`mt-3 flex items-center gap-2 text-[14px] font-semibold ${validity.expired ? "text-accent-ink" : "text-ink"}`}>
+        <Hourglass className="size-4 shrink-0" aria-hidden />
         {validity.text}
       </p>
       {validity.expired ? (
-        <button
-          onClick={onRefresh}
-          disabled={busy}
-          className="mt-2 rounded-xl border border-brand/30 bg-white px-4 py-2 text-[14px] font-bold text-brand disabled:opacity-50"
-        >
+        <button onClick={onRefresh} disabled={busy} className={`${BTN_SMALL} mt-2`}>
+          <RefreshCw className="size-4" aria-hidden />
           Demander un nouveau devis
         </button>
       ) : null}
@@ -697,25 +723,26 @@ function BuyArea({
   if (confirming && state.kind === "ready") {
     const confirmButton = confirmButtonState(buying, quotePending);
     return (
-      <div data-testid="boost-confirm" role="group" aria-label="Confirmer l'achat" className="mt-4 rounded-xl border border-accent/40 bg-accent-soft/50 p-3.5">
+      <div data-testid="boost-confirm" role="group" aria-label="Confirmer l'achat" className="mt-4 rounded-3xl border border-accent/40 bg-accent-soft p-4">
         <p data-testid="boost-confirm-text" className="text-[15px] font-semibold text-ink">
           {purchaseConfirmationText({ amountXof: state.amountXof, durationCode: quote.durationCode, balanceXof: state.balanceXof, promoXof: state.promoXof })}
         </p>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <button
             data-testid="boost-confirm-button"
             onClick={onConfirm}
             disabled={confirmButton.disabled}
             aria-disabled={confirmButton.disabled}
-            className="flex-1 rounded-xl bg-brand px-4 py-3 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+            className={`${BTN_PRIMARY} sm:flex-1`}
           >
+            <Check className="size-5" aria-hidden />
             {confirmButton.label}
           </button>
           <button
             data-testid="boost-cancel-button"
             onClick={onCancel}
             disabled={buying || quotePending}
-            className="rounded-xl border border-line bg-white px-4 py-3 text-[15px] font-bold text-ink disabled:opacity-50"
+            className={`${BTN_OUTLINE} sm:w-auto`}
           >
             {BUY_LABELS.cancel}
           </button>
@@ -727,34 +754,26 @@ function BuyArea({
   const enabled = canBuy(state, buying || quotePending);
   return (
     <div className="mt-4">
-      <button
-        data-testid="boost-buy"
-        onClick={onBuy}
-        disabled={!enabled}
-        aria-disabled={!enabled}
-        className="flex w-full items-center justify-center rounded-xl bg-brand px-4 py-3.5 text-[15px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
-      >
+      <button data-testid="boost-buy" onClick={onBuy} disabled={!enabled} aria-disabled={!enabled} className={BTN_PRIMARY}>
+        <Rocket className="size-5" aria-hidden />
         {BUY_LABELS.buy}
       </button>
 
       {state.kind === "insufficient" ? (
-        <div data-testid="boost-insufficient" role="status" className="mt-3 rounded-xl bg-accent-soft p-3.5">
+        <div data-testid="boost-insufficient" role="status" className="mt-3 rounded-3xl bg-accent-soft p-4">
           <p className="text-[15px] font-extrabold text-accent-ink">{state.text}</p>
-          <p className="mt-0.5 text-[14px] text-ink-soft">{state.detail}</p>
-          <button
-            data-testid="boost-recharge"
-            onClick={onRecharge}
-            className="mt-3 flex w-full items-center justify-center rounded-xl border border-brand/30 bg-white px-4 py-3 text-[15px] font-bold text-brand"
-          >
+          <p className="mt-0.5 text-[14px] text-accent-ink">{state.detail}</p>
+          <button data-testid="boost-recharge" onClick={onRecharge} className={`${BTN_OUTLINE} mt-3`}>
+            <Wallet className="size-5" aria-hidden />
             {BUY_LABELS.recharge}
           </button>
         </div>
       ) : null}
 
       {state.kind === "balance_unknown" ? (
-        <div data-testid="boost-balance-unknown" role="status" className="mt-3 rounded-xl bg-mist p-3.5">
+        <div data-testid="boost-balance-unknown" role="status" className="mt-3 rounded-3xl bg-mist p-4">
           <p className="text-[14px] font-semibold text-ink-soft">{BALANCE_UNKNOWN_TEXT}</p>
-          <button onClick={onRetryBalance} className="mt-2 text-[14px] font-bold text-brand underline">
+          <button onClick={onRetryBalance} className={`${LINK_ACTION} mt-1 -ml-3`}>
             Réessayer la lecture
           </button>
         </div>

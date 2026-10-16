@@ -3,10 +3,14 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { Tag } from "lucide-react";
+import { ArtCheck } from "@/components/illustrations";
 import { InterestedBuyerCard } from "@/components/matches/match-parts";
 import { ProposalForm } from "@/components/proposals/proposal-form";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
+import { IconTile } from "@/components/ui";
+import { BTN_PRIMARY, ErrorState, LoadingBlock, Notice } from "@/components/vendor/vendor-parts";
 import { describeProposalError, proposals, type SellerRequest } from "@/lib/client/proposals-api";
 import { SENT_MESSAGE, canPropose, parseQuoteTarget } from "@/lib/client/proposals-view";
 
@@ -26,49 +30,43 @@ function QuoteScreen({ demandId, offerId }: { demandId: string; offerId: string 
   }, [demandId, redirectIfUnauthorized]);
 
   if (error) {
-    return (
-      <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
-        {error}
-      </p>
-    );
+    return <ErrorState message={error} />;
   }
   if (request === null) {
-    return (
-      <p aria-busy="true" className="mt-6 text-center text-[15px] text-ink-soft">
-        Chargement…
-      </p>
-    );
+    return <LoadingBlock label="Chargement…" className="pt-3" />;
   }
   const offer = request.offers.find((entry) => entry.offerId === offerId);
   if (!offer) {
-    return (
-      <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
-        Cette annonce ne correspond plus à ce besoin.
-      </p>
-    );
+    return <ErrorState message="Cette annonce ne correspond plus à ce besoin." />;
   }
   if (sent) {
     return (
-      <div role="status" data-testid="proposal-sent" className="mt-4 rounded-2xl bg-brand-soft p-4 text-center">
-        <p className="text-[15px] font-bold text-brand">{SENT_MESSAGE}</p>
-        <Link href="/vendeur/demandes" className="mt-3 inline-flex rounded-xl bg-brand px-5 py-2.5 text-[15px] font-bold text-white">
-          Retour aux demandes
-        </Link>
+      <div role="status" data-testid="proposal-sent" className="animate-rise mt-4 flex flex-col items-center gap-4 rounded-3xl bg-brand-soft p-6 text-center">
+        <ArtCheck className="size-28" />
+        <p className="text-[17px] font-bold text-brand-ink">{SENT_MESSAGE}</p>
+        <div className="w-full max-w-xs">
+          <Link href="/vendeur/demandes" className={BTN_PRIMARY}>
+            Retour aux demandes
+          </Link>
+        </div>
       </div>
     );
   }
   return (
-    <div data-testid="quote-screen">
-      <ul className="mt-3">
+    <div data-testid="quote-screen" className="flex flex-col gap-4 pt-3">
+      <ul>
         <InterestedBuyerCard item={request.need} />
       </ul>
-      <p className="mt-3 text-[14px] font-semibold text-ink">Annonce : {offer.title}</p>
+      <div className="flex items-center gap-3 rounded-3xl border border-line bg-white p-3.5">
+        <IconTile icon={Tag} tone="brand" />
+        <p className="min-w-0 flex-1 text-[16px] font-bold leading-snug text-ink">{offer.title}</p>
+      </div>
       {canPropose(offer) ? (
         <ProposalForm demandId={demandId} offerId={offerId} withLines onSent={() => setSent(true)} />
       ) : (
-        <p role="status" className="mt-3 rounded-xl bg-mist px-3 py-2 text-[14px] text-ink-soft">
+        <Notice tone="mist" role="status">
           Un devis ne peut pas être envoyé pour cette annonce : une proposition est déjà en attente, ou l'acheteur en a refusé une.
-        </p>
+        </Notice>
       )}
     </div>
   );
@@ -84,9 +82,7 @@ function PageContent() {
         {target ? (
           <QuoteScreen demandId={target.demandId} offerId={target.offerId} />
         ) : (
-          <p role="alert" className="mt-6 text-center text-[15px] font-semibold text-ink">
-            Choisissez une demande, puis « Faire un devis ».
-          </p>
+          <ErrorState message="Choisissez une demande, puis « Faire un devis »." />
         )}
       </div>
     </main>

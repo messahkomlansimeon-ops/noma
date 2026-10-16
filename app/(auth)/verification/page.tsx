@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Delete, MessageSquareText } from "lucide-react";
+import { Check, Clock, Delete, Pencil, RotateCw, TriangleAlert } from "lucide-react";
+import { ArtChat } from "@/components/illustrations";
 import { TopBar } from "@/components/top-bar";
 import { Btn } from "@/components/ui";
 import { api, describeApiError } from "@/lib/client/api";
@@ -108,36 +109,29 @@ export default function Verification() {
         }
       />
 
-      <main className="flex flex-1 flex-col px-6 pb-6">
-        <div className="mt-4 flex justify-center">
-          <span className="flex size-16 items-center justify-center rounded-full bg-brand-soft text-brand">
-            <MessageSquareText className="size-8" strokeWidth={1.7} />
-          </span>
-        </div>
-
-        <h1 className="mt-4 text-center text-[24px] font-extrabold text-ink">
-          Vérifiez votre numéro
-        </h1>
-        <p className="mt-1 text-center text-[15px] text-ink-soft">
-          {flow ? `Code envoyé au ${maskPhoneForDisplay(flow.phone)}` : " "}
-        </p>
-        <p data-testid="otp-not-received-hint" className="mt-1 text-center text-[13px] text-ink-soft">
-          {OTP_NOT_RECEIVED_HINT}
-        </p>
-        <div className="mt-2 text-center">
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-6 pb-6">
+        <section className="animate-rise flex flex-col items-center gap-2 rounded-[2rem] bg-brand-soft px-5 pb-5 pt-5 text-center">
+          <ArtChat className="size-32" />
+          <h1 className="text-[24px] font-extrabold tracking-tight text-ink">
+            Vérifiez votre numéro
+          </h1>
+          <p className="text-[16px] font-bold text-ink">
+            {flow ? `Code envoyé au ${maskPhoneForDisplay(flow.phone)}` : " "}
+          </p>
           <button
             onClick={changeNumber}
-            className="text-[14px] font-bold text-brand underline underline-offset-2"
+            className="press flex min-h-11 items-center gap-1.5 rounded-full px-4 text-[14px] font-bold text-brand hover:bg-white/70"
           >
+            <Pencil className="size-4" aria-hidden />
             Modifier le numéro
           </button>
-        </div>
+        </section>
 
-        <div className="relative mt-6 flex justify-center gap-2">
+        <div className="animate-rise relative flex justify-center gap-2">
           {Array.from({ length: CODE_LENGTH }, (_, i) => (
             <div
               key={i}
-              className={`flex h-14 w-11 items-center justify-center rounded-xl border-2 bg-white text-[24px] font-extrabold text-ink ${
+              className={`flex h-16 min-w-0 max-w-14 flex-1 items-center justify-center rounded-2xl border-2 bg-white text-[26px] font-extrabold text-ink transition-colors ${
                 code.length === i
                   ? "border-accent"
                   : code.length > i
@@ -166,35 +160,41 @@ export default function Verification() {
         </div>
 
         {error ? (
-          <div role="alert" className="mt-3 text-center text-[14px] font-semibold text-accent-ink">
+          <div role="alert" className="animate-pop flex items-start gap-2 rounded-2xl bg-danger-soft px-3.5 py-2.5 text-[14px] font-semibold text-danger-ink">
+            <TriangleAlert className="mt-0.5 size-5 shrink-0" aria-hidden />
             {error}
           </div>
         ) : null}
 
-        <Btn
-          onClick={() => void verify()}
-          disabled={!flow || code.length !== CODE_LENGTH || pending !== null}
-          className="mt-6 py-4"
-        >
+        <Btn onClick={() => void verify()} disabled={!flow || code.length !== CODE_LENGTH || pending !== null} className="min-h-14 text-[18px]">
           {pending === "verify" ? "Vérification…" : "Vérifier"}
+          <Check className="size-5" aria-hidden />
         </Btn>
-        <div className="mt-3 text-center text-[14px] text-ink-soft">
+
+        <div className="flex flex-col items-center gap-1 text-center">
           {wait && wait.seconds > 0 ? (
-            <>
-              Renvoyer le code dans <span className="font-bold text-ink">{wait.label}</span>
-            </>
+            <p className="flex min-h-11 items-center gap-2 text-[14px] text-ink-soft">
+              <Clock className="size-5" aria-hidden />
+              <span>
+                Renvoyer le code dans <span className="font-bold tabular-nums text-ink">{wait.label}</span>
+              </span>
+            </p>
           ) : (
             <button
               onClick={() => void resend()}
               disabled={!flow || pending !== null}
-              className="font-bold text-brand underline underline-offset-2 disabled:opacity-40"
+              className="press flex min-h-11 items-center gap-2 rounded-full px-4 text-[15px] font-bold text-brand disabled:opacity-40"
             >
+              <RotateCw className="size-4" aria-hidden />
               {pending === "resend" ? "Envoi…" : "Renvoyer le code"}
             </button>
           )}
+          <p data-testid="otp-not-received-hint" className="text-[13px] text-ink-soft">
+            {OTP_NOT_RECEIVED_HINT}
+          </p>
         </div>
 
-        <div className="mt-auto rounded-2xl bg-mist p-3">
+        <div className="mt-auto rounded-3xl bg-mist p-3">
           <div className="grid grid-cols-3 gap-2">
             {["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"].map(
               (k) =>
@@ -204,16 +204,16 @@ export default function Verification() {
                   <button
                     key={k}
                     onClick={pop}
-                    className="flex h-12 items-center justify-center rounded-xl bg-white text-ink transition active:bg-line"
+                    className="press flex h-14 items-center justify-center rounded-2xl bg-white text-ink active:bg-line"
                     aria-label="Effacer"
                   >
-                    <Delete className="size-5" strokeWidth={1.8} />
+                    <Delete className="size-6" strokeWidth={1.8} aria-hidden />
                   </button>
                 ) : (
                   <button
                     key={k}
                     onClick={() => push(k)}
-                    className="h-12 rounded-xl bg-white text-[20px] font-bold text-ink transition active:bg-line"
+                    className="press h-14 rounded-2xl bg-white text-[22px] font-bold text-ink active:bg-line"
                   >
                     {k}
                   </button>

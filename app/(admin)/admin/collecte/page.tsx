@@ -1,7 +1,9 @@
 "use client";
 
+import { Activity, CircleCheck, Globe, Link2, OctagonAlert, Radar } from "lucide-react";
 import { AdminPage } from "@/components/admin/admin-page";
-import { Badge } from "@/components/ui";
+import { Notice, PageHeading, Panel } from "@/components/admin/admin-ui";
+import { Badge, IconTile } from "@/components/ui";
 import {
   ADMIN_COLLECTION_NOTE,
   ADMIN_COLLECTION_NOT_READY,
@@ -23,63 +25,69 @@ export default function AdminCollecte() {
         const summary = adminWatchSummary(collection);
         const errors = adminErrorRows(collection.errors);
         return (
-          <div data-testid="admin-collection">
-            <h1 className="text-[22px] font-extrabold text-ink">{ADMIN_COLLECTION_TITLE}</h1>
-            <p data-testid="admin-collection-note" className="mt-1 rounded-xl bg-mist px-3 py-2 text-[13px] font-semibold text-ink-soft">
-              {ADMIN_COLLECTION_NOTE}
-            </p>
+          <div data-testid="admin-collection" className="flex flex-col gap-4">
+            <PageHeading icon={Globe} tone="info">
+              {ADMIN_COLLECTION_TITLE}
+            </PageHeading>
+            <Notice data-testid="admin-collection-note">{ADMIN_COLLECTION_NOTE}</Notice>
             {!collection.schemaReady ? (
-              <p role="status" className="mt-4 rounded-2xl bg-mist p-4 text-center text-[15px] text-ink-soft">
+              <p role="status" className="animate-rise flex items-center gap-3 rounded-3xl bg-mist p-4 text-[15px] font-semibold text-ink-soft">
+                <OctagonAlert className="size-6 shrink-0" aria-hidden />
                 {ADMIN_COLLECTION_NOT_READY}
               </p>
             ) : (
               <>
-                <section aria-labelledby="sources-title" className="mt-4">
-                  <h2 id="sources-title" className="text-[16px] font-extrabold text-ink">
+                <section aria-labelledby="sources-title" className="flex flex-col gap-3">
+                  <h2 id="sources-title" className="flex items-center gap-2 text-[18px] font-extrabold tracking-tight text-ink">
+                    <Link2 className="size-5 text-brand" aria-hidden />
                     Sources
                   </h2>
-                  <ul className="mt-2 space-y-2.5" aria-label="Sources">
+                  <ul className="stagger flex flex-col gap-3 md:grid md:grid-cols-2" aria-label="Sources">
                     {collection.sources.map((source) => {
                       const row = adminSourceRow(source);
                       return (
-                        <li key={row.code} data-testid="collection-source" data-state={row.state} data-source={row.code} className="rounded-2xl border border-line bg-white p-3.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[15px] font-bold text-ink">{row.name}</span>
+                        <li key={row.code} data-testid="collection-source" data-state={row.state} data-source={row.code} className="rounded-3xl border border-line bg-white p-4">
+                          <div className="flex items-center gap-3">
+                            <IconTile icon={Globe} tone={row.state === "closed" ? "success" : row.state === "disabled" ? "mist" : "accent"} />
+                            <span className="min-w-0 flex-1 text-[16px] font-bold leading-snug text-ink">{row.name}</span>
                             <Badge tone={row.state === "closed" ? "sage" : row.state === "disabled" ? "wash" : "carrot"}>{row.stateText}</Badge>
                           </div>
-                          <div className="text-[13px] text-ink-soft">Source {row.typeText.toLowerCase()}</div>
-                          <div data-testid="collection-quota" className="text-[13px] text-ink-soft">
-                            {row.quotaText}
+                          <div className="mt-3 space-y-0.5">
+                            <div className="text-[13px] text-ink-soft">Source {row.typeText.toLowerCase()}</div>
+                            <div data-testid="collection-quota" className="text-[13px] text-ink-soft">
+                              {row.quotaText}
+                            </div>
+                            <div className="text-[13px] text-ink-soft">{row.failuresText}</div>
+                            {row.pauseText ? <div className="text-[13px] font-semibold text-accent-ink">{row.pauseText}</div> : null}
+                            {row.lastErrorText ? <div className="text-[13px] text-ink-soft">Dernière erreur : {row.lastErrorText}</div> : null}
                           </div>
-                          <div className="text-[13px] text-ink-soft">{row.failuresText}</div>
-                          {row.pauseText ? <div className="text-[13px] font-semibold text-accent-ink">{row.pauseText}</div> : null}
-                          {row.lastErrorText ? <div className="text-[13px] text-ink-soft">Dernière erreur : {row.lastErrorText}</div> : null}
                         </li>
                       );
                     })}
                   </ul>
                 </section>
-                <section aria-labelledby="watches-title" data-testid="collection-watches" className="mt-4 rounded-2xl border border-line bg-white p-4">
-                  <h2 id="watches-title" className="text-[15px] font-extrabold text-ink">
-                    Surveillances et annonces
-                  </h2>
-                  <ul className="mt-1.5 space-y-0.5 text-[13px] text-ink-soft">
+                <Panel icon={Radar} tone="brand" title="Surveillances et annonces" titleId="watches-title" aria-labelledby="watches-title" data-testid="collection-watches">
+                  <ul className="mt-3 space-y-1 text-[14px] leading-snug text-ink-soft">
                     {summary.lines.map((line) => (
                       <li key={line}>{line}</li>
                     ))}
                   </ul>
-                </section>
-                <section aria-labelledby="errors-title" data-testid="collection-errors" className="mt-4">
-                  <h2 id="errors-title" className="text-[16px] font-extrabold text-ink">
+                </Panel>
+                <section aria-labelledby="errors-title" data-testid="collection-errors" className="flex flex-col gap-3">
+                  <h2 id="errors-title" className="flex items-center gap-2 text-[18px] font-extrabold tracking-tight text-ink">
+                    <Activity className="size-5 text-brand" aria-hidden />
                     Dernières erreurs
                   </h2>
                   {errors.length === 0 ? (
-                    <p className="mt-2 text-[14px] text-ink-soft">{ADMIN_COLLECTION_NO_ERRORS}</p>
+                    <p className="flex items-center gap-3 rounded-3xl border border-line bg-white p-4 text-[15px] font-semibold text-ink-soft">
+                      <CircleCheck className="size-6 shrink-0 text-success" aria-hidden />
+                      {ADMIN_COLLECTION_NO_ERRORS}
+                    </p>
                   ) : (
-                    <ul className="mt-2 space-y-1.5">
+                    <ul className="stagger flex flex-col gap-2 md:grid md:grid-cols-2">
                       {errors.map((entry) => (
-                        <li key={entry.key} data-testid="collection-error" className="rounded-xl border border-line bg-white px-3 py-2 text-[13px]">
-                          <div className="font-semibold text-ink">{entry.text}</div>
+                        <li key={entry.key} data-testid="collection-error" className="rounded-2xl border border-line bg-white px-4 py-3 text-[13px]">
+                          <div className="text-[14px] font-semibold text-ink">{entry.text}</div>
                           <div className="text-ink-soft">{entry.dateText}</div>
                         </li>
                       ))}
