@@ -98,7 +98,7 @@ function BuyerHomeScreen({ home }: { home: BuyerHome }) {
         <span className="md:hidden">
           <LogoMark />
         </span>
-        <h1 className="hidden text-[26px] font-extrabold tracking-tight text-ink md:block">{BUYER_HOME_TITLE}</h1>
+        <span className="hidden md:block" />
         <HeaderBtn icon={Bell} href="/notifications" dot={view.hasUnread} label="Notifications" />
       </div>
 
@@ -115,7 +115,7 @@ function BuyerHomeScreen({ home }: { home: BuyerHome }) {
       </Link>
 
       <section className="flex flex-col gap-3">
-        <h1 className="text-[20px] font-extrabold tracking-tight text-ink md:hidden">{BUYER_HOME_TITLE}</h1>
+        <h1 className="text-[22px] font-extrabold tracking-tight text-ink">{BUYER_HOME_TITLE}</h1>
         {view.hasDemands ? (
           <div className="stagger flex flex-col gap-3" data-buyer-demands>
             {view.demands.map((demand) => (

@@ -77,7 +77,7 @@ function Dashboard() {
         <span className="md:hidden">
           <LogoMark />
         </span>
-        <h1 className="hidden text-[26px] font-extrabold tracking-tight text-ink md:block">{VENDOR_HOME_TITLE}</h1>
+        <span className="hidden md:block" />
         <Link
           href={walletHref({ next: "/vendeur" })}
           className="press flex min-h-11 items-center gap-2 rounded-full border border-line-strong bg-white px-4 text-[14px] font-bold text-ink hover:border-brand"
@@ -100,7 +100,7 @@ function Dashboard() {
       </button>
 
       <section className="flex flex-col gap-3">
-        <h1 className="text-[20px] font-extrabold tracking-tight text-ink md:hidden">{VENDOR_HOME_TITLE}</h1>
+        <h1 className="text-[22px] font-extrabold tracking-tight text-ink">{VENDOR_HOME_TITLE}</h1>
         <div className="stagger grid grid-cols-3 gap-2.5">
           {view.tiles.map((tile) => (
             <div key={tile.label} className="min-w-0" data-tile={tile.label}>

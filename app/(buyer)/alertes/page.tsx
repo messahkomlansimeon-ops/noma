@@ -102,13 +102,13 @@ function MesBesoins() {
         <span className="md:hidden">
           <LogoMark />
         </span>
-        <h1 className="hidden text-[26px] font-extrabold tracking-tight text-ink md:block">Mes besoins</h1>
+        <span className="hidden md:block" />
         <span className="relative">
           <HeaderBtn icon={Bell} href="/notifications" label="Notifications" />
           <UnreadBadge className="pointer-events-none absolute -right-0.5 -top-0.5" />
         </span>
       </div>
-      <h1 className="-mt-2 text-[24px] font-extrabold tracking-tight text-ink md:hidden">Mes besoins</h1>
+      <h1 className="-mt-2 text-[24px] font-extrabold tracking-tight text-ink">Mes besoins</h1>
 
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
         {DEMAND_FILTERS.map((f) => (
