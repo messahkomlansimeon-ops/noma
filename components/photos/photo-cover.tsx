@@ -21,7 +21,7 @@ export function PhotoCover({ photoId, className = "size-14", fallback }: { photo
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
       data-testid="photo-cover"
-      className={`shrink-0 rounded-xl bg-sage object-cover ${className}`}
+      className={`shrink-0 rounded-2xl bg-brand-soft object-cover ${className}`}
     />
   );
 }

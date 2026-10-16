@@ -53,7 +53,7 @@ export function UnreadBadge({ className = "" }: { className?: string }) {
       data-testid="unread-badge"
       role="status"
       aria-label={unreadBadgeAccessibleLabel(count)}
-      className={`flex min-w-5 items-center justify-center rounded-full bg-carrot px-1.5 text-[11px] font-extrabold leading-5 text-white ${className}`}
+      className={`flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[12px] font-extrabold leading-5 text-ink ${className}`}
     >
       {label}
     </span>

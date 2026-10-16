@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Calculator, CircleCheck, HandCoins, Tag } from "lucide-react";
 import { InterestedBuyerCard } from "@/components/matches/match-parts";
 import { ProposalForm } from "@/components/proposals/proposal-form";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
-import { Badge } from "@/components/ui";
+import { Badge, IconTile } from "@/components/ui";
+import { BTN_OUTLINE, BTN_PRIMARY, ErrorState, LoadingBlock, Notice, SectionHeading } from "@/components/vendor/vendor-parts";
 import { isUuid } from "@/lib/client/api";
 import { describeProposalError, proposals, type SellerRequest } from "@/lib/client/proposals-api";
 import { SENT_MESSAGE, canPropose, offerStateText, quotePath } from "@/lib/client/proposals-view";
@@ -36,38 +38,31 @@ function Detail({ demandId }: { demandId: string }) {
   }, [demandId, reloadKey, redirectIfUnauthorized]);
 
   if (error) {
-    return (
-      <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
-        {error}
-      </p>
-    );
+    return <ErrorState message={error} />;
   }
   if (request === null) {
-    return (
-      <p aria-busy="true" className="mt-6 text-center text-[14px] text-ink-soft">
-        Chargement…
-      </p>
-    );
+    return <LoadingBlock label="Chargement…" className="pt-3" />;
   }
   return (
-    <div data-testid="vendor-request-detail">
-      <ul className="mt-3">
+    <div data-testid="vendor-request-detail" className="flex flex-col gap-4 pt-3">
+      <ul>
         <InterestedBuyerCard item={request.need} />
       </ul>
       {sent ? (
-        <p role="status" data-testid="proposal-sent" className="mt-3 rounded-xl bg-sage px-3 py-2 text-[13px] font-semibold text-forest">
+        <Notice tone="brand" icon={CircleCheck} role="status" data-testid="proposal-sent" className="animate-pop">
           {SENT_MESSAGE}
-        </p>
+        </Notice>
       ) : null}
-      <h2 className="mt-5 text-[16px] font-extrabold text-ink">Vos annonces qui correspondent</h2>
-      <ul className="mt-2 space-y-3">
+      <SectionHeading icon={Tag}>Vos annonces qui correspondent</SectionHeading>
+      <ul className="stagger flex flex-col gap-3 md:grid md:grid-cols-2 md:items-start">
         {request.offers.map((offer) => {
           const state = offerStateText(offer);
           const quote = quotePath(demandId, offer.offerId);
           return (
-            <li key={offer.offerId} data-testid="request-offer" className="rounded-2xl border border-line bg-white p-3.5">
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-[14px] font-bold text-ink">{offer.title}</span>
+            <li key={offer.offerId} data-testid="request-offer" className="rounded-3xl border border-line bg-white p-4">
+              <div className="flex items-start gap-3">
+                <IconTile icon={Tag} tone="brand" />
+                <span className="min-w-0 flex-1 pt-0.5 text-[16px] font-bold leading-snug text-ink">{offer.title}</span>
                 {state ? <Badge tone={offer.proposal?.status === "sent" || offer.proposal?.status === "accepted" ? "sage" : "wash"}>{state}</Badge> : null}
               </div>
               {canPropose(offer) ? (
@@ -83,12 +78,14 @@ function Detail({ demandId }: { demandId: string }) {
                     }}
                   />
                 ) : (
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <button onClick={() => { setSent(false); setOpen(offer.offerId); }} data-testid="proposal-open" className="rounded-xl bg-forest px-3 py-2.5 text-[14px] font-bold text-white">
+                  <div className="mt-3 flex flex-col gap-2">
+                    <button onClick={() => { setSent(false); setOpen(offer.offerId); }} data-testid="proposal-open" className={BTN_PRIMARY}>
+                      <HandCoins className="size-5" aria-hidden />
                       Faire une proposition
                     </button>
                     {quote ? (
-                      <Link href={quote} data-testid="quote-open" className="flex items-center justify-center rounded-xl border border-forest/30 bg-white px-3 py-2.5 text-[14px] font-bold text-forest">
+                      <Link href={quote} data-testid="quote-open" className={BTN_OUTLINE}>
+                        <Calculator className="size-5" aria-hidden />
                         Faire un devis
                       </Link>
                     ) : null}
@@ -114,9 +111,7 @@ export default function DemandeDetail() {
           {isUuid(id) ? (
             <Detail demandId={id} />
           ) : (
-            <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
-              Demande introuvable.
-            </p>
+            <ErrorState message="Demande introuvable." />
           )}
         </div>
       </main>

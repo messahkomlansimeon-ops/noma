@@ -3,7 +3,9 @@
 import { useParams } from "next/navigation";
 import { OrderDetail } from "@/components/orders/order-detail";
 import { SessionGate } from "@/components/session-gate";
+import { ArtAlert } from "@/components/illustrations";
 import { TopBar } from "@/components/top-bar";
+import { EmptyState } from "@/components/ui";
 import { isUuid } from "@/lib/client/api";
 
 export default function CommandeDetail() {
@@ -16,9 +18,9 @@ export default function CommandeDetail() {
       ) : (
         <main>
           <TopBar back="/commandes" title="Commande" />
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
-            Commande introuvable.
-          </p>
+          <div role="alert">
+            <EmptyState art={<ArtAlert className="size-32" />} title="Commande introuvable." />
+          </div>
         </main>
       )}
     </SessionGate>

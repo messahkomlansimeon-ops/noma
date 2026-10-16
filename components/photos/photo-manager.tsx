@@ -1,13 +1,14 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ImagePlus, Star, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImagePlus, Images, ShieldCheck, Star, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
+import { ErrorState, LoadingBlock, Notice, SectionHeading } from "@/components/vendor/vendor-parts";
 import { ApiError } from "@/lib/client/api";
 import { describePhotoError, mediaUrl, PHOTO_ACCEPT_ATTRIBUTE, PHOTO_MAX_PER_OFFER, photosApi, type OfferPhoto } from "@/lib/client/photos-api";
 import { addPicked, uploadPicked, type PickedFile, type PickedPhoto } from "@/lib/client/photos-queue";
 import {
-  moveItem, orderOf, orderWithCoverFirst, PHONE_REMINDER, PHOTOS_ADD_LABEL, PHOTOS_EMPTY, PHOTOS_HINT, PHOTOS_LIMIT_REACHED, PHOTOS_TITLE, photoCountText, progressPercent, remainingSlots,
+  moveItem, orderOf, orderWithCoverFirst, PHONE_REMINDER, PHOTOS_ADD_LABEL, PHOTOS_HINT, PHOTOS_LIMIT_REACHED, PHOTOS_TITLE, photoCountText, progressPercent, remainingSlots,
 } from "@/lib/client/photos-view";
 
 /**
@@ -111,77 +112,72 @@ export function PhotoManager({ offerId, readOnly = false, onChange }: { offerId:
   const ids = photos ? orderOf(photos) : [];
   const count = photos?.length ?? 0;
   const room = remainingSlots(count);
+  const tileBtn = "press flex size-11 items-center justify-center rounded-xl text-ink-soft hover:bg-mist disabled:opacity-30";
   return (
-    <section aria-labelledby="photos-title" className="mt-5" data-testid="photo-manager">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 id="photos-title" className="text-[16px] font-extrabold text-ink">
-          {PHOTOS_TITLE}
-        </h2>
-        {photos ? (
-          <span data-testid="photo-count" className="text-[12px] font-semibold text-ink-soft">
-            {photoCountText(count)}
-          </span>
-        ) : null}
-      </div>
+    <section aria-labelledby="photos-title" data-testid="photo-manager">
+      <SectionHeading
+        icon={Images}
+        id="photos-title"
+        aside={
+          photos ? (
+            <span data-testid="photo-count" className="rounded-full bg-mist px-3 py-1 text-[13px] font-bold text-ink-soft">
+              {photoCountText(count)}
+            </span>
+          ) : null
+        }
+      >
+        {PHOTOS_TITLE}
+      </SectionHeading>
 
       {loadError ? (
-        <div role="alert" className="mt-2 rounded-2xl border border-line bg-white p-3 text-center">
-          <p className="text-[13px] font-semibold text-ink">{loadError}</p>
-          <button
-            type="button"
-            onClick={() => {
-              setLoadError(null);
-              setReloadKey((key) => key + 1);
-            }}
-            className="mt-2 rounded-xl bg-forest px-4 py-2 text-[13px] font-bold text-white"
-          >
-            Réessayer
-          </button>
-        </div>
+        <ErrorState
+          message={loadError}
+          onRetry={() => {
+            setLoadError(null);
+            setReloadKey((key) => key + 1);
+          }}
+        />
       ) : photos === null ? (
-        <p className="mt-2 text-[13px] text-ink-soft" aria-busy="true">
-          Chargement des photos…
-        </p>
+        <LoadingBlock label="Chargement des photos…" rows={1} rowClassName="h-32 w-full rounded-3xl" className="mt-3" />
       ) : (
         <>
-          {photos.length === 0 && picked.length === 0 ? <p className="mt-2 text-[13px] text-ink-soft">{PHOTOS_EMPTY}</p> : null}
           {photos.length > 0 ? (
-            <ul className="mt-2 grid grid-cols-3 gap-2" data-testid="photo-list">
+            <ul className="stagger mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="photo-list">
               {photos.map((photo, index) => (
-                <li key={photo.id} data-testid="photo-tile" data-photo-id={photo.id} data-cover={photo.position === 0 ? "true" : "false"} className="overflow-hidden rounded-xl border border-line bg-white">
+                <li key={photo.id} data-testid="photo-tile" data-photo-id={photo.id} data-cover={photo.position === 0 ? "true" : "false"} className="overflow-hidden rounded-3xl border border-line bg-white">
                   <div className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element -- fichiers servis par /api/media avec contrôle d'accès */}
                     <img src={mediaUrl(photo.id) ?? undefined} alt={`Photo ${index + 1}`} loading="lazy" decoding="async" referrerPolicy="no-referrer" className="aspect-square w-full object-cover" />
                     {photo.position === 0 ? (
-                      <span className="absolute left-1 top-1 rounded-md bg-forest px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">Couverture</span>
+                      <span className="absolute left-2 top-2 rounded-full bg-brand px-2.5 py-1 text-[12px] font-extrabold text-white shadow-sm">Couverture</span>
                     ) : null}
                   </div>
                   {readOnly ? null : (
-                    <div className="flex items-center justify-between gap-0.5 p-1">
-                      <button type="button" disabled={busy || index === 0} onClick={() => void reorder(moveItem(ids, index, index - 1))} aria-label="Reculer cette photo" data-testid="photo-move-left" className="flex size-8 items-center justify-center rounded-lg text-ink-soft disabled:opacity-30">
-                        <ChevronLeft className="size-4" aria-hidden />
+                    <div className="flex items-center justify-between p-1">
+                      <button type="button" disabled={busy || index === 0} onClick={() => void reorder(moveItem(ids, index, index - 1))} aria-label="Reculer cette photo" data-testid="photo-move-left" className={tileBtn}>
+                        <ChevronLeft className="size-5" aria-hidden />
                       </button>
-                      <button type="button" disabled={busy || index === 0} onClick={() => void reorder(orderWithCoverFirst(ids, photo.id))} aria-label="Mettre en couverture" data-testid="photo-cover-button" className="flex size-8 items-center justify-center rounded-lg text-ink-soft disabled:opacity-30">
-                        <Star className="size-4" aria-hidden />
+                      <button type="button" disabled={busy || index === 0} onClick={() => void reorder(orderWithCoverFirst(ids, photo.id))} aria-label="Mettre en couverture" data-testid="photo-cover-button" className={tileBtn}>
+                        <Star className="size-5" aria-hidden />
                       </button>
-                      <button type="button" disabled={busy || index === photos.length - 1} onClick={() => void reorder(moveItem(ids, index, index + 1))} aria-label="Avancer cette photo" data-testid="photo-move-right" className="flex size-8 items-center justify-center rounded-lg text-ink-soft disabled:opacity-30">
-                        <ChevronRight className="size-4" aria-hidden />
+                      <button type="button" disabled={busy || index === photos.length - 1} onClick={() => void reorder(moveItem(ids, index, index + 1))} aria-label="Avancer cette photo" data-testid="photo-move-right" className={tileBtn}>
+                        <ChevronRight className="size-5" aria-hidden />
                       </button>
                     </div>
                   )}
                   <div className="border-t border-line p-1">
                     {confirming === photo.id ? (
                       <div className="flex gap-1">
-                        <button type="button" disabled={busy} onClick={() => void remove(photo.id)} data-testid="photo-delete-confirm" className="flex-1 rounded-lg bg-carrot px-1 py-1.5 text-[11px] font-bold text-white disabled:opacity-40">
+                        <button type="button" disabled={busy} onClick={() => void remove(photo.id)} data-testid="photo-delete-confirm" className="press min-h-11 flex-1 rounded-xl bg-accent px-1 text-[13px] font-bold text-ink disabled:opacity-40">
                           Confirmer
                         </button>
-                        <button type="button" onClick={() => setConfirming(null)} className="flex-1 rounded-lg bg-wash px-1 py-1.5 text-[11px] font-bold text-ink">
+                        <button type="button" onClick={() => setConfirming(null)} className="press min-h-11 flex-1 rounded-xl bg-mist px-1 text-[13px] font-bold text-ink">
                           Annuler
                         </button>
                       </div>
                     ) : (
-                      <button type="button" disabled={busy} onClick={() => setConfirming(photo.id)} aria-label="Supprimer cette photo" data-testid="photo-delete" className="flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-[11px] font-bold text-carrot-ink disabled:opacity-40">
-                        <Trash2 className="size-3.5" aria-hidden />
+                      <button type="button" disabled={busy} onClick={() => setConfirming(photo.id)} aria-label="Supprimer cette photo" data-testid="photo-delete" className="press flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl text-[13px] font-bold text-danger-ink hover:bg-danger-soft disabled:opacity-40">
+                        <Trash2 className="size-4" aria-hidden />
                         Supprimer
                       </button>
                     )}
@@ -192,32 +188,32 @@ export function PhotoManager({ offerId, readOnly = false, onChange }: { offerId:
           ) : null}
 
           {picked.length > 0 ? (
-            <ul className="mt-2 space-y-2" data-testid="photo-uploads" aria-live="polite">
+            <ul className="mt-3 space-y-2" data-testid="photo-uploads" aria-live="polite">
               {picked.map((item) => (
-                <li key={item.key} data-status={item.status} className="flex items-center gap-3 rounded-xl border border-line bg-white p-2">
+                <li key={item.key} data-status={item.status} className="flex items-center gap-3 rounded-2xl border border-line bg-white p-2.5">
                   {item.previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element -- aperçu local (adresse blob) d'un fichier choisi
-                    <img src={item.previewUrl} alt="" className="size-12 shrink-0 rounded-lg object-cover" />
+                    <img src={item.previewUrl} alt="" className="size-14 shrink-0 rounded-xl object-cover" />
                   ) : (
-                    <span className="size-12 shrink-0 rounded-lg bg-wash" />
+                    <span className="size-14 shrink-0 rounded-xl bg-mist" />
                   )}
                   <div className="min-w-0 flex-1">
                     {item.status === "failed" ? (
-                      <p role="alert" data-testid="photo-error" className="text-[12px] font-semibold text-carrot-ink">
+                      <p role="alert" data-testid="photo-error" className="text-[13px] font-semibold text-danger-ink">
                         {item.error}
                       </p>
                     ) : (
                       <>
-                        <p className="text-[12px] font-semibold text-ink">{item.status === "done" ? "Photo envoyée" : item.status === "uploading" ? "Envoi en cours…" : "En attente"}</p>
-                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-wash" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent(item.progress)} data-testid="photo-progress">
-                          <div className="h-full rounded-full bg-forest" style={{ width: `${progressPercent(item.progress)}%` }} />
+                        <p className="text-[13px] font-semibold text-ink">{item.status === "done" ? "Photo envoyée" : item.status === "uploading" ? "Envoi en cours…" : "En attente"}</p>
+                        <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-mist" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent(item.progress)} data-testid="photo-progress">
+                          <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${progressPercent(item.progress)}%` }} />
                         </div>
                       </>
                     )}
                   </div>
                   {item.status === "failed" ? (
-                    <button type="button" onClick={() => dismissFailed(item.key)} aria-label="Fermer ce message" className="flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-soft">
-                      <X className="size-4" aria-hidden />
+                    <button type="button" onClick={() => dismissFailed(item.key)} aria-label="Fermer ce message" className="press flex size-11 shrink-0 items-center justify-center rounded-xl text-ink-soft hover:bg-mist">
+                      <X className="size-5" aria-hidden />
                     </button>
                   ) : null}
                 </li>
@@ -226,28 +222,30 @@ export function PhotoManager({ offerId, readOnly = false, onChange }: { offerId:
           ) : null}
 
           {message ? (
-            <p role="alert" data-testid="photo-message" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+            <Notice tone="danger" role="alert" data-testid="photo-message" className="mt-3">
               {message}
-            </p>
+            </Notice>
           ) : null}
 
           {readOnly ? null : room > 0 ? (
             <label
-              className={`mt-2.5 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-forest/30 bg-white py-3 text-[14px] font-bold text-forest ${busy ? "pointer-events-none opacity-40" : ""}`}
+              className={`press mt-3 flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-3xl border-2 border-dashed border-brand/40 bg-brand-soft/50 px-4 text-[15px] font-bold text-brand hover:bg-brand-soft ${
+                photos.length === 0 && picked.length === 0 ? "min-h-32" : "min-h-16"
+              } ${busy ? "pointer-events-none opacity-40" : ""}`}
             >
-              <ImagePlus className="size-4" aria-hidden />
+              <ImagePlus className={photos.length === 0 && picked.length === 0 ? "size-9" : "size-6"} aria-hidden />
               {PHOTOS_ADD_LABEL}
               <input ref={input} type="file" accept={PHOTO_ACCEPT_ATTRIBUTE} multiple disabled={busy} onChange={(event) => void onFiles(event.target.files)} data-testid="photo-add-input" className="sr-only" />
             </label>
           ) : (
-            <p data-testid="photo-limit" className="mt-2 text-[12px] font-semibold text-ink-soft">
+            <Notice tone="mist" data-testid="photo-limit" className="mt-3">
               {PHOTOS_LIMIT_REACHED}
-            </p>
+            </Notice>
           )}
-          <p className="mt-1.5 text-[11px] leading-relaxed text-ink-soft">{PHOTOS_HINT}</p>
-          <p data-testid="photo-phone-reminder" className="mt-1 rounded-lg bg-sage px-2.5 py-1.5 text-[12px] font-semibold leading-snug text-sage-ink">
+          <p className="mt-2 text-[12px] leading-snug text-ink-soft">{PHOTOS_HINT}</p>
+          <Notice tone="brand" icon={ShieldCheck} data-testid="photo-phone-reminder" className="mt-2" small>
             {PHONE_REMINDER}
-          </p>
+          </Notice>
           <span className="sr-only">{`Maximum ${PHOTO_MAX_PER_OFFER} photos.`}</span>
         </>
       )}

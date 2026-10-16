@@ -3,15 +3,17 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Briefcase, Info, LoaderCircle, RefreshCw, RotateCw, Share2 } from "lucide-react";
 import { ActiveSearchCard } from "@/components/active-search-card";
+import { ArtAlert, ArtEmpty, ArtSearch } from "@/components/illustrations";
 import { ExternalSection } from "@/components/external/external-section";
 import { ProposalsBanner } from "@/components/proposals/proposals-banner";
 import { BuyerMatchCard } from "@/components/matches/match-parts";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
 import { TrackingPanel } from "@/components/tracking-panel";
-import { Badge } from "@/components/ui";
+import { Thumb } from "@/components/thumb";
+import { Badge, Btn, BtnOutline, EmptyState, IconTile, Skeleton } from "@/components/ui";
 import { UnreadSync } from "@/components/unread-badge";
 import { useNoma } from "@/lib/store";
 import {
@@ -21,12 +23,10 @@ import {
   type DemandRecord,
   type StoredMatch,
 } from "@/lib/client/api";
-import { DEMAND_STATUS_VIEW, demandSummary, recordTitle } from "@/lib/client/catalog-view";
+import { DEMAND_STATUS_VIEW, artForCategory, demandSummary, recordTitle } from "@/lib/client/catalog-view";
 import { COMPARE_COUNT, COMPARE_LIMIT_MESSAGE, comparePath, pruneSelection, toggleSelection } from "@/lib/client/compare-view";
 import {
-  EMPTY_BUYER_HINT,
   EMPTY_BUYER_MESSAGE,
-  PROCESSING_HINT,
   PROCESSING_MESSAGE,
   TRUNCATED_NOTE,
   buyerResultsLabel,
@@ -145,19 +145,26 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
 
   if (loadError) {
     return (
-      <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-        <p className="text-[14px] font-semibold text-ink">{loadError}</p>
-        <button onClick={refresh} className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white">
-          Réessayer
-        </button>
+      <div role="alert" className="animate-rise flex flex-col items-center gap-4 px-6 py-8 text-center">
+        <ArtAlert className="size-28" />
+        <p className="text-[16px] font-bold text-ink">{loadError}</p>
+        <div className="w-full max-w-xs">
+          <Btn onClick={refresh}>
+            <RotateCw className="size-5" aria-hidden />
+            Réessayer
+          </Btn>
+        </div>
       </div>
     );
   }
   if (!loaded) {
     return (
-      <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
-        Chargement des résultats…
-      </p>
+      <div className="flex flex-col gap-3" aria-busy="true">
+        <span className="sr-only">Chargement des résultats…</span>
+        <Skeleton className="h-24 w-full rounded-3xl" />
+        <Skeleton className="h-40 w-full rounded-3xl" />
+        <Skeleton className="h-40 w-full rounded-3xl" />
+      </div>
     );
   }
 
@@ -172,20 +179,27 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
 
   return (
     <>
-      <div className="rounded-2xl border border-line bg-white p-3.5">
-        <div className="text-[15px] font-bold text-ink">{recordTitle(demand)}</div>
-        {summary ? <div className="text-[12px] text-ink-soft">{summary}</div> : null}
-        <div className="mt-2">
-          <Badge tone={status.tone}>{status.label}</Badge>
+      <div className="animate-rise flex items-center gap-3 rounded-3xl border border-line bg-white p-3.5">
+        <Thumb art={artForCategory(demand.category)} className="size-14" iconClassName="size-7" />
+        <div className="min-w-0 flex-1">
+          <div className="line-clamp-2 text-[17px] font-extrabold leading-snug text-ink">{recordTitle(demand)}</div>
+          {summary ? <div className="text-[14px] text-ink-soft">{summary}</div> : null}
+          <Badge tone={status.tone} className="mt-1.5">
+            {status.label}
+          </Badge>
         </div>
       </div>
 
       {carrier ? (
-        <div data-testid="mission-carrier-note" className="mt-3 rounded-2xl border border-line bg-white p-3.5">
-          <p className="text-[13px] font-semibold text-ink">Ce besoin appartient à votre mission « {carrier.title} » : il se gère depuis la mission.</p>
-          <Link href={missionPath(carrier.id)} className="mt-2 inline-block text-[13px] font-bold text-forest">
-            Ouvrir la mission ›
-          </Link>
+        <div data-testid="mission-carrier-note" className="mt-3 flex flex-col gap-3 rounded-3xl border border-line bg-white p-4">
+          <div className="flex items-center gap-3">
+            <IconTile icon={Briefcase} tone="info" />
+            <p className="flex-1 text-[15px] font-semibold text-ink">Ce besoin appartient à votre mission « {carrier.title} » : il se gère depuis la mission.</p>
+          </div>
+          <BtnOutline href={missionPath(carrier.id)}>
+            Ouvrir la mission
+            <ArrowRight className="size-5" aria-hidden />
+          </BtnOutline>
         </div>
       ) : null}
 
@@ -196,57 +210,62 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
       {/* Lot FIN1 : la carte vient APRÈS les résultats (le premier écran montre la première annonce, pas une carte de réglages longue de plusieurs écrans). */}
       {notActive ? (
         <>
-          <p role="status" className="mt-4 rounded-2xl bg-wash p-4 text-[14px] font-semibold text-ink-soft">
+          <p role="status" className="mt-4 flex items-center gap-3 rounded-3xl bg-mist p-4 text-[15px] font-semibold text-ink-soft">
+            <Info className="size-5 shrink-0" aria-hidden />
             {notActive}
           </p>
           {carrier === null ? activeSearchCard : null}
         </>
       ) : (
         <>
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <h2 className="text-[16px] font-extrabold text-ink" data-testid="results-count">
+          <div className="mt-5 flex items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-[18px] font-extrabold tracking-tight text-ink" data-testid="results-count">
               {state === "results" ? buyerResultsLabel(loaded.items.length, loaded.nextCursor !== null) : "Offres correspondantes"}
             </h2>
             <button
               onClick={refresh}
               disabled={busy}
-              className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[13px] font-semibold text-ink disabled:opacity-50"
+              className="press flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border-2 border-line-strong bg-white px-4 text-[14px] font-bold text-ink hover:border-brand disabled:opacity-50"
             >
-              <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
+              <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
               Actualiser
             </button>
           </div>
 
           {loaded.processing && state === "results" ? (
-            <p role="status" className="mt-2 text-[12px] font-semibold text-carrot-ink">
-              {PROCESSING_MESSAGE} De nouveaux résultats peuvent arriver : appuyez sur Actualiser.
+            <p role="status" className="mt-2 flex items-center gap-2 text-[13px] font-semibold text-accent-ink">
+              <LoaderCircle className="size-4 animate-spin" aria-hidden />
+              {PROCESSING_MESSAGE}
             </p>
           ) : null}
 
           {state === "processing" ? (
-            <div role="status" className="mt-4 rounded-2xl bg-wash p-4 text-center">
-              <p className="text-[14px] font-bold text-ink">{PROCESSING_MESSAGE}</p>
-              <p className="mt-1 text-[13px] text-ink-soft">{PROCESSING_HINT}</p>
+            <div role="status">
+              <EmptyState art={<ArtSearch className="size-36" />} title={PROCESSING_MESSAGE} />
             </div>
           ) : null}
 
           {state === "empty" ? (
-            <div role="status" className="mt-4 rounded-2xl bg-wash p-4 text-center">
-              <p className="text-[14px] font-bold text-ink">{EMPTY_BUYER_MESSAGE}</p>
-              <p className="mt-1 text-[13px] text-ink-soft">{EMPTY_BUYER_HINT}</p>
+            <div role="status">
+              <EmptyState art={<ArtEmpty className="size-36" />} title={EMPTY_BUYER_MESSAGE} />
             </div>
           ) : null}
 
           <ProposalsBanner demandId={demandId} />
 
           {!notActive ? (
-            <Link href={`/besoins/${demandId}/partager`} data-testid="share-link-entry" className="mt-3 inline-block text-[13px] font-bold text-forest underline">
+            <Link
+              href={`/besoins/${demandId}/partager`}
+              data-testid="share-link-entry"
+              className="press mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-brand-soft px-4 text-[14px] font-bold text-brand-ink hover:bg-brand-soft/70"
+            >
+              <Share2 className="size-4" aria-hidden />
               Partager ce besoin
             </Link>
           ) : null}
 
           {state === "results" ? (
-            <ul className="mt-3 space-y-3" aria-label="Offres correspondant à votre besoin">
+            <ul className="stagger mt-3 flex flex-col gap-3 md:grid md:grid-cols-2" aria-label="Offres correspondant à votre besoin">
               {loaded.items.map((item) => (
                 <BuyerMatchCard
                   key={item.candidateId}
@@ -266,29 +285,34 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
           ) : null}
 
           {state === "results" && chosen.length > 0 ? (
-            <div data-testid="compare-bar" className="sticky bottom-20 z-10 mt-3 rounded-2xl border border-forest/30 bg-white p-3 shadow-sm">
+            <div data-testid="compare-bar" className="sticky bottom-20 z-10 mt-3 rounded-3xl border-2 border-brand/30 bg-white p-3 shadow-lg md:bottom-4">
               {chosen.length === COMPARE_COUNT && comparePath(demandId, chosen) ? (
                 <Link
                   href={comparePath(demandId, chosen) ?? "#"}
                   data-testid="compare-link"
-                  className="flex w-full items-center justify-center rounded-xl bg-forest py-3 text-[14px] font-bold text-white"
+                  className="press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-[16px] font-bold text-white hover:bg-brand-deep"
                 >
+                  <ArrowLeftRight className="size-5" aria-hidden />
                   Comparer ces 2 offres
                 </Link>
               ) : (
-                <p className="text-center text-[13px] font-semibold text-ink-soft">Cochez une deuxième offre pour les comparer.</p>
+                <p className="flex min-h-11 items-center justify-center gap-2 text-center text-[14px] font-semibold text-ink-soft">
+                  <ArrowLeftRight className="size-4 shrink-0" aria-hidden />
+                  Cochez une deuxième offre pour les comparer.
+                </p>
               )}
             </div>
           ) : null}
 
           {loaded.truncated && state === "results" ? (
-            <p role="status" className="mt-3 text-[12px] font-semibold text-ink-soft">
+            <p role="status" className="mt-3 flex items-start gap-2 text-[13px] font-semibold text-ink-soft">
+              <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
               {TRUNCATED_NOTE}
             </p>
           ) : null}
 
           {moreError ? (
-            <p role="alert" className="mt-3 text-center text-[13px] font-semibold text-carrot-ink">
+            <p role="alert" className="mt-3 text-center text-[14px] font-semibold text-accent-ink">
               {moreError}
             </p>
           ) : null}
@@ -297,7 +321,7 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
             <button
               onClick={() => void loadMore()}
               disabled={busy}
-              className="mt-4 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white py-3 text-[14px] font-bold text-forest disabled:opacity-50"
+              className="press mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-line-strong bg-white px-5 py-3 text-[16px] font-bold text-ink hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loadingMore ? "Chargement…" : "Voir plus"}
             </button>
@@ -319,13 +343,13 @@ function PageContent() {
   return (
     <main>
       <TopBar back="/alertes" title="Résultats de mon besoin" />
-      <div className="px-4 pb-6">
+      <div className="px-4 pb-6 pt-2">
         {isUuid(demandId) ? (
           <ResultatsDuBesoin demandId={demandId} />
         ) : (
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
-            Besoin introuvable.
-          </p>
+          <div role="alert">
+            <EmptyState art={<ArtEmpty className="size-36" />} title="Besoin introuvable." />
+          </div>
         )}
       </div>
     </main>

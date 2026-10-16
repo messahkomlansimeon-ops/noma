@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ShieldCheck, ShoppingBag } from "lucide-react";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
+import { ErrorState, LoadingBlock, Notice, SectionHeading } from "@/components/vendor/vendor-parts";
 import { SALES_NOTE, SALES_TITLE, salesView } from "@/lib/client/orders-view";
 import { describeSocialError, social, type OfferSales } from "@/lib/client/social-api";
 
@@ -30,38 +32,35 @@ export function OfferSalesSection({ offerId }: { offerId: string }) {
   }, [offerId, redirectIfUnauthorized]);
 
   const view = sales === null ? null : salesView(sales);
+  const tile = "animate-pop flex flex-col-reverse justify-end gap-1 rounded-3xl border border-line bg-white p-3.5";
   return (
-    <section aria-labelledby="sales-title" className="mt-5" data-testid="offer-sales">
-      <h2 id="sales-title" className="text-[16px] font-extrabold text-ink">
+    <section aria-labelledby="sales-title" data-testid="offer-sales">
+      <SectionHeading icon={ShoppingBag} id="sales-title">
         {SALES_TITLE}
-      </h2>
+      </SectionHeading>
       {error ? (
-        <p role="alert" className="mt-2 text-[13px] font-semibold text-carrot-ink">
-          {error}
-        </p>
+        <ErrorState message={error} />
       ) : view === null ? (
-        <p className="mt-2 text-[13px] text-ink-soft" aria-busy="true">
-          Chargement…
-        </p>
+        <LoadingBlock label="Chargement…" rows={1} rowClassName="h-20 w-full rounded-3xl" className="mt-3" />
       ) : (
-        <dl className="mt-2 divide-y divide-line rounded-2xl border border-line bg-white px-3.5 py-0.5">
-          <div className="flex items-start justify-between gap-4 py-2 text-[13px]" data-stat="sales-confirmed">
-            <dt className="text-ink-soft">Ventes confirmées</dt>
-            <dd className="text-right font-semibold text-ink" data-stat-value>
+        <dl className="mt-3 grid grid-cols-2 gap-2.5 md:grid-cols-3">
+          <div className={`${tile} col-span-2 md:col-span-1`} data-stat="sales-confirmed">
+            <dt className="text-[13px] font-semibold leading-tight text-ink-soft">Ventes confirmées</dt>
+            <dd className="text-[24px] font-extrabold leading-tight text-ink" data-stat-value>
               {view.total}
             </dd>
           </div>
           {view.split ? (
             <>
-              <div className="flex items-start justify-between gap-4 py-2 text-[13px]" data-stat="sales-boost">
-                <dt className="text-ink-soft">dont attribuées au boost</dt>
-                <dd className="text-right font-semibold text-ink" data-stat-value>
+              <div className={tile} data-stat="sales-boost">
+                <dt className="text-[13px] font-semibold leading-tight text-ink-soft">dont attribuées au boost</dt>
+                <dd className="text-[20px] font-extrabold leading-tight text-ink" data-stat-value>
                   {view.split.boost}
                 </dd>
               </div>
-              <div className="flex items-start justify-between gap-4 py-2 text-[13px]" data-stat="sales-organic">
-                <dt className="text-ink-soft">dont organiques</dt>
-                <dd className="text-right font-semibold text-ink" data-stat-value>
+              <div className={tile} data-stat="sales-organic">
+                <dt className="text-[13px] font-semibold leading-tight text-ink-soft">dont organiques</dt>
+                <dd className="text-[20px] font-extrabold leading-tight text-ink" data-stat-value>
                   {view.split.organic}
                 </dd>
               </div>
@@ -69,7 +68,9 @@ export function OfferSalesSection({ offerId }: { offerId: string }) {
           ) : null}
         </dl>
       )}
-      <p className="mt-1.5 text-[11px] leading-relaxed text-ink-soft">{SALES_NOTE}</p>
+      <Notice tone="info" icon={ShieldCheck} className="mt-3" small>
+        {SALES_NOTE}
+      </Notice>
     </section>
   );
 }

@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, ShieldCheck, Users } from "lucide-react";
+import { ArtSearch } from "@/components/illustrations";
 import { InterestedBuyerCard } from "@/components/matches/match-parts";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
+import { EmptyState } from "@/components/ui";
+import { BTN_OUTLINE, ErrorState, LINK_ACTION, LoadingBlock, Notice, SectionHeading } from "@/components/vendor/vendor-parts";
 import { api, describeApiError, type OfferRecord, type StoredMatch } from "@/lib/client/api";
 import {
-  EMPTY_SELLER_HINT,
   EMPTY_SELLER_MESSAGE,
   NEEDS_NOTE,
   PROCESSING_MESSAGE,
@@ -97,38 +99,30 @@ export function InterestedBuyers({ offer }: { offer: OfferRecord }) {
   }, [offerId, loaded, busy, redirectIfUnauthorized]);
 
   return (
-    <section aria-labelledby="interested-title" className="mt-5">
-      <div className="flex items-center justify-between gap-3">
-        <h2 id="interested-title" className="text-[16px] font-extrabold text-ink">
-          Acheteurs intéressés
-        </h2>
-        {!notPublished ? (
-          <button
-            onClick={refresh}
-            disabled={busy}
-            className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-[13px] font-semibold text-ink disabled:opacity-50"
-          >
-            <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
-            Actualiser
-          </button>
-        ) : null}
-      </div>
+    <section aria-labelledby="interested-title">
+      <SectionHeading
+        icon={Users}
+        id="interested-title"
+        aside={
+          !notPublished ? (
+            <button onClick={refresh} disabled={busy} className={`${LINK_ACTION} border border-line bg-white`}>
+              <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} aria-hidden />
+              Actualiser
+            </button>
+          ) : null
+        }
+      >
+        Acheteurs intéressés
+      </SectionHeading>
 
       {notPublished ? (
-        <p role="status" className="mt-3 rounded-2xl bg-wash p-4 text-[14px] font-semibold text-ink-soft">
+        <Notice tone="mist" role="status" className="mt-3">
           {notPublished}
-        </p>
+        </Notice>
       ) : loadError ? (
-        <div role="alert" className="mt-3 rounded-2xl border border-line bg-white p-4 text-center">
-          <p className="text-[14px] font-semibold text-ink">{loadError}</p>
-          <button onClick={refresh} className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white">
-            Réessayer
-          </button>
-        </div>
+        <ErrorState message={loadError} onRetry={refresh} />
       ) : !loaded ? (
-        <p className="mt-3 text-[14px] text-ink-soft" aria-busy="true">
-          Chargement des besoins d'acheteurs…
-        </p>
+        <LoadingBlock label="Chargement des besoins d'acheteurs…" rows={2} rowClassName="h-20 w-full rounded-3xl" className="mt-3" />
       ) : (
         <InterestedList
           loaded={loaded}
@@ -159,24 +153,23 @@ export function InterestedList({
   return (
     <>
       {loaded.items.length > 0 ? (
-        <p className="mt-1 text-[13px] text-ink-soft" data-testid="interested-note">
+        <Notice tone="info" icon={ShieldCheck} className="mt-3" data-testid="interested-note">
           {NEEDS_NOTE}
-        </p>
+        </Notice>
       ) : null}
 
       {loaded.processing ? (
-        <p role="status" className="mt-1 text-[12px] font-semibold text-carrot-ink">
+        <Notice tone="accent" role="status" icon={Loader2} className="mt-3">
           {PROCESSING_MESSAGE} La liste peut encore évoluer : appuyez sur Actualiser.
-        </p>
+        </Notice>
       ) : null}
 
       {state === "empty" || state === "processing" ? (
-        <div className="mt-3 rounded-2xl bg-wash p-4 text-center" data-testid="interested-empty">
-          <p className="text-[14px] font-bold text-ink">{state === "processing" ? PROCESSING_MESSAGE : EMPTY_SELLER_MESSAGE}</p>
-          {state === "empty" ? <p className="mt-1 text-[13px] text-ink-soft">{EMPTY_SELLER_HINT}</p> : null}
+        <div data-testid="interested-empty">
+          <EmptyState art={<ArtSearch className="size-32" />} title={state === "processing" ? PROCESSING_MESSAGE : EMPTY_SELLER_MESSAGE} />
         </div>
       ) : (
-        <ul className="mt-3 space-y-3" aria-label="Besoins qui correspondent à votre annonce">
+        <ul className="stagger mt-3 flex flex-col gap-3 md:grid md:grid-cols-2 md:items-start" aria-label="Besoins qui correspondent à votre annonce">
           {loaded.items.map((item) => (
             <InterestedBuyerCard key={item.candidateId} item={item} />
           ))}
@@ -184,23 +177,19 @@ export function InterestedList({
       )}
 
       {loaded.truncated && state === "results" ? (
-        <p role="status" className="mt-3 text-[12px] font-semibold text-ink-soft">
+        <Notice tone="mist" role="status" className="mt-3">
           {TRUNCATED_NOTE}
-        </p>
+        </Notice>
       ) : null}
 
       {moreError ? (
-        <p role="alert" className="mt-3 text-center text-[13px] font-semibold text-carrot-ink">
+        <Notice tone="danger" role="alert" className="mt-3">
           {moreError}
-        </p>
+        </Notice>
       ) : null}
 
       {loaded.nextCursor ? (
-        <button
-          onClick={onMore}
-          disabled={disabled}
-          className="mt-4 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white py-3 text-[14px] font-bold text-forest disabled:opacity-50"
-        >
+        <button onClick={onMore} disabled={disabled} className={`${BTN_OUTLINE} mt-4`}>
           {loadingMore ? "Chargement…" : "Voir plus"}
         </button>
       ) : null}

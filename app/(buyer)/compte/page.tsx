@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  ArrowRight,
   Bell,
   CircleHelp,
   CircleUser,
@@ -17,12 +18,12 @@ import {
   Store,
   Wallet,
 } from "lucide-react";
-import { LogoMark } from "@/components/logo";
 import { NotificationPreferencesCard } from "@/components/notification-preferences-card";
 import { useLogout } from "@/components/session-gate";
 import { useMessagesUnread } from "@/components/messages-badge";
 import { useUnreadCount } from "@/components/unread-badge";
-import { Badge, MenuRow } from "@/components/ui";
+import { HeaderBtn } from "@/components/top-bar";
+import { Badge, Card, IconTile, MenuRow } from "@/components/ui";
 import { useNoma } from "@/lib/store";
 
 export default function MonCompte() {
@@ -34,84 +35,65 @@ export default function MonCompte() {
   const soon = () => showToast("Bientôt disponible");
 
   return (
-    <main>
-      <div className="flex items-center justify-between px-4 py-3">
-        <LogoMark />
-        <button
-          onClick={soon}
-          className="flex size-9 items-center justify-center rounded-full text-ink transition hover:bg-wash"
-          aria-label="Réglages"
-        >
-          <Settings className="size-5" strokeWidth={1.8} />
-        </button>
+    <main className="flex flex-col gap-5 px-4 pb-6 pt-3">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-[26px] font-extrabold tracking-tight text-ink">Mon compte</h1>
+        <HeaderBtn icon={Settings} onClick={soon} label="Réglages" />
       </div>
 
-      <div className="px-4">
-        <h1 className="font-display text-[26px] font-extrabold text-ink">
-          Mon compte
-        </h1>
-
-        <div className="mt-3 flex items-center gap-3.5 rounded-2xl border border-line bg-white p-4">
-          <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-sage text-forest">
-            <CircleUser className="size-7" strokeWidth={1.7} aria-hidden />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[16px] font-extrabold text-ink">Votre compte noma</div>
-            <div className="text-[13px] text-ink-soft">Connecté avec votre numéro de téléphone</div>
-            <Badge tone="sage" className="mt-1">
-              <ShieldCheck className="size-3" />
-              Téléphone confirmé
-            </Badge>
-          </div>
+      <Card className="animate-rise flex items-center gap-4">
+        <span className="flex size-16 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
+          <CircleUser className="size-9" strokeWidth={1.8} aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[18px] font-extrabold text-ink">Votre compte noma</div>
+          <Badge tone="sage" className="mt-1.5">
+            <ShieldCheck className="size-3.5" aria-hidden />
+            Téléphone confirmé
+          </Badge>
         </div>
+      </Card>
 
-        <div className="mt-4 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">
-          <MenuRow icon={MessageCircle} label="Messages" badge={messagesUnread !== null && messagesUnread > 0 ? messagesUnread : undefined} href="/messages" />
-          <MenuRow icon={Package} label="Mes commandes" href="/commandes" />
-          <MenuRow icon={Layers} label="Mes missions" href="/missions" />
-          <MenuRow icon={Wallet} label="Mon porte-monnaie" href="/compte/porte-monnaie" />
-          <MenuRow icon={Search} label="Mes recherches suivies" href="/alertes" />
-          <MenuRow icon={Heart} label="Mes favoris" href="/favoris" />
-          <MenuRow icon={CircleUser} label="Informations personnelles" onClick={soon} />
-          <MenuRow icon={Bell} label="Notifications" badge={unread !== null && unread > 0 ? unread : undefined} href="/notifications" />
-          <MenuRow icon={Handshake} label="Propositions reçues" href="/propositions" />
-          <MenuRow icon={CircleHelp} label="Mes signalements" href="/signaler" />
-        </div>
+      <ul className="stagger divide-y divide-line overflow-hidden rounded-3xl border border-line bg-white md:grid md:grid-cols-2 md:gap-3 md:divide-y-0 md:overflow-visible md:rounded-none md:border-0 md:bg-transparent">
+        {[
+          <MenuRow key="messages" icon={MessageCircle} label="Messages" badge={messagesUnread !== null && messagesUnread > 0 ? messagesUnread : undefined} href="/messages" />,
+          <MenuRow key="commandes" icon={Package} label="Mes commandes" href="/commandes" />,
+          <MenuRow key="missions" icon={Layers} label="Mes missions" href="/missions" />,
+          <MenuRow key="porte-monnaie" icon={Wallet} label="Mon porte-monnaie" href="/compte/porte-monnaie" />,
+          <MenuRow key="alertes" icon={Search} label="Mes recherches suivies" href="/alertes" />,
+          <MenuRow key="favoris" icon={Heart} label="Mes favoris" href="/favoris" />,
+          <MenuRow key="infos" icon={CircleUser} label="Informations personnelles" onClick={soon} />,
+          <MenuRow key="notifications" icon={Bell} label="Notifications" badge={unread !== null && unread > 0 ? unread : undefined} href="/notifications" />,
+          <MenuRow key="propositions" icon={Handshake} label="Propositions reçues" href="/propositions" />,
+          <MenuRow key="signaler" icon={CircleHelp} label="Mes signalements" href="/signaler" />,
+        ].map((row) => (
+          <li key={row.key} className="md:overflow-hidden md:rounded-3xl md:border md:border-line md:bg-white">
+            {row}
+          </li>
+        ))}
+      </ul>
 
+      <div className="[&>*]:mt-0">
         <NotificationPreferencesCard />
-
-        <div className="mt-4 rounded-2xl bg-sage p-4">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-10 items-center justify-center rounded-full bg-white text-forest">
-              <Store className="size-5" strokeWidth={1.9} />
-            </span>
-            <div>
-              <div className="text-[14px] font-extrabold text-ink">
-                Vous vendez ?
-              </div>
-              <div className="text-[12px] text-sage-ink">
-                Votre compte suffit : publiez une annonce.
-              </div>
-            </div>
-          </div>
-          <Link
-            href="/vendeur"
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-forest py-3 text-[14px] font-bold text-white transition active:scale-[0.99]"
-          >
-            Aller à mon espace vendeur
-            <span aria-hidden>›</span>
-          </Link>
-        </div>
-
-        <button
-          onClick={() => void logout()}
-          disabled={loggingOut}
-          className="mt-4 flex w-full items-center justify-center gap-2 py-2 text-[14px] font-bold text-ink-soft transition hover:text-ink disabled:opacity-40"
-        >
-          <LogOut className="size-4" />
-          {loggingOut ? "Déconnexion…" : "Se déconnecter"}
-        </button>
       </div>
+
+      <Link
+        href="/vendeur"
+        className="press animate-rise flex min-h-16 items-center gap-3 rounded-3xl bg-brand-soft p-4 hover:bg-brand-soft/70"
+      >
+        <IconTile icon={Store} tone="accent" className="size-12" />
+        <span className="flex-1 text-[16px] font-extrabold text-ink">Aller à mon espace vendeur</span>
+        <ArrowRight className="size-5 shrink-0 text-brand" aria-hidden />
+      </Link>
+
+      <button
+        onClick={() => void logout()}
+        disabled={loggingOut}
+        className="press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl text-[15px] font-bold text-ink-soft hover:bg-mist hover:text-ink disabled:opacity-40"
+      >
+        <LogOut className="size-5" aria-hidden />
+        {loggingOut ? "Déconnexion…" : "Se déconnecter"}
+      </button>
     </main>
   );
 }

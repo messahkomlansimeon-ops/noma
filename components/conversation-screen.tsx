@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Send, ShieldAlert } from "lucide-react";
+import { ChevronRight, Package, RotateCw, Send, ShieldAlert, ShieldCheck, Store, Tag, TriangleAlert, UserRound } from "lucide-react";
+import { ArtAlert, ArtChat } from "@/components/illustrations";
 import { MessageBubble } from "@/components/message-bubble";
 import { messagesRefresher } from "@/components/messages-badge";
 import { DeclareOrder } from "@/components/orders/declare-order";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
 import { openBrowserStream } from "@/components/social/browser-stream";
 import { TopBar } from "@/components/top-bar";
+import { Btn, EmptyState, IconTile, Skeleton, Textarea } from "@/components/ui";
 import { createMessageSync, type MessageSync, type SyncStatus } from "@/lib/client/message-sync";
 import { missionDraftMessage, type MissionHint } from "@/lib/client/missions-view";
 import {
@@ -41,6 +43,13 @@ function browserStorage(): SimpleStorage | null {
     return null;
   }
 }
+
+const STATUS_DOT: Record<SyncStatus, string> = {
+  connecting: "bg-accent",
+  live: "bg-success",
+  reconnecting: "bg-accent",
+  stopped: "bg-line-strong",
+};
 
 const STATUS_TEXT: Record<SyncStatus, string> = {
   connecting: "Connexion…",
@@ -186,17 +195,20 @@ export function ConversationScreen({ conversationId, space, hint = null }: { con
     return (
       <main>
         <TopBar back={back} title="Conversation" />
-        <div role="alert" data-testid="conversation-error" className="mx-4 mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-          <p className="text-[14px] font-semibold text-ink">{loadError}</p>
-          <button
-            onClick={() => {
-              setLoadError(null);
-              setReloadKey((key) => key + 1);
-            }}
-            className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
-          >
-            Réessayer
-          </button>
+        <div role="alert" data-testid="conversation-error" className="animate-rise mx-4 mt-4 flex flex-col items-center gap-4 rounded-3xl border border-line bg-white p-6 text-center">
+          <ArtAlert className="size-24" />
+          <p className="text-[16px] font-bold text-ink">{loadError}</p>
+          <div className="w-full max-w-xs">
+            <Btn
+              onClick={() => {
+                setLoadError(null);
+                setReloadKey((key) => key + 1);
+              }}
+            >
+              <RotateCw className="size-5" aria-hidden />
+              Réessayer
+            </Btn>
+          </div>
         </div>
       </main>
     );
@@ -205,9 +217,12 @@ export function ConversationScreen({ conversationId, space, hint = null }: { con
     return (
       <main>
         <TopBar back={back} title="Conversation" />
-        <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
-          Chargement de la conversation…
-        </p>
+        <div className="flex flex-col gap-3 px-4 pt-4" aria-busy="true">
+          <span className="sr-only">Chargement de la conversation…</span>
+          <Skeleton className="h-14 w-full rounded-3xl" />
+          <Skeleton className="h-12 w-2/3 rounded-3xl" />
+          <Skeleton className="ml-auto h-12 w-1/2 rounded-3xl" />
+        </div>
       </main>
     );
   }
@@ -218,35 +233,43 @@ export function ConversationScreen({ conversationId, space, hint = null }: { con
   return (
     <main className="flex min-h-[calc(100dvh-8rem)] flex-col">
       <TopBar back={back} title="Conversation" border />
-      <div className="px-4 pb-2 pt-2">
-        <h1 data-testid="conversation-title" className="font-display text-[18px] font-extrabold leading-tight text-ink">
-          {label}
-        </h1>
-        <div className="mt-0.5 flex items-center justify-between gap-2 text-[12px] text-ink-soft">
-          <span data-testid="live-status" data-status={status}>
-            {STATUS_TEXT[status]}
-          </span>
+      <div className="flex flex-col gap-3 px-4 pb-2 pt-3">
+        <div className="animate-rise flex items-center gap-3">
+          <IconTile icon={detail.role === "buyer" ? Store : UserRound} tone={detail.role === "buyer" ? "brand" : "info"} className="size-12" />
+          <div className="min-w-0 flex-1">
+            <h1 data-testid="conversation-title" className="text-[18px] font-extrabold leading-tight text-ink">
+              {label}
+            </h1>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[13px] text-ink-soft">
+              <span aria-hidden className={`size-2 rounded-full ${STATUS_DOT[status]}`} />
+              <span data-testid="live-status" data-status={status}>
+                {STATUS_TEXT[status]}
+              </span>
+            </div>
+          </div>
           {offerHref ? (
-            <Link href={offerHref} className="font-bold text-forest">
+            <Link href={offerHref} className="press flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-brand-soft px-3.5 text-[14px] font-bold text-brand-ink hover:bg-brand-soft/70">
+              <Tag className="size-4" aria-hidden />
               {detail.role === "seller" ? "Voir mon annonce" : "Voir l'annonce"}
             </Link>
           ) : null}
         </div>
         {!detail.available ? (
-          <p data-testid="offer-gone" className="mt-2 rounded-xl bg-wash px-3 py-2 text-[12px] font-semibold text-ink-soft">
+          <p data-testid="offer-gone" className="flex items-center gap-2.5 rounded-2xl bg-mist px-4 py-3 text-[14px] font-semibold text-ink-soft">
+            <TriangleAlert className="size-5 shrink-0" aria-hidden />
             {OFFER_GONE_NOTICE}
           </p>
         ) : null}
         {reminder ? (
-          <div data-testid="safety-reminder" role="note" className="mt-2 flex items-start gap-2 rounded-xl bg-carrot-soft px-3 py-2 text-[12px] text-carrot-ink">
-            <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <div data-testid="safety-reminder" role="note" className="animate-rise flex items-start gap-3 rounded-2xl bg-accent-soft p-3.5 text-[14px] text-accent-ink">
+            <ShieldAlert className="mt-0.5 size-5 shrink-0" aria-hidden />
             <span className="flex-1">{SAFETY_REMINDER}</span>
             <button
               onClick={() => {
                 markSafetyReminderSeen(browserStorage());
                 setReminder(false);
               }}
-              className="shrink-0 font-bold underline"
+              className="press flex min-h-11 shrink-0 items-center rounded-full bg-white px-3.5 text-[14px] font-bold text-ink"
             >
               {SAFETY_DISMISS_LABEL}
             </button>
@@ -256,19 +279,31 @@ export function ConversationScreen({ conversationId, space, hint = null }: { con
           <Link
             href={orderPath(detail.role, detail.order.id)}
             data-testid="conversation-order"
-            className="mt-2 flex items-center justify-between rounded-xl border border-line bg-white px-3 py-2 text-[13px] font-semibold text-ink"
+            className="press flex min-h-14 items-center gap-3 rounded-2xl border border-line bg-white px-3 py-2 text-[15px] font-bold text-ink hover:border-brand"
           >
-            <span>Commande : {statusLabel(detail.order.status, detail.role)}</span>
-            <span className="text-forest">Voir ›</span>
+            <IconTile icon={Package} className="size-10" />
+            <span className="flex-1">Commande : {statusLabel(detail.order.status, detail.role)}</span>
+            <ChevronRight className="size-5 text-ink-soft" aria-hidden />
           </Link>
         ) : null}
-        {detail.canDeclareOrder ? <DeclareOrder demandId={detail.demandId as string} offerId={detail.offerId} initialPrice={hint?.priceXof} initialQuantity={hint?.quantity} /> : null}
-        {detail.role === "buyer" ? <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">{NO_PAYMENT_THROUGH_NOMA}</p> : null}
+        {detail.canDeclareOrder ? (
+          <div className="[&>*]:mt-0">
+            <DeclareOrder demandId={detail.demandId as string} offerId={detail.offerId} initialPrice={hint?.priceXof} initialQuantity={hint?.quantity} />
+          </div>
+        ) : null}
+        {detail.role === "buyer" ? (
+          <p className="flex items-start gap-2 text-[12px] leading-relaxed text-ink-soft">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
+            {NO_PAYMENT_THROUGH_NOMA}
+          </p>
+        ) : null}
       </div>
 
-      <ul aria-label="Messages" aria-live="polite" data-testid="message-list" className="flex-1 space-y-2 px-4 pb-3 pt-1">
+      <ul aria-label="Messages" aria-live="polite" data-testid="message-list" className="flex-1 space-y-2.5 px-4 pb-3 pt-1">
         {loadedMessages && messages.length === 0 ? (
-          <li className="py-6 text-center text-[13px] text-ink-soft">{detail.role === "buyer" ? THREAD_EMPTY_BUYER : THREAD_EMPTY_SELLER}</li>
+          <li>
+            <EmptyState art={<ArtChat className="size-28" />} title={detail.role === "buyer" ? THREAD_EMPTY_BUYER : THREAD_EMPTY_SELLER} />
+          </li>
         ) : null}
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} />
@@ -281,20 +316,22 @@ export function ConversationScreen({ conversationId, space, hint = null }: { con
           event.preventDefault();
           void send();
         }}
-        className="sticky bottom-[4.25rem] border-t border-line bg-cream/95 px-3 py-2 backdrop-blur"
+        className="sticky bottom-[4.25rem] border-t border-line bg-canvas/95 px-3 py-2 backdrop-blur md:bottom-0"
       >
         {sendError ? (
-          <p role="alert" data-testid="send-error" className="mb-1.5 text-[12px] font-semibold text-carrot-ink">
+          <p role="alert" data-testid="send-error" className="mb-1.5 flex items-center gap-2 text-[14px] font-semibold text-danger-ink">
+            <TriangleAlert className="size-4 shrink-0" aria-hidden />
             {sendError}
           </p>
         ) : null}
         {composer.problem ? (
-          <p role="alert" className="mb-1.5 text-[12px] font-semibold text-carrot-ink">
+          <p role="alert" className="mb-1.5 flex items-center gap-2 text-[14px] font-semibold text-danger-ink">
+            <TriangleAlert className="size-4 shrink-0" aria-hidden />
             {composer.problem}
           </p>
         ) : null}
         <div className="flex items-end gap-2">
-          <textarea
+          <Textarea
             value={text}
             onChange={(event) => setText(event.target.value)}
             onKeyDown={(event) => {
@@ -307,19 +344,19 @@ export function ConversationScreen({ conversationId, space, hint = null }: { con
             placeholder={COMPOSER_PLACEHOLDER}
             aria-label="Votre message"
             data-testid="message-input"
-            className="max-h-32 min-h-11 flex-1 resize-none rounded-2xl border border-line bg-white px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-soft/50"
+            className="max-h-32 min-h-12 flex-1"
           />
           <button
             type="submit"
             disabled={!composer.canSend}
             data-testid="message-send"
             aria-label={SEND_LABEL}
-            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-forest text-white transition active:scale-95 disabled:opacity-40"
+            className="press flex size-12 shrink-0 items-center justify-center rounded-full bg-brand text-white hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Send className="size-5" aria-hidden />
           </button>
         </div>
-        <div className="mt-1 text-right text-[10px] text-ink-soft">{composer.counter}</div>
+        <div className="mt-1 text-right text-[12px] text-ink-soft">{composer.counter}</div>
       </form>
     </main>
   );

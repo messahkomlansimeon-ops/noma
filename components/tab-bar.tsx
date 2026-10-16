@@ -16,6 +16,7 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react";
+import { LogoMark } from "@/components/logo";
 import { MessagesBadge, messagesRefresher } from "@/components/messages-badge";
 import { UnreadBadge, unreadRefresher } from "@/components/unread-badge";
 
@@ -31,27 +32,58 @@ interface TabItem {
 }
 
 /** Les adresses « / », « /vendeur » et « /admin » ne rendent l'onglet actif QUE sur elles-mêmes (sinon il le serait sur toutes les pages de leur espace). */
+function isActive(pathname: string | null, item: TabItem): boolean {
+  return item.match.some((m) =>
+    m === "/" || m === "/vendeur" || m === "/admin" ? pathname === m : (pathname ?? "").startsWith(m),
+  );
+}
+
+function Pastilles({ item }: { item: TabItem }) {
+  return (
+    <>
+      {item.unread ? <UnreadBadge className="absolute -right-3 -top-2" /> : null}
+      {item.messages ? <MessagesBadge className="absolute -right-3 -top-2" /> : null}
+    </>
+  );
+}
+
+/**
+ * Une seule liste d'entrées, UN SEUL élément `<nav>` (donc chaque pastille et chaque repère n'existent qu'une fois) : barre fixe en bas sur téléphone, menu latéral collant à gauche
+ * à partir de 768 px. Sur grand écran, le menu est le premier élément de la grille du gabarit.
+ */
 function TabBar({ items }: { items: TabItem[] }) {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[480px] border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-      <div className="grid grid-cols-4">
+    <nav
+      aria-label="Navigation principale"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:sticky md:inset-x-auto md:bottom-auto md:top-0 md:flex md:h-dvh md:flex-col md:gap-8 md:border-r md:border-t-0 md:bg-white md:px-4 md:py-6 md:pb-6"
+    >
+      <div className="hidden px-2 md:block">
+        <LogoMark size="lg" />
+      </div>
+      <div className="mx-auto grid w-full max-w-xl grid-cols-4 md:mx-0 md:flex md:max-w-none md:flex-col md:gap-1.5">
         {items.map((it) => {
-          const active = it.match.some((m) =>
-            m === "/" || m === "/vendeur" || m === "/admin" ? pathname === m : pathname.startsWith(m),
-          );
+          const active = isActive(pathname, it);
           return (
             <Link
               key={it.href}
               href={it.href}
-              className={`flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition ${
-                active ? "text-forest" : "text-ink-soft"
+              aria-current={active ? "page" : undefined}
+              className={`press flex min-h-16 flex-col items-center justify-center gap-1 text-[12px] font-bold md:min-h-12 md:flex-row md:justify-start md:gap-3 md:rounded-2xl md:px-3.5 md:text-[16px] ${
+                active ? "text-brand md:bg-brand-soft" : "text-ink-soft md:hover:bg-mist md:hover:text-ink"
               }`}
             >
-              <span className="relative">
-                <it.icon className="size-5" strokeWidth={active ? 2.3 : 1.8} />
-                {it.unread ? <UnreadBadge className="absolute -right-2.5 -top-1.5" /> : null}
-                {it.messages ? <MessagesBadge className="absolute -right-2.5 -top-1.5" /> : null}
+              <span
+                className={`relative flex h-8 w-14 items-center justify-center rounded-full transition-all duration-300 md:h-auto md:w-auto md:bg-transparent ${
+                  active ? "bg-brand-soft" : "bg-transparent"
+                }`}
+              >
+                <it.icon
+                  className={`size-6 transition-transform duration-300 ${active ? "scale-110 md:scale-100" : ""}`}
+                  strokeWidth={active ? 2.4 : 2}
+                  aria-hidden
+                />
+                <Pastilles item={it} />
               </span>
               {it.label}
             </Link>

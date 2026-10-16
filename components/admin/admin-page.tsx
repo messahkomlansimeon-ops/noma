@@ -2,8 +2,11 @@
 
 import { notFound } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { RotateCw } from "lucide-react";
+import { ArtAlert } from "@/components/illustrations";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
+import { Btn, Skeleton } from "@/components/ui";
 import { ApiError } from "@/lib/client/api";
 import { ADMIN_LOADING } from "@/lib/client/admin-view";
 import { describeSocialError } from "@/lib/client/social-api";
@@ -46,23 +49,31 @@ function Content<T>({ title, back, load, children }: { title: string; back: stri
       <TopBar back={back} title={title} />
       <div className="px-4 pb-6">
         {state.kind === "loading" ? (
-          <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
-            {ADMIN_LOADING}
-          </p>
+          <div className="mt-4 flex flex-col gap-3 md:grid md:grid-cols-2" aria-busy="true">
+            <span className="sr-only">{ADMIN_LOADING}</span>
+            <Skeleton className="h-14 w-full rounded-3xl md:col-span-2" />
+            <Skeleton className="h-28 w-full rounded-3xl" />
+            <Skeleton className="h-28 w-full rounded-3xl" />
+            <Skeleton className="h-28 w-full rounded-3xl" />
+            <Skeleton className="h-28 w-full rounded-3xl" />
+          </div>
         ) : state.kind === "not-found" ? (
           <AdminNotFound />
         ) : state.kind === "error" ? (
-          <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[14px] font-semibold text-ink">{state.message}</p>
-            <button
-              onClick={() => {
-                setState({ kind: "loading" });
-                reload();
-              }}
-              className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
-            >
-              Réessayer
-            </button>
+          <div role="alert" className="animate-rise mt-4 flex flex-col items-center gap-4 px-2 py-8 text-center">
+            <ArtAlert />
+            <p className="text-[17px] font-bold leading-snug text-ink">{state.message}</p>
+            <div className="w-full max-w-xs">
+              <Btn
+                onClick={() => {
+                  setState({ kind: "loading" });
+                  reload();
+                }}
+              >
+                <RotateCw className="size-5" aria-hidden />
+                Réessayer
+              </Btn>
+            </div>
           </div>
         ) : (
           children(state.data, reload)

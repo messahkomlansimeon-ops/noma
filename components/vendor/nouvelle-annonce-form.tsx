@@ -2,11 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AlignLeft, Banknote, CircleAlert, CircleCheck, Layers, LayoutGrid, Loader2, MapPin, Package, Save, Send, Smartphone, Sparkles, Tag } from "lucide-react";
 import { PhotoPicker } from "@/components/photos/photo-picker";
 import { MarketHint } from "@/components/market/market-hint";
 import { TopBar } from "@/components/top-bar";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
-import { FieldLabel, Input, Segmented, Switch, Textarea } from "@/components/ui";
+import { Btn, IconTile, Input, Segmented, Switch, Textarea } from "@/components/ui";
+import { BTN_OUTLINE, IconLabel } from "@/components/vendor/vendor-parts";
 import { ApiError, api, describeApiError, type OfferRecord } from "@/lib/client/api";
 import {
   CATEGORY_OPTIONS,
@@ -22,7 +24,8 @@ type Submitting = "publish" | "draft" | null;
 
 function FieldError({ message }: { message?: string }) {
   return message ? (
-    <div role="alert" className="mt-1.5 text-[12px] font-semibold text-carrot-ink">
+    <div role="alert" className="mt-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-danger-ink">
+      <CircleAlert className="size-4 shrink-0" aria-hidden />
       {message}
     </div>
   ) : null;
@@ -139,155 +142,155 @@ export function NouvelleAnnonceForm({
     if (!redirected) finish();
   };
 
+  const group = embedded ? "space-y-4" : "space-y-4 rounded-3xl border border-line bg-white p-4";
   return (
     <>
-      {!embedded && (
-        <TopBar
-          back="/vendeur/annonces"
-          right={
-            <span className="pr-2 text-[12px] font-semibold text-ink-soft">
-              Brouillon
-            </span>
-          }
-        />
-      )}
+      {!embedded && <TopBar back="/vendeur/annonces" />}
 
-      <div className={embedded ? "" : "px-4"}>
+      <div className={embedded ? "" : "px-4 pb-6"}>
         {!embedded && (
-          <h1 className="font-display text-[26px] font-extrabold text-ink">
+          <h1 className="flex items-center gap-3 text-[26px] font-extrabold tracking-tight text-ink">
+            <IconTile icon={Package} tone="brand" />
             Nouvelle annonce
           </h1>
         )}
 
-        <div className="mt-5 space-y-4">
-          <div>
-            <FieldLabel>Titre</FieldLabel>
-            <Input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              maxLength={FIELD_LIMITS.title}
-              placeholder="iPhone 12 · 128 Go"
-              aria-invalid={errors.title ? true : undefined}
-            />
-            <FieldError message={errors.title} />
-          </div>
-
-          <div>
-            <FieldLabel>Description (facultatif)</FieldLabel>
-            <Textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              maxLength={FIELD_LIMITS.description}
-              rows={3}
-              placeholder="État, accessoires, garantie…"
-            />
-            <FieldError message={errors.description} />
-          </div>
-
-          <div>
-            <FieldLabel>Catégorie</FieldLabel>
-            <Segmented
-              options={CATEGORY_OPTIONS.map((option) => option.label)}
-              value={category ?? ""}
-              onChange={(value) => setCategory(value === category ? null : value)}
-              size="sm"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2.5">
+        <div className={`mt-5 flex flex-col gap-4 ${embedded ? "" : "md:grid md:grid-cols-2 md:items-start"}`}>
+          <div className={group}>
             <div>
-              <FieldLabel>Marque</FieldLabel>
+              <IconLabel icon={Tag}>Titre</IconLabel>
               <Input
-                value={brand}
-                onChange={(event) => setBrand(event.target.value)}
-                maxLength={FIELD_LIMITS.short}
-                placeholder="Apple"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                maxLength={FIELD_LIMITS.title}
+                placeholder="iPhone 12 · 128 Go"
+                aria-invalid={errors.title ? true : undefined}
               />
+              <FieldError message={errors.title} />
             </div>
+
             <div>
-              <FieldLabel>Modèle</FieldLabel>
-              <Input
-                value={model}
-                onChange={(event) => setModel(event.target.value)}
-                maxLength={FIELD_LIMITS.short}
-                placeholder="iPhone 12"
+              <IconLabel icon={AlignLeft}>Description (facultatif)</IconLabel>
+              <Textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                maxLength={FIELD_LIMITS.description}
+                rows={3}
+                placeholder="État, accessoires, garantie…"
               />
+              <FieldError message={errors.description} />
             </div>
           </div>
 
-          <div>
-            <FieldLabel>Variante (facultatif)</FieldLabel>
-            <Input
-              value={variant}
-              onChange={(event) => setVariant(event.target.value)}
-              maxLength={FIELD_LIMITS.short}
-              placeholder="128 Go"
-            />
+          <div className={group}>
+            <div>
+              <IconLabel icon={LayoutGrid}>Catégorie</IconLabel>
+              <Segmented
+                options={CATEGORY_OPTIONS.map((option) => option.label)}
+                value={category ?? ""}
+                onChange={(value) => setCategory(value === category ? null : value)}
+                size="sm"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <IconLabel icon={Smartphone}>Marque</IconLabel>
+                <Input
+                  value={brand}
+                  onChange={(event) => setBrand(event.target.value)}
+                  maxLength={FIELD_LIMITS.short}
+                  placeholder="Apple"
+                />
+              </div>
+              <div>
+                <IconLabel icon={Smartphone}>Modèle</IconLabel>
+                <Input
+                  value={model}
+                  onChange={(event) => setModel(event.target.value)}
+                  maxLength={FIELD_LIMITS.short}
+                  placeholder="iPhone 12"
+                />
+              </div>
+            </div>
+
+            <div>
+              <IconLabel icon={Layers}>Variante (facultatif)</IconLabel>
+              <Input
+                value={variant}
+                onChange={(event) => setVariant(event.target.value)}
+                maxLength={FIELD_LIMITS.short}
+                placeholder="128 Go"
+              />
+            </div>
           </div>
 
-          <div>
-            <FieldLabel>Prix</FieldLabel>
-            <div className="flex items-center gap-2">
-              <Input
-                value={price}
-                onChange={(event) => setPrice(event.target.value)}
-                inputMode="numeric"
-                placeholder="150 000"
-                aria-invalid={errors.price ? true : undefined}
+          <div className={group}>
+            <div>
+              <IconLabel icon={Banknote}>Prix</IconLabel>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={price}
+                  onChange={(event) => setPrice(event.target.value)}
+                  inputMode="numeric"
+                  placeholder="150 000"
+                  aria-invalid={errors.price ? true : undefined}
+                />
+                <span className="flex min-h-12 items-center rounded-2xl bg-mist px-4 text-[14px] font-bold text-ink-soft">
+                  FCFA
+                </span>
+              </div>
+              <FieldError message={errors.price} />
+              <MarketHint category={category} brand={brand} model={model} variant={variant} condition={condition} />
+            </div>
+
+            <div>
+              <IconLabel icon={Sparkles}>État</IconLabel>
+              <Segmented
+                options={[...CONDITION_OPTIONS]}
+                value={condition ?? ""}
+                onChange={(value) => setCondition(value === condition ? null : value)}
+                tone="carrot"
               />
-              <span className="rounded-xl bg-wash px-3 py-3 text-[13px] font-bold text-ink-soft">
-                FCFA
+            </div>
+          </div>
+
+          <div className={group}>
+            <div>
+              <IconLabel icon={MapPin}>Localisation (facultatif)</IconLabel>
+              <Input
+                value={location}
+                onChange={(event) => setLocation(event.target.value)}
+                maxLength={FIELD_LIMITS.location}
+                placeholder="Marcory, Abidjan"
+              />
+            </div>
+
+            <div className="flex min-h-14 items-center justify-between gap-3 rounded-2xl bg-mist px-4 py-2">
+              <span className="flex items-center gap-2 text-[15px] font-bold text-ink">
+                <CircleCheck className="size-5 text-success" aria-hidden />
+                Disponible
               </span>
+              <Switch checked={available} onChange={setAvailable} label="Disponible" />
             </div>
-            <FieldError message={errors.price} />
-            <MarketHint category={category} brand={brand} model={model} variant={variant} condition={condition} />
           </div>
 
-          <div>
-            <FieldLabel>État</FieldLabel>
-            <Segmented
-              options={[...CONDITION_OPTIONS]}
-              value={condition ?? ""}
-              onChange={(value) => setCondition(value === condition ? null : value)}
-              tone="carrot"
-            />
+          <div className={`${group} ${embedded ? "" : "md:col-span-2"}`}>
+            <PhotoPicker items={photos} onChange={setPhotos} disabled={submitting !== null} />
           </div>
-
-          <div>
-            <FieldLabel>Localisation (facultatif)</FieldLabel>
-            <Input
-              value={location}
-              onChange={(event) => setLocation(event.target.value)}
-              maxLength={FIELD_LIMITS.location}
-              placeholder="Marcory, Abidjan"
-            />
-          </div>
-
-          <div className="flex items-center justify-between rounded-xl border border-line bg-white px-3.5 py-3">
-            <span className="text-[14px] font-semibold text-ink">Disponible</span>
-            <Switch checked={available} onChange={setAvailable} />
-          </div>
-
-          <PhotoPicker items={photos} onChange={setPhotos} disabled={submitting !== null} />
         </div>
 
-        <button
-          onClick={() => void submit("publish")}
-          disabled={submitting !== null}
-          className="mt-5 w-full rounded-xl bg-forest py-3.5 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {submitting === "publish" ? "Publication…" : "Publier l'annonce"}
-        </button>
-        <button
-          onClick={() => void submit("draft")}
-          disabled={submitting !== null}
-          className="mt-2.5 w-full rounded-xl border border-forest/30 bg-white py-3.5 text-[15px] font-bold text-forest transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {submitting === "draft" ? "Enregistrement…" : "Enregistrer en brouillon"}
-        </button>
-        <div className="py-4 text-center text-[12px] text-ink-soft">
-          Un brouillon n'est visible de personne tant que vous ne le publiez pas.
+        <div className="mt-5 flex flex-col gap-2.5 md:flex-row-reverse md:[&>*]:flex-1">
+          <Btn onClick={() => void submit("publish")} disabled={submitting !== null}>
+            {submitting === "publish" ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <Send className="size-5" aria-hidden />}
+            {submitting === "publish" ? "Publication…" : "Publier l'annonce"}
+          </Btn>
+          <button onClick={() => void submit("draft")} disabled={submitting !== null} className={BTN_OUTLINE}>
+            {submitting === "draft" ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <Save className="size-5" aria-hidden />}
+            {submitting === "draft" ? "Enregistrement…" : "Enregistrer en brouillon"}
+          </button>
         </div>
+        <p className="mt-3 text-center text-[13px] text-ink-soft">Un brouillon n'est visible de personne tant que vous ne le publiez pas.</p>
       </div>
     </>
   );

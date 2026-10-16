@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ChevronRight, Layers, Plus } from "lucide-react";
+import { ChevronRight, CircleAlert, Layers, Plus, RotateCw } from "lucide-react";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
+import { ArtAlert, ArtBag } from "@/components/illustrations";
 import { TopBar } from "@/components/top-bar";
-import { Badge } from "@/components/ui";
+import { Badge, Btn, EmptyState, IconTile, Skeleton } from "@/components/ui";
 import { describeMissionError, missions, type MissionSummary } from "@/lib/client/missions-api";
 import {
   MISSIONS_EMPTY,
-  MISSIONS_EMPTY_HINT,
   MISSIONS_LOADING,
   MISSIONS_MORE_LABEL,
   MISSIONS_MORE_LOADING,
@@ -21,8 +21,8 @@ import {
 /** Barre de progression (pourcentage entier). */
 export function ProgressBar({ percent, label }: { percent: number; label: string }) {
   return (
-    <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-2 w-full overflow-hidden rounded-full bg-wash">
-      <div className="h-2 rounded-full bg-forest" style={{ width: `${percent}%` }} />
+    <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-2.5 w-full overflow-hidden rounded-full bg-mist">
+      <div className="h-2.5 rounded-full bg-brand transition-[width] duration-500" style={{ width: `${percent}%` }} />
     </div>
   );
 }
@@ -79,65 +79,77 @@ export function MissionsList() {
       <TopBar back="/compte" />
       <div className="px-4 pb-6">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="font-display text-[22px] font-extrabold text-ink">{MISSIONS_TITLE}</h1>
-          <Link href="/missions/nouvelle" data-testid="mission-new" className="flex items-center gap-1.5 rounded-full bg-forest px-3.5 py-2 text-[13px] font-bold text-white">
-            <Plus className="size-4" aria-hidden />
+          <h1 className="flex items-center gap-2.5 text-[24px] font-extrabold tracking-tight text-ink">
+            <Layers className="size-6 text-brand" aria-hidden />
+            {MISSIONS_TITLE}
+          </h1>
+          <Link
+            href="/missions/nouvelle"
+            data-testid="mission-new"
+            className="press flex min-h-11 items-center gap-1.5 rounded-full bg-brand px-4 text-[15px] font-bold text-white hover:bg-brand-deep"
+          >
+            <Plus className="size-5" aria-hidden />
             {MISSIONS_NEW_LABEL}
           </Link>
         </div>
         {error ? (
-          <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[14px] font-semibold text-ink">{error}</p>
-            <button
-              onClick={() => {
-                setError(null);
-                setReloadKey((key) => key + 1);
-              }}
-              className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
-            >
-              Réessayer
-            </button>
+          <div role="alert" className="animate-rise mt-4 flex flex-col items-center gap-4 rounded-3xl border border-line bg-white p-6 text-center">
+            <ArtAlert className="size-24" />
+            <p className="text-[16px] font-bold text-ink">{error}</p>
+            <div className="w-full max-w-xs">
+              <Btn
+                onClick={() => {
+                  setError(null);
+                  setReloadKey((key) => key + 1);
+                }}
+              >
+                <RotateCw className="size-5" aria-hidden />
+                Réessayer
+              </Btn>
+            </div>
           </div>
         ) : items === null ? (
-          <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
-            {MISSIONS_LOADING}
-          </p>
+          <div className="mt-4 flex flex-col gap-3 md:grid md:grid-cols-2" aria-busy="true">
+            <span className="sr-only">{MISSIONS_LOADING}</span>
+            <Skeleton className="h-28 w-full rounded-3xl" />
+            <Skeleton className="h-28 w-full rounded-3xl" />
+            <Skeleton className="h-28 w-full rounded-3xl" />
+          </div>
         ) : items.length === 0 ? (
-          <div role="status" data-testid="missions-empty" className="mt-6 rounded-2xl bg-wash p-5 text-center">
-            <Layers className="mx-auto size-7 text-ink-soft" aria-hidden />
-            <p className="mt-2 text-[14px] font-bold text-ink">{MISSIONS_EMPTY}</p>
-            <p className="mt-1 text-[13px] text-ink-soft">{MISSIONS_EMPTY_HINT}</p>
+          <div role="status" data-testid="missions-empty">
+            <EmptyState art={<ArtBag className="size-36" />} title={MISSIONS_EMPTY} />
           </div>
         ) : (
-          <ul aria-label="Vos missions" className="mt-3 space-y-2.5" data-testid="missions-list">
+          <ul aria-label="Vos missions" className="stagger mt-4 flex flex-col gap-3 md:grid md:grid-cols-2" data-testid="missions-list">
             {items.map((mission) => {
               const row = missionRow(mission);
               return (
                 <li key={row.id} data-testid="mission-row" data-status={mission.status}>
-                  <Link href={row.href} className="flex items-start gap-3 rounded-2xl border border-line bg-white p-3.5">
+                  <Link href={row.href} className="press flex h-full items-start gap-3 rounded-3xl border border-line bg-white p-3.5 hover:border-brand">
+                    <IconTile icon={Layers} className="size-12" />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[15px] font-bold text-ink">{row.title}</span>
+                      <span className="block text-[16px] font-bold leading-snug text-ink">{row.title}</span>
                       <span className="mt-1 flex flex-wrap items-center gap-1.5">
                         <Badge tone={row.tone}>{row.statusText}</Badge>
-                        {row.deadlineText ? <span className="text-[12px] text-ink-soft">{row.deadlineText}</span> : null}
+                        {row.deadlineText ? <span className="text-[13px] text-ink-soft">{row.deadlineText}</span> : null}
                       </span>
                       {row.securedText ? (
-                        <span className="mt-2 block">
-                          <span data-testid="mission-secured" className="block text-[13px] font-semibold text-ink">
+                        <span className="mt-2.5 block">
+                          <span data-testid="mission-secured" className="mb-1.5 block text-[14px] font-semibold text-ink">
                             {row.securedText}
                           </span>
                           <ProgressBar percent={row.securedPercent} label="Achats confirmés" />
                         </span>
                       ) : null}
                       {row.coverageText ? (
-                        <span data-testid="mission-coverage" className="mt-1.5 block text-[12px] text-ink-soft">
+                        <span data-testid="mission-coverage" className="mt-1.5 block text-[13px] text-ink-soft">
                           {row.coverageText}
                           {row.coveragePercent !== null ? ` (${row.coveragePercent} %)` : ""}
                         </span>
                       ) : null}
-                      <span className="mt-1 block text-[12px] text-ink-soft">{row.budgetText}</span>
+                      <span className="mt-1 block text-[13px] text-ink-soft">{row.budgetText}</span>
                     </span>
-                    <ChevronRight className="mt-1 size-4 shrink-0 text-ink-soft" aria-hidden />
+                    <ChevronRight className="mt-3 size-5 shrink-0 text-ink-soft" aria-hidden />
                   </Link>
                 </li>
               );
@@ -145,17 +157,18 @@ export function MissionsList() {
           </ul>
         )}
         {items !== null && items.length > 0 && nextCursor !== null ? (
-          <div className="mt-3 text-center">
+          <div className="mt-4">
             <button
               onClick={() => void loadMore()}
               disabled={loadingMore}
               data-testid="missions-more"
-              className="rounded-xl border border-line bg-white px-5 py-2.5 text-[14px] font-bold text-ink disabled:opacity-50"
+              className="press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-line-strong bg-white px-5 py-3 text-[16px] font-bold text-ink hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-40"
             >
               {loadingMore ? MISSIONS_MORE_LOADING : MISSIONS_MORE_LABEL}
             </button>
             {moreError ? (
-              <p role="alert" data-testid="missions-more-error" className="mt-2 text-[12px] font-semibold text-carrot-ink">
+              <p role="alert" data-testid="missions-more-error" className="mt-2 flex items-center justify-center gap-2 text-[14px] font-semibold text-danger-ink">
+                <CircleAlert className="size-4 shrink-0" aria-hidden />
                 {moreError}
               </p>
             ) : null}

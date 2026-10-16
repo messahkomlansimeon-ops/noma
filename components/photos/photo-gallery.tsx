@@ -17,8 +17,8 @@ export function PhotoGallery({ photos, title }: { photos: readonly PhotoRef[]; t
   const current = usable[index];
   const drop = (id: string) => setFailed((known) => (known.includes(id) ? known : [...known, id]));
   return (
-    <section aria-label="Photos de l'annonce" data-testid="photo-gallery" className="mb-3">
-      <div className="overflow-hidden rounded-2xl bg-wash" style={{ aspectRatio: "4 / 3" }}>
+    <section aria-label="Photos de l'annonce" data-testid="photo-gallery" className="animate-rise mb-4">
+      <div className="overflow-hidden rounded-3xl bg-mist" style={{ aspectRatio: "4 / 3" }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- fichiers servis par /api/media avec contrôle d'accès */}
         <img
           key={current.id}
@@ -35,7 +35,7 @@ export function PhotoGallery({ photos, title }: { photos: readonly PhotoRef[]; t
         />
       </div>
       {usable.length > 1 ? (
-        <ul className="mt-2 flex gap-2 overflow-x-auto" aria-label="Choisir une photo">
+        <ul className="no-scrollbar mt-2.5 flex gap-2.5 overflow-x-auto p-0.5" aria-label="Choisir une photo">
           {usable.map((photo, position) => (
             <li key={photo.id} className="shrink-0">
               <button
@@ -44,7 +44,7 @@ export function PhotoGallery({ photos, title }: { photos: readonly PhotoRef[]; t
                 aria-label={`Voir la photo ${position + 1} sur ${usable.length}`}
                 aria-current={position === index ? "true" : undefined}
                 data-testid="gallery-thumb"
-                className={`block overflow-hidden rounded-xl border-2 ${position === index ? "border-forest" : "border-transparent"}`}
+                className={`press block overflow-hidden rounded-2xl border-2 ${position === index ? "border-brand" : "border-transparent opacity-80 hover:opacity-100"}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- fichiers servis par /api/media avec contrôle d'accès */}
                 <img
@@ -54,7 +54,7 @@ export function PhotoGallery({ photos, title }: { photos: readonly PhotoRef[]; t
                   decoding="async"
                   referrerPolicy="no-referrer"
                   onError={() => drop(photo.id)}
-                  className="size-14 object-cover"
+                  className="size-16 object-cover"
                 />
               </button>
             </li>

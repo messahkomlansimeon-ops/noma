@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { CircleAlert, ShieldCheck, ShoppingBag } from "lucide-react";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
+import { Input } from "@/components/ui";
 import {
   DECLARE_ORDER_CONFIRM_LABEL,
   DECLARE_ORDER_LABEL,
@@ -59,34 +61,27 @@ export function DeclareOrder({ demandId, offerId, initialPrice, initialQuantity 
       <button
         onClick={() => setOpen(true)}
         data-testid="declare-order-open"
-        className="mt-2 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white px-4 py-3 text-[14px] font-bold text-forest transition active:scale-[0.99]"
+        className="press mt-2 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-brand bg-white px-5 py-3 text-[16px] font-bold text-brand hover:bg-brand-soft"
       >
+        <ShoppingBag className="size-5" aria-hidden />
         {DECLARE_ORDER_LABEL}
       </button>
     );
   }
   return (
-    <div className="mt-2 rounded-xl border border-line bg-white p-3.5" data-testid="declare-order-form">
+    <div className="animate-rise mt-2 rounded-3xl border border-line bg-white p-4" data-testid="declare-order-form">
       {withQuantity ? (
-        <>
-          <label htmlFor="order-quantity" className="text-[13px] font-bold text-ink">
+        <div className="mb-3">
+          <label htmlFor="order-quantity" className="mb-1.5 block text-[14px] font-bold text-ink">
             Quantité achetée
           </label>
-          <input
-            id="order-quantity"
-            inputMode="numeric"
-            autoComplete="off"
-            value={quantity}
-            onChange={(event) => setQuantity(event.target.value)}
-            data-testid="order-quantity"
-            className="mb-2.5 mt-1.5 w-full rounded-xl border border-line bg-white px-3.5 py-3 text-[15px] text-ink placeholder:text-ink-soft/50"
-          />
-        </>
+          <Input id="order-quantity" inputMode="numeric" autoComplete="off" value={quantity} onChange={(event) => setQuantity(event.target.value)} data-testid="order-quantity" />
+        </div>
       ) : null}
-      <label htmlFor="order-price" className="text-[13px] font-bold text-ink">
+      <label htmlFor="order-price" className="mb-1.5 block text-[14px] font-bold text-ink">
         {withQuantity ? "Prix convenu par unité (FCFA)" : PRICE_LABEL}
       </label>
-      <input
+      <Input
         id="order-price"
         inputMode="numeric"
         autoComplete="off"
@@ -94,30 +89,36 @@ export function DeclareOrder({ demandId, offerId, initialPrice, initialQuantity 
         onChange={(event) => setPrice(event.target.value)}
         placeholder={PRICE_PLACEHOLDER}
         data-testid="order-price"
-        className="mt-1.5 w-full rounded-xl border border-line bg-white px-3.5 py-3 text-[15px] text-ink placeholder:text-ink-soft/50"
       />
       {problem ? (
-        <p role="alert" className="mt-1.5 text-[12px] font-semibold text-carrot-ink">
+        <p role="alert" className="mt-2 flex items-center gap-2 text-[14px] font-semibold text-danger-ink">
+          <CircleAlert className="size-4 shrink-0" aria-hidden />
           {problem}
         </p>
       ) : null}
-      <p data-testid="no-payment-notice" className="mt-2 text-[12px] leading-relaxed text-ink-soft">
+      <p data-testid="no-payment-notice" className="mt-3 flex items-start gap-2.5 rounded-2xl bg-mist p-3 text-[13px] leading-relaxed text-ink-soft">
+        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
         {NO_PAYMENT_NOTICE}
       </p>
       {error ? (
-        <p role="alert" data-testid="declare-order-error" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+        <p role="alert" data-testid="declare-order-error" className="mt-3 flex items-center gap-2 rounded-2xl bg-danger-soft px-4 py-3 text-[14px] font-semibold text-danger-ink">
+          <CircleAlert className="size-5 shrink-0" aria-hidden />
           {error}
         </p>
       ) : null}
-      <div className="mt-3 grid grid-cols-2 gap-2.5">
-        <button onClick={() => setOpen(false)} disabled={pending} className="rounded-xl border border-line bg-white px-3 py-2.5 text-[14px] font-bold text-ink disabled:opacity-50">
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <button
+          onClick={() => setOpen(false)}
+          disabled={pending}
+          className="press flex min-h-12 items-center justify-center rounded-2xl border-2 border-line-strong bg-white px-3 py-3 text-[16px] font-bold text-ink hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-40"
+        >
           Annuler
         </button>
         <button
           onClick={() => void submit()}
           disabled={pending || parsed === null || !quantityOk}
           data-testid="declare-order-submit"
-          className="rounded-xl bg-forest px-3 py-2.5 text-[14px] font-bold text-white transition active:scale-[0.99] disabled:opacity-50"
+          className="press flex min-h-12 items-center justify-center rounded-2xl bg-brand px-3 py-3 text-[16px] font-bold text-white hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending ? DECLARE_ORDER_ONGOING : DECLARE_ORDER_CONFIRM_LABEL}
         </button>

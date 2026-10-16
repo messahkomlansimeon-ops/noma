@@ -7,6 +7,7 @@ import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate"
 import { Thumb } from "@/components/thumb";
 import { TopBar } from "@/components/top-bar";
 import { Badge } from "@/components/ui";
+import { ErrorState, LoadingBlock } from "@/components/vendor/vendor-parts";
 import { BoostSection } from "@/components/vendor/boost-section";
 import { InterestedBuyers } from "@/components/vendor/interested-buyers";
 import { OfferSalesSection } from "@/components/vendor/offer-sales";
@@ -51,49 +52,40 @@ function Annonce({ offerId }: { offerId: string }) {
 
   if (loadError) {
     return (
-      <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-        <p className="text-[14px] font-semibold text-ink">{loadError}</p>
-        <button
-          onClick={() => {
-            setLoadError(null);
-            setReloadKey((key) => key + 1);
-          }}
-          className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
-        >
-          Réessayer
-        </button>
-      </div>
+      <ErrorState
+        message={loadError}
+        onRetry={() => {
+          setLoadError(null);
+          setReloadKey((key) => key + 1);
+        }}
+      />
     );
   }
   if (!offer) {
-    return (
-      <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
-        Chargement de l'annonce…
-      </p>
-    );
+    return <LoadingBlock label="Chargement de l'annonce…" className="pt-2" />;
   }
 
   const status = OFFER_STATUS_VIEW[offer.status];
   const price = formatMoney(offer.price);
   const summary = offerSummary(offer);
   return (
-    <>
-      <div className="rounded-2xl border border-line bg-white p-3.5">
-        <div className="flex items-center gap-3">
-          <Thumb art={artForCategory(offer.category)} className="size-14" iconClassName="size-7" photoId={coverId} />
+    <div className="stagger flex flex-col gap-6 pt-2">
+      <div className="rounded-3xl border border-line bg-white p-4">
+        <div className="flex items-center gap-3.5">
+          <Thumb art={artForCategory(offer.category)} className="size-20" iconClassName="size-10" photoId={coverId} />
           <div className="min-w-0 flex-1">
-            <div className="text-[15px] font-bold text-ink">{recordTitle(offer)}</div>
+            <div className="text-[17px] font-bold leading-snug text-ink">{recordTitle(offer)}</div>
             {price ? (
-              <div className="font-display text-[18px] font-extrabold text-ink">{price}</div>
+              <div className="text-[24px] font-extrabold leading-tight text-ink">{price}</div>
             ) : (
-              <div className="text-[13px] text-ink-soft">Prix à compléter</div>
+              <div className="text-[14px] font-semibold text-accent-ink">Prix à compléter</div>
             )}
-            <div className="mt-1">
+            <div className="mt-1.5">
               <Badge tone={status.tone}>{status.label}</Badge>
             </div>
           </div>
         </div>
-        {summary ? <div className="mt-1.5 text-[12px] text-ink-soft">{summary}</div> : null}
+        {summary ? <div className="mt-2 text-[13px] text-ink-soft">{summary}</div> : null}
       </div>
 
       <PhotoManager offerId={offer.id} readOnly={offer.status === "archived"} onChange={onPhotosChanged} />
@@ -101,7 +93,7 @@ function Annonce({ offerId }: { offerId: string }) {
       <OfferStatsSection offer={offer} />
       <OfferSalesSection offerId={offer.id} />
       <BoostSection offer={offer} onOfferChanged={() => setReloadKey((key) => key + 1)} />
-    </>
+    </div>
   );
 }
 
@@ -112,13 +104,7 @@ function PageContent() {
     <main>
       <TopBar back="/vendeur/annonces" title="Mon annonce" />
       <div className="px-4 pb-6">
-        {isUuid(offerId) ? (
-          <Annonce offerId={offerId} />
-        ) : (
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
-            Annonce introuvable.
-          </p>
-        )}
+        {isUuid(offerId) ? <Annonce offerId={offerId} /> : <ErrorState message="Annonce introuvable." />}
       </div>
     </main>
   );

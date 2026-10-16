@@ -1,15 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { CircleAlert, Flag, Phone, Send, ShieldCheck } from "lucide-react";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
+import { ArtAlert, ArtCheck, ArtShield } from "@/components/illustrations";
 import { TopBar } from "@/components/top-bar";
-import { Badge } from "@/components/ui";
+import { Badge, Btn, Card, EmptyState, IconTile, Skeleton, Textarea } from "@/components/ui";
 import { describeReportError, reports, type MyReport } from "@/lib/client/reports-api";
 import {
   MY_REPORTS_EMPTY,
-  MY_REPORTS_HINT,
   MY_REPORTS_TITLE,
   REPORT_FORM_INTRO,
   REPORT_INVALID_TARGET,
@@ -57,11 +57,15 @@ function ReportForm({ target }: { target: ReportTarget }) {
 
   if (sent) {
     return (
-      <div role="status" data-testid="report-sent" className="mt-4 rounded-2xl bg-sage p-4 text-center">
-        <p className="text-[14px] font-bold text-forest">{REPORT_SENT_MESSAGE}</p>
-        <Link href="/signaler" className="mt-3 inline-flex rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white">
-          Voir mes signalements
-        </Link>
+      <div role="status" data-testid="report-sent" className="animate-rise mt-4 flex flex-col items-center gap-4 rounded-3xl bg-success-soft p-6 text-center">
+        <ArtCheck className="size-28" />
+        <p className="text-[17px] font-bold text-success-ink">{REPORT_SENT_MESSAGE}</p>
+        <div className="w-full max-w-xs">
+          <Btn href="/signaler">
+            <Flag className="size-5" aria-hidden />
+            Voir mes signalements
+          </Btn>
+        </div>
       </div>
     );
   }
@@ -73,34 +77,42 @@ function ReportForm({ target }: { target: ReportTarget }) {
         event.preventDefault();
         void submit();
       }}
-      className="mt-3"
+      className="mt-3 flex flex-col gap-4"
     >
-      <p className="text-[13px] text-ink-soft">{REPORT_FORM_INTRO}</p>
-      <fieldset className="mt-3">
-        <legend className="text-[14px] font-extrabold text-ink">Motif</legend>
-        <div className="mt-2 space-y-2">
+      <p className="flex items-start gap-2.5 rounded-2xl bg-mist p-3.5 text-[14px] text-ink-soft">
+        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
+        {REPORT_FORM_INTRO}
+      </p>
+      <fieldset>
+        <legend className="flex items-center gap-2 text-[17px] font-extrabold text-ink">
+          <Flag className="size-5 text-brand" aria-hidden />
+          Motif
+        </legend>
+        <div className="stagger mt-3 grid gap-2.5 md:grid-cols-2">
           {REPORT_REASONS.map((entry) => (
-            <label key={entry} className="flex items-center gap-2.5 rounded-xl border border-line bg-white px-3 py-2.5 text-[14px] text-ink">
-              <input type="radio" name="reason" value={entry} checked={reason === entry} onChange={() => setReason(entry)} className="size-4 accent-forest" />
+            <label
+              key={entry}
+              className="press flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl border-2 border-line bg-white px-4 py-3 text-[15px] font-semibold text-ink hover:border-line-strong has-[:checked]:border-brand has-[:checked]:bg-brand-soft"
+            >
+              <input type="radio" name="reason" value={entry} checked={reason === entry} onChange={() => setReason(entry)} className="size-5 shrink-0 accent-brand" />
               {REPORT_REASON_LABELS[entry]}
             </label>
           ))}
         </div>
       </fieldset>
-      <label htmlFor="report-detail" className="mt-4 block text-[14px] font-extrabold text-ink">
-        Précisions (facultatif)
-      </label>
-      <textarea
-        id="report-detail"
-        value={detail}
-        onChange={(event) => setDetail(event.target.value)}
-        maxLength={REPORT_DETAIL_MAX}
-        rows={4}
-        className="mt-1.5 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-[14px] text-ink"
-      />
-      <p className="mt-1 text-[12px] text-ink-soft">{REPORT_NO_PHONE_NOTE}</p>
+      <div>
+        <label htmlFor="report-detail" className="mb-1.5 block text-[17px] font-extrabold text-ink">
+          Précisions (facultatif)
+        </label>
+        <Textarea id="report-detail" value={detail} onChange={(event) => setDetail(event.target.value)} maxLength={REPORT_DETAIL_MAX} rows={4} />
+        <p className="mt-2 flex items-start gap-2 text-[13px] text-ink-soft">
+          <Phone className="mt-0.5 size-4 shrink-0" aria-hidden />
+          {REPORT_NO_PHONE_NOTE}
+        </p>
+      </div>
       {error ? (
-        <p role="alert" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+        <p role="alert" className="flex items-center gap-2.5 rounded-2xl bg-danger-soft px-4 py-3 text-[15px] font-semibold text-danger-ink">
+          <CircleAlert className="size-5 shrink-0" aria-hidden />
           {error}
         </p>
       ) : null}
@@ -108,8 +120,9 @@ function ReportForm({ target }: { target: ReportTarget }) {
         type="submit"
         disabled={reason === null || pending}
         data-testid="report-submit"
-        className="mt-4 flex w-full items-center justify-center rounded-xl bg-forest py-3 text-[14px] font-bold text-white disabled:opacity-50"
+        className="press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-[16px] font-bold text-white hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-40"
       >
+        <Send className="size-5" aria-hidden />
         {pending ? "Envoi…" : "Envoyer le signalement"}
       </button>
     </form>
@@ -135,41 +148,50 @@ function MyReports() {
 
   if (error) {
     return (
-      <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
-        {error}
-      </p>
+      <div role="alert">
+        <EmptyState art={<ArtAlert className="size-32" />} title={error} />
+      </div>
     );
   }
   if (items === null) {
     return (
-      <p aria-busy="true" className="mt-6 text-center text-[14px] text-ink-soft">
-        Chargement…
-      </p>
+      <div className="mt-4 flex flex-col gap-3 md:grid md:grid-cols-2" aria-busy="true">
+        <span className="sr-only">Chargement…</span>
+        <Skeleton className="h-20 w-full rounded-3xl" />
+        <Skeleton className="h-20 w-full rounded-3xl" />
+      </div>
     );
   }
   return (
     <div data-testid="my-reports">
-      <h2 className="mt-3 font-display text-[20px] font-extrabold text-ink">{MY_REPORTS_TITLE}</h2>
+      <h2 className="mt-3 flex items-center gap-2.5 text-[22px] font-extrabold tracking-tight text-ink">
+        <Flag className="size-6 text-brand" aria-hidden />
+        {MY_REPORTS_TITLE}
+      </h2>
       {items.length === 0 ? (
-        <p className="mt-3 rounded-2xl bg-wash p-4 text-center text-[14px] text-ink-soft">{MY_REPORTS_EMPTY}</p>
+        <EmptyState art={<ArtShield className="size-36" />} title={MY_REPORTS_EMPTY} />
       ) : (
-        <ul className="mt-3 space-y-2.5" aria-label={MY_REPORTS_TITLE}>
+        <ul className="stagger mt-4 flex flex-col gap-3 md:grid md:grid-cols-2" aria-label={MY_REPORTS_TITLE}>
           {items.map((report) => {
             const row = myReportRow(report);
             return (
-              <li key={row.key} data-testid="my-report" className="rounded-2xl border border-line bg-white p-3.5">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-[14px] font-bold text-ink">{row.title}</span>
-                  <Badge tone={row.open ? "carrot" : "sage"}>{row.statusText}</Badge>
-                </div>
-                <div className="mt-0.5 text-[12px] text-ink-soft">{row.reasonText}</div>
-                <div className="text-[12px] text-ink-soft">{row.dateText}</div>
+              <li key={row.key} data-testid="my-report">
+                <Card className="flex h-full items-start gap-3">
+                  <IconTile icon={Flag} tone={row.open ? "accent" : "success"} className="size-11" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-[16px] font-bold leading-snug text-ink">{row.title}</span>
+                      <Badge tone={row.open ? "carrot" : "sage"}>{row.statusText}</Badge>
+                    </div>
+                    <div className="mt-0.5 text-[13px] text-ink-soft">{row.reasonText}</div>
+                    <div className="text-[13px] text-ink-soft">{row.dateText}</div>
+                  </div>
+                </Card>
               </li>
             );
           })}
         </ul>
       )}
-      <p className="mt-4 text-[12px] text-ink-soft">{MY_REPORTS_HINT}</p>
     </div>
   );
 }
@@ -187,9 +209,9 @@ function PageContent() {
         ) : target ? (
           <ReportForm target={target} />
         ) : (
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
-            {REPORT_INVALID_TARGET}
-          </p>
+          <div role="alert">
+            <EmptyState art={<ArtAlert className="size-32" />} title={REPORT_INVALID_TARGET} />
+          </div>
         )}
       </div>
     </main>

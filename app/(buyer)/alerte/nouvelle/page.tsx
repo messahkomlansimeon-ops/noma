@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { CheckCheck } from "lucide-react";
+import { CalendarDays, CircleAlert, FileText, MapPin, Search, Tag, Wallet, Zap } from "lucide-react";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
 import { FieldLabel, Input, Segmented, Textarea } from "@/components/ui";
@@ -17,9 +17,13 @@ import { useNoma } from "@/lib/store";
 
 type Submitting = "activate" | "draft" | null;
 
+const BTN =
+  "press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-[16px] font-bold disabled:cursor-not-allowed disabled:opacity-40";
+
 function FieldError({ message }: { message?: string }) {
   return message ? (
-    <div role="alert" className="mt-1.5 text-[12px] font-semibold text-carrot-ink">
+    <div role="alert" className="mt-2 flex items-start gap-1.5 text-[13px] font-semibold text-accent-ink">
+      <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
       {message}
     </div>
   ) : null;
@@ -90,10 +94,15 @@ function NouveauBesoin() {
     <main>
       <TopBar back="/alertes" title="Nouveau besoin" />
 
-      <div className="px-4">
-        <div className="space-y-4">
+      <div className="flex flex-col gap-4 px-4 pb-6 pt-2">
+        <section className="animate-rise flex flex-col gap-4 rounded-3xl border border-line bg-white p-4">
           <div>
-            <FieldLabel>Que cherchez-vous ?</FieldLabel>
+            <FieldLabel>
+              <span className="flex items-center gap-2">
+                <Search className="size-4 text-brand" aria-hidden />
+                Que cherchez-vous ?
+              </span>
+            </FieldLabel>
             <Textarea
               value={text}
               onChange={(event) => setText(event.target.value)}
@@ -106,7 +115,12 @@ function NouveauBesoin() {
           </div>
 
           <div>
-            <FieldLabel>Catégorie (facultatif)</FieldLabel>
+            <FieldLabel>
+              <span className="flex items-center gap-2">
+                <Tag className="size-4 text-brand" aria-hidden />
+                Catégorie
+              </span>
+            </FieldLabel>
             <Segmented
               options={CATEGORY_OPTIONS.map((option) => option.label)}
               value={category ?? ""}
@@ -114,8 +128,10 @@ function NouveauBesoin() {
               size="sm"
             />
           </div>
+        </section>
 
-          <div className="grid grid-cols-2 gap-2.5">
+        <section className="animate-rise flex flex-col gap-4 rounded-3xl border border-line bg-white p-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <FieldLabel>Marque</FieldLabel>
               <Input
@@ -137,7 +153,7 @@ function NouveauBesoin() {
           </div>
 
           <div>
-            <FieldLabel>Variante (facultatif)</FieldLabel>
+            <FieldLabel>Variante</FieldLabel>
             <Input
               value={variant}
               onChange={(event) => setVariant(event.target.value)}
@@ -147,7 +163,7 @@ function NouveauBesoin() {
           </div>
 
           <div>
-            <FieldLabel>État souhaité (facultatif)</FieldLabel>
+            <FieldLabel>État souhaité</FieldLabel>
             <Segmented
               options={[...CONDITION_OPTIONS]}
               value={condition ?? ""}
@@ -155,10 +171,17 @@ function NouveauBesoin() {
               tone="carrot"
             />
           </div>
+        </section>
 
-          <div className="grid grid-cols-2 gap-2.5">
+        <section className="animate-rise flex flex-col gap-4 rounded-3xl border border-line bg-white p-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <FieldLabel>Localisation</FieldLabel>
+              <FieldLabel>
+                <span className="flex items-center gap-2">
+                  <MapPin className="size-4 text-brand" aria-hidden />
+                  Localisation
+                </span>
+              </FieldLabel>
               <Input
                 value={location}
                 onChange={(event) => setLocation(event.target.value)}
@@ -167,7 +190,12 @@ function NouveauBesoin() {
               />
             </div>
             <div>
-              <FieldLabel>Budget max (FCFA)</FieldLabel>
+              <FieldLabel>
+                <span className="flex items-center gap-2">
+                  <Wallet className="size-4 text-brand" aria-hidden />
+                  Budget max (FCFA)
+                </span>
+              </FieldLabel>
               <Input
                 value={budget}
                 onChange={(event) => setBudget(event.target.value)}
@@ -180,7 +208,12 @@ function NouveauBesoin() {
           <FieldError message={errors.budget} />
 
           <div>
-            <FieldLabel>Besoin avant le (facultatif)</FieldLabel>
+            <FieldLabel>
+              <span className="flex items-center gap-2">
+                <CalendarDays className="size-4 text-brand" aria-hidden />
+                Besoin avant le
+              </span>
+            </FieldLabel>
             <Input
               value={deadline}
               onChange={(event) => setDeadline(event.target.value)}
@@ -189,29 +222,25 @@ function NouveauBesoin() {
             />
             <FieldError message={errors.deadline} />
           </div>
-        </div>
+        </section>
 
-        <div className="mt-4 flex items-center gap-2 text-[13px] font-semibold text-forest">
-          <CheckCheck className="size-4" />
-          Vous pouvez archiver ce besoin à tout moment.
-        </div>
-
-        <button
-          onClick={() => void submit("activate")}
-          disabled={submitting !== null}
-          className="mt-5 w-full rounded-xl bg-forest py-4 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {submitting === "activate" ? "Activation…" : "Activer le besoin"}
-        </button>
-        <button
-          onClick={() => void submit("draft")}
-          disabled={submitting !== null}
-          className="mt-2.5 w-full rounded-xl border border-forest/30 bg-white py-3.5 text-[15px] font-bold text-forest transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {submitting === "draft" ? "Enregistrement…" : "Enregistrer en brouillon"}
-        </button>
-        <div className="py-4 text-center text-[12px] text-ink-soft">
-          Un besoin brouillon n'est pas pris en compte tant qu'il n'est pas activé.
+        <div className="flex flex-col gap-2.5 md:flex-row-reverse">
+          <button
+            onClick={() => void submit("activate")}
+            disabled={submitting !== null}
+            className={`${BTN} bg-brand text-white shadow-md shadow-brand/30 hover:bg-brand-deep`}
+          >
+            <Zap className="size-5" aria-hidden />
+            {submitting === "activate" ? "Activation…" : "Activer le besoin"}
+          </button>
+          <button
+            onClick={() => void submit("draft")}
+            disabled={submitting !== null}
+            className={`${BTN} border-2 border-line-strong bg-white text-ink hover:border-brand hover:text-brand`}
+          >
+            <FileText className="size-5" aria-hidden />
+            {submitting === "draft" ? "Enregistrement…" : "Enregistrer en brouillon"}
+          </button>
         </div>
       </div>
     </main>

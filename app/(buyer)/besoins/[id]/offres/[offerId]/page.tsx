@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { Phone } from "lucide-react";
+import { ArrowLeft, Flag, Info, Phone, RotateCw, ShieldCheck, TriangleAlert } from "lucide-react";
+import { ArtAlert, ArtEmpty } from "@/components/illustrations";
 import { IndicatorLine, SponsoredNotice } from "@/components/matches/match-parts";
 import { ProBadge } from "@/components/pro-badge";
 import { PhotoGallery } from "@/components/photos/photo-gallery";
@@ -13,7 +14,7 @@ import { FavoriteButton } from "@/components/social/favorite-button";
 import { OfferActions } from "@/components/social/offer-actions";
 import { Thumb } from "@/components/thumb";
 import { TopBar } from "@/components/top-bar";
-import { WhatsAppIcon } from "@/components/ui";
+import { Btn, BtnOutline, EmptyState, IconTile, Skeleton, WhatsAppIcon } from "@/components/ui";
 import {
   api,
   describeApiError,
@@ -88,30 +89,35 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
 
   if (loadError) {
     return (
-      <div role="alert" data-testid="offer-load-error" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-        <p className="text-[14px] font-semibold text-ink">{loadError}</p>
-        <div className="mt-3 flex flex-col items-center gap-2">
-          <button
+      <div role="alert" data-testid="offer-load-error" className="animate-rise flex flex-col items-center gap-4 px-6 py-8 text-center">
+        <ArtAlert className="size-28" />
+        <p className="text-[16px] font-bold text-ink">{loadError}</p>
+        <div className="flex w-full max-w-xs flex-col gap-2.5">
+          <Btn
             onClick={() => {
               setLoadError(null);
               setReloadKey((key) => key + 1);
             }}
-            className="rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
           >
+            <RotateCw className="size-5" aria-hidden />
             Réessayer
-          </button>
-          <Link href={missionId === null ? `/besoins/${demandId}` : `/missions/${missionId}`} className="text-[13px] font-semibold text-forest underline">
+          </Btn>
+          <BtnOutline href={missionId === null ? `/besoins/${demandId}` : `/missions/${missionId}`}>
+            <ArrowLeft className="size-5" aria-hidden />
             {missionId === null ? "Retour aux résultats de mon besoin" : "Retour à la mission"}
-          </Link>
+          </BtnOutline>
         </div>
       </div>
     );
   }
   if (!detail) {
     return (
-      <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
-        Chargement de l'annonce…
-      </p>
+      <div className="flex flex-col gap-3" aria-busy="true">
+        <span className="sr-only">Chargement de l'annonce…</span>
+        <Skeleton className="aspect-[4/3] w-full rounded-3xl" />
+        <Skeleton className="h-24 w-full rounded-3xl" />
+        <Skeleton className="h-16 w-full rounded-3xl" />
+      </div>
     );
   }
 
@@ -120,34 +126,36 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
   // Lot H1 : « Prix du marché » pour CE produit (sans catégorie, marque ou modèle, il n'y a pas de marché : pas d'encart).
   const marketQuery = marketQueryFromProduct(detail.item.candidate);
   return (
-    <article data-testid="offer-detail" data-sponsored={view.sponsored ? "true" : "false"}>
+    <article data-testid="offer-detail" data-sponsored={view.sponsored ? "true" : "false"} className="flex flex-col">
       {view.sponsoredBadge ? <SponsoredNotice badge={view.sponsoredBadge} notice={view.sponsoredNotice} /> : null}
       <PhotoGallery photos={detail.details.photos ?? []} title={view.title} />
-      <div className="flex items-center gap-3">
+      <div className="animate-rise flex items-center gap-3 rounded-3xl border border-line bg-white p-4">
         <Thumb art={artForCategory(detail.item.candidate.category)} className="size-20" iconClassName="size-10" photoId={coverPhotoIdOf(detail.details.photos) ?? detail.item.coverPhotoId ?? null} />
         <div className="min-w-0 flex-1">
-          <h1 data-testid="offer-title" className="font-display text-[22px] font-extrabold leading-tight text-ink">
+          <h1 data-testid="offer-title" className="text-[20px] font-extrabold leading-tight text-ink">
             {view.title}
           </h1>
-          <div data-testid="offer-price" className="font-display text-[26px] font-extrabold leading-tight text-ink">
+          <div data-testid="offer-price" className="text-[26px] font-extrabold leading-tight text-ink">
             {view.priceText}
           </div>
-          {view.subtitle ? <div className="text-[13px] text-ink-soft">{view.subtitle}</div> : null}
-          {view.dateText ? <div className="text-[12px] text-ink-soft">{view.dateText}</div> : null}
+          {view.subtitle ? <div className="text-[14px] text-ink-soft">{view.subtitle}</div> : null}
+          {view.dateText ? <div className="text-[13px] text-ink-soft">{view.dateText}</div> : null}
           {view.proBadge ? <div className="mt-1.5"><ProBadge withNotice /></div> : null}
         </div>
         <FavoriteButton demandId={demandId} offerId={offerId} />
       </div>
 
-      <div className="mt-3 text-[13px] font-bold text-ink">{view.compatibility}</div>
-      {view.compatibilityPercent !== null ? (
-        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-wash" aria-hidden>
-          <div className="h-full rounded-full bg-forest" style={{ width: `${view.compatibilityPercent}%` }} />
-        </div>
-      ) : null}
+      <div className="mt-4">
+        <div className="text-[15px] font-bold text-ink">{view.compatibility}</div>
+        {view.compatibilityPercent !== null ? (
+          <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-mist" aria-hidden>
+            <div className="h-full rounded-full bg-brand" style={{ width: `${view.compatibilityPercent}%` }} />
+          </div>
+        ) : null}
+      </div>
 
       {view.indicators.length > 0 ? (
-        <ul className="mt-3 space-y-1.5" aria-label="Indicateurs de l'annonce">
+        <ul className="mt-3 flex flex-col gap-2" aria-label="Indicateurs de l'annonce">
           {view.indicators.map((indicator) => (
             <IndicatorLine key={indicator.key} indicator={indicator} />
           ))}
@@ -155,9 +163,9 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
       ) : null}
 
       {view.attributes.length > 0 ? (
-        <dl data-testid="offer-attributes" className="mt-4 divide-y divide-line rounded-2xl border border-line bg-white px-4 py-1">
+        <dl data-testid="offer-attributes" className="mt-4 divide-y divide-line rounded-3xl border border-line bg-white px-4 py-1">
           {view.attributes.map((attribute) => (
-            <div key={attribute.label} className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
+            <div key={attribute.label} className="flex items-center justify-between gap-4 py-3 text-[14px]">
               <dt className="shrink-0 text-ink-soft">{attribute.label}</dt>
               <dd className="text-right font-semibold text-ink">{attribute.value}</dd>
             </div>
@@ -167,23 +175,28 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
 
       {marketQuery ? <MarketCard query={marketQuery} /> : null}
 
-      <section aria-labelledby="contact-title" className="mt-5 rounded-2xl bg-sage p-4">
-        <h2 id="contact-title" className="text-[15px] font-extrabold text-forest">
-          Cette annonce vous intéresse ?
-        </h2>
+      <section aria-labelledby="contact-title" className="mt-5 flex flex-col gap-3 rounded-3xl bg-brand-soft p-4">
+        <div className="flex items-center gap-3">
+          <IconTile icon={Phone} tone="accent" className="size-10" />
+          <h2 id="contact-title" className="text-[16px] font-extrabold text-brand-ink">
+            Cette annonce vous intéresse ?
+          </h2>
+        </div>
         {contact.kind === "done" && links ? (
-          <div data-testid="contact-result" className="mt-2">
-            <div className="text-[13px] text-sage-ink">Numéro vérifié du vendeur</div>
-            <div data-testid="contact-phone" className="font-display text-[24px] font-extrabold text-ink">
-              {formatContactPhone(contact.contact.phone)}
+          <div data-testid="contact-result" className="animate-pop flex flex-col gap-3">
+            <div>
+              <div className="text-[14px] text-brand-ink">Numéro vérifié du vendeur</div>
+              <div data-testid="contact-phone" className="text-[26px] font-extrabold text-ink">
+                {formatContactPhone(contact.contact.phone)}
+              </div>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 gap-2.5">
               <a
                 href={links.tel}
                 data-testid="contact-tel"
-                className="flex items-center justify-center gap-2 rounded-xl bg-forest px-3 py-3 text-[14px] font-bold text-white"
+                className="press flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-brand px-3 py-3 text-[16px] font-bold text-white hover:bg-brand-deep"
               >
-                <Phone className="size-4" aria-hidden />
+                <Phone className="size-5" aria-hidden />
                 Appeler
               </a>
               <a
@@ -191,9 +204,9 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
                 target="_blank"
                 rel="noopener noreferrer"
                 data-testid="contact-whatsapp"
-                className="flex items-center justify-center gap-2 rounded-xl border border-forest/30 bg-white px-3 py-3 text-[14px] font-bold text-forest"
+                className="press flex min-h-12 items-center justify-center gap-2 rounded-2xl border-2 border-line-strong bg-white px-3 py-3 text-[16px] font-bold text-ink hover:border-brand"
               >
-                <WhatsAppIcon />
+                <WhatsAppIcon className="size-5" />
                 WhatsApp
               </a>
             </div>
@@ -204,30 +217,41 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
               onClick={() => void reveal()}
               disabled={contact.kind === "pending"}
               data-testid="contact-button"
-              className="mt-2 flex w-full items-center justify-center rounded-xl bg-forest px-4 py-3.5 text-[15px] font-bold text-white transition active:scale-[0.99] disabled:opacity-50"
+              className="press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-[16px] font-bold text-white shadow-md shadow-brand/30 hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
             >
+              <Phone className="size-5" aria-hidden />
               {contact.kind === "pending" ? CONTACT_ONGOING_LABEL : CONTACT_BUTTON_LABEL}
             </button>
             {contact.kind === "failed" ? (
-              <p role="alert" data-testid="contact-error" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+              <p role="alert" data-testid="contact-error" className="flex items-start gap-2 rounded-2xl bg-accent-soft px-3.5 py-3 text-[14px] font-semibold text-accent-ink">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
                 {contact.message}
               </p>
             ) : null}
           </>
         )}
-        <p data-testid="contact-notice" className="mt-3 text-[12px] leading-relaxed text-sage-ink">
-          {CONTACT_NOTICE} {CONTACT_HINT}
+        <p data-testid="contact-notice" className="flex items-start gap-2 text-[13px] leading-relaxed text-brand-ink">
+          <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>
+            {CONTACT_NOTICE} {CONTACT_HINT}
+          </span>
         </p>
       </section>
 
       <OfferActions demandId={demandId} offerId={offerId} />
 
-      <p className="mt-4 text-center text-[12px] leading-relaxed text-ink-soft">
-        Informations telles qu'annoncées par le vendeur. Ni l'état, ni la disponibilité ne sont garantis : confirmez-les avec lui.
+      <p className="mt-4 flex items-start justify-center gap-2 text-[13px] leading-relaxed text-ink-soft">
+        <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+        <span>Informations telles qu'annoncées par le vendeur. Ni l'état, ni la disponibilité ne sont garantis : confirmez-les avec lui.</span>
       </p>
       {reportOfferPath(demandId, offerId) ? (
-        <p className="mt-2 text-center">
-          <Link href={reportOfferPath(demandId, offerId) ?? "/signaler"} data-testid="report-offer" className="text-[13px] font-bold text-ink-soft underline">
+        <p className="mt-1 text-center">
+          <Link
+            href={reportOfferPath(demandId, offerId) ?? "/signaler"}
+            data-testid="report-offer"
+            className="press inline-flex min-h-11 items-center gap-1.5 text-[14px] font-bold text-ink-soft underline"
+          >
+            <Flag className="size-4" aria-hidden />
             Signaler cette annonce
           </Link>
         </p>
@@ -248,13 +272,13 @@ function PageContent() {
   return (
     <main>
       <TopBar back={back} title="Annonce" />
-      <div className="px-4 pb-6">
+      <div className="px-4 pb-6 pt-2">
         {valid ? (
           <Fiche demandId={demandId} offerId={offerId} missionId={missionId} />
         ) : (
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
-            Annonce introuvable.
-          </p>
+          <div role="alert">
+            <EmptyState art={<ArtEmpty className="size-36" />} title="Annonce introuvable." />
+          </div>
         )}
       </div>
     </main>

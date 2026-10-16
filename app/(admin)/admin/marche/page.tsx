@@ -1,6 +1,10 @@
 "use client";
 
+import { TrendingUp } from "lucide-react";
 import { AdminPage } from "@/components/admin/admin-page";
+import { Notice, PageHeading } from "@/components/admin/admin-ui";
+import { ArtSearch } from "@/components/illustrations";
+import { Badge, EmptyState } from "@/components/ui";
 import { market } from "@/lib/client/market-api";
 import { ADMIN_MARKET_EMPTY, ADMIN_MARKET_NOTE, ADMIN_MARKET_TITLE, MARKET_INSUFFICIENT_TEXT, adminMarketRows, periodText, type ListingsView } from "@/lib/client/market-view";
 
@@ -8,7 +12,7 @@ const load = (signal: AbortSignal) => market.admin({ signal });
 
 function ListingsCell({ view }: { view: ListingsView }) {
   return (
-    <td data-testid="admin-market-listings" data-published={view.published ? "true" : "false"} className="px-2 py-2 align-top">
+    <td data-testid="admin-market-listings" data-published={view.published ? "true" : "false"} className="px-3 py-3 align-top">
       {view.published ? (
         <>
           <div className="font-bold text-ink">{view.headline}</div>
@@ -31,36 +35,39 @@ export default function AdminMarche() {
       {(data) => {
         const rows = adminMarketRows(data.rows);
         return (
-          <div data-testid="admin-market">
-            <h1 className="font-display text-[22px] font-extrabold text-ink">{ADMIN_MARKET_TITLE}</h1>
-            <p className="text-[12px] text-ink-soft">
-              {periodText(data.period.days)}. {ADMIN_MARKET_NOTE}
-            </p>
+          <div data-testid="admin-market" className="flex flex-col gap-4">
+            <PageHeading icon={TrendingUp} tone="success">
+              {ADMIN_MARKET_TITLE}
+            </PageHeading>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="sky">{periodText(data.period.days)}</Badge>
+            </div>
+            <Notice>{ADMIN_MARKET_NOTE}</Notice>
             {rows.length === 0 ? (
-              <p data-testid="admin-market-empty" className="mt-4 text-center text-[14px] text-ink-soft">
-                {ADMIN_MARKET_EMPTY}
-              </p>
+              <div data-testid="admin-market-empty">
+                <EmptyState art={<ArtSearch className="size-36" />} title={ADMIN_MARKET_EMPTY} />
+              </div>
             ) : (
-              <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-white">
-                <table data-testid="admin-market-table" className="w-full text-left text-[12px]">
+              <div className="animate-rise overflow-x-auto rounded-3xl border border-line bg-white">
+                <table data-testid="admin-market-table" className="w-full text-left text-[14px]">
                   <thead>
-                    <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-soft">
-                      <th className="px-2 py-2 font-semibold">Produit</th>
-                      <th className="px-2 py-2 font-semibold">Prix demandés (médiane)</th>
-                      <th className="px-2 py-2 font-semibold">Ventes confirmées</th>
+                    <tr className="border-b border-line bg-mist/60 text-[12px] uppercase tracking-wide text-ink-soft">
+                      <th className="px-3 py-3 font-bold">Produit</th>
+                      <th className="px-3 py-3 font-bold">Prix demandés (médiane)</th>
+                      <th className="px-3 py-3 font-bold">Ventes confirmées</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
                     {rows.map((row) => (
                       <tr key={row.key} data-market-row>
-                        <th scope="row" className="px-2 py-2 text-left align-top font-semibold text-ink">
+                        <th scope="row" className="px-3 py-3 text-left align-top font-bold text-ink">
                           {row.label}
                         </th>
                         <ListingsCell view={row.listings} />
-                        <td data-testid="admin-market-sales" className="px-2 py-2 align-top text-ink">
+                        <td data-testid="admin-market-sales" className="px-3 py-3 align-top text-ink">
                           {row.salesText}
                           {row.historicalText ? (
-                            <div data-testid="admin-market-historical" className="text-[11px] text-ink-soft">
+                            <div data-testid="admin-market-historical" className="text-[12px] text-ink-soft">
                               {row.historicalText}
                             </div>
                           ) : null}

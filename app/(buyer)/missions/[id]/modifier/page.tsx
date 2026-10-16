@@ -4,7 +4,9 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { MissionForm } from "@/components/missions/mission-form";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
+import { ArtAlert } from "@/components/illustrations";
 import { TopBar } from "@/components/top-bar";
+import { EmptyState, Skeleton } from "@/components/ui";
 import { isUuid } from "@/lib/client/api";
 import { describeMissionError, missions } from "@/lib/client/missions-api";
 import { MISSION_NOT_FOUND, formValuesOf, type MissionFormValues } from "@/lib/client/missions-view";
@@ -33,9 +35,9 @@ function EditLoader({ id }: { id: string }) {
     return (
       <main>
         <TopBar back={`/missions/${id}`} title="Modifier la mission" />
-        <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
-          {error}
-        </p>
+        <div role="alert">
+          <EmptyState art={<ArtAlert className="size-32" />} title={error} />
+        </div>
       </main>
     );
   }
@@ -43,9 +45,13 @@ function EditLoader({ id }: { id: string }) {
     return (
       <main>
         <TopBar back={`/missions/${id}`} title="Modifier la mission" />
-        <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
-          Chargement de la mission…
-        </p>
+        <div className="flex flex-col gap-3 px-4 pt-4" aria-busy="true">
+          <span className="sr-only">Chargement de la mission…</span>
+          <Skeleton className="h-8 w-2/3" />
+          <Skeleton className="h-14 w-full rounded-2xl" />
+          <Skeleton className="h-14 w-full rounded-2xl" />
+          <Skeleton className="h-14 w-full rounded-2xl" />
+        </div>
       </main>
     );
   }
@@ -62,9 +68,9 @@ export default function ModifierMission() {
       ) : (
         <main>
           <TopBar back="/missions" title="Mission" />
-          <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
-            {MISSION_NOT_FOUND}
-          </p>
+          <div role="alert">
+            <EmptyState art={<ArtAlert className="size-32" />} title={MISSION_NOT_FOUND} />
+          </div>
         </main>
       )}
     </SessionGate>

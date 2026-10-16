@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { FileUp } from "lucide-react";
+import { Eye, FileUp, Info, ListChecks, Loader2, Rocket, ShieldCheck } from "lucide-react";
+import { ArtCheck } from "@/components/illustrations";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
+import { Textarea } from "@/components/ui";
+import { BTN_OUTLINE, BTN_PRIMARY, LINK_ACTION, Notice } from "@/components/vendor/vendor-parts";
 import { describeApiError } from "@/lib/client/api";
 import type { CatalogImportResult } from "@/lib/client/pro-api";
 import { proApi } from "@/lib/client/pro-api";
@@ -73,17 +76,21 @@ export function CatalogImportScreen() {
   return (
     <main>
       <TopBar back="/vendeur/annonces" title={IMPORT_PAGE_TITLE} />
-      <div className="px-4 pb-8">
-        <p className="mt-3 text-[13px] text-ink-soft">
+      <div className="flex flex-col gap-4 px-4 pb-8 pt-2">
+        <Notice tone="info" icon={ShieldCheck} small>
           Colonnes : {IMPORT_COLUMNS_HELP} {IMPORT_MAX_ROWS} lignes au plus par fichier. Votre fichier n&apos;est pas conservé : seules les annonces créées le sont.
-        </p>
-        <details className="mt-2 rounded-xl border border-line bg-white p-3 text-[12px] text-ink-soft">
-          <summary className="cursor-pointer font-bold text-ink">Exemple de fichier</summary>
-          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">{IMPORT_EXAMPLE}</pre>
+        </Notice>
+
+        <details className="rounded-3xl border border-line bg-white p-4 text-[13px] text-ink-soft">
+          <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-[15px] font-bold text-ink">
+            <Info className="size-5 text-brand" aria-hidden />
+            Exemple de fichier
+          </summary>
+          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-2xl bg-mist p-3 font-sans text-[13px] text-ink">{IMPORT_EXAMPLE}</pre>
         </details>
 
-        <label className="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-forest/40 bg-white px-4 py-4 text-[14px] font-bold text-forest">
-          <FileUp className="size-5" aria-hidden />
+        <label className="press flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-brand/40 bg-brand-soft/50 px-4 py-6 text-center text-[16px] font-bold text-brand hover:bg-brand-soft">
+          <FileUp className="size-9" aria-hidden />
           {fileName ?? "Choisir un fichier CSV"}
           <input
             data-testid="import-file"
@@ -93,60 +100,66 @@ export function CatalogImportScreen() {
             onChange={(event) => void readFile(event.target.files?.[0])}
           />
         </label>
-        <label htmlFor="import-text" className="mt-3 block text-[13px] font-bold text-ink">Ou collez le contenu du fichier</label>
-        <textarea
-          id="import-text"
-          data-testid="import-text"
-          value={text}
-          onChange={(event) => { setText(event.target.value); setFileName(null); setError(null); }}
-          rows={6}
-          spellCheck={false}
-          className="mt-1.5 w-full rounded-xl border border-line bg-white px-3 py-2.5 font-mono text-[12px] text-ink"
-          placeholder={IMPORT_EXAMPLE}
-        />
-        {check && !check.ok ? <p role="alert" data-testid="import-check" className="mt-1.5 text-[13px] font-semibold text-carrot-ink">{check.message}</p> : null}
+        <div>
+          <label htmlFor="import-text" className="mb-1.5 flex items-center gap-2 text-[14px] font-bold text-ink">
+            <ListChecks className="size-4 shrink-0 text-brand" aria-hidden />
+            Ou collez le contenu du fichier
+          </label>
+          <Textarea
+            id="import-text"
+            data-testid="import-text"
+            value={text}
+            onChange={(event) => { setText(event.target.value); setFileName(null); setError(null); }}
+            rows={6}
+            spellCheck={false}
+            placeholder={IMPORT_EXAMPLE}
+          />
+          {check && !check.ok ? <p role="alert" data-testid="import-check" className="mt-1.5 text-[14px] font-semibold text-danger-ink">{check.message}</p> : null}
+        </div>
 
-        <button
-          data-testid="import-preview"
-          onClick={() => void run(true)}
-          disabled={pending !== null || check === null || !check.ok}
-          className="mt-3 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white px-4 py-3 text-[14px] font-bold text-forest disabled:opacity-40"
-        >
-          {pending === "preview" ? "Aperçu en cours…" : "Aperçu (rien n'est créé)"}
-        </button>
-        <button
-          data-testid="import-apply"
-          onClick={() => void run(false)}
-          disabled={!canApply}
-          className="mt-2 flex w-full items-center justify-center rounded-xl bg-forest px-4 py-3 text-[14px] font-bold text-white disabled:opacity-40"
-        >
-          {pending === "apply" ? "Import en cours…" : "Importer et mettre en ligne"}
-        </button>
+        <div className="flex flex-col gap-2.5 md:flex-row md:[&>*]:flex-1">
+          <button
+            data-testid="import-preview"
+            onClick={() => void run(true)}
+            disabled={pending !== null || check === null || !check.ok}
+            className={BTN_OUTLINE}
+          >
+            {pending === "preview" ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <Eye className="size-5" aria-hidden />}
+            {pending === "preview" ? "Aperçu en cours…" : "Aperçu (rien n'est créé)"}
+          </button>
+          <button data-testid="import-apply" onClick={() => void run(false)} disabled={!canApply} className={BTN_PRIMARY}>
+            {pending === "apply" ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <Rocket className="size-5" aria-hidden />}
+            {pending === "apply" ? "Import en cours…" : "Importer et mettre en ligne"}
+          </button>
+        </div>
 
         {error ? (
-          <div role="alert" data-testid="import-error" className="mt-3 rounded-xl bg-carrot-soft p-3 text-[13px] font-semibold text-carrot-ink">
+          <Notice tone="danger" role="alert" data-testid="import-error">
             {error}
             {error.includes("réservé à l'offre Pro") ? (
-              <Link href={PRO_PAGE_PATH} className="mt-1 block underline">Voir l&apos;offre Pro</Link>
+              <Link href={PRO_PAGE_PATH} className={`${LINK_ACTION} -ml-3 mt-1 underline`}>Voir l&apos;offre Pro</Link>
             ) : null}
-          </div>
+          </Notice>
         ) : null}
 
         {result && summary ? (
-          <section data-testid="import-report" data-mode={result.mode} data-replayed={summary.replayed ? "true" : "false"} className="mt-4 rounded-2xl border border-line bg-white p-4">
-            <div className="text-[15px] font-extrabold text-ink">{summary.title}</div>
-            <p data-testid="import-summary" className="mt-1 text-[13px] text-ink-soft">{summary.detail}</p>
+          <section data-testid="import-report" data-mode={result.mode} data-replayed={summary.replayed ? "true" : "false"} className="animate-rise rounded-3xl border border-line bg-white p-5">
+            <div className="flex items-center gap-3">
+              <ArtCheck className="size-14 shrink-0" />
+              <div className="min-w-0 flex-1 text-[17px] font-extrabold text-ink">{summary.title}</div>
+            </div>
+            <p data-testid="import-summary" className="mt-2 text-[14px] text-ink-soft">{summary.detail}</p>
             {rejected.length > 0 ? (
               <ul data-testid="import-rejected" className="mt-3 space-y-1.5" aria-label="Lignes refusées">
                 {rejected.map((row) => (
-                  <li key={row.line} data-line={row.line} className="rounded-lg bg-carrot-soft px-3 py-2 text-[12px] text-carrot-ink">
+                  <li key={row.line} data-line={row.line} className="rounded-2xl bg-danger-soft px-3.5 py-2.5 text-[13px] text-danger-ink">
                     <strong>Ligne {row.line}</strong> : {row.text.replace(/^Ligne refusée : /, "")}
                   </li>
                 ))}
               </ul>
             ) : null}
             {result.mode === "apply" && result.acceptedCount > 0 ? (
-              <Link href="/vendeur/annonces" data-testid="import-listings-link" className="mt-3 block text-[13px] font-bold text-forest underline">Voir mes annonces</Link>
+              <Link href="/vendeur/annonces" data-testid="import-listings-link" className={`${BTN_OUTLINE} mt-4`}>Voir mes annonces</Link>
             ) : null}
           </section>
         ) : null}

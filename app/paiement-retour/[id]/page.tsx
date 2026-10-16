@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { CircleCheck, CircleX, Hourglass } from "lucide-react";
+import { RotateCw, Wallet } from "lucide-react";
+import { ArtAlert, ArtCheck, ArtWallet } from "@/components/illustrations";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
+import { Skeleton } from "@/components/ui";
 import { ApiError, api, isUuid, type WalletTopup } from "@/lib/client/api";
 import {
   RETURN_POLL_INTERVAL_MS,
@@ -16,7 +18,9 @@ import {
   walletHref,
 } from "@/lib/client/wallet-view";
 
-const linkClass = "flex w-full items-center justify-center rounded-xl px-4 py-3.5 text-[15px] font-bold transition active:scale-[0.99]";
+const linkClass = "press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-[16px] font-bold";
+const PRIMARY = "bg-brand text-white hover:bg-brand-deep";
+const OUTLINE = "border-2 border-line-strong bg-white text-ink hover:border-brand hover:text-brand";
 
 /**
  * Retour du navigateur après le paiement Wave (lot PAY1) : AFFICHAGE SEULEMENT. Cette page ne crédite JAMAIS : elle relit l'état de la recharge sur le serveur (qui ne change que sur
@@ -65,61 +69,68 @@ function Retour({ topupId }: { topupId: string }) {
 
   return (
     <main className="flex flex-1 flex-col">
-      <div className="px-4 pb-10 pt-6">
-        <h1 className="font-display text-[26px] font-extrabold text-ink">{WAVE_LABEL}</h1>
+      <div className="flex flex-col gap-4 px-4 pb-10 pt-6">
+        <h1 className="flex items-center gap-2.5 text-[26px] font-extrabold tracking-tight text-ink">
+          <Wallet className="size-7 text-brand" aria-hidden />
+          {WAVE_LABEL}
+        </h1>
         {view.kind === "loading" ? (
-          <p className="mt-8 text-center text-[14px] text-ink-soft" aria-busy="true">
-            Vérification du paiement…
-          </p>
+          <div className="flex flex-col gap-3" aria-busy="true">
+            <span className="sr-only">Vérification du paiement…</span>
+            <Skeleton className="h-40 w-full rounded-3xl" />
+            <Skeleton className="h-12 w-full rounded-2xl" />
+          </div>
         ) : null}
 
         {view.kind === "pending" ? (
-          <div className="mt-5">
-            <div data-testid="return-result" data-kind="pending" role="status" className="rounded-2xl border border-line bg-white p-5 text-center">
-              <Hourglass className="mx-auto size-9 text-ink-soft" aria-hidden />
-              <p data-testid="return-title" className="mt-2 text-[16px] font-extrabold text-ink">{view.title}</p>
-              <p className="mt-1 text-[13px] text-ink-soft">{view.detail}</p>
-              <p data-testid="return-amount" className="mt-2 text-[13px] font-semibold text-ink">Montant : {view.amountText}</p>
+          <div className="flex flex-col gap-3">
+            <div data-testid="return-result" data-kind="pending" role="status" className="animate-rise flex flex-col items-center gap-2 rounded-3xl border border-line bg-white p-5 text-center">
+              <ArtWallet className="size-28" />
+              <p data-testid="return-title" className="text-[17px] font-extrabold text-ink">{view.title}</p>
+              <p className="text-[14px] text-ink-soft">{view.detail}</p>
+              <p data-testid="return-amount" className="text-[16px] font-bold text-ink">Montant : {view.amountText}</p>
             </div>
-            <Link href={WALLET_PATH} className={`${linkClass} mt-5 border border-forest/30 bg-white text-forest`}>
+            <Link href={WALLET_PATH} className={`${linkClass} ${OUTLINE}`}>
               Voir mon porte-monnaie
             </Link>
           </div>
         ) : null}
 
         {view.kind === "succeeded" ? (
-          <div className="mt-5">
-            <div data-testid="return-result" data-kind="succeeded" role="status" className="rounded-2xl border border-forest/30 bg-sage p-5 text-center">
-              <CircleCheck className="mx-auto size-9 text-forest" aria-hidden />
-              <p data-testid="return-title" className="mt-2 text-[16px] font-extrabold text-forest">{view.title}</p>
-              <p className="mt-1 text-[13px] text-ink-soft">{view.detail}</p>
+          <div className="flex flex-col gap-3">
+            <div data-testid="return-result" data-kind="succeeded" role="status" className="animate-rise flex flex-col items-center gap-2 rounded-3xl bg-success-soft p-5 text-center">
+              <ArtCheck className="size-28" />
+              <p data-testid="return-title" className="text-[18px] font-extrabold text-success-ink">{view.title}</p>
+              <p className="text-[14px] text-ink-soft">{view.detail}</p>
             </div>
-            <Link data-testid="return-wallet" href={WALLET_PATH} className={`${linkClass} mt-5 bg-forest text-white`}>
+            <Link data-testid="return-wallet" href={WALLET_PATH} className={`${linkClass} ${PRIMARY}`}>
               Voir mon porte-monnaie
             </Link>
           </div>
         ) : null}
 
         {view.kind === "failed" || view.kind === "expired" ? (
-          <div className="mt-5">
-            <div data-testid="return-result" data-kind={view.kind} role="status" className="rounded-2xl border border-carrot/40 bg-carrot-soft p-5 text-center">
-              <CircleX className="mx-auto size-9 text-carrot-ink" aria-hidden />
-              <p data-testid="return-title" className="mt-2 text-[15px] font-extrabold text-carrot-ink">{view.title}</p>
-              <p className="mt-1 text-[13px] text-ink-soft">{view.detail}</p>
+          <div className="flex flex-col gap-3">
+            <div data-testid="return-result" data-kind={view.kind} role="status" className="animate-rise flex flex-col items-center gap-2 rounded-3xl bg-accent-soft p-5 text-center">
+              <ArtAlert className="size-28" />
+              <p data-testid="return-title" className="text-[17px] font-extrabold text-accent-ink">{view.title}</p>
+              <p className="text-[14px] text-ink-soft">{view.detail}</p>
             </div>
-            <Link data-testid="return-retry" href={walletHref({ recharge: true })} className={`${linkClass} mt-5 bg-forest text-white`}>
+            <Link data-testid="return-retry" href={walletHref({ recharge: true })} className={`${linkClass} ${PRIMARY}`}>
+              <RotateCw className="size-5" aria-hidden />
               Recommencer la recharge
             </Link>
-            <Link href={WALLET_PATH} className={`${linkClass} mt-3 border border-forest/30 bg-white text-forest`}>
+            <Link href={WALLET_PATH} className={`${linkClass} ${OUTLINE}`}>
               Retour à mon porte-monnaie
             </Link>
           </div>
         ) : null}
 
         {view.kind === "not_found" || view.kind === "error" ? (
-          <div className="mt-5">
-            <div data-testid="return-result" data-kind={view.kind} role="alert" className="rounded-2xl border border-line bg-white p-5 text-center">
-              <p className="text-[15px] font-bold text-ink">{view.detail}</p>
+          <div className="flex flex-col gap-3">
+            <div data-testid="return-result" data-kind={view.kind} role="alert" className="animate-rise flex flex-col items-center gap-3 rounded-3xl border border-line bg-white p-5 text-center">
+              <ArtAlert className="size-24" />
+              <p className="text-[16px] font-bold text-ink">{view.detail}</p>
             </div>
             {view.kind === "error" ? (
               <button
@@ -127,12 +138,13 @@ function Retour({ topupId }: { topupId: string }) {
                   setFailure(null);
                   setReloadKey((key) => key + 1);
                 }}
-                className={`${linkClass} mt-5 bg-forest text-white`}
+                className={`${linkClass} ${PRIMARY}`}
               >
+                <RotateCw className="size-5" aria-hidden />
                 Réessayer
               </button>
             ) : null}
-            <Link href={WALLET_PATH} className={`${linkClass} mt-3 border border-forest/30 bg-white text-forest`}>
+            <Link href={WALLET_PATH} className={`${linkClass} ${OUTLINE}`}>
               Retour à mon porte-monnaie
             </Link>
           </div>
@@ -149,9 +161,10 @@ function PageContent() {
     <Retour topupId={topupId} />
   ) : (
     <main className="flex flex-1 flex-col">
-      <p role="alert" className="mt-6 px-4 text-center text-[14px] font-semibold text-ink">
-        Cette recharge est introuvable.
-      </p>
+      <div role="alert" className="flex flex-col items-center gap-3 px-4 pt-8 text-center">
+        <ArtAlert className="size-28" />
+        <p className="text-[16px] font-bold text-ink">Cette recharge est introuvable.</p>
+      </div>
     </main>
   );
 }
@@ -159,7 +172,7 @@ function PageContent() {
 export default function PaiementRetourPage() {
   // Plein écran mobile, sans barre d'onglets, comme la page de paiement simulé. useSearchParams exige une frontière Suspense.
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-cream sm:border-x sm:border-line">
+    <div className="mx-auto flex min-h-dvh w-full max-w-xl flex-col">
       <SessionGate>
         <Suspense fallback={null}>
           <PageContent />

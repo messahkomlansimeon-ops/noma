@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CircleCheck, Send, ShieldCheck, Undo2 } from "lucide-react";
+import { ArtChat, ArtEmpty } from "@/components/illustrations";
 import { InterestedBuyerCard } from "@/components/matches/match-parts";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { TopBar } from "@/components/top-bar";
-import { Badge } from "@/components/ui";
+import { Badge, EmptyState, IconTile } from "@/components/ui";
+import { BTN_PRIMARY, BTN_SMALL, ErrorState, LoadingBlock, Notice, SectionHeading } from "@/components/vendor/vendor-parts";
 import { describeProposalError, proposals, type Proposal, type SellerRequests } from "@/lib/client/proposals-api";
 import {
   REQUESTS_EMPTY,
@@ -73,50 +76,52 @@ function Content() {
   );
 
   if (error && loaded === null) {
-    return (
-      <p role="alert" className="mt-6 text-center text-[14px] font-semibold text-ink">
-        {error}
-      </p>
-    );
+    return <ErrorState message={error} />;
   }
   if (loaded === null) {
-    return (
-      <p aria-busy="true" className="mt-6 text-center text-[14px] text-ink-soft">
-        Chargement…
-      </p>
-    );
+    return <LoadingBlock label="Chargement…" className="pt-3" />;
   }
   const { requests, sent } = loaded;
   return (
-    <div data-testid="vendor-requests">
-      <p className="mt-3 text-[13px] text-ink-soft">{REQUESTS_HINT}</p>
+    <div data-testid="vendor-requests" className="flex flex-col gap-4 pt-3">
+      <Notice tone="info" icon={ShieldCheck} small>
+        {REQUESTS_HINT}
+      </Notice>
       {notice ? (
-        <p role="status" className="mt-2 rounded-xl bg-sage px-3 py-2 text-[13px] font-semibold text-forest">
+        <Notice tone="brand" icon={CircleCheck} role="status">
           {notice}
-        </p>
+        </Notice>
       ) : null}
       {error ? (
-        <p role="alert" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+        <Notice tone="danger" role="alert">
           {error}
-        </p>
+        </Notice>
       ) : null}
       {requests.requests.length === 0 ? (
-        <p className="mt-4 rounded-2xl bg-wash p-4 text-center text-[14px] text-ink-soft">{REQUESTS_EMPTY}</p>
+        <EmptyState art={<ArtChat className="size-36" />} title={REQUESTS_EMPTY} />
       ) : (
-        <ul aria-label={REQUESTS_TITLE} className="mt-3 space-y-3">
+        <ul aria-label={REQUESTS_TITLE} className="stagger flex flex-col gap-3 md:grid md:grid-cols-2 md:items-start">
           {requests.requests.map((request) => {
             const row = requestRow(request);
             const href = requestPath(row.demandId);
             return (
-              <li key={row.demandId} data-testid="vendor-request" className="rounded-2xl border border-line bg-white p-1">
+              <li key={row.demandId} data-testid="vendor-request" className="rounded-3xl border border-line bg-white p-1.5">
                 <ul>
                   <InterestedBuyerCard item={request.need} />
                 </ul>
-                <div className="px-3.5 pb-3">
-                  <p className="text-[12px] text-ink-soft">{row.offersText}</p>
-                  {row.proposedCount > 0 ? <p className="mt-0.5 text-[12px] font-semibold text-forest">{row.allProposed ? "Proposition envoyée" : `${row.proposedCount} proposition(s) envoyée(s)`}</p> : null}
+                <div className="flex flex-col gap-2.5 px-2.5 pb-2.5 pt-1">
+                  <p className="text-[13px] text-ink-soft">{row.offersText}</p>
+                  {row.proposedCount > 0 ? (
+                    <div>
+                      <Badge tone="sage">
+                        <CircleCheck className="size-3.5" aria-hidden />
+                        {row.allProposed ? "Proposition envoyée" : `${row.proposedCount} proposition(s) envoyée(s)`}
+                      </Badge>
+                    </div>
+                  ) : null}
                   {href ? (
-                    <Link href={href} data-testid="vendor-request-open" className="mt-2 flex w-full items-center justify-center rounded-xl border border-forest/30 bg-white py-2.5 text-[14px] font-bold text-forest">
+                    <Link href={href} data-testid="vendor-request-open" className={BTN_PRIMARY}>
+                      <Send className="size-5" aria-hidden />
                       Répondre
                     </Link>
                   ) : null}
@@ -127,41 +132,45 @@ function Content() {
         </ul>
       )}
       {requests.offersTruncated ? (
-        <p role="status" className="mt-3 text-[12px] font-semibold text-ink-soft">
+        <Notice tone="mist" role="status" small>
           {REQUESTS_TRUNCATED_NOTE}
-        </p>
+        </Notice>
       ) : null}
 
-      <h2 className="mt-6 font-display text-[18px] font-extrabold text-ink">{SENT_TITLE}</h2>
-      {sent.length === 0 ? (
-        <p className="mt-2 text-[13px] text-ink-soft">{SENT_EMPTY}</p>
-      ) : (
-        <ul className="mt-2 space-y-2.5" aria-label={SENT_TITLE}>
-          {sent.map((proposal) => {
-            const row = proposalRow(proposal, "seller");
-            return (
-              <li key={row.id} data-testid="sent-proposal" data-status={row.status} className="rounded-2xl border border-line bg-white p-3.5">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-[14px] font-bold text-ink">{row.title}</span>
-                  <Badge tone={row.status === "sent" ? "carrot" : row.status === "accepted" ? "sage" : "wash"}>{row.statusText}</Badge>
-                </div>
-                <div className="mt-0.5 text-[14px] font-extrabold text-ink">{row.priceText}</div>
-                <div className="text-[12px] text-ink-soft">{row.validText}</div>
-                {canAnswer(proposal) ? (
-                  <button
-                    onClick={() => void withdraw(proposal.id)}
-                    disabled={pendingId === proposal.id}
-                    data-testid="proposal-withdraw"
-                    className="mt-2 rounded-xl border border-line bg-white px-3.5 py-2 text-[13px] font-bold text-ink disabled:opacity-50"
-                  >
-                    Retirer
-                  </button>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      <div className="mt-2 flex flex-col gap-3">
+        <SectionHeading icon={Send}>{SENT_TITLE}</SectionHeading>
+        {sent.length === 0 ? (
+          <EmptyState art={<ArtEmpty className="size-28" />} title={SENT_EMPTY} />
+        ) : (
+          <ul className="stagger flex flex-col gap-3 md:grid md:grid-cols-2 md:items-start" aria-label={SENT_TITLE}>
+            {sent.map((proposal) => {
+              const row = proposalRow(proposal, "seller");
+              return (
+                <li key={row.id} data-testid="sent-proposal" data-status={row.status} className="rounded-3xl border border-line bg-white p-4">
+                  <div className="flex items-start gap-3">
+                    <IconTile icon={Send} tone="brand" />
+                    <span className="min-w-0 flex-1 pt-0.5 text-[16px] font-bold leading-snug text-ink">{row.title}</span>
+                    <Badge tone={row.status === "sent" ? "carrot" : row.status === "accepted" ? "sage" : "wash"}>{row.statusText}</Badge>
+                  </div>
+                  <div className="mt-1 text-[20px] font-extrabold text-ink">{row.priceText}</div>
+                  <div className="text-[13px] text-ink-soft">{row.validText}</div>
+                  {canAnswer(proposal) ? (
+                    <button
+                      onClick={() => void withdraw(proposal.id)}
+                      disabled={pendingId === proposal.id}
+                      data-testid="proposal-withdraw"
+                      className={`${BTN_SMALL} mt-3`}
+                    >
+                      <Undo2 className="size-4" aria-hidden />
+                      Retirer
+                    </button>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

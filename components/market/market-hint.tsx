@@ -1,5 +1,6 @@
 "use client";
 
+import { TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { market } from "@/lib/client/market-api";
 import { marketHintText, marketQueryFromForm } from "@/lib/client/market-view";
@@ -39,8 +40,9 @@ export function MarketHint({ category, brand, model, variant, condition }: { cat
   const text = key !== null && result !== null && result.key === key ? result.text : null;
   if (text === null) return null;
   return (
-    <p data-testid="market-hint" className="mt-1.5 text-[12px] font-semibold leading-snug text-forest">
-      {text}
+    <p data-testid="market-hint" className="mt-2 flex items-start gap-2 rounded-2xl bg-brand-soft px-3 py-2 text-[13px] font-semibold leading-snug text-brand-ink">
+      <TrendingUp className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <span>{text}</span>
     </p>
   );
 }

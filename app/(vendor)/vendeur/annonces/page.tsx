@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ChevronRight, Plus, Search } from "lucide-react";
+import { Archive, ChevronRight, Pause, Plus, Rocket, Search, Users, Zap, type LucideIcon } from "lucide-react";
+import { ArtSearch, ArtStore } from "@/components/illustrations";
 import { TopBar } from "@/components/top-bar";
 import { Sheet } from "@/components/modal";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { NouvelleAnnonceForm } from "@/components/vendor/nouvelle-annonce-form";
+import { ErrorState, LoadingBlock, Notice } from "@/components/vendor/vendor-parts";
 import { Thumb } from "@/components/thumb";
-import { Badge } from "@/components/ui";
+import { Badge, Btn, Chip, EmptyState } from "@/components/ui";
 import { ApiError, api, describeApiError, type OfferRecord } from "@/lib/client/api";
 import {
   LIST_TRUNCATED_MESSAGE,
@@ -34,6 +36,8 @@ const ACTION_DONE: Record<OfferAction, string> = {
   pause: "Annonce mise en pause",
   archive: "Annonce archivée",
 };
+
+const ACTION_ICONS: Record<OfferAction, LucideIcon> = { publish: Rocket, pause: Pause, archive: Archive };
 
 function MesAnnonces() {
   const showToast = useNoma((s) => s.showToast);
@@ -118,96 +122,96 @@ function MesAnnonces() {
         right={
           <button
             onClick={() => setSheet(true)}
-            className="flex size-9 items-center justify-center rounded-full bg-forest text-white"
+            className="press flex size-11 items-center justify-center rounded-full bg-brand text-white shadow-[0_6px_16px_-8px_rgb(43_63_214/0.8)]"
             aria-label="Nouvelle annonce"
           >
-            <Plus className="size-5" />
+            <Plus className="size-6" aria-hidden />
           </button>
         }
       />
 
-      <div className="px-4">
-        <div className="flex items-center gap-2.5 rounded-xl border border-line bg-white px-3.5 py-3">
-          <Search className="size-4 text-ink-soft" />
+      <div className="flex flex-col gap-4 px-4 pb-6 pt-2">
+        <div className="flex min-h-12 items-center gap-2.5 rounded-2xl border-2 border-line bg-white px-4 hover:border-line-strong">
+          <Search className="size-5 shrink-0 text-ink-soft" aria-hidden />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Rechercher une annonce"
             aria-label="Rechercher une annonce"
-            className="w-full bg-transparent text-[14px] text-ink placeholder:text-ink-soft/60"
+            className="min-h-11 w-full bg-transparent text-[16px] text-ink placeholder:text-ink-soft/60"
           />
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           {OFFER_FILTERS.map((f) => (
-            <button
+            <Chip
               key={f.id}
+              className="min-h-11"
+              active={filter === f.id}
               onClick={() => {
                 setFilter(f.id);
                 setArmed(null);
               }}
-              className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition ${
-                filter === f.id
-                  ? "bg-forest text-white"
-                  : "border border-line bg-white text-ink"
-              }`}
             >
               {f.label}
               {offers ? countSuffix(countOffers(offers, f.id), truncated) : ""}
-            </button>
+            </Chip>
           ))}
         </div>
 
         {truncated && !loadError ? (
-          <p role="status" className="mt-3 text-[13px] font-semibold text-carrot-ink">
+          <Notice tone="accent" role="status">
             {LIST_TRUNCATED_MESSAGE}
-          </p>
+          </Notice>
         ) : null}
 
         {loadError ? (
-          <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-4 text-center">
-            <p className="text-[14px] font-semibold text-ink">{loadError}</p>
-            <button
-              onClick={() => {
-                setLoadError(null);
-                reload();
-              }}
-              className="mt-3 rounded-xl bg-forest px-5 py-2.5 text-[14px] font-bold text-white"
-            >
-              Réessayer
-            </button>
-          </div>
+          <ErrorState
+            message={loadError}
+            onRetry={() => {
+              setLoadError(null);
+              reload();
+            }}
+          />
         ) : offers === null ? (
-          <p className="mt-6 text-center text-[14px] text-ink-soft" aria-busy="true">
-            Chargement de vos annonces…
-          </p>
+          <LoadingBlock label="Chargement de vos annonces…" />
         ) : visible.length === 0 ? (
-          <p className="mt-6 text-center text-[14px] text-ink-soft">
-            {offers.length === 0
-              ? "Vous n'avez pas encore d'annonce."
-              : "Aucune annonce ne correspond à ce filtre."}
-          </p>
+          offers.length === 0 ? (
+            <EmptyState
+              art={<ArtStore className="size-36" />}
+              title="Vous n'avez pas encore d'annonce."
+              action={
+                <Btn onClick={() => setSheet(true)}>
+                  <Plus className="size-5" aria-hidden />
+                  Nouvelle annonce
+                </Btn>
+              }
+            />
+          ) : (
+            <EmptyState art={<ArtSearch className="size-32" />} title="Aucune annonce ne correspond à ce filtre." />
+          )
         ) : (
-          <div className="mt-4 space-y-3">
+          <div className="stagger flex flex-col gap-3 md:grid md:grid-cols-2 md:items-start">
             {visible.map((offer) => {
               const status = OFFER_STATUS_VIEW[offer.status];
               const price = formatMoney(offer.price);
               const summary = offerSummary(offer);
               const busy = busyId === offer.id;
+              const actions = offerActions(offer.status);
               return (
-                <div key={offer.id} className="rounded-2xl border border-line bg-white p-3.5">
+                <div key={offer.id} className="rounded-3xl border border-line bg-white p-4">
                   <div className="flex items-center gap-3">
-                    <Thumb art={artForCategory(offer.category)} className="size-14" iconClassName="size-7" photoId={offer.coverPhotoId} />
+                    <Thumb art={artForCategory(offer.category)} className="size-16" iconClassName="size-8" photoId={offer.coverPhotoId} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[15px] font-bold text-ink">
+                      <div className="line-clamp-2 text-[16px] font-bold leading-snug text-ink">
                         {recordTitle(offer)}
                       </div>
                       {price ? (
-                        <div className="font-display text-[18px] font-extrabold text-ink">{price}</div>
+                        <div className="text-[20px] font-extrabold leading-tight text-ink">{price}</div>
                       ) : (
-                        <div className="text-[13px] text-ink-soft">Prix à compléter</div>
+                        <div className="text-[14px] font-semibold text-accent-ink">Prix à compléter</div>
                       )}
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         <Badge tone={status.tone}>{status.label}</Badge>
                         {offer.availabilityStatus === "unavailable" && (
                           <Badge tone="carrot">Indisponible</Badge>
@@ -216,35 +220,36 @@ function MesAnnonces() {
                       </div>
                     </div>
                   </div>
-                  {summary && <div className="mt-1.5 text-[12px] text-ink-soft">{summary}</div>}
+                  {summary && <div className="mt-2 line-clamp-2 text-[13px] text-ink-soft">{summary}</div>}
                   <Link
                     href={`/vendeur/annonces/${offer.id}`}
                     aria-label={`Acheteurs intéressés et boost : ${recordTitle(offer)}`}
-                    className="mt-2 flex items-center justify-between border-t border-line pt-2.5 text-[13px] font-bold text-forest"
+                    className="press mt-3 flex min-h-12 items-center gap-2.5 rounded-2xl bg-brand-soft px-3.5 text-[14px] font-bold text-brand-ink hover:bg-brand-soft/70"
                   >
-                    Acheteurs intéressés et boost
-                    <ChevronRight className="size-4" aria-hidden />
+                    <Users className="size-5 shrink-0" aria-hidden />
+                    <span className="flex-1">Acheteurs intéressés et boost</span>
+                    <Zap className="size-4 shrink-0" aria-hidden />
+                    <ChevronRight className="size-5 shrink-0" aria-hidden />
                   </Link>
-                  {offerActions(offer.status).length > 0 && (
-                    <div className="mt-2.5 flex border-t border-line pt-2.5">
-                      {offerActions(offer.status).map((a, index) => (
-                        <button
-                          key={a.action}
-                          onClick={() => void run(offer, a.action)}
-                          disabled={busyId !== null}
-                          className={`flex flex-1 items-center justify-center gap-1.5 text-[13px] font-bold disabled:opacity-40 ${
-                            a.action === "archive" && armed === `${offer.id}:archive`
-                              ? "text-carrot-ink"
-                              : "text-ink"
-                          } ${index > 0 ? "border-l border-line" : ""}`}
-                        >
-                          {busy
-                            ? "…"
-                            : a.action === "archive" && armed === `${offer.id}:archive`
-                              ? "Confirmer l'archivage"
-                              : a.label}
-                        </button>
-                      ))}
+                  {actions.length > 0 && (
+                    <div className="mt-3 flex gap-2">
+                      {actions.map((a) => {
+                        const Icon = ACTION_ICONS[a.action];
+                        const confirm = a.action === "archive" && armed === `${offer.id}:archive`;
+                        return (
+                          <button
+                            key={a.action}
+                            onClick={() => void run(offer, a.action)}
+                            disabled={busyId !== null}
+                            className={`press flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 px-3 text-[14px] font-bold disabled:opacity-40 ${
+                              confirm ? "border-accent bg-accent text-ink" : "border-line-strong bg-white text-ink hover:border-brand hover:text-brand"
+                            }`}
+                          >
+                            <Icon className="size-4 shrink-0" aria-hidden />
+                            {busy ? "…" : confirm ? "Confirmer l'archivage" : a.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -252,14 +257,6 @@ function MesAnnonces() {
             })}
           </div>
         )}
-
-        <button
-          onClick={() => setSheet(true)}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-forest py-3.5 text-[15px] font-bold text-white transition active:scale-[0.99]"
-        >
-          <Plus className="size-4" />
-          Nouvelle annonce
-        </button>
       </div>
 
       <Sheet open={sheet} onClose={() => setSheet(false)} title="Nouvelle annonce">

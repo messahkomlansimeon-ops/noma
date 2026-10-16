@@ -1,6 +1,8 @@
 "use client";
 
+import { Rocket, SlidersHorizontal } from "lucide-react";
 import { AdminPage } from "@/components/admin/admin-page";
+import { Notice, PageHeading, Panel } from "@/components/admin/admin-ui";
 import { SETTINGS_NOTE, SETTINGS_TITLE, settingsRows } from "@/lib/client/admin-view";
 import { social } from "@/lib/client/social-api";
 
@@ -11,19 +13,20 @@ export default function AdminReglages() {
   return (
     <AdminPage title="Réglages" back="/admin" load={load}>
       {(settings) => (
-        <div data-testid="admin-settings">
-          <h1 className="font-display text-[22px] font-extrabold text-ink">{SETTINGS_TITLE}</h1>
-          <p className="text-[12px] text-ink-soft">{SETTINGS_NOTE}</p>
-          <div className="mt-3 space-y-2.5">
+        <div data-testid="admin-settings" className="flex flex-col gap-4">
+          <PageHeading icon={SlidersHorizontal} tone="mist">
+            {SETTINGS_TITLE}
+          </PageHeading>
+          <Notice>{SETTINGS_NOTE}</Notice>
+          <div className="stagger flex flex-col gap-3 md:grid md:grid-cols-2 md:items-start">
             {settingsRows(settings).map((row) => (
-              <section key={row.key} data-settings-key={row.key} className="rounded-2xl border border-line bg-white p-4">
-                <h2 className="text-[14px] font-extrabold text-ink">{row.title}</h2>
-                <ul className="mt-1.5 space-y-0.5 text-[12px] text-ink-soft">
+              <Panel key={row.key} icon={Rocket} tone="accent" title={row.title} data-settings-key={row.key}>
+                <ul className="mt-3 space-y-1 text-[14px] leading-snug text-ink-soft">
                   {row.lines.map((line) => (
                     <li key={line}>{line}</li>
                   ))}
                 </ul>
-              </section>
+              </Panel>
             ))}
           </div>
         </div>

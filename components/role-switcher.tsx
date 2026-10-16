@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ShieldCheck, ShoppingBag, Store, type LucideIcon } from "lucide-react";
 import { readSharedSession } from "@/lib/client/session-shared";
 
 export type DemoRole = "buyer" | "vendor" | "admin";
@@ -12,6 +13,8 @@ const defs: { role: DemoRole; label: string; href: string }[] = [
   { role: "vendor", label: "Vendeur", href: "/vendeur" },
   { role: "admin", label: "Admin", href: "/admin" },
 ];
+
+const roleIcons: Record<DemoRole, LucideIcon> = { buyer: ShoppingBag, vendor: Store, admin: ShieldCheck };
 
 /** Onglets du sélecteur : l'onglet Admin n'existe QUE pour un administrateur (lot D3) ; les comptes ordinaires et les visiteurs ne le voient jamais. */
 export function roleTabs(isAdmin: boolean): readonly { role: DemoRole; label: string; href: string }[] {
@@ -46,20 +49,26 @@ export function RoleSwitcher() {
     };
   }, []);
   return (
-    <nav aria-label="Changer d'espace" className="flex items-center justify-center gap-1.5 border-b border-line bg-white px-3 py-1.5" data-role-switcher>
-      <span className="mr-1 text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">Démo</span>
-      {roleTabs(isAdmin).map((d) => (
-        <Link
-          key={d.role}
-          href={d.href}
-          aria-current={d.role === role ? "page" : undefined}
-          className={`rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide transition ${
-            d.role === role ? "bg-ink text-white" : "border border-line bg-white text-ink hover:bg-wash"
-          }`}
-        >
-          {d.label}
-        </Link>
-      ))}
+    <nav aria-label="Changer d'espace" className="flex items-center justify-center border-b border-line bg-white px-3 py-2" data-role-switcher>
+      <div className="flex gap-1 rounded-full bg-mist p-1">
+        {roleTabs(isAdmin).map((d) => {
+          const Icon = roleIcons[d.role];
+          const current = d.role === role;
+          return (
+            <Link
+              key={d.role}
+              href={d.href}
+              aria-current={current ? "page" : undefined}
+              className={`press flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition-colors ${
+                current ? "bg-brand text-white shadow-sm" : "text-ink-soft hover:text-ink"
+              }`}
+            >
+              <Icon className="size-4" strokeWidth={2.2} aria-hidden />
+              {d.label}
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }

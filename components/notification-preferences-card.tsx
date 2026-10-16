@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MessageSquareText } from "lucide-react";
-import { Switch } from "@/components/ui";
+import { MessageSquareText, RotateCw } from "lucide-react";
+import { ArtAlert } from "@/components/illustrations";
+import { Btn, IconTile, Skeleton, Switch } from "@/components/ui";
 import { unreadRefresher } from "@/components/unread-badge";
 import { api, describeApiError, isUnauthorized, type NotificationPreferences } from "@/lib/client/api";
 import {
@@ -47,24 +48,28 @@ export function NotificationPreferencesCard() {
   if (state === "hidden") return null;
   if (state === "loading") {
     return (
-      <p className="mt-4 text-center text-[13px] text-ink-soft" aria-busy="true">
-        {PREFERENCES_LOADING}
-      </p>
+      <div className="mt-4" aria-busy="true">
+        <span className="sr-only">{PREFERENCES_LOADING}</span>
+        <Skeleton className="h-24 w-full rounded-3xl" />
+      </div>
     );
   }
   if (state === "error" || !preferences) {
     return (
-      <div role="alert" className="mt-4 rounded-2xl border border-line bg-white p-3.5 text-center">
-        <p className="text-[13px] font-semibold text-ink">Vos préférences de notification sont indisponibles pour le moment.</p>
-        <button
-          onClick={() => {
-            setState("loading");
-            setReloadKey((key) => key + 1);
-          }}
-          className="mt-2 rounded-xl bg-forest px-4 py-2 text-[13px] font-bold text-white"
-        >
-          Réessayer
-        </button>
+      <div role="alert" className="animate-rise mt-4 flex flex-col items-center gap-3 rounded-3xl border border-line bg-white p-4 text-center">
+        <ArtAlert className="size-20" />
+        <p className="text-[15px] font-bold text-ink">Vos préférences de notification sont indisponibles pour le moment.</p>
+        <div className="w-full max-w-xs">
+          <Btn
+            onClick={() => {
+              setState("loading");
+              setReloadKey((key) => key + 1);
+            }}
+          >
+            <RotateCw className="size-5" aria-hidden />
+            Réessayer
+          </Btn>
+        </div>
       </div>
     );
   }
@@ -85,28 +90,24 @@ export function NotificationPreferencesCard() {
   };
 
   return (
-    <section className="mt-4 rounded-2xl border border-line bg-white p-4" aria-label={PREFERENCES_TITLE} data-testid="notification-preferences">
-      <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sage text-forest">
-          <MessageSquareText className="size-[18px]" strokeWidth={1.9} aria-hidden />
-        </span>
+    <section className="animate-rise mt-4 rounded-3xl border border-line bg-white p-4" aria-label={PREFERENCES_TITLE} data-testid="notification-preferences">
+      <div className="flex items-center gap-3">
+        <IconTile icon={MessageSquareText} tone="brand" />
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-extrabold text-ink">{PREFERENCES_TITLE}</div>
-          <div className="mt-1 flex items-center justify-between gap-3">
-            <span id="external-label" className="text-[13px] font-semibold text-ink">
-              {preferencesLabel(preferences)}
-            </span>
-            <span className={saving ? "opacity-50" : ""}>
-              <Switch checked={view.enabled} onChange={(next) => void toggle(next)} label={preferencesLabel(preferences)} />
-            </span>
-          </div>
-          <p className="mt-2 text-[12px] text-ink-soft">{PREFERENCES_HINT}</p>
-          <p className="mt-1.5 text-[12px] font-semibold text-carrot-ink" data-testid="external-notice">
-            {view.notice}
-          </p>
-          {view.extra ? <p className="mt-1 text-[12px] text-ink-soft">{view.extra}</p> : null}
+          <div className="text-[16px] font-extrabold text-ink">{PREFERENCES_TITLE}</div>
+          <span id="external-label" className="text-[14px] font-semibold text-ink-soft">
+            {preferencesLabel(preferences)}
+          </span>
         </div>
+        <span className={saving ? "opacity-50" : ""}>
+          <Switch checked={view.enabled} onChange={(next) => void toggle(next)} label={preferencesLabel(preferences)} />
+        </span>
       </div>
+      <p className="mt-3 text-[13px] text-ink-soft">{PREFERENCES_HINT}</p>
+      <p className="mt-1.5 rounded-2xl bg-accent-soft px-3 py-2 text-[13px] font-semibold text-accent-ink" data-testid="external-notice">
+        {view.notice}
+      </p>
+      {view.extra ? <p className="mt-1.5 text-[13px] text-ink-soft">{view.extra}</p> : null}
     </section>
   );
 }

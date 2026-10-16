@@ -239,7 +239,7 @@ async function main(): Promise<void> {
     await shot(page, "02-annonce-formulaire");
     await sheet.getByRole("button", { name: "Publier l'annonce" }).click();
     await page.getByText("Annonce publiée").waitFor();
-    const card = page.locator("div.rounded-2xl", { hasText: "iPhone 12 · 128 Go" }).first();
+    const card = page.locator("div.rounded-3xl", { hasText: "iPhone 12 · 128 Go" }).first();
     await card.getByText("En ligne", { exact: true }).waitFor();
     await card.getByText(/150\s000 FCFA/).waitFor();
     ok("annonce créée puis publiée : badge « En ligne », prix 150 000 FCFA");
@@ -247,7 +247,7 @@ async function main(): Promise<void> {
     await page.getByRole("button", { name: "Nouvelle annonce" }).last().click();
     await page.getByRole("dialog").getByPlaceholder("iPhone 12 · 128 Go").fill("Galaxy A54 brouillon");
     await page.getByRole("dialog").getByRole("button", { name: "Enregistrer en brouillon" }).click();
-    const draft = page.locator("div.rounded-2xl", { hasText: "Galaxy A54 brouillon" }).first();
+    const draft = page.locator("div.rounded-3xl", { hasText: "Galaxy A54 brouillon" }).first();
     await draft.getByText("Brouillon", { exact: true }).waitFor();
     ok("brouillon enregistré : badge « Brouillon », prix « à compléter »");
 
@@ -266,7 +266,7 @@ async function main(): Promise<void> {
     await shot(page, "03-annonces-liste");
 
     await page.reload();
-    await page.locator("div.rounded-2xl", { hasText: "iPhone 12 · 128 Go" }).first().getByText("En ligne", { exact: true }).waitFor();
+    await page.locator("div.rounded-3xl", { hasText: "iPhone 12 · 128 Go" }).first().getByText("En ligne", { exact: true }).waitFor();
     ok("après rechargement, l'état vient du serveur (iPhone 12 en ligne)");
     const offers = (await (await api(context, "/api/offers")).json()) as { offers: { status: string; rawText: string }[] };
     assert.deepEqual(offers.offers.map((offer) => offer.status).sort(), ["archived", "published"]);
@@ -274,7 +274,7 @@ async function main(): Promise<void> {
 
     step("Lien « Acheteurs intéressés et boost » depuis « Mes annonces »");
     await page
-      .locator("div.rounded-2xl", { hasText: "iPhone 12 · 128 Go" })
+      .locator("div.rounded-3xl", { hasText: "iPhone 12 · 128 Go" })
       .first()
       .getByRole("link", { name: /Acheteurs intéressés et boost/ })
       .click();
@@ -283,9 +283,9 @@ async function main(): Promise<void> {
     await page.getByRole("heading", { name: "Booster cette annonce" }).waitFor();
     ok("la page de l'annonce s'ouvre : sections « Acheteurs intéressés » et « Booster cette annonce »");
     await page.goto(`${BASE}/vendeur/annonces`);
-    await page.locator("div.rounded-2xl", { hasText: "iPhone 12 · 128 Go" }).first().getByRole("button", { name: "Mettre en pause" }).click();
-    await page.locator("div.rounded-2xl", { hasText: "iPhone 12 · 128 Go" }).first().getByText("En pause", { exact: true }).waitFor();
-    await page.locator("div.rounded-2xl", { hasText: "iPhone 12 · 128 Go" }).first().getByRole("link", { name: /Acheteurs intéressés et boost/ }).click();
+    await page.locator("div.rounded-3xl", { hasText: "iPhone 12 · 128 Go" }).first().getByRole("button", { name: "Mettre en pause" }).click();
+    await page.locator("div.rounded-3xl", { hasText: "iPhone 12 · 128 Go" }).first().getByText("En pause", { exact: true }).waitFor();
+    await page.locator("div.rounded-3xl", { hasText: "iPhone 12 · 128 Go" }).first().getByRole("link", { name: /Acheteurs intéressés et boost/ }).click();
     await page.getByTestId("boost-not-eligible").waitFor();
     assert.match((await page.getByTestId("boost-not-eligible").textContent()) ?? "", /Le devis n'est proposé que pour une annonce en ligne/);
     assert.equal(await page.getByRole("group", { name: "Durée du boost" }).count(), 0, "aucun choix de durée pour une annonce en pause");
@@ -294,8 +294,8 @@ async function main(): Promise<void> {
     ok("annonce en pause : « Acheteurs intéressés » dit qu'il faut la remettre en ligne (le serveur ne sert rien pour une annonce hors ligne)");
     await shot(page, "04-annonce-en-pause-devis-refuse");
     await page.goto(`${BASE}/vendeur/annonces`);
-    await page.locator("div.rounded-2xl", { hasText: "iPhone 12 · 128 Go" }).first().getByRole("button", { name: "Remettre en ligne" }).click();
-    await page.locator("div.rounded-2xl", { hasText: "iPhone 12 · 128 Go" }).first().getByText("En ligne", { exact: true }).waitFor();
+    await page.locator("div.rounded-3xl", { hasText: "iPhone 12 · 128 Go" }).first().getByRole("button", { name: "Remettre en ligne" }).click();
+    await page.locator("div.rounded-3xl", { hasText: "iPhone 12 · 128 Go" }).first().getByText("En ligne", { exact: true }).waitFor();
 
     step("Besoins de l'acheteur : création, activation, satisfait, réactivation");
     await page.goto(`${BASE}/alertes`);
@@ -310,7 +310,7 @@ async function main(): Promise<void> {
     await shot(page, "05-besoin-formulaire");
     await page.getByRole("button", { name: "Activer le besoin" }).click();
     await page.waitForURL("**/alertes");
-    const need = page.locator("div.rounded-2xl", { hasText: "Je cherche un iPhone 12" }).first();
+    const need = page.locator("div.rounded-3xl", { hasText: "Je cherche un iPhone 12" }).first();
     await need.getByText("Active", { exact: true }).waitFor();
     await need.getByText(/200\s000 FCFA max/).waitFor();
     ok("besoin créé puis activé : badge « Active », budget 200 000 FCFA max");
@@ -322,11 +322,11 @@ async function main(): Promise<void> {
     ok("besoin satisfait : la page de résultats dit de le réactiver (aucun appel de correspondances pour un besoin non actif)");
     await page.goBack();
     await page.waitForURL("**/alertes");
-    await page.locator("div.rounded-2xl", { hasText: "Je cherche un iPhone 12" }).first().getByRole("button", { name: "Réactiver" }).click();
-    await page.locator("div.rounded-2xl", { hasText: "Je cherche un iPhone 12" }).first().getByText("Active", { exact: true }).waitFor();
+    await page.locator("div.rounded-3xl", { hasText: "Je cherche un iPhone 12" }).first().getByRole("button", { name: "Réactiver" }).click();
+    await page.locator("div.rounded-3xl", { hasText: "Je cherche un iPhone 12" }).first().getByText("Active", { exact: true }).waitFor();
     ok("« Marquer satisfait » puis « Réactiver » : « Satisfait » puis « Active »");
     await shot(page, "06-besoins-liste");
-    await page.locator("div.rounded-2xl", { hasText: "Je cherche un iPhone 12" }).first().getByRole("link", { name: "Voir les offres", exact: true }).click();
+    await page.locator("div.rounded-3xl", { hasText: "Je cherche un iPhone 12" }).first().getByRole("link", { name: "Voir les offres", exact: true }).click();
     await page.waitForURL(/\/besoins\/[0-9a-f-]{36}$/);
     await page.getByRole("heading", { name: /Offres correspondantes|offre/ }).waitFor();
     ok("« Voir les offres » ouvre la page de résultats du besoin");
@@ -407,7 +407,7 @@ async function main(): Promise<void> {
     await form.getByPlaceholder("Marcory, Abidjan").fill("Abidjan");
     await form.getByRole("button", { name: "Publier l'annonce" }).click();
     await sellerPage.getByText("Annonce publiée").waitFor();
-    const sellerCard = sellerPage.locator("div.rounded-2xl", { hasText: offerTitle }).first();
+    const sellerCard = sellerPage.locator("div.rounded-3xl", { hasText: offerTitle }).first();
     await sellerCard.getByText("En ligne", { exact: true }).waitFor();
     ok(`offre de A publiée à 190 000 FCFA (plus chère que les ${RIVAL_OFFERS} offres de C)`);
     await sellerCard.getByRole("link", { name: /Acheteurs intéressés et boost/ }).click();
@@ -451,7 +451,7 @@ async function main(): Promise<void> {
     await buyerPage.getByPlaceholder("200 000").fill("250 000");
     await buyerPage.getByRole("button", { name: "Activer le besoin" }).click();
     await buyerPage.waitForURL("**/alertes");
-    const buyerNeed = buyerPage.locator("div.rounded-2xl", { hasText: `Je cherche un ${product.brand} ${product.model}` }).first();
+    const buyerNeed = buyerPage.locator("div.rounded-3xl", { hasText: `Je cherche un ${product.brand} ${product.model}` }).first();
     await buyerNeed.getByText("Active", { exact: true }).waitFor();
     await buyerNeed.getByRole("link", { name: "Voir les offres", exact: true }).click();
     await buyerPage.waitForURL(/\/besoins\/[0-9a-f-]{36}$/);
@@ -490,7 +490,7 @@ async function main(): Promise<void> {
     info(`état « Recherche en cours… » vu avant les résultats : ${sawProcessing ? "oui" : "non (résultats déjà prêts)"}`);
     assert.equal(sawMore, true, "la page n'a proposé « Voir plus » qu'au-delà de 20 offres");
     assert.equal(await cards.count(), total);
-    const prices = new Set((await cards.locator(".font-display").allInnerTexts()).map((text) => text.replace(/\s/g, "")));
+    const prices = new Set((await cards.getByTestId("offer-price").allInnerTexts()).map((text) => text.replace(/\s/g, "")));
     assert.equal(prices.size, total, "« Voir plus » n'a introduit aucun doublon : une offre par prix distinct");
     assert.equal(await buyerPage.getByRole("button", { name: "Voir plus" }).count(), 0, "plus de « Voir plus » une fois toutes les offres affichées");
     assert.equal((await buyerPage.getByTestId("results-count").textContent())?.trim(), `${total} offres correspondent à votre besoin`);
@@ -640,7 +640,7 @@ async function main(): Promise<void> {
     await payForm.getByPlaceholder("Marcory, Abidjan").fill("Abidjan");
     await payForm.getByRole("button", { name: "Publier l'annonce" }).click();
     await sellerPage.getByText("Annonce publiée").waitFor();
-    const payCard = sellerPage.locator("div.rounded-2xl", { hasText: payTitle }).first();
+    const payCard = sellerPage.locator("div.rounded-3xl", { hasText: payTitle }).first();
     await payCard.getByText("En ligne", { exact: true }).waitFor();
     await payCard.getByRole("link", { name: /Acheteurs intéressés et boost/ }).click();
     await sellerPage.waitForURL(/\/vendeur\/annonces\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
@@ -661,7 +661,7 @@ async function main(): Promise<void> {
     await buyerPage.getByRole("button", { name: "Activer le besoin" }).click();
     await buyerPage.waitForURL("**/alertes");
     await buyerPage
-      .locator("div.rounded-2xl", { hasText: `Je cherche un ${payProduct.brand} ${payProduct.model}` })
+      .locator("div.rounded-3xl", { hasText: `Je cherche un ${payProduct.brand} ${payProduct.model}` })
       .first()
       .getByRole("link", { name: "Voir les offres", exact: true })
       .click();
@@ -1156,8 +1156,8 @@ async function main(): Promise<void> {
     const colorOf = (row: typeof rows) => row.getByTestId("wallet-row-amount").evaluate((element) => getComputedStyle(element).color);
     const debitColor = await colorOf(purchaseRow);
     const creditColor = await colorOf(topupRow);
-    assert.equal(creditColor, "rgb(14, 95, 59)", "crédit en vert (forest)");
-    assert.equal(debitColor, "rgb(194, 65, 12)", "débit en orange foncé (carrot-ink)");
+    assert.equal(creditColor, "rgb(12, 94, 67)", "crédit en vert (success-ink)");
+    assert.equal(debitColor, "rgb(122, 82, 0)", "débit en brun-orangé (accent-ink)");
     assert.equal(await purchaseRow.getByTestId("wallet-row-amount").getAttribute("data-tone"), "debit");
     assert.equal(await topupRow.getByTestId("wallet-row-amount").getAttribute("data-tone"), "credit");
     const walletText = await sellerPage.locator("main").innerText();
@@ -1603,7 +1603,7 @@ async function main(): Promise<void> {
     await mForm.getByPlaceholder("Marcory, Abidjan").fill("Abidjan");
     await mForm.getByRole("button", { name: "Publier l'annonce" }).click();
     await mSellerPage.getByText("Annonce publiée").waitFor();
-    const mSellerCard = mSellerPage.locator("div.rounded-2xl", { hasText: `${mTitle} · offre de S` }).first();
+    const mSellerCard = mSellerPage.locator("div.rounded-3xl", { hasText: `${mTitle} · offre de S` }).first();
     await mSellerCard.getByText("En ligne", { exact: true }).waitFor();
     await mSellerCard.getByRole("link", { name: /Acheteurs intéressés et boost/ }).click();
     await mSellerPage.waitForURL(/\/vendeur\/annonces\/[0-9a-f-]{36}$/);
@@ -1629,7 +1629,7 @@ async function main(): Promise<void> {
     await mBuyerPage.getByPlaceholder("200 000").fill("250 000");
     await mBuyerPage.getByRole("button", { name: "Activer le besoin" }).click();
     await mBuyerPage.waitForURL("**/alertes");
-    await mBuyerPage.locator("div.rounded-2xl", { hasText: `Je cherche un ${mTitle}` }).first().getByRole("link", { name: "Voir les offres", exact: true }).click();
+    await mBuyerPage.locator("div.rounded-3xl", { hasText: `Je cherche un ${mTitle}` }).first().getByRole("link", { name: "Voir les offres", exact: true }).click();
     await mBuyerPage.waitForURL(/\/besoins\/[0-9a-f-]{36}$/);
     const mDemandId = mBuyerPage.url().split("/").pop() as string;
     // B2 à B5 : par l'API (quatre comptes distincts), même produit.
@@ -1783,7 +1783,7 @@ async function main(): Promise<void> {
     await mSellerPage.getByTestId("stats-period-all").click();
     assert.equal(await statValue("all", "contacts"), "environ 5 acheteurs");
     const boostBlock = mSellerPage.getByTestId("stats-boost").first();
-    assert.match(norm(await boostBlock.locator(".text-\\[13px\\].font-bold").first().textContent()), /^Boost de 24 h · en cours$/);
+    assert.match(norm(await boostBlock.getByTestId("stats-boost-title").textContent()), /^Boost de 24 h · en cours$/);
     const boostValue = async (key: string) => norm(await boostBlock.locator(`[data-stat="${key}"] [data-stat-value]`).textContent());
     assert.equal(await boostValue("exposed"), "environ 5 acheteurs");
     assert.equal(await boostValue("sponsored"), "environ 5 acheteurs");
@@ -1856,10 +1856,10 @@ async function main(): Promise<void> {
     await nPage.getByPlaceholder("200 000").fill("100 000");
     await nPage.getByRole("button", { name: "Activer le besoin" }).click();
     await nPage.waitForURL("**/alertes");
-    await nPage.getByRole("link", { name: /Notifications/ }).first().waitFor();
+    await nPage.locator('a[href="/notifications"]').first().waitFor();
     assert.equal(await nPage.getByTestId("unread-badge").count(), 0, "aucune notification : aucune pastille");
     ok("acheteur N1 : besoin activé, page « Mes besoins » avec le lien « Notifications » et AUCUNE pastille (0 non lue)");
-    await nPage.locator("div.rounded-2xl", { hasText: `Je cherche un ${nTitle}` }).first().getByRole("link", { name: "Voir les offres", exact: true }).click();
+    await nPage.locator("div.rounded-3xl", { hasText: `Je cherche un ${nTitle}` }).first().getByRole("link", { name: "Voir les offres", exact: true }).click();
     await nPage.waitForURL(/\/besoins\/[0-9a-f-]{36}$/);
     const nDemandId = nPage.url().split("/").pop() as string;
     const nPanel = nPage.getByTestId("tracking-panel");
@@ -1904,7 +1904,7 @@ async function main(): Promise<void> {
 
     step("Page /notifications : liste, non-lues en gras, lien vers la fiche, « Tout marquer comme lu », pastille disparue");
     await nPage.goto(`${BASE}/alertes`);
-    await nPage.getByRole("link", { name: /Notifications/ }).first().click();
+    await nPage.locator('a[href="/notifications"]').first().click();
     await nPage.waitForURL("**/notifications");
     const nRows = nPage.getByTestId("notification-row");
     await nRows.first().waitFor();
@@ -1983,9 +1983,9 @@ async function main(): Promise<void> {
     ok("pendant la pause, la nouvelle annonce apparaît dans les résultats : le matching continue");
     await sleep(2_000);
     await nPage.goto(`${BASE}/alertes`);
-    await nPage.getByRole("link", { name: /Notifications/ }).first().waitFor();
+    await nPage.locator('a[href="/notifications"]').first().waitFor();
     assert.equal(await nPage.getByTestId("unread-badge").count(), 0, "pause : la nouvelle annonce ne produit aucune pastille");
-    await nPage.getByRole("link", { name: /Notifications/ }).first().click();
+    await nPage.locator('a[href="/notifications"]').first().click();
     await nPage.getByTestId("notification-row").first().waitFor();
     assert.equal(await nPage.getByTestId("notification-row").count(), 2, "toujours les deux notifications d'avant la pause (A1 et A1b)");
     ok("pause : aucune pastille, toujours les DEUX mêmes notifications dans la liste (une nouvelle annonce ne notifie pas)");
@@ -2003,7 +2003,7 @@ async function main(): Promise<void> {
     ok(`« Reprendre » : « ${nUntilResumed} » ; « Prolonger de 30 jours » : « ${await nHeadline()} »`);
     const nThird = await nPublish("A3", "58 000");
     await nWaitBadges("la pastille après la reprise, le worker de matching tourne-t-il sur la même base ?", ["1", "1"], WORKER_TIMEOUT_MS, true);
-    await nPage.getByRole("link", { name: /Notifications/ }).first().click();
+    await nPage.locator('a[href="/notifications"]').first().click();
     await nPage.getByTestId("notification-row").nth(2).waitFor();
     const nListText = norm(await nPage.locator("main").innerText());
     assert.equal(await nPage.getByTestId("notification-row").count(), 3);
@@ -2053,7 +2053,8 @@ async function main(): Promise<void> {
   } catch (error) {
     for (const [index, open] of openPages.entries()) await shot(open, `99-echec-${index + 1}`).catch(() => {});
     console.error(
-      `  ✗ ÉCHEC : ${error instanceof Error ? error.message.split("\n")[0] : "erreur inattendue"} (URL : ${openPages.map((open) => open.url()).join(" | ")})`,
+      `  ✗ ÉCHEC : ${error instanceof Error ? error.message.split("\n")[0] : "erreur inattendue"} (URL : ${openPages.map((open) => open.url()).join(" | ")})` +
+        (error instanceof Error && error.stack ? `\n${error.stack.split("\n").filter((line) => line.includes("e2e-ui.ts")).slice(0, 3).join("\n")}` : ""),
     );
     await browser.close();
     process.exit(1);

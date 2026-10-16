@@ -3,9 +3,10 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle } from "lucide-react";
+import { ChevronRight, MessageCircle, PackageCheck, ShieldCheck, TriangleAlert } from "lucide-react";
 import { DeclareOrder } from "@/components/orders/declare-order";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
+import { IconTile } from "@/components/ui";
 import { WRITE_TO_SELLER_LABEL, WRITE_TO_SELLER_ONGOING, conversationPath } from "@/lib/client/messages-view";
 import { NO_PAYMENT_NOTICE, offerOrderBanner, type OfferOrderBanner } from "@/lib/client/orders-view";
 import { describeSocialError, social } from "@/lib/client/social-api";
@@ -52,38 +53,46 @@ export function OfferActions({ demandId, offerId }: { demandId: string; offerId:
   };
 
   return (
-    <section aria-labelledby="actions-title" className="mt-4 rounded-2xl border border-line bg-white p-4" data-testid="offer-actions">
-      <h2 id="actions-title" className="text-[15px] font-extrabold text-ink">
+    <section aria-labelledby="actions-title" className="mt-4 flex flex-col gap-3 rounded-3xl border border-line bg-white p-4" data-testid="offer-actions">
+      <h2 id="actions-title" className="sr-only">
         Discuter ou conclure
       </h2>
       <button
         onClick={() => void write()}
         disabled={pending}
         data-testid="write-to-seller"
-        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-forest px-4 py-3 text-[14px] font-bold text-white transition active:scale-[0.99] disabled:opacity-50"
+        className="press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-[16px] font-bold text-white shadow-md shadow-brand/30 hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <MessageCircle className="size-4" aria-hidden />
+        <MessageCircle className="size-5" aria-hidden />
         {pending ? WRITE_TO_SELLER_ONGOING : WRITE_TO_SELLER_LABEL}
       </button>
       {error ? (
-        <p role="alert" data-testid="write-error" className="mt-2 text-[13px] font-semibold text-carrot-ink">
+        <p role="alert" data-testid="write-error" className="flex items-start gap-2 rounded-2xl bg-accent-soft px-3.5 py-3 text-[14px] font-semibold text-accent-ink">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
           {error}
         </p>
       ) : null}
       {banner ? (
-        <div data-testid="offer-order-banner" data-kind={banner.kind} className="mt-2 rounded-xl border border-forest/30 bg-sage px-3.5 py-3">
-          <div data-testid="offer-order-label" className="text-[14px] font-bold text-forest">
-            {banner.label}
+        <div data-testid="offer-order-banner" data-kind={banner.kind} className="flex items-center gap-3 rounded-2xl bg-success-soft px-3.5 py-3">
+          <IconTile icon={PackageCheck} tone="success" className="size-10" />
+          <div className="min-w-0 flex-1">
+            <div data-testid="offer-order-label" className="text-[15px] font-bold text-success-ink">
+              {banner.label}
+            </div>
+            <div className="text-[13px] text-success-ink">{banner.hint}</div>
           </div>
-          <div className="text-[12px] text-sage-ink">{banner.hint}</div>
-          <Link href={banner.href} className="mt-1 inline-block text-[12px] font-bold text-forest underline">
+          <Link href={banner.href} className="press flex min-h-11 shrink-0 items-center gap-1 text-[14px] font-bold text-success-ink underline">
             Voir la commande
+            <ChevronRight className="size-4" aria-hidden />
           </Link>
         </div>
       ) : (
         <DeclareOrder demandId={demandId} offerId={offerId} />
       )}
-      <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">{NO_PAYMENT_NOTICE}</p>
+      <p className="flex items-start gap-2 text-[13px] leading-relaxed text-ink-soft">
+        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-ink-soft" aria-hidden />
+        {NO_PAYMENT_NOTICE}
+      </p>
     </section>
   );
 }

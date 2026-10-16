@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Radar, Wallet } from "lucide-react";
+import { Check, Info, Radar, RotateCw, TriangleAlert, Wallet } from "lucide-react";
+import { ArtAlert } from "@/components/illustrations";
 import { useUnauthorizedRedirect } from "@/components/session-gate";
+import { Btn, IconTile, Skeleton } from "@/components/ui";
 import { useNoma } from "@/lib/store";
 import { ApiError, describeApiError } from "@/lib/client/api";
 import { activeSearchApi, type ActiveSearchState } from "@/lib/client/active-search-api";
@@ -15,7 +17,10 @@ import { createGenerationGuard } from "@/lib/client/match-view";
 import { browserSessionStorage, createIdempotencyKeys, newIdempotencyKey, walletHref } from "@/lib/client/wallet-view";
 
 const KEY_PREFIX = "noma:active-search-key:";
-const TONE_CLASS = { active: "border-forest/30 bg-sage", off: "border-line bg-white", paused: "border-carrot/40 bg-carrot-soft", closed: "border-line bg-wash", unavailable: "border-line bg-wash" } as const;
+const TONE_CLASS = { active: "border-brand/30 bg-brand-soft", off: "border-line bg-white", paused: "border-accent/40 bg-accent-soft", closed: "border-line bg-mist", unavailable: "border-line bg-mist" } as const;
+const TILE_TONE = { active: "brand", off: "mist", paused: "accent", closed: "mist", unavailable: "mist" } as const;
+const BIG_BUTTON =
+  "press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-[16px] font-bold disabled:cursor-not-allowed disabled:opacity-40";
 
 /**
  * Carte « Recherche active » de la page d'un besoin actif (lot RA1) : état de l'option, ce qu'elle apporte, ses règles (dites AVANT l'achat), prix PROVISOIRE, achat avec confirmation et clé
@@ -130,16 +135,25 @@ export function ActiveSearchCardView(props: ActiveSearchCardViewProps) {
   const { demandId, state, loadError, confirming, pending, actionError, done } = props;
   if (loadError) {
     return (
-      <div role="alert" data-testid="active-search-error" className="mt-3 rounded-2xl border border-line bg-white p-3.5 text-center">
-        <p className="text-[13px] font-semibold text-ink">{loadError}</p>
-        <button onClick={props.onRetry} className="mt-2 rounded-xl bg-forest px-4 py-2 text-[13px] font-bold text-white">
-          Réessayer
-        </button>
+      <div role="alert" data-testid="active-search-error" className="animate-rise mt-3 flex flex-col items-center gap-3 rounded-3xl border border-line bg-white p-4 text-center">
+        <ArtAlert className="size-20" />
+        <p className="text-[15px] font-bold text-ink">{loadError}</p>
+        <div className="w-full max-w-xs">
+          <Btn onClick={props.onRetry}>
+            <RotateCw className="size-5" aria-hidden />
+            Réessayer
+          </Btn>
+        </div>
       </div>
     );
   }
   if (!state) {
-    return <p className="mt-3 text-center text-[13px] text-ink-soft" aria-busy="true">{ACTIVE_SEARCH_LOADING}</p>;
+    return (
+      <div className="mt-3" aria-busy="true">
+        <span className="sr-only">{ACTIVE_SEARCH_LOADING}</span>
+        <Skeleton className="h-28 w-full rounded-3xl" />
+      </div>
+    );
   }
 
   const view = activeSearchView(state);
@@ -150,46 +164,59 @@ export function ActiveSearchCardView(props: ActiveSearchCardViewProps) {
   const compact = view.tone === "paused" || view.tone === "unavailable";
   return (
     <section
-      className={`mt-3 rounded-2xl border p-3.5 ${TONE_CLASS[view.tone]}`}
+      className={`mt-3 rounded-3xl border p-4 ${TONE_CLASS[view.tone]}`}
       aria-label={ACTIVE_SEARCH_TITLE}
       data-testid="active-search-card"
       data-tone={view.tone}
       data-active={state.active ? "true" : "false"}
       data-acceleration={state.accelerationPending ? "pending" : state.active ? "running" : "none"}
     >
-      <div className="flex items-start gap-2.5">
-        <Radar className={`mt-0.5 size-5 shrink-0 ${view.tone === "active" ? "text-forest" : "text-ink-soft"}`} aria-hidden />
+      <div className="flex items-center gap-3">
+        <IconTile icon={Radar} tone={TILE_TONE[view.tone]} />
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-extrabold text-ink">{ACTIVE_SEARCH_TITLE}</div>
-          <div className="mt-0.5 text-[13px] font-bold text-ink" data-testid="active-search-headline">{view.headline}</div>
-          <p className="mt-0.5 text-[12px] text-ink-soft" data-testid="active-search-detail">{view.detail}</p>
+          <div className="text-[13px] font-bold uppercase tracking-wide text-ink-soft">{ACTIVE_SEARCH_TITLE}</div>
+          <div className="text-[16px] font-extrabold leading-snug text-ink" data-testid="active-search-headline">{view.headline}</div>
         </div>
       </div>
+      <p className="mt-2 text-[14px] text-ink-soft" data-testid="active-search-detail">{view.detail}</p>
 
       {compact ? null : (
         <>
-          <ul className="mt-2.5 list-disc space-y-1 pl-5 text-[12px] text-ink-soft" data-testid="active-search-benefits">
-            {ACTIVE_SEARCH_BENEFITS.map((line) => <li key={line}>{line}</li>)}
+          <ul className="mt-3 flex flex-col gap-2 text-[14px] text-ink" data-testid="active-search-benefits">
+            {ACTIVE_SEARCH_BENEFITS.map((line) => (
+              <li key={line} className="flex items-start gap-2">
+                <Check className="mt-0.5 size-4 shrink-0 text-success-ink" strokeWidth={2.6} aria-hidden />
+                <span>{line}</span>
+              </li>
+            ))}
           </ul>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-[12px] text-ink-soft" data-testid="active-search-rules">
-            {ACTIVE_SEARCH_RULES.map((line) => <li key={line}>{line}</li>)}
+          <ul className="mt-3 flex flex-col gap-2 text-[13px] text-ink-soft" data-testid="active-search-rules">
+            {ACTIVE_SEARCH_RULES.map((line) => (
+              <li key={line} className="flex items-start gap-2">
+                <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span>{line}</span>
+              </li>
+            ))}
           </ul>
-          <p className="mt-2 text-[11px] text-ink-soft">{EXTERNAL_NOTIFICATION_NOTE}</p>
-          <p data-testid="active-search-price-notice" className="mt-2 rounded-lg bg-carrot-soft px-3 py-2 text-[12px] font-semibold text-carrot-ink">{ACTIVE_SEARCH_PRICE_NOTICE}</p>
+          <p className="mt-3 text-[13px] text-ink-soft">{EXTERNAL_NOTIFICATION_NOTE}</p>
+          <div className="mt-3 flex items-start gap-2 rounded-2xl bg-accent-soft px-3.5 py-2.5 text-accent-ink">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <p data-testid="active-search-price-notice" className="text-[13px] font-semibold">{ACTIVE_SEARCH_PRICE_NOTICE}</p>
+          </div>
         </>
       )}
 
       {!compact && purchase.kind === "blocked" ? (
-        <p data-testid="active-search-blocked" className="mt-3 rounded-xl bg-wash p-3 text-[13px] font-semibold text-ink-soft">{purchase.text}</p>
+        <p data-testid="active-search-blocked" className="mt-3 rounded-2xl bg-mist p-3.5 text-[14px] font-semibold text-ink-soft">{purchase.text}</p>
       ) : null}
       {!compact && purchase.kind === "none" ? (
-        <p role="alert" className="mt-3 rounded-xl bg-carrot-soft p-3 text-[13px] font-semibold text-carrot-ink">Votre solde n&apos;a pas pu être lu : l&apos;achat est impossible pour le moment.</p>
+        <p role="alert" className="mt-3 rounded-2xl bg-accent-soft p-3.5 text-[14px] font-semibold text-accent-ink">Votre solde n&apos;a pas pu être lu : l&apos;achat est impossible pour le moment.</p>
       ) : null}
       {!compact && purchase.kind === "insufficient" ? (
-        <div data-testid="active-search-insufficient" className="mt-3 rounded-xl bg-carrot-soft p-3 text-[13px] text-carrot-ink">
+        <div data-testid="active-search-insufficient" className="mt-3 rounded-2xl bg-accent-soft p-3.5 text-[14px] text-accent-ink">
           <div className="font-extrabold">{purchase.text}</div>
           <p className="mt-0.5">{purchase.detail}</p>
-          <Link href={walletHref({ next: `/besoins/${demandId}`, recharge: true })} data-testid="active-search-recharge" className="mt-2 inline-flex items-center gap-1.5 font-bold underline">
+          <Link href={walletHref({ next: `/besoins/${demandId}`, recharge: true })} data-testid="active-search-recharge" className="press mt-2 inline-flex min-h-11 items-center gap-1.5 font-bold underline">
             <Wallet className="size-4" aria-hidden />
             {ACTIVE_SEARCH_LABELS.recharge}
           </Link>
@@ -201,32 +228,36 @@ export function ActiveSearchCardView(props: ActiveSearchCardViewProps) {
           data-testid="active-search-buy"
           onClick={props.onBuy}
           disabled={!canPurchase(purchase, pending)}
-          className="mt-3 flex w-full items-center justify-center rounded-xl bg-forest px-4 py-3 text-[14px] font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+          className={`${BIG_BUTTON} mt-3 bg-brand text-white shadow-md shadow-brand/30 hover:bg-brand-deep`}
         >
           {view.buttonLabel}
         </button>
       ) : null}
       {!compact && purchase.kind === "ready" && confirming ? (
-        <div data-testid="active-search-confirmation" className="mt-3 rounded-2xl border border-forest/30 bg-white p-3.5">
-          <p className="text-[13px] font-semibold text-ink">{purchaseConfirmationText(purchase, view.isExtension)}</p>
-          <div className="mt-3 flex gap-2">
+        <div data-testid="active-search-confirmation" className="animate-pop mt-3 rounded-3xl border-2 border-brand/30 bg-white p-4">
+          <p className="text-[15px] font-semibold text-ink">{purchaseConfirmationText(purchase, view.isExtension)}</p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <button
               data-testid="active-search-confirm"
               onClick={props.onConfirm}
               disabled={pending}
-              className="flex-1 rounded-xl bg-forest px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50"
+              className={`${BIG_BUTTON} bg-brand text-white hover:bg-brand-deep sm:flex-1`}
             >
               {pending ? ACTIVE_SEARCH_LABELS.confirming : ACTIVE_SEARCH_LABELS.confirm}
             </button>
-            <button onClick={props.onCancel} disabled={pending} className="rounded-xl border border-line bg-white px-4 py-2.5 text-[13px] font-bold text-ink disabled:opacity-50">
+            <button
+              onClick={props.onCancel}
+              disabled={pending}
+              className={`${BIG_BUTTON} border-2 border-line-strong bg-white text-ink hover:border-brand sm:w-auto`}
+            >
               {ACTIVE_SEARCH_LABELS.cancel}
             </button>
           </div>
         </div>
       ) : null}
 
-      {actionError ? <p role="alert" data-testid="active-search-action-error" className="mt-3 rounded-xl bg-carrot-soft p-3 text-[13px] font-semibold text-carrot-ink">{actionError}</p> : null}
-      {done ? <p role="status" data-testid="active-search-done" className="mt-3 rounded-xl bg-white p-3 text-[13px] font-semibold text-forest">{done}</p> : null}
+      {actionError ? <p role="alert" data-testid="active-search-action-error" className="mt-3 rounded-2xl bg-accent-soft p-3.5 text-[14px] font-semibold text-accent-ink">{actionError}</p> : null}
+      {done ? <p role="status" data-testid="active-search-done" className="mt-3 rounded-2xl bg-white p-3.5 text-[14px] font-semibold text-success-ink">{done}</p> : null}
     </section>
   );
 }

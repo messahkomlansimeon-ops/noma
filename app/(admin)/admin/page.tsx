@@ -1,12 +1,60 @@
 "use client";
 
 import Link from "next/link";
+import {
+  Activity,
+  ChevronRight,
+  CircleCheck,
+  CreditCard,
+  Crown,
+  Globe,
+  Handshake,
+  MessageCircle,
+  Radar,
+  Rocket,
+  Search,
+  ShoppingBag,
+  SlidersHorizontal,
+  Smartphone,
+  Store,
+  Tag,
+  TrendingUp,
+  TriangleAlert,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 import { AdminPage } from "@/components/admin/admin-page";
+import { PageHeading, Panel, StatTile } from "@/components/admin/admin-ui";
+import { IconTile, type TileTone } from "@/components/ui";
 import { ADMIN_TITLE, summaryTiles, workerView } from "@/lib/client/admin-view";
 import { formatDateTimeFr } from "@/lib/client/wallet-view";
 import { social } from "@/lib/client/social-api";
 
 const load = (signal: AbortSignal) => social.admin.summary({ signal });
+
+const TILE_LOOK: Record<string, { icon: LucideIcon; tone: TileTone }> = {
+  accounts: { icon: Users, tone: "brand" },
+  offers: { icon: Tag, tone: "accent" },
+  demands: { icon: Search, tone: "info" },
+  matches: { icon: Handshake, tone: "success" },
+  boosts: { icon: Rocket, tone: "accent" },
+  credits: { icon: Wallet, tone: "brand" },
+  conversations: { icon: MessageCircle, tone: "info" },
+  orders: { icon: ShoppingBag, tone: "success" },
+};
+
+const SECTION_LINK = "press flex min-h-16 items-center gap-3 rounded-3xl border border-line bg-white px-4 py-3 hover:border-brand";
+
+function SectionRow({ icon, tone, label }: { icon: LucideIcon; tone: TileTone; label: string }) {
+  return (
+    <>
+      <IconTile icon={icon} tone={tone} className="size-11" />
+      <span className="flex-1 text-[16px] font-bold text-ink">{label}</span>
+      <ChevronRight className="size-5 shrink-0 text-ink-soft" aria-hidden />
+    </>
+  );
+}
 
 /** Tableau de bord de l'administration (lot D2) : des chiffres réels, lus sur le serveur au moment de l'ouverture. */
 export default function Admin() {
@@ -15,56 +63,59 @@ export default function Admin() {
       {(summary) => {
         const worker = workerView(summary.worker);
         return (
-          <div data-testid="admin-dashboard">
-            <h1 className="font-display text-[22px] font-extrabold text-ink">{ADMIN_TITLE}</h1>
-            <p className="text-[12px] text-ink-soft">Lu le {formatDateTimeFr(summary.readAt)}</p>
-            <div className="mt-3 grid grid-cols-2 gap-2.5">
-              {summaryTiles(summary).map((tile) => (
-                <div key={tile.key} data-tile={tile.key} className="rounded-2xl border border-line bg-white p-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">{tile.label}</div>
-                  <div className="font-display text-[22px] font-extrabold leading-tight text-ink" data-tile-value>
-                    {tile.value}
-                  </div>
-                  {tile.detail ? <div className="text-[11px] leading-snug text-ink-soft">{tile.detail}</div> : null}
-                </div>
-              ))}
+          <div data-testid="admin-dashboard" className="flex flex-col gap-4">
+            <PageHeading icon={Activity}>{ADMIN_TITLE}</PageHeading>
+            <p className="-mt-2 text-[13px] text-ink-soft">Lu le {formatDateTimeFr(summary.readAt)}</p>
+
+            <div className="stagger grid grid-cols-2 gap-3 md:grid-cols-4">
+              {summaryTiles(summary).map((tile) => {
+                const look = TILE_LOOK[tile.key] ?? { icon: Activity, tone: "brand" as TileTone };
+                return <StatTile key={tile.key} tile={tile.key} icon={look.icon} tone={look.tone} label={tile.label} value={tile.value} detail={tile.detail} />;
+              })}
             </div>
-            <section aria-labelledby="worker-title" data-testid="admin-worker" data-healthy={worker.healthy ? "true" : "false"} className="mt-3 rounded-2xl border border-line bg-white p-4">
-              <h2 id="worker-title" className="text-[14px] font-extrabold text-ink">
-                {worker.headline}
-              </h2>
-              <ul className="mt-1.5 space-y-0.5 text-[12px] text-ink-soft">
+
+            <Panel
+              icon={worker.healthy ? CircleCheck : TriangleAlert}
+              tone={worker.healthy ? "success" : "accent"}
+              title={worker.headline}
+              titleId="worker-title"
+              aria-labelledby="worker-title"
+              data-testid="admin-worker"
+              data-healthy={worker.healthy ? "true" : "false"}
+            >
+              <ul className="mt-3 space-y-1 text-[13px] leading-snug text-ink-soft">
                 {worker.lines.map((line) => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>
-            </section>
-            <div className="mt-4 grid gap-2.5">
-              <Link href="/admin/vendeurs" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
-                Vendeurs et journal d&apos;administration ›
+            </Panel>
+
+            <nav aria-label="Sections" className="stagger grid grid-cols-1 gap-3 md:grid-cols-2">
+              <Link href="/admin/vendeurs" className={SECTION_LINK}>
+                <SectionRow icon={Store} tone="brand" label="Vendeurs" />
               </Link>
-              <Link href="/admin/marche" data-testid="admin-market-link" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
-                Marché : prix observés ›
+              <Link href="/admin/marche" data-testid="admin-market-link" className={SECTION_LINK}>
+                <SectionRow icon={TrendingUp} tone="success" label="Marché" />
               </Link>
-              <Link href="/admin/reglages" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
-                Réglages du boost (lecture seule) ›
+              <Link href="/admin/reglages" className={SECTION_LINK}>
+                <SectionRow icon={SlidersHorizontal} tone="mist" label="Réglages" />
               </Link>
-              <Link href="/admin/offres" data-testid="admin-offers-link" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
-                Offres Pro : plans et abonnements ›
+              <Link href="/admin/offres" data-testid="admin-offers-link" className={SECTION_LINK}>
+                <SectionRow icon={Crown} tone="accent" label="Offres Pro" />
               </Link>
-              <Link href="/admin/sms" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
-                SMS : consommation et envois à rapprocher ›
+              <Link href="/admin/sms" className={SECTION_LINK}>
+                <SectionRow icon={Smartphone} tone="info" label="SMS" />
               </Link>
-              <Link href="/admin/recherche-active" data-testid="admin-active-search-link" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
-                Recherche active : options et revenus ›
+              <Link href="/admin/recherche-active" data-testid="admin-active-search-link" className={SECTION_LINK}>
+                <SectionRow icon={Radar} tone="brand" label="Recherche active" />
               </Link>
-              <Link href="/admin/collecte" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
-                Collecte externe (lecture seule) ›
+              <Link href="/admin/collecte" className={SECTION_LINK}>
+                <SectionRow icon={Globe} tone="info" label="Collecte externe" />
               </Link>
-              <Link href="/admin/paiements" data-testid="admin-payments-link" className="rounded-xl border border-forest/30 bg-white px-4 py-3 text-center text-[14px] font-bold text-forest">
-                Paiements : recharges et anomalies ›
+              <Link href="/admin/paiements" data-testid="admin-payments-link" className={SECTION_LINK}>
+                <SectionRow icon={CreditCard} tone="success" label="Paiements" />
               </Link>
-            </div>
+            </nav>
           </div>
         );
       }}

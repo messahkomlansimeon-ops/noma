@@ -18,7 +18,7 @@ export function Sparkline({ trend, label, width = 220, height = 48, testId }: { 
       preserveAspectRatio="none"
       data-testid={testId}
       data-points={geometry.points.length}
-      className="mt-2 block text-forest"
+      className="mt-2 block text-brand"
     >
       {geometry.paths.map((path) => (
         <path key={path} d={path} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
