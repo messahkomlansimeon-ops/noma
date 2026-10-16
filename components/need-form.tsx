@@ -2,15 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Briefcase, Key, MapPin, Search, ShoppingBag, TriangleAlert, Wallet, type LucideIcon } from "lucide-react";
+import { Briefcase, MapPin, Search, ShoppingBag, TriangleAlert, Wallet, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui";
 import { parseBudgetFcfa } from "@/lib/contracts";
 import { useRealSearch } from "@/lib/real-search";
 
-const modes = ["Acheter", "Louer", "Un service"];
+const modes = ["Acheter", "Un service"];
 // Location temporairement désactivée : achat et service seuls.
-const DISABLED_MODES = new Set<string>(["Louer"]);
-const MODE_ICONS: Record<string, LucideIcon> = { Acheter: ShoppingBag, Louer: Key, "Un service": Briefcase };
+const MODE_ICONS: Record<string, LucideIcon> = { Acheter: ShoppingBag, "Un service": Briefcase };
 
 /** Clé publique Turnstile — absente = widget non rendu (dev local) ;
  *  présente = jeton requis avant chaque recherche. */
@@ -115,7 +114,6 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
           return (
             <button
               key={m}
-              disabled={DISABLED_MODES.has(m)}
               onClick={() =>
                 setNeed({
                   mode: m === "Un service" ? "service" : "achat",
@@ -129,7 +127,6 @@ export function NeedForm({ onDone }: { onDone?: () => void }) {
             >
               <ModeIcon className="size-4" aria-hidden />
               {m}
-              {m === "Louer" ? " (bientôt)" : ""}
             </button>
           );
         })}

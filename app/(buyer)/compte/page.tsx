@@ -13,7 +13,6 @@ import {
   MessageCircle,
   Package,
   Search,
-  Settings,
   ShieldCheck,
   Store,
   Wallet,
@@ -22,24 +21,16 @@ import { NotificationPreferencesCard } from "@/components/notification-preferenc
 import { useLogout } from "@/components/session-gate";
 import { useMessagesUnread } from "@/components/messages-badge";
 import { useUnreadCount } from "@/components/unread-badge";
-import { HeaderBtn } from "@/components/top-bar";
 import { Badge, Card, IconTile, MenuRow } from "@/components/ui";
-import { useNoma } from "@/lib/store";
 
 export default function MonCompte() {
-  const showToast = useNoma((s) => s.showToast);
   const { logout, pending: loggingOut } = useLogout();
   const unread = useUnreadCount();
   const messagesUnread = useMessagesUnread();
 
-  const soon = () => showToast("Bientôt disponible");
-
   return (
     <main className="flex flex-col gap-5 px-4 pb-6 pt-3">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-[26px] font-extrabold tracking-tight text-ink">Mon compte</h1>
-        <HeaderBtn icon={Settings} onClick={soon} label="Réglages" />
-      </div>
+      <h1 className="text-[26px] font-extrabold tracking-tight text-ink">Mon compte</h1>
 
       <Card className="animate-rise flex items-center gap-4">
         <span className="flex size-16 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
@@ -62,7 +53,6 @@ export default function MonCompte() {
           <MenuRow key="porte-monnaie" icon={Wallet} label="Mon porte-monnaie" href="/compte/porte-monnaie" />,
           <MenuRow key="alertes" icon={Search} label="Mes recherches suivies" href="/alertes" />,
           <MenuRow key="favoris" icon={Heart} label="Mes favoris" href="/favoris" />,
-          <MenuRow key="infos" icon={CircleUser} label="Informations personnelles" onClick={soon} />,
           <MenuRow key="notifications" icon={Bell} label="Notifications" badge={unread !== null && unread > 0 ? unread : undefined} href="/notifications" />,
           <MenuRow key="propositions" icon={Handshake} label="Propositions reçues" href="/propositions" />,
           <MenuRow key="signaler" icon={CircleHelp} label="Mes signalements" href="/signaler" />,

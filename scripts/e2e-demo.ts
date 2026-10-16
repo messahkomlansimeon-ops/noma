@@ -7,7 +7,7 @@
  *      fiche d'une annonce (aucun numéro de téléphone, attributs), contact, notifications ;
  *   4. vendeur démo (+225 07 00 00 02 02) : tableau de bord (annonces par statut, besoins correspondants « environ N », solde, boost actif), page d'une annonce avec ses
  *      statistiques (« environ 10 » acheteurs, jamais un compte exact, tout pourcentage en « environ X % ») ;
- *   5. achat d'un boost avec les crédits (Galaxy S21) puis « Sponsorisé » côté acheteur ; pages « Bientôt disponible » ; recherche sur d'autres sites (démonstration) avec les fausses sources ;
+ *   5. achat d'un boost avec les crédits (Galaxy S21) puis « Sponsorisé » côté acheteur ; recherche sur d'autres sites (démonstration) avec les fausses sources ;
  *   6. sur chaque page visitée : aucun texte technique (identifiant, code d'erreur brut), aucun défilement horizontal à 390 px ;
  *   7. LOT D2, dans trois navigateurs (acheteur, vendeur, admin) : favori ajouté puis retiré ; messagerie EN DIRECT (le message de l'acheteur apparaît chez le vendeur SANS recharger,
  *      en moins de 3 s, et inversement ; du HTML dans un message reste du texte ; un numéro n'est pas bloqué ; rappel de sécurité la première fois) ; commande déclarée par l'acheteur,

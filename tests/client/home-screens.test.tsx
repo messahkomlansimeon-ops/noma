@@ -3,7 +3,6 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { renderToString } from "react-dom/server";
-import { COMING_SOON_LABEL, ComingSoon } from "../../components/coming-soon";
 import NotFound from "../../app/not-found";
 import { AdminNotFound } from "../../components/admin/admin-page";
 import { APP_TITLE } from "../../lib/site";
@@ -26,25 +25,14 @@ function sources(directory: string): string[] {
 
 const read = (path: string): string => readFileSync(join(ROOT, path), "utf8");
 
-describe("composant « Bientôt disponible »", () => {
-  test("titre, phrase simple, bouton de retour ; aucune donnée d'exemple", () => {
-    const html = renderToString(<ComingSoon title="Mes favoris" sentence="Garder des annonces de côté arrive bientôt." backHref="/alertes" backLabel="Mes besoins" />);
-    assert.ok(html.includes(COMING_SOON_LABEL));
-    assert.equal(COMING_SOON_LABEL, "Bientôt disponible");
-    assert.match(html, /Mes favoris/);
-    assert.match(html, /Garder des annonces de côté arrive bientôt\./);
-    assert.match(html, /href="\/alertes"/);
-    assert.match(html, /Mes besoins/);
-    assert.match(html, /data-coming-soon/);
-  });
-
+describe("aucun écran « Bientôt disponible »", () => {
   test("plus aucune page de l'application n'est « Bientôt disponible » : toutes les fonctions annoncées sont branchées sur le serveur (lot FIN3)", () => {
     const walk = (dir: string): string[] =>
       readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(`${dir}/${entry.name}`) : entry.name === "page.tsx" ? [`${dir}/${entry.name}`] : []));
     const pages = walk("app");
     assert.ok(pages.length > 40, "les pages sont bien parcourues");
-    const stillComingSoon = pages.filter((page) => /ComingSoon/.test(read(page)));
-    assert.deepEqual(stillComingSoon, [], "aucune page n'utilise plus l'écran « Bientôt disponible »");
+    const stillComingSoon = [...pages, ...sources("components")].filter((file) => /ComingSoon|Bientôt disponible|\(bientôt\)/.test(read(file)));
+    assert.deepEqual(stillComingSoon, [], "aucune page ni aucun composant n'affiche plus « Bientôt disponible »");
   });
 });
 
