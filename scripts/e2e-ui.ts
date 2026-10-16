@@ -1156,8 +1156,8 @@ async function main(): Promise<void> {
     const colorOf = (row: typeof rows) => row.getByTestId("wallet-row-amount").evaluate((element) => getComputedStyle(element).color);
     const debitColor = await colorOf(purchaseRow);
     const creditColor = await colorOf(topupRow);
-    assert.equal(creditColor, "rgb(14, 95, 59)", "crédit en vert (forest)");
-    assert.equal(debitColor, "rgb(194, 65, 12)", "débit en orange foncé (carrot-ink)");
+    assert.equal(creditColor, "rgb(12, 94, 67)", "crédit en vert (success-ink)");
+    assert.equal(debitColor, "rgb(122, 82, 0)", "débit en brun-orangé (accent-ink)");
     assert.equal(await purchaseRow.getByTestId("wallet-row-amount").getAttribute("data-tone"), "debit");
     assert.equal(await topupRow.getByTestId("wallet-row-amount").getAttribute("data-tone"), "credit");
     const walletText = await sellerPage.locator("main").innerText();
@@ -1783,7 +1783,7 @@ async function main(): Promise<void> {
     await mSellerPage.getByTestId("stats-period-all").click();
     assert.equal(await statValue("all", "contacts"), "environ 5 acheteurs");
     const boostBlock = mSellerPage.getByTestId("stats-boost").first();
-    assert.match(norm(await boostBlock.locator(".text-\\[13px\\].font-bold").first().textContent()), /^Boost de 24 h · en cours$/);
+    assert.match(norm(await boostBlock.getByTestId("stats-boost-title").textContent()), /^Boost de 24 h · en cours$/);
     const boostValue = async (key: string) => norm(await boostBlock.locator(`[data-stat="${key}"] [data-stat-value]`).textContent());
     assert.equal(await boostValue("exposed"), "environ 5 acheteurs");
     assert.equal(await boostValue("sponsored"), "environ 5 acheteurs");
@@ -1856,7 +1856,7 @@ async function main(): Promise<void> {
     await nPage.getByPlaceholder("200 000").fill("100 000");
     await nPage.getByRole("button", { name: "Activer le besoin" }).click();
     await nPage.waitForURL("**/alertes");
-    await nPage.getByRole("link", { name: /Notifications/ }).first().waitFor();
+    await nPage.locator('a[href="/notifications"]').first().waitFor();
     assert.equal(await nPage.getByTestId("unread-badge").count(), 0, "aucune notification : aucune pastille");
     ok("acheteur N1 : besoin activé, page « Mes besoins » avec le lien « Notifications » et AUCUNE pastille (0 non lue)");
     await nPage.locator("div.rounded-3xl", { hasText: `Je cherche un ${nTitle}` }).first().getByRole("link", { name: "Voir les offres", exact: true }).click();
@@ -1904,7 +1904,7 @@ async function main(): Promise<void> {
 
     step("Page /notifications : liste, non-lues en gras, lien vers la fiche, « Tout marquer comme lu », pastille disparue");
     await nPage.goto(`${BASE}/alertes`);
-    await nPage.getByRole("link", { name: /Notifications/ }).first().click();
+    await nPage.locator('a[href="/notifications"]').first().click();
     await nPage.waitForURL("**/notifications");
     const nRows = nPage.getByTestId("notification-row");
     await nRows.first().waitFor();
@@ -1983,9 +1983,9 @@ async function main(): Promise<void> {
     ok("pendant la pause, la nouvelle annonce apparaît dans les résultats : le matching continue");
     await sleep(2_000);
     await nPage.goto(`${BASE}/alertes`);
-    await nPage.getByRole("link", { name: /Notifications/ }).first().waitFor();
+    await nPage.locator('a[href="/notifications"]').first().waitFor();
     assert.equal(await nPage.getByTestId("unread-badge").count(), 0, "pause : la nouvelle annonce ne produit aucune pastille");
-    await nPage.getByRole("link", { name: /Notifications/ }).first().click();
+    await nPage.locator('a[href="/notifications"]').first().click();
     await nPage.getByTestId("notification-row").first().waitFor();
     assert.equal(await nPage.getByTestId("notification-row").count(), 2, "toujours les deux notifications d'avant la pause (A1 et A1b)");
     ok("pause : aucune pastille, toujours les DEUX mêmes notifications dans la liste (une nouvelle annonce ne notifie pas)");
@@ -2003,7 +2003,7 @@ async function main(): Promise<void> {
     ok(`« Reprendre » : « ${nUntilResumed} » ; « Prolonger de 30 jours » : « ${await nHeadline()} »`);
     const nThird = await nPublish("A3", "58 000");
     await nWaitBadges("la pastille après la reprise, le worker de matching tourne-t-il sur la même base ?", ["1", "1"], WORKER_TIMEOUT_MS, true);
-    await nPage.getByRole("link", { name: /Notifications/ }).first().click();
+    await nPage.locator('a[href="/notifications"]').first().click();
     await nPage.getByTestId("notification-row").nth(2).waitFor();
     const nListText = norm(await nPage.locator("main").innerText());
     assert.equal(await nPage.getByTestId("notification-row").count(), 3);
@@ -2053,7 +2053,8 @@ async function main(): Promise<void> {
   } catch (error) {
     for (const [index, open] of openPages.entries()) await shot(open, `99-echec-${index + 1}`).catch(() => {});
     console.error(
-      `  ✗ ÉCHEC : ${error instanceof Error ? error.message.split("\n")[0] : "erreur inattendue"} (URL : ${openPages.map((open) => open.url()).join(" | ")})`,
+      `  ✗ ÉCHEC : ${error instanceof Error ? error.message.split("\n")[0] : "erreur inattendue"} (URL : ${openPages.map((open) => open.url()).join(" | ")})` +
+        (error instanceof Error && error.stack ? `\n${error.stack.split("\n").filter((line) => line.includes("e2e-ui.ts")).slice(0, 3).join("\n")}` : ""),
     );
     await browser.close();
     process.exit(1);

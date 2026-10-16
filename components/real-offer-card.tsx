@@ -54,7 +54,7 @@ export function RealOfferCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="line-clamp-2 text-[16px] font-bold leading-snug text-ink">{offer.title}</div>
-          <div data-testid="offer-price" className="text-[19px] font-extrabold leading-tight text-ink">
+          <div className="text-[19px] font-extrabold leading-tight text-ink">
             {formatPublicPrice(offer)}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">

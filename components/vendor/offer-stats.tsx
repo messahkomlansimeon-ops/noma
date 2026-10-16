@@ -133,7 +133,7 @@ export function OfferStatsSection({ offer }: { offer: OfferRecord }) {
                 const boostView = boostStatsView(boost, durationLabel(boost.durationCode));
                 return (
                   <div key={boostView.key} className="mt-3" data-testid="stats-boost">
-                    <div className="text-[15px] font-bold text-ink">{boostView.title}</div>
+                    <div data-testid="stats-boost-title" className="text-[15px] font-bold text-ink">{boostView.title}</div>
                     {boostView.note ? (
                       <Notice tone="mist" className="mt-2" data-testid="stats-boost-note">
                         {boostView.note}

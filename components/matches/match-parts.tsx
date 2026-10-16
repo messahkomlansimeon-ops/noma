@@ -83,7 +83,7 @@ export function BuyerMatchCard({ item, detailHref, compare }: { item: StoredMatc
         <Thumb art={artForCategory(item.candidate.category)} className="size-16" iconClassName="size-8" photoId={item.coverPhotoId} />
         <div className="min-w-0 flex-1">
           <div className="line-clamp-2 text-[16px] font-bold leading-snug text-ink">{row.title}</div>
-          <div className="text-[20px] font-extrabold leading-tight text-ink">{row.priceText}</div>
+          <div data-testid="offer-price" className="text-[20px] font-extrabold leading-tight text-ink">{row.priceText}</div>
           {row.subtitle ? <div className="text-[13px] text-ink-soft">{row.subtitle}</div> : null}
           {row.proBadge ? <div className="mt-1"><ProBadge /></div> : null}
         </div>
