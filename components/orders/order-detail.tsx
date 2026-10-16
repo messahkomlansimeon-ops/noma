@@ -22,6 +22,7 @@ import {
   statusTone,
 } from "@/lib/client/orders-view";
 import { describeSocialError, social, type OrderAction, type OrderView } from "@/lib/client/social-api";
+import { reportOrderPath } from "@/lib/client/reports-view";
 import { formatDateTimeFr, formatFcfa } from "@/lib/client/wallet-view";
 
 /**
@@ -193,6 +194,13 @@ export function OrderDetail({ orderId, space }: { orderId: string; space: "buyer
               <Link href={conversationPath(order.role, order.conversationId)} className="mt-3 inline-block text-[13px] font-bold text-forest">
                 Ouvrir la conversation ›
               </Link>
+            ) : null}
+            {reportOrderPath(orderId) ? (
+              <div>
+                <Link href={reportOrderPath(orderId) ?? "/signaler"} data-testid="report-order" className="mt-3 inline-block text-[13px] font-bold text-ink-soft underline">
+                  Signaler cette commande
+                </Link>
+              </div>
             ) : null}
           </article>
         )}

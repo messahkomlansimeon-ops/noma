@@ -24,6 +24,7 @@ import {
 import { artForCategory } from "@/lib/client/catalog-view";
 import { marketQueryFromProduct } from "@/lib/client/market-view";
 import { missionFromSearch } from "@/lib/client/missions-view";
+import { reportOfferPath } from "@/lib/client/reports-view";
 import { coverPhotoIdOf } from "@/lib/client/photos-view";
 import {
   CONTACT_BUTTON_LABEL,
@@ -224,6 +225,13 @@ function Fiche({ demandId, offerId, missionId }: { demandId: string; offerId: st
       <p className="mt-4 text-center text-[12px] leading-relaxed text-ink-soft">
         Informations telles qu'annoncées par le vendeur. Ni l'état, ni la disponibilité ne sont garantis : confirmez-les avec lui.
       </p>
+      {reportOfferPath(demandId, offerId) ? (
+        <p className="mt-2 text-center">
+          <Link href={reportOfferPath(demandId, offerId) ?? "/signaler"} data-testid="report-offer" className="text-[13px] font-bold text-ink-soft underline">
+            Signaler cette annonce
+          </Link>
+        </p>
+      ) : null}
     </article>
   );
 }

@@ -1,6 +1,6 @@
 # Administration (lots D2 et D3)
 
-`/admin` (tableau de bord), `/admin/vendeurs`, `/admin/reglages` ; `/admin/dossiers` reste « Bientôt disponible ». Routes `/api/admin/*` dans `lib/server/admin/http.ts`.
+`/admin` (tableau de bord), `/admin/vendeurs`, `/admin/reglages`, `/admin/dossiers` (dossiers de modération, lot FIN3-C2 : voir SIGNALEMENTS.md). Routes `/api/admin/*` dans `lib/server/admin/http.ts`.
 
 ## Le rôle
 
@@ -44,4 +44,4 @@ identifiant de payeur. Voir `PAIEMENT-WAVE.md`.
 - Un `404` JSON rapide sur `/api/admin/*` révèle l'existence des routes (pas de données) : la réponse est identique pour tout non-administrateur, mais elle diffère de celle d'une URL inconnue servie par Next.
 - Le verrou d'attribution de `is_admin` repose sur un réglage de session (`noma.admin_grant`) : un accès SQL direct à la base peut le contourner. L'accès direct à la base est de toute façon un accès total ; le déclencheur protège contre le code applicatif, pas contre l'administrateur de la base.
 
-Pas de retrait du rôle depuis l'application (ni de commande `--revoke`) ; la suspension n'est proposée que dans la liste des vendeurs ; « Dossiers de modération » n'est pas branché.
+Pas de retrait du rôle depuis l'application (ni de commande `--revoke`) ; la suspension est proposée dans la liste des vendeurs et comme décision d'un dossier de modération (SIGNALEMENTS.md).

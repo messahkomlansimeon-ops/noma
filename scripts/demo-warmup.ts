@@ -36,6 +36,7 @@ export const WARMUP_PAGE_PATTERNS: readonly string[] = Object.freeze([
   "/besoins/[id]",
   "/besoins/[id]/offres/[offerId]",
   "/besoins/[id]/comparer",
+  "/signaler",
   "/favoris",
   "/messages",
   "/messages/[id]",
@@ -78,11 +79,10 @@ export const WARMUP_PAGE_PATTERNS: readonly string[] = Object.freeze([
 export const WARMUP_EXCLUDED_PAGES: Readonly<Record<string, string>> = Object.freeze({
   "/partager": "écran « Bientôt disponible »",
   "/propositions": "écran « Bientôt disponible »",
-  "/signaler": "écran « Bientôt disponible »",
   "/vendeur/demandes": "ancien écran du vendeur, hors parcours",
   "/vendeur/demandes/[id]": "ancien écran du vendeur, hors parcours",
   "/vendeur/devis/nouveau": "écran « Bientôt disponible »",
-  "/admin/dossiers/[id]": "« Dossiers » reste « Bientôt disponible »",
+  "/admin/dossiers/[id]": "dossier de modération : demande un identifiant de dossier réel (la file « /admin/dossiers » est préchauffée)",
   "/paiement-retour/[id]": "retour du paiement Wave : désactivé par défaut, hors démonstration",
 });
 
@@ -99,6 +99,9 @@ export const WARMUP_API_PATTERNS: readonly string[] = Object.freeze([
   "/api/admin/payments/anomalies/[id]/resolve",
   "/api/admin/plans",
   "/api/admin/plans/[code]/versions",
+  "/api/admin/reports",
+  "/api/admin/reports/[id]",
+  "/api/admin/reports/[id]/decision",
   "/api/admin/settings",
   "/api/admin/sms",
   "/api/admin/summary",
@@ -164,6 +167,7 @@ export const WARMUP_API_PATTERNS: readonly string[] = Object.freeze([
   "/api/orders",
   "/api/orders/[id]",
   "/api/orders/[id]/[action]",
+  "/api/reports",
   "/api/payments/fake/webhook",
   "/api/search",
   "/api/subscription",

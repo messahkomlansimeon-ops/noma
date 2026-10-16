@@ -29,7 +29,7 @@ before(async () => {
   baseUrl = opened.target.connectionString;
   await admin.query(`CREATE DATABASE "${mainDb}"`);
   pool = new Pool({ connectionString: urlFor(mainDb), max: 4 });
-  assert.equal((await runMigrations(pool)).applied.at(-1), "0029_active_search_places");
+  assert.equal((await runMigrations(pool)).applied.at(-1), "0030_reports_moderation");
 });
 
 after(async () => {

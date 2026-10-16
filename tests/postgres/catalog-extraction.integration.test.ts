@@ -104,6 +104,7 @@ if (!configuredUrl?.trim()) {
         "0027_missions",
         "0028_active_search",
         "0029_active_search_places",
+        "0030_reports_moderation",
       ]);
     });
 
