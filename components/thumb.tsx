@@ -36,9 +36,9 @@ export function Thumb({
   const Icon = artIcon[art];
   const icon = (
     <span
-      className={`flex shrink-0 items-center justify-center rounded-xl bg-brand-soft ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-2xl bg-brand-soft ${className}`}
     >
-      <Icon className={`text-brand ${iconClassName}`} strokeWidth={1.6} />
+      <Icon className={`text-brand ${iconClassName}`} strokeWidth={1.9} />
     </span>
   );
   return photoId ? <PhotoCover photoId={photoId} className={className} fallback={icon} /> : icon;

@@ -11,11 +11,14 @@ function HeaderBtn({
   href,
   onClick,
   dot,
+  label,
 }: {
   icon: LucideIcon;
   href?: string;
   onClick?: () => void;
   dot?: boolean;
+  /** Nom accessible : le bouton n'a pas de texte visible. */
+  label?: string;
 }) {
   const cls =
     "press relative flex size-11 items-center justify-center rounded-full text-ink hover:bg-mist";
@@ -29,13 +32,13 @@ function HeaderBtn({
   );
   if (href) {
     return (
-      <Link href={href} className={cls}>
+      <Link href={href} className={cls} aria-label={label}>
         {inner}
       </Link>
     );
   }
   return (
-    <button onClick={onClick} className={cls}>
+    <button onClick={onClick} className={cls} aria-label={label}>
       {inner}
     </button>
   );

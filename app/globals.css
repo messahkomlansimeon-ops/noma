@@ -68,7 +68,6 @@ select {
 :focus-visible {
   outline: 3px solid var(--color-brand);
   outline-offset: 2px;
-  border-radius: 8px;
 }
 
 input:focus,
@@ -93,6 +92,7 @@ a {
 }
 
 /* Animations : entrée douce, pression, flottement des illustrations. */
+/* Les animations d'entrée finissent sur « transform: none » : un transform, même nul, ferait de l'élément le bloc contenant de ses descendants « fixed » (barre du bas, feuilles). */
 @keyframes rise {
   from {
     opacity: 0;
@@ -100,7 +100,7 @@ a {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
@@ -111,7 +111,7 @@ a {
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: none;
   }
 }
 
@@ -185,7 +185,7 @@ a {
     transform: translateY(100%);
   }
   to {
-    transform: translateY(0);
+    transform: none;
   }
 }
 
