@@ -38,17 +38,13 @@ describe("composant « Bientôt disponible »", () => {
     assert.match(html, /data-coming-soon/);
   });
 
-  test("toutes les pages qui ne sont pas branchées sur le serveur utilisent ce composant (et rien d'autre)", () => {
-    // Lot D2 : favoris, messages, commandes (acheteur et vendeur), administration (tableau de bord, vendeurs, réglages) sont branchés sur le serveur ; il reste « Bientôt disponible » ici.
-    const pages = [
-      "app/(buyer)/partager/page.tsx",
-    ];
-    for (const page of pages) {
-      const source = read(page);
-      assert.match(source, /<ComingSoon\b/, page);
-      assert.ok(!/useNoma|lib\/data|useState|useEffect/.test(source), `${page} : aucune donnée ni état`);
-      assert.ok(source.split("\n").length < 20, `${page} : une page « Bientôt disponible » reste minuscule`);
-    }
+  test("plus aucune page de l'application n'est « Bientôt disponible » : toutes les fonctions annoncées sont branchées sur le serveur (lot FIN3)", () => {
+    const walk = (dir: string): string[] =>
+      readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(`${dir}/${entry.name}`) : entry.name === "page.tsx" ? [`${dir}/${entry.name}`] : []));
+    const pages = walk("app");
+    assert.ok(pages.length > 40, "les pages sont bien parcourues");
+    const stillComingSoon = pages.filter((page) => /ComingSoon/.test(read(page)));
+    assert.deepEqual(stillComingSoon, [], "aucune page n'utilise plus l'écran « Bientôt disponible »");
   });
 });
 

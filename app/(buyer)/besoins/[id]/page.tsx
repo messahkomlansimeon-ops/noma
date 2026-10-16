@@ -239,6 +239,12 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
 
           <ProposalsBanner demandId={demandId} />
 
+          {!notActive ? (
+            <Link href={`/besoins/${demandId}/partager`} data-testid="share-link-entry" className="mt-3 inline-block text-[13px] font-bold text-forest underline">
+              Partager ce besoin
+            </Link>
+          ) : null}
+
           {state === "results" ? (
             <ul className="mt-3 space-y-3" aria-label="Offres correspondant à votre besoin">
               {loaded.items.map((item) => (

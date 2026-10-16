@@ -36,6 +36,8 @@ export const WARMUP_PAGE_PATTERNS: readonly string[] = Object.freeze([
   "/besoins/[id]",
   "/besoins/[id]/offres/[offerId]",
   "/besoins/[id]/comparer",
+  "/besoins/[id]/partager",
+  "/besoin/[token]",
   "/signaler",
   "/propositions",
   "/favoris",
@@ -81,7 +83,6 @@ export const WARMUP_PAGE_PATTERNS: readonly string[] = Object.freeze([
 
 /** Pages qui existent mais ne servent pas à la démonstration : « Bientôt disponible », anciens écrans, retour de Wave (désactivé par défaut). Le test exige une raison pour chacune. */
 export const WARMUP_EXCLUDED_PAGES: Readonly<Record<string, string>> = Object.freeze({
-  "/partager": "écran « Bientôt disponible »",
   "/admin/dossiers/[id]": "dossier de modération : demande un identifiant de dossier réel (la file « /admin/dossiers » est préchauffée)",
   "/paiement-retour/[id]": "retour du paiement Wave : désactivé par défaut, hors démonstration",
 });
@@ -134,6 +135,7 @@ export const WARMUP_API_PATTERNS: readonly string[] = Object.freeze([
   "/api/demands/[id]/satisfy",
   "/api/demands/[id]/stored-matches",
   "/api/demands/[id]/tracking",
+  "/api/demands/[id]/share",
   "/api/dev/fake-payments/[id]/confirm",
   "/api/dev/fake-payments/[id]/fail",
   "/api/favorites",
@@ -175,6 +177,7 @@ export const WARMUP_API_PATTERNS: readonly string[] = Object.freeze([
   "/api/requests/[id]/proposals",
   "/api/payments/fake/webhook",
   "/api/search",
+  "/api/shared-needs/[token]",
   "/api/subscription",
   "/api/subscription/auto-renew",
   "/api/subscription/notices/read",

@@ -174,6 +174,7 @@ if (!configuredUrl?.trim()) {
         "0029_active_search_places",
         "0030_reports_moderation",
         "0031_seller_proposals",
+        "0032_demand_share_links",
       ]);
     });
 
