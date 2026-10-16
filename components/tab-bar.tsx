@@ -88,10 +88,10 @@ export function BuyerTabBar() {
   return (
     <TabBar
       items={[
-        { href: "/", label: "Explorer", icon: Search, match: ["/", "/recherche", "/partager"] },
+        { href: "/", label: "Explorer", icon: Search, match: ["/", "/recherche"] },
         { href: "/favoris", label: "Favoris", icon: Heart, match: ["/favoris"] },
         { href: "/alertes", label: "Alertes", icon: Bell, match: ["/alertes", "/alerte", "/notifications"], unread: true },
-        { href: "/compte", label: "Compte", icon: User, match: ["/compte", "/messages", "/commandes", "/missions", "/signaler", "/propositions", "/inviter"], messages: true },
+        { href: "/compte", label: "Compte", icon: User, match: ["/compte", "/messages", "/commandes", "/missions", "/signaler", "/propositions"], messages: true },
       ]}
     />
   );

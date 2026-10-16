@@ -255,3 +255,4 @@ Légende de cette section : ✅ en service · 🚧 codé et testé mais pas en s
 - ✅ **Comparer deux offres d'un besoin** (lot FIN3-C1) : `/besoins/[id]/comparer`, voir COMPARAISON.md. Les maquettes `/comparer` et `offre/[id]` sont supprimées.
 - ✅ **Signalements et dossiers de modération** (lot FIN3-C2, migration 0030) : `/signaler`, `/admin/dossiers`, voir SIGNALEMENTS.md.
 - ✅ **Propositions de vendeur et devis** (lot FIN3-C3, migration 0031) : `/vendeur/demandes`, `/vendeur/devis/nouveau`, `/propositions`, voir PROPOSITIONS.md. L'acceptation crée une commande par le circuit existant ; pas de notification.
+- ✅ **Partager un besoin et inviter un vendeur** (lot FIN3-C4, migration 0032) : un lien public sans identité, `/besoins/[id]/partager` et `/besoin/[token]`, voir PARTAGE.md. Plus aucune page de l'application n'est « Bientôt disponible ».
