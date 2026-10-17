@@ -216,3 +216,25 @@ Toutes les réponses portent les en-têtes de protection :
 | `409` | `extraction_conflict` | Conflit concurrent : la ressource a été modifiée pendant l'extraction. |
 | `413` | `payload_too_large` | Corps de la requête POST dépassant la limite autorisée de 32 Kio. |
 | `503` | `catalog_extraction_unavailable` | Indisponibilité temporaire (origine non configurée ou base de données inaccessible). |
+
+---
+
+## Écrans (carte « Remplir la fiche depuis mon texte »)
+
+Ces routes sont branchées sur deux écrans, par la même carte (`components/extraction/extraction-card.tsx`) :
+
+- la page d'une annonce du vendeur (`/vendeur/annonces/[id]`, route `offers`) ;
+- la page d'un besoin de l'acheteur (`/besoins/[id]`, route `demands`), sauf un besoin porteur d'une mission (il se gère depuis la mission).
+
+La carte n'apparaît pas pour une fiche archivée. Le parcours est : **Analyser mon texte** (`POST …/extraction-proposals`, ou relecture de l'historique `GET` au chargement : rien n'est recalculé), lignes proposées avec l'extrait exact du texte, cases à cocher, **Appliquer la sélection** (`POST …/apply`).
+
+Règles de l'écran (`lib/client/extraction-view.ts`, testé) :
+
+- l'écran n'envoie que les **noms** des champs cochés, jamais leurs valeurs : elles viennent de la proposition enregistrée par le serveur ;
+- `expectedContentVersion` est la version de la proposition ; la clé d'idempotence est liée à la proposition ET à la sélection (un double appui ou un nouvel essai réseau ne s'applique jamais deux fois), et elle est oubliée après tout refus du serveur ;
+- une valeur **déjà saisie** dans la fiche n'est jamais cochée d'avance (la valeur actuelle est montrée) ; une valeur identique à la fiche n'est pas proposée ;
+- la **catégorie** et l'**état** sont montrés mais NON applicables : l'extracteur écrit des codes (`phones`, `very_good`) alors que le formulaire, la mise en correspondance (égalité stricte sur la catégorie : « telephones » ≠ « phones ») et les affichages de noma parlent en français (« Téléphones », « Occasion ») ; les appliquer ferait passer l'annonce à côté des besoins créés avec le formulaire et afficherait un code à l'écran. **À faire côté serveur** pour les ouvrir : traduire ces deux codes dans le vocabulaire de noma au moment de l'application (la marque, le modèle et le lieu sont comparés sans tenir compte de la casse ni des accents : sans risque) ;
+- une ligne ambiguë ou un montant **sans devise** est montré mais désactivé (« Non applicable ») : aucune devise n'est supposée ;
+- un refus de fraîcheur (`stale_proposal`, `stale_version`, `extraction_conflict`, `conflict`) retire les lignes et demande une nouvelle analyse ; les messages sont fixes, jamais le texte du serveur.
+
+Vérifié par `tests/client/extraction.test.ts` (client, lignes, messages, câblage) et par `npm run e2e:extraction` (vrai navigateur, vrai serveur, vraie base : analyse, application partielle, seconde analyse, devise inconnue, texte modifié entre-temps, valeur déjà saisie, besoin d'acheteur, annonce archivée).

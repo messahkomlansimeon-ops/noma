@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { ExtractionCard } from "@/components/extraction/extraction-card";
 import { PhotoManager } from "@/components/photos/photo-manager";
 import { SessionGate, useUnauthorizedRedirect } from "@/components/session-gate";
 import { Thumb } from "@/components/thumb";
@@ -89,6 +90,7 @@ function Annonce({ offerId }: { offerId: string }) {
       </div>
 
       <PhotoManager offerId={offer.id} readOnly={offer.status === "archived"} onChange={onPhotosChanged} />
+      <ExtractionCard kind="offers" record={offer} onChanged={() => setReloadKey((key) => key + 1)} />
       <InterestedBuyers offer={offer} />
       <OfferStatsSection offer={offer} />
       <OfferSalesSection offerId={offer.id} />

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeftRight, ArrowRight, Briefcase, Info, LoaderCircle, RefreshCw, RotateCw, Share2 } from "lucide-react";
 import { ActiveSearchCard } from "@/components/active-search-card";
+import { ExtractionCard } from "@/components/extraction/extraction-card";
 import { ArtAlert, ArtEmpty, ArtSearch } from "@/components/illustrations";
 import { ExternalSection } from "@/components/external/external-section";
 import { ProposalsBanner } from "@/components/proposals/proposals-banner";
@@ -177,6 +178,9 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
   // Un besoin PORTEUR d'une mission n'a pas la carte (`carrier === null` à chaque emplacement) ; actif ou satisfait seulement.
   const activeSearchCard = demand.status === "active" || demand.status === "satisfied" ? <ActiveSearchCard demandId={demandId} onChanged={() => setTrackingKey((key) => key + 1)} /> : null;
 
+  // Propositions tirées du texte du besoin : jamais pour un besoin porteur d'une mission (il se gère depuis la mission) ni pour un besoin archivé (la carte se masque seule).
+  const extractionCard = carrier === null ? <ExtractionCard kind="demands" record={demand} onChanged={refresh} /> : null;
+
   return (
     <>
       <div className="animate-rise flex items-center gap-3 rounded-3xl border border-line bg-white p-3.5">
@@ -215,6 +219,7 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
             {notActive}
           </p>
           {carrier === null ? activeSearchCard : null}
+          {extractionCard ? <div className="mt-4">{extractionCard}</div> : null}
         </>
       ) : (
         <>
@@ -328,6 +333,7 @@ function ResultatsDuBesoin({ demandId }: { demandId: string }) {
           ) : null}
 
           {carrier === null ? activeSearchCard : null}
+          {extractionCard ? <div className="mt-4">{extractionCard}</div> : null}
 
           {/* Lot EXT1 : annonces d'AUTRES SITES, section séparée (jamais dans la liste ni le classement ci-dessus). */}
           <ExternalSection demandId={demandId} />
